@@ -1,0 +1,96 @@
+﻿<Project Sdk="Microsoft.NET.Sdk">
+    <PropertyGroup>
+        <Nullable>enable</Nullable>
+        <ImplicitUsings>true</ImplicitUsings>
+
+        <TargetFramework>net8.0-windows</TargetFramework>
+
+        <AllowUnsafeBlocks>true</AllowUnsafeBlocks>
+        <Configurations>Debug;Release</Configurations>
+        <Platforms>x64;ARM64</Platforms>
+
+        <AssemblyOriginatorKeyFile>TimDevStrongKeyNameFile.snk</AssemblyOriginatorKeyFile>
+        <PublicSign>false</PublicSign>
+        <AssemblyName>GuardianFirewallService</AssemblyName>
+        <AssemblyVersion>0.9.46.307</AssemblyVersion>
+        <FileVersion>0.9.46.307</FileVersion>
+
+        <ApplicationIcon>Guardian.ico</ApplicationIcon>
+
+        <OutputType>Exe</OutputType>
+
+    </PropertyGroup>
+    <ItemGroup>
+        <Using Include="System.Runtime.Serialization " />
+        <Using Include="Microsoft.Extensions.DependencyInjection.Extensions" />
+    </ItemGroup>
+    <ItemGroup>
+        <PackageReference Include="guardianconnect" Version="0.9.48.317" />
+        <PackageReference Include="Microsoft.Extensions.DependencyInjection" Version="8.0.0" />
+        <PackageReference Include="Microsoft.Extensions.Hosting.WindowsServices" Version="8.0.0" />
+        <PackageReference Include="Microsoft.Extensions.Logging" Version="8.0.0" />
+        <PackageReference Include="Newtonsoft.Json" Version="13.0.3" />
+        <PackageReference Include="Serilog.Enrichers.CallerInfo" Version="1.0.5" />
+        <PackageReference Include="Serilog.Enrichers.Process" Version="3.0.0" />
+        <PackageReference Include="Serilog.Enrichers.Thread" Version="4.0.0" />
+        <PackageReference Include="Serilog.Enrichers.WithCaller" Version="1.2.0" />
+        <PackageReference Include="Serilog.Settings.AppSettings" Version="3.0.0" />
+        <PackageReference Include="Serilog.Sinks.Debug" Version="3.0.0" />
+        <PackageReference Include="Serilog.Sinks.File" Version="6.0.0" />
+        <PackageReference Include="System.Threading.AccessControl" Version="8.0.0" />
+    </ItemGroup>
+    <ItemGroup>
+      <MauiAsset Include="logsettings.json">
+        <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+      </MauiAsset>
+    </ItemGroup>
+    <ItemGroup>
+      <None Update="appsettings.Development.json">
+        <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+      </None>
+      <None Update="appsettings.json">
+        <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+      </None>
+      <None Update="installassvc.cmd">
+        <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+      </None>
+      <None Update="logsettings.json">
+        <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+      </None>
+      <None Update="NecessaryInstallPackages\dotnet-hosting-8.0.2-win.exe">
+        <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+      </None>
+      <None Update="NecessaryInstallPackages\dotnet-runtime-8.0.7-win-arm64.exe">
+        <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+      </None>
+      <None Update="NecessaryInstallPackages\dotnet-runtime-8.0.7-win-x64.exe">
+        <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+      </None>
+      <None Update="NecessaryInstallPackages\VC_redist.arm64.exe">
+        <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+      </None>
+      <None Update="NecessaryInstallPackages\VC_redist.x64.exe">
+        <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+      </None>
+      <None Update="uninstallfromservices.cmd">
+        <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+      </None>
+      <None Update="Guardian.ico">
+        <CopyToOutputDirectory>Always</CopyToOutputDirectory>
+      </None>
+    </ItemGroup>
+    <ItemGroup>
+      <AvaloniaResource Include="Guardian.ico">
+        <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+      </AvaloniaResource>
+    </ItemGroup>
+    <!--
+    <Target Name="PreBuild" BeforeTargets="PreBuildEvent">
+      <Exec Command="C:\GitHub\Guardian\GuardianConnect-Win-PoC\GuardianWinService\bin\uninstallsvc.cmd" />
+    </Target>
+    <Target Name="PostBuild" AfterTargets="PostBuildEvent">
+      <Exec Command="C:\GitHub\Guardian\GuardianConnect-Win-PoC\GuardianWinService\bin\installdbgsvc.cmd" />
+    </Target>
+    -->
+
+</Project>
