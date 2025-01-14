@@ -1,0 +1,1 @@
+msbuild /restore /t:"GuardianUI" /P:DeployOnBuild=true /p:PlatformTarget=x64 /p:RuntimeIdentifier=win-x64 /p:Configuration=Release guardianwindows.sln /p:GenerateAppxPackageOnBuild=true /p:SelfContained=true

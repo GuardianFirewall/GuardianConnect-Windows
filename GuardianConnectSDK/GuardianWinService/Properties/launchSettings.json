@@ -1,0 +1,12 @@
+{
+  "profiles": {
+    "GuardianWinService": {
+      "commandName": "Project",
+      "environmentVariables": {
+        "ASPNETCORE_ENVIRONMENT": "Development"
+      },
+      "applicationUrl": "https://localhost:7038;http://localhost:5043",
+      "nativeDebugging": true
+    }
+  }
+}
