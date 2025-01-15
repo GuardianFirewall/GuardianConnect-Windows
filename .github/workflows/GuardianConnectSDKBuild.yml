@@ -61,7 +61,7 @@ jobs:
         Configuration: ${{ matrix.configuration }}
 
     - name: Build GuardianConnect
-      run: msbuild /t:restore /t:Build /t:GuardianConnect /p:Platform=$ENV:CPU /p:Configuration=Release /p:RuntimeIdentifier=win-$ENV:CPU guardianconnectSDK\GuardianConnectSDK.sln
+      run: msbuild /t:restore /t:Build /t:GuardianConnect /p:Platform=$ENV:CPU /p:Configuration=Release /p:RuntimeIdentifier=win-$ENV:CPU guardianconnectSDK\GuardianConnect
       
     - name: Add local folder as nuget package source for adding GuardianConnect.nupkg
       run: .\make-gcsdk-nuget-pkg.cmd
