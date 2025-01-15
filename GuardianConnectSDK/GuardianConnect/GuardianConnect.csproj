@@ -14,6 +14,8 @@
         <Title>GuardianConnect</Title>
         <Authors>DNSFilter, Inc.</Authors>
         <GeneratePackageOnBuild>true</GeneratePackageOnBuild>
+        <PackageIcon>Guardian.png</PackageIcon>
+        <RepositoryUrl>https://github.com/GuardianFirewall/GuardianConnect-Windows</RepositoryUrl>
   </PropertyGroup>
 
   <ItemGroup>

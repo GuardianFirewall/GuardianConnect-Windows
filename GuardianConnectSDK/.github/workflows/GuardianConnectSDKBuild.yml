@@ -1,0 +1,114 @@
+
+name: GuardianFirewall Installer Build (Internal - signed-container ONLY)
+
+on:
+#  workflow_dispatch:
+  push:
+    branches: [ "main" ]
+  pull_request:
+    branches: [ "main" ]
+
+jobs:
+
+  build:
+
+    strategy:
+      matrix:
+        configuration: [Release]
+          
+          # How to specify this??
+          #os-version: [ windows-latest ]
+          #compiler: [ latest, gcc-latest, gcc-6.4.0, gcc-10.2.0, g++-11.2.0, clang, clang-8.0.0, clang-11.1.0, clang++-12.0.1 ]
+
+    runs-on: windows-2022  # For a list of available runner types, refer to
+                             # https://help.github.com/en/actions/reference/workflow-syntax-for-github-actions#jobsjob_idruns-on
+
+    # GuardianVPNWindowsClientInstaller\bin\x86\Release\en-US\GuardianVPNWindowsClientInstaller.msi
+    env:
+      Solution_Name: GuardianConnectSDK.sln
+      unsignedinstallerexepath: "PackagingHelpers/Input/GuardianFirewall*.exe"
+      signedinstallerexepath: "PackagingHelpers/Signed/"
+      unsignedzipfile: "PackagingHelpers/Output/guardianBinaries.zip"
+      signedzipfile: "PackagingHelpers/Signed/guardianBinaries.zip"
+      signpath-organization-id: 5c1e4170-8bf7-48b1-8542-78374ccc3471
+      guardian-signpath-project-slug: GuardianFirewall
+      guardian-signpath-artifact-config-slug: GuardianFirewallInstaller
+      signpath-policy-slug: DNSFilter_Branded
+      sign-user: pgp-dev@dnsfilter.com
+
+    steps:
+    - name: Checkout
+      uses: actions/checkout@v3
+      with:
+        fetch-depth: 0
+
+
+    # Get CPU Architecture from Github variable
+    - name: Get CPU from GH's $RUNNER_ARCH
+      run: |
+          $cpu = $env:RUNNER_ARCH.replace('X', 'x').replace('ARM', 'arm')
+          echo "CPU=$cpu" | Out-File -FilePath $Env:GITHUB_ENV -Encoding utf8 -Append
+
+    # Show env
+    - name: Show env after above with colon syntax
+      run: echo "$env:CPU"
+
+    # Add  MSBuild to the PATH: https://github.com/microsoft/setup-msbuild
+    - name: Setup MSBuild.exe
+      uses: microsoft/setup-msbuild@v2
+
+    # Restore the application to populate the obj folder with RuntimeIdentifiers
+    - name: Restore the application
+      run: msbuild $env:Solution_Name /t:Restore /p:Configuration=$env:Configuration
+      env:
+        Configuration: ${{ matrix.configuration }}
+
+    - name: Build GuardianConnect
+      run: msbuild /t:restore /t:Build /t:GuardianConnect /p:Platform=$ENV:CPU /p:Configuration=Release /p:RuntimeIdentifier=win-$ENV:CPU guardianconnect.sln
+      
+      name: Add local folder as nuget package source for adding GuardianConnect.nupkg
+      run: .\make-gcsdk-nuget-pkg.cmd
+      shell: cmd
+    
+    - name: Build GuardianFirewall Service
+      run: msbuild /t:restore /t:Build /t:GuardianWinService /p:Platform=$ENV:CPU /p:Configuration=Release /p:RuntimeIdentifier=win-$ENV:CPU guardianwindows.sln
+
+      env:
+        Configuration: ${{ matrix.configuration }}
+        
+      #----------------
+      # This is from guy from Microsoft - try this (https://www.jamescroft.co.uk/setting-github-actions-environment-variables-in-powershell/ )
+    - name: Get Installer Executable Full Path
+      run: |
+        $version = Get-ChildItem ${{env.unsignedinstallerexepath}}
+        echo "ixfp=$version" | Out-File -FilePath $Env:GITHUB_ENV -Encoding utf8 -Append
+        echo "ixfp = ${{ env.ixfp }}"
+      shell: pwsh
+
+    - name: Get Filename only
+      run: |
+        $name = Get-ChildItem -Name ${{env.unsignedinstallerexepath}}
+        echo "xfonly=$name" | Out-File -FilePath $Env:GITHUB_ENV -Encoding utf8 -Append
+        echo "xfonly = $env.xfonly"
+        echo "xfonly = $i{{ env.xfonly }}"
+      shell: pwsh
+      
+    - name: Get Filename without extension (used below for github artifact
+      run: |
+        $name = Get-ChildItem -Name ${{env.unsignedinstallerexepath}} |Split-Path -LeafBase
+        echo "xfbase=$name" | Out-File -FilePath $Env:GITHUB_ENV -Encoding utf8 -Append
+        #echo "fileNameWithoutExtension = [System.IO.Path]::GetFileNameWithoutExtension($name)" | Out-File -FilePath $Env:GITHUB_ENV -Encoding utf8 -Append
+      shell: pwsh
+      
+    - name: Get Filename without extension (using a .net-ism in pwsh
+      run: |
+        $name = Get-ChildItem -Name ${{env.unsignedinstallerexepath}} |Split-Path -LeafBase
+        echo "fileNameWithoutExtension = [System.IO.Path]::GetFileNameWithoutExtension($name)" | Out-File -FilePath $Env:GITHUB_ENV -Encoding utf8 -Append
+      shell: pwsh
+      
+    # Upload the MSI package: https://github.com/marketplace/actions/upload-a-build-artifact
+    - name: Upload build artifacts
+      uses: actions/upload-artifact@v3
+      with:
+        name: ${{env.xfbase}}_Installer
+        path: "${{ env.ixfp }}"
