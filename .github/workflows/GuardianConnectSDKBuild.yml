@@ -8,6 +8,11 @@ on:
   pull_request:
     branches: [ "main" ]
 
+defaults:
+  run:
+    shell: cmd
+    working-directory: .\GuardianConnectSDK
+    
 jobs:
 
   build:
@@ -24,16 +29,7 @@ jobs:
                              # https://help.github.com/en/actions/reference/workflow-syntax-for-github-actions#jobsjob_idruns-on
 
     env:
-      Solution_Name: GuardianConnectSDK\GuardianConnectSDK.sln
-      unsignedinstallerexepath: "PackagingHelpers/Input/GuardianFirewall*.exe"
-      signedinstallerexepath: "PackagingHelpers/Signed/"
-      unsignedzipfile: "PackagingHelpers/Output/guardianBinaries.zip"
-      signedzipfile: "PackagingHelpers/Signed/guardianBinaries.zip"
-      signpath-organization-id: 5c1e4170-8bf7-48b1-8542-78374ccc3471
-      guardian-signpath-project-slug: GuardianFirewall
-      guardian-signpath-artifact-config-slug: GuardianFirewallInstaller
-      signpath-policy-slug: DNSFilter_Branded
-      sign-user: pgp-dev@dnsfilter.com
+      Solution_Name: GuardianConnectSDK.sln
 
     steps:
     - name: Checkout
@@ -43,7 +39,6 @@ jobs:
 
     - name: Get a dir
       run: dir
-      shell: cmd
 
     # Get CPU Architecture from Github variable
     - name: Get CPU from GH's $RUNNER_ARCH
