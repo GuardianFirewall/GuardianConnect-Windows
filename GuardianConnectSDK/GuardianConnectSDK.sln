@@ -1,8 +1,34 @@
 ﻿
 Microsoft Visual Studio Solution File, Format Version 12.00
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "GuardianConnect", "GuardianConnect\GuardianConnect.csproj", "{0E1780B5-BC9E-4E9E-9ADE-1634EDD4D196}"
+EndProject
+Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "NativeRoutines", "NativeRoutines\NativeRoutines.vcxproj", "{3E6F0E3D-60AE-4000-8EB3-0D05B919162E}"
+EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "GuardianConnect.Shared", "Shared\GuardianConnect.Shared.csproj", "{FF022251-2CB6-4924-9E2C-99A7F5AFC5DC}"
+EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "GuardianWinService", "GuardianWinService\GuardianWinService.csproj", "{C5D003BD-5C5C-4481-A28C-8F8BA4714C26}"
+EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
-		Debug|Any CPU = Debug|Any CPU
-		Release|Any CPU = Release|Any CPU
+		Release|x64 = Release|x64
+		Debug|x64 = Debug|x64
+	EndGlobalSection
+	GlobalSection(ProjectConfigurationPlatforms) = postSolution
+		{0E1780B5-BC9E-4E9E-9ADE-1634EDD4D196}.Release|x64.ActiveCfg = Release|x64
+		{0E1780B5-BC9E-4E9E-9ADE-1634EDD4D196}.Release|x64.Build.0 = Release|x64
+		{0E1780B5-BC9E-4E9E-9ADE-1634EDD4D196}.Debug|x64.ActiveCfg = Debug|x64
+		{0E1780B5-BC9E-4E9E-9ADE-1634EDD4D196}.Debug|x64.Build.0 = Debug|x64
+		{FF022251-2CB6-4924-9E2C-99A7F5AFC5DC}.Release|x64.ActiveCfg = Release|x64
+		{FF022251-2CB6-4924-9E2C-99A7F5AFC5DC}.Release|x64.Build.0 = Release|x64
+		{FF022251-2CB6-4924-9E2C-99A7F5AFC5DC}.Debug|x64.ActiveCfg = Debug|x64
+		{FF022251-2CB6-4924-9E2C-99A7F5AFC5DC}.Debug|x64.Build.0 = Debug|x64
+		{C5D003BD-5C5C-4481-A28C-8F8BA4714C26}.Release|x64.ActiveCfg = Release|x64
+		{C5D003BD-5C5C-4481-A28C-8F8BA4714C26}.Release|x64.Build.0 = Release|x64
+		{C5D003BD-5C5C-4481-A28C-8F8BA4714C26}.Debug|x64.ActiveCfg = Debug|x64
+		{C5D003BD-5C5C-4481-A28C-8F8BA4714C26}.Debug|x64.Build.0 = Debug|x64
+		{3E6F0E3D-60AE-4000-8EB3-0D05B919162E}.Release|x64.ActiveCfg = Release|x64
+		{3E6F0E3D-60AE-4000-8EB3-0D05B919162E}.Release|x64.Build.0 = Release|x64
+		{3E6F0E3D-60AE-4000-8EB3-0D05B919162E}.Debug|x64.ActiveCfg = Debug|x64
+		{3E6F0E3D-60AE-4000-8EB3-0D05B919162E}.Debug|x64.Build.0 = Debug|x64
 	EndGlobalSection
 EndGlobal
