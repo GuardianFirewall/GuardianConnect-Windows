@@ -34,4 +34,10 @@
     <ProjectReference Include="..\NativeRoutines\NativeRoutines.vcxproj" />
     <ProjectReference Include="..\Shared\GuardianConnect.Shared.csproj" />
   </ItemGroup>
+
+  <ItemGroup>
+    <None Update="Guardian.png">
+      <CopyToOutputDirectory>Always</CopyToOutputDirectory>
+    </None>
+  </ItemGroup>
 </Project>
