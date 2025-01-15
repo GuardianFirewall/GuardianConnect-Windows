@@ -41,6 +41,9 @@ jobs:
       with:
         fetch-depth: 0
 
+    - name: Get a dir
+      run: dir
+      shell: cmd
 
     # Get CPU Architecture from Github variable
     - name: Get CPU from GH's $RUNNER_ARCH
