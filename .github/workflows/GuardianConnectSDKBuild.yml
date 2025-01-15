@@ -25,7 +25,7 @@ jobs:
 
     # GuardianVPNWindowsClientInstaller\bin\x86\Release\en-US\GuardianVPNWindowsClientInstaller.msi
     env:
-      Solution_Name: GuardianConnectSDK.sln
+      Solution_Name: GuardianConnectSDK\GuardianConnectSDK.sln
       unsignedinstallerexepath: "PackagingHelpers/Input/GuardianFirewall*.exe"
       signedinstallerexepath: "PackagingHelpers/Signed/"
       unsignedzipfile: "PackagingHelpers/Output/guardianBinaries.zip"
