@@ -35,6 +35,11 @@
     <ProjectReference Include="..\Shared\GuardianConnect.Shared.csproj" />
   </ItemGroup>
 
+    <ItemGroup>
+        <None Include="Guardian.png" Pack="true" PackagePath=""/>
+        <None Include="README.md" Pack="true" PackagePath=""/>
+    </ItemGroup>
+
   <ItemGroup>
     <None Update="Guardian.png">
       <CopyToOutputDirectory>Always</CopyToOutputDirectory>
