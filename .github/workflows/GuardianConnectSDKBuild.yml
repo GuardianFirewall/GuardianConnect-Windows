@@ -10,7 +10,6 @@ on:
 
 defaults:
   run:
-    shell: cmd
     working-directory: .\GuardianConnectSDK
     
 jobs:
@@ -39,6 +38,7 @@ jobs:
 
     - name: Get a dir
       run: dir
+      shell: cmd
 
     # Get CPU Architecture from Github variable
     - name: Get CPU from GH's $RUNNER_ARCH
