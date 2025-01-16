@@ -25,7 +25,6 @@
         <Using Include="Microsoft.Extensions.DependencyInjection.Extensions" />
     </ItemGroup>
     <ItemGroup>
-        <PackageReference Include="guardianconnect" Version="0.9.48.317" />
         <PackageReference Include="Microsoft.Extensions.DependencyInjection" Version="8.0.0" />
         <PackageReference Include="Microsoft.Extensions.Hosting.WindowsServices" Version="8.0.0" />
         <PackageReference Include="Microsoft.Extensions.Logging" Version="8.0.0" />
@@ -83,6 +82,11 @@
       <AvaloniaResource Include="Guardian.ico">
         <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
       </AvaloniaResource>
+    </ItemGroup>
+    <ItemGroup>
+      <ProjectReference Include="..\GuardianConnect\GuardianConnect.csproj" />
+      <ProjectReference Include="..\NativeRoutines\NativeRoutines.vcxproj" />
+      <ProjectReference Include="..\Shared\GuardianConnect.Shared.csproj" />
     </ItemGroup>
     <!--
     <Target Name="PreBuild" BeforeTargets="PreBuildEvent">

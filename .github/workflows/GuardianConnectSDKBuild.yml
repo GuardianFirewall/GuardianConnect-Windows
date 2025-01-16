@@ -72,7 +72,8 @@ jobs:
       shell: cmd
       
     - name: do nuget package double-check
-      run: nuget search GuardianConnect -Prerelease -Source "GuardianConnect Local"
+      #run: nuget search GuardianConnect -Prerelease -Source "GuardianConnect Local"
+      run: nuget search GuardianConnect -prerelease -source "GuardianConnectSDK NugetPackages"
       
     - name: Build GuardianFirewall Service
       #run: msbuild /t:restore /t:Build /t:GuardianWinService /p:Platform=$ENV:CPU /p:Configuration=Release /p:RuntimeIdentifier=win-$ENV:CPU GuardianConnectSDK\GuardianWinService\GuardianWinService.csproj
