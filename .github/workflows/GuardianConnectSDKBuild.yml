@@ -73,7 +73,7 @@ jobs:
       
     # Upload the MSI package: https://github.com/marketplace/actions/upload-a-build-artifact
     - name: Upload build artifacts
-      uses: actions/upload-artifact@v3
+      uses: actions/upload-artifact@v4
       with:
         name: GuardianConnectSDKBundle_"${{ env.version }}".nupkg
         path: .\GuardianConnectSDK\GuardianConnect."${{ env.version }}".nupkg
