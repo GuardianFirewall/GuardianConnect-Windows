@@ -30,12 +30,12 @@
     <file src="bin\x64\Release\net8.0-windows\NativeRoutines.dll" target="lib\net8.0" />
     <file src="bin\x64\Release\net8.0-windows\NativeRoutines.pdb" target="lib\net8.0" />
     <!-- Guardian Win Service also is bundled in to this package -->
-    <file src="..\GuardianWinService\bin\x64\Release\net8.0-windows\GuardianFirewallService.exe" target="lib\net8.0" />
-    <file src="..\GuardianWinService\bin\x64\Release\net8.0-windows\GuardianFirewallService.dll" target="lib\net8.0" />
-    <file src="..\GuardianWinService\bin\x64\Release\net8.0-windows\GuardianFirewallService.pdb" target="lib\net8.0" />
-    <file src="..\GuardianWinService\bin\x64\Release\net8.0-windows\GuardianFirewallService.deps.json" target="lib\net8.0" />
-    <file src="..\GuardianWinService\bin\x64\Release\net8.0-windows\GuardianFirewallService.runtimeconfig.json" target="lib\net8.0" />
-    <file src="..\GuardianWinService\bin\x64\Release\net8.0-windows\installassvc.cmd" target="lib\net8.0" />
-    <file src="..\GuardianWinService\bin\x64\Release\net8.0-windows\logsettings.json" target="lib\net8.0" />
+    <file src="GuardianWinService\bin\x64\Release\net8.0-windows\win-x64\GuardianFirewallService.exe" target=" lib\net8.0" />
+    <file src="..\GuardianWinService\bin\x64\Release\net8.0-windows\win-x64\GuardianFirewallService.dll" target="lib\net8.0" />
+    <file src="..\GuardianWinService\bin\x64\Release\net8.0-windows\win-x64\GuardianFirewallService.pdb" target="lib\net8.0" />
+    <file src="..\GuardianWinService\bin\x64\Release\net8.0-windows\win-x64\GuardianFirewallService.deps.json" target="lib\net8.0" />
+    <file src="..\GuardianWinService\bin\x64\Release\net8.0-windows\win-x64\GuardianFirewallService.runtimeconfig.json" target="lib\net8.0" />
+    <file src="..\GuardianWinService\bin\x64\Release\net8.0-windows\win-x64\installassvc.cmd" target="lib\net8.0" />
+    <file src="..\GuardianWinService\bin\x64\Release\net8.0-windows\win-x64\logsettings.json" target="lib\net8.0" />
   </files>
 </package>
