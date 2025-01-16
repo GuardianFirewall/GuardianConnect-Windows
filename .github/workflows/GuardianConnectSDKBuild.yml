@@ -65,7 +65,8 @@ jobs:
       run: msbuild /t:restore /t:Build /p:Platform=$ENV:CPU /p:Configuration=Release /p:RuntimeIdentifier=win-$ENV:CPU GuardianConnect
       
     - name: Add local folder as nuget package source for adding GuardianConnect.nupkg
-      run: nuget add bin\$ENV:CPU\Release\GuardianConnect.0.9.48.317.nupkg -source GuardianConnectSDK_NugetPackages
+      #run: nuget add bin\$ENV:CPU\Release\GuardianConnect.0.9.48.317.nupkg -source GuardianConnectSDK_NugetPackages
+      run: nuget add bin\x64\Release\GuardianConnect.0.9.48.317.nupkg -source GuardianConnectSDK_NugetPackages
       working-directory: GuardianConnectSDK\GuardianConnect
       shell: cmd
 #    - name: Build GuardianFirewall Service
