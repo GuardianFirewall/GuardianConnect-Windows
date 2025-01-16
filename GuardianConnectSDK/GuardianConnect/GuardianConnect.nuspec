@@ -7,7 +7,7 @@
     <authors>DNSFilter, Inc.</authors>
     <requireLicenseAcceptance>false</requireLicenseAcceptance>
     <license type="expression">MIT</license>
-    <icon>GuardianConnect\Guardian.png</icon>
+    <icon>Guardian.png</icon>
     <projectUrl>https://github.com/GuardianFirewall/guardianconnect-windows</projectUrl>
     <readme>README.md</readme>
     <description>Use this Nuget package to interact with the Guardian Firewall VPN Infrastructure</description>
@@ -20,6 +20,7 @@
   </metadata>
   <files>
     <file src="README.md"/>
+    <file src="Guardian.png"/>
     <file src="bin\x64\Release\net8.0-windows\GuardianConnect.deps.json" target="lib\net8.0" />
     <file src="bin\x64\Release\net8.0-windows\GuardianConnect.dll" target="lib\net8.0" />
     <file src="bin\x64\Release\net8.0-windows\GuardianConnect.pdb" target="lib\net8.0" />
