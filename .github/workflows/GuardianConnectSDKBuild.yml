@@ -66,6 +66,7 @@ jobs:
       
     - name: Add local folder as nuget package source for adding GuardianConnect.nupkg
       run: .\make-gcsdk-nuget-pkg.cmd
+      working-directory: GuardianConnect
       shell: cmd
     
 #    - name: Build GuardianFirewall Service
