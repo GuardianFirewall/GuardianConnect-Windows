@@ -72,7 +72,7 @@ jobs:
       
     - name: Build GuardianFirewall Service
       #run: msbuild /t:restore /t:Build /t:GuardianWinService /p:Platform=$ENV:CPU /p:Configuration=Release /p:RuntimeIdentifier=win-$ENV:CPU GuardianConnectSDK\GuardianWinService\GuardianWinService.csproj
-      run: msbuild /t:restore /t:Build /p:Platform=$ENV:CPU /p:Configuration=Release /p:RuntimeIdentifier=win-$ENV:CPU GuardianConnectSDK\GuardianWinService\GuardianWinService.csproj
+      run: msbuild /t:restore /t:Build /p:Platform=$ENV:CPU /p:Configuration=Release /p:RuntimeIdentifier=win-$ENV:CPU GuardianWinService\GuardianWinService.csproj
 
       env:
         Configuration: ${{ matrix.configuration }}
