@@ -77,4 +77,4 @@ jobs:
       with:
         #name: GuardianConnectSDKBundle_"${{ env.version }}".nupkg
         name: GuardianConnectSDKBundle_0.9.48.317.nupkg
-        path: GuardianConnect\GuardianConnect.09.48.317.nupkg
+        path: GuardianConnect\GuardianConnect.0.9.48.317.nupkg
