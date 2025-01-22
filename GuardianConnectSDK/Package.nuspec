@@ -1,0 +1,35 @@
+<?xml version="1.0" encoding="utf-8"?>
+<package >
+  <metadata>
+    <id>GuardianConnect</id>
+    <version>0.9.48.317</version>
+    <title>GuardianConnect SDK Nuget Bundle Package</title>
+    <authors>DNSFilter, Inc.</authors>
+    <license type="expression">MIT</license>
+    <icon>Guardian.png</icon>
+    <projectUrl>https://github.com/GuardianFirewall/guardianconnect-windows</projectUrl>
+    <!--
+    <readme>README.md</readme>
+    -->
+    <description>Use this Nuget package to interact with the Guardian Firewall VPN Infrastructure</description>
+    <releaseNotes>0.9.48: Initial Beta Release as SDK package</releaseNotes>
+    <copyright>Copyright DNSFilter, Inc.</copyright>
+    <tags>GuardianConnectSDK Beta Windows</tags>
+    <dependencies>
+      <group targetFramework="net8.0"/>
+    </dependencies>
+    <!--
+    <dependencies>
+      <group targetFramework=".NETStandard2.1">
+        <dependency id="SampleDependency" version="1.0.0" />
+      </group>
+    </dependencies>
+    -->
+  </metadata>
+  <files>
+  <file src=".\README.md" target="lib\net8.0"/>
+  <file src="Guardian.png"/>
+    <file src="GuardianWinService\bin\x64\release\net8.0-windows\runtimes\**\*.*" target="lib\net8.0"/>
+    <file src="GuardianWinService\bin\x64\release\net8.0-windows\win-x64\**\*.*" target="lib\net8.0"/>
+  </files>
+</package>

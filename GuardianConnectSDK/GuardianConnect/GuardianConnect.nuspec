@@ -1,5 +1,5 @@
 <?xml version="1.0" encoding="utf-8"?>
-<package >
+<package>
   <metadata>
     <id>GuardianConnect</id>
     <version>0.9.48.317</version>
@@ -21,6 +21,7 @@
   <files>
     <file src="README.md"/>
     <file src="Guardian.png"/>
+    <!--
     <file src="bin\x64\Release\net8.0-windows\GuardianConnect.deps.json" target="lib\net8.0" />
     <file src="bin\x64\Release\net8.0-windows\GuardianConnect.dll" target="lib\net8.0" />
     <file src="bin\x64\Release\net8.0-windows\GuardianConnect.pdb" target="lib\net8.0" />
@@ -30,6 +31,7 @@
     <file src="bin\x64\Release\net8.0-windows\Guardian.png" target="lib\net8.0" />
     <file src="bin\x64\Release\net8.0-windows\NativeRoutines.dll" target="lib\net8.0" />
     <file src="bin\x64\Release\net8.0-windows\NativeRoutines.pdb" target="lib\net8.0" />
+    -->
     <!-- Guardian Win Service also is bundled in to this package -->
     <file src="..\GuardianWinService\bin\x64\Release\net8.0-windows\win-x64\GuardianFirewallService.exe" target=" lib\net8.0" />
     <file src="..\GuardianWinService\bin\x64\Release\net8.0-windows\win-x64\GuardianFirewallService.dll" target="lib\net8.0" />
@@ -38,5 +40,7 @@
     <file src="..\GuardianWinService\bin\x64\Release\net8.0-windows\win-x64\GuardianFirewallService.runtimeconfig.json" target="lib\net8.0" />
     <file src="..\GuardianWinService\bin\x64\Release\net8.0-windows\win-x64\installassvc.cmd" target="lib\net8.0" />
     <file src="..\GuardianWinService\bin\x64\Release\net8.0-windows\win-x64\logsettings.json" target="lib\net8.0" />
+    
+    <file src="bin\x64\release\net8.0-windows\*.dll" target="lib\net8.0" />
   </files>
 </package>
