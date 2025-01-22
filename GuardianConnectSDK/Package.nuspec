@@ -29,7 +29,9 @@
   <files>
   <file src=".\README.md" target="lib\net8.0"/>
   <file src="Guardian.png"/>
+    <!--
     <file src="GuardianWinService\bin\x64\release\net8.0-windows\runtimes\**\*.*" target="lib\net8.0"/>
+    -->
     <file src="GuardianWinService\bin\x64\release\net8.0-windows\win-x64\**\*.*" target="lib\net8.0"/>
   </files>
 </package>
