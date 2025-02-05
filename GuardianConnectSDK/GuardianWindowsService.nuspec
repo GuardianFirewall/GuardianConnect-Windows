@@ -25,6 +25,6 @@
     <!--
     <file src="GuardianWinService\bin\x64\release\net8.0-windows\win-x64\**\*.*" target="lib\net8.0"/>
     -->
-    <file src="GuardianWinService\bin\x64\release\net8.0-windows\**\*.*" target="lib\net8.0"/>
+    <file src="GuardianWinService\bin\x64\release\net8.0-windows\**\*.*" target="GuardianFirewallService\bin\net8.0"/>
   </files>
 </package>
