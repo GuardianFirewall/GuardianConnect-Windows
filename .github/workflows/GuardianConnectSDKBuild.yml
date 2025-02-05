@@ -89,3 +89,4 @@ jobs:
       with:
         name: GuardianFirewallService.1.1.52.nupkg
         path: D:\a\GuardianConnect-Windows\GuardianConnect-Windows\GuardianConnectSDK\GuardianConnect.0.1.1.52.nupkg
+        
