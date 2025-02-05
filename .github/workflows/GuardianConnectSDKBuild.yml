@@ -67,17 +67,19 @@ jobs:
       run: msbuild /t:restore /t:Build /p:Platform=$ENV:CPU /p:Configuration=Release /p:RuntimeIdentifier=win-$ENV:CPU GuardianWinService\GuardianWinService.csproj
 
     - name: Create GuardianConnect.nupkg package bundle
-      #run: nuget pack GuardianConnect.nuspec
-      run: nuget pack
-      #working-directory: GuardianConnectSDK\GuardianConnect
+      run: nuget pack GuardianConnectSDK_Package.nuspec
       shell: cmd
       
-    # Upload the MSI package: https://github.com/marketplace/actions/upload-a-build-artifact
+    - name: Create GuardianWindowsService.nupkg package bundle
+      run: nuget pack GuardianWindowsService.nuspec
+      shell: cmd
+      
+      # Upload the MSI package: https://github.com/marketplace/actions/upload-a-build-artifact
     - name: Upload build artifacts
       uses: actions/upload-artifact@v4
       with:
         #name: GuardianConnectSDKBundle_"${{ env.version }}".nupkg
-        name: GuardianConnectSDK_0.9.48.317.nupkg
-        #path: GuardianConnect\GuardianConnect.0.9.48.317.nupkg
-        #path: GuardianConnectSDK\GuardianConnect\GuardianConnect.0.9.48.317.nupkg
-        path: D:\a\GuardianConnect-Windows\GuardianConnect-Windows\GuardianConnectSDK\GuardianConnect.0.9.48.317.nupkg
+        name: GuardianConnectSDK_0.1.1.52.nupkg
+        #path: GuardianConnect\GuardianConnect.0.1.1.52.nupkg
+        #path: GuardianConnectSDK\GuardianConnect\GuardianConnect.0.1.1.52.nupkg
+        path: D:\a\GuardianConnect-Windows\GuardianConnect-Windows\GuardianConnectSDK\GuardianConnect.0.1.1.52.nupkg

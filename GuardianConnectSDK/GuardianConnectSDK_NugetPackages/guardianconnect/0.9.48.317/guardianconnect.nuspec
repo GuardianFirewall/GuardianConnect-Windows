@@ -2,7 +2,7 @@
 <package xmlns="http://schemas.microsoft.com/packaging/2013/05/nuspec.xsd">
   <metadata>
     <id>GuardianConnect</id>
-    <version>0.9.48.317</version>
+    <version>0.1.1.52</version>
     <title>GuardianConnect</title>
     <authors>DNSFilter, Inc.</authors>
     <icon>Guardian.png</icon>
@@ -11,7 +11,7 @@
     <dependencies>
       <group targetFramework="net8.0-windows7.0">
         <dependency id="NativeRoutines" version="1.0.0" exclude="Build,Analyzers" />
-        <dependency id="GuardianConnect.Shared" version="0.9.48.316" exclude="Build,Analyzers" />
+        <dependency id="GuardianConnect.Shared" version="0.1.1.52" exclude="Build,Analyzers" />
         <dependency id="Newtonsoft.Json" version="13.0.3" exclude="Build,Analyzers" />
         <dependency id="Serilog" version="4.0.1" exclude="Build,Analyzers" />
         <dependency id="Serilog.Enrichers.Thread" version="4.0.0" exclude="Build,Analyzers" />
