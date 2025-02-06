@@ -79,13 +79,13 @@ jobs:
       uses: actions/upload-artifact@v4
       with:
         #name: GuardianConnectSDKBundle_"${{ env.version }}".nupkg
-        name: GuardianConnectSDK_0.1.1.52.nupkg
-        #path: GuardianConnect\GuardianConnect.0.1.1.52.nupkg
-        #path: GuardianConnectSDK\GuardianConnect\GuardianConnect.0.1.1.52.nupkg
-        path: D:\a\GuardianConnect-Windows\GuardianConnect-Windows\GuardianConnectSDK\GuardianConnect.0.1.1.52.nupkg
+        name: GuardianConnectSDK_0.10.1.52.nupkg
+        #path: GuardianConnect\GuardianConnect.0.10.1.52.nupkg
+        #path: GuardianConnectSDK\GuardianConnect\GuardianConnect.0.10.1.52.nupkg
+        path: D:\a\GuardianConnect-Windows\GuardianConnect-Windows\GuardianConnectSDK\GuardianConnect.0.10.1.52.nupkg
         
     - name: Upload build artifacts - GuardianFirewall Service
       uses: actions/upload-artifact@v4
       with:
-        name: GuardianFirewallService.1.1.52.nupkg
-        path: D:\a\GuardianConnect-Windows\GuardianConnect-Windows\GuardianConnectSDK\GuardianFirewallService.0.1.1.52.nupkg
+        name: GuardianFirewallService.10.1.52.nupkg
+        path: D:\a\GuardianConnect-Windows\GuardianConnect-Windows\GuardianConnectSDK\GuardianFirewallService.0.10.1.52.nupkg

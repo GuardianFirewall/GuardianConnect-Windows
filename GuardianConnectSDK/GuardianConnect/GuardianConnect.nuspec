@@ -2,7 +2,7 @@
 <package>
   <metadata>
     <id>GuardianConnect</id>
-    <version>0.1.1.52</version>
+    <version>0.10.1.52</version>
     <title>GuardianConnect SDK Nuget Bundle Package</title>
     <authors>DNSFilter, Inc.</authors>
     <requireLicenseAcceptance>false</requireLicenseAcceptance>
@@ -11,7 +11,7 @@
     <projectUrl>https://github.com/GuardianFirewall/guardianconnect-windows</projectUrl>
     <readme>README.md</readme>
     <description>Use this Nuget package to interact with the Guardian Firewall VPN Infrastructure</description>
-    <releaseNotes>0.1.1: Initial Beta Release as SDK package</releaseNotes>
+    <releaseNotes>0.10.1: Initial Beta Release as SDK package</releaseNotes>
     <copyright>Copyright DNSFilter, Inc.</copyright>
     <tags>GuardianConnectSDK Beta Windows</tags>
     <dependencies>

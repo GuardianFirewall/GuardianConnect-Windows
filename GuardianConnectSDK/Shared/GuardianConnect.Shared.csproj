@@ -4,16 +4,16 @@
         <ImplicitUsings>enable</ImplicitUsings>
         <Nullable>enable</Nullable>
         <LangVersion>11</LangVersion>
-        <TargetFrameworks>net8.0</TargetFrameworks>
         <Configurations>Release;Debug</Configurations>
         <Platforms>x64;ARM64</Platforms>
-        <AssemblyVersion>0.1.1.52</AssemblyVersion>
-        <FileVersion>0.1.1.52</FileVersion>
+        <AssemblyVersion>0.10.1.52</AssemblyVersion>
+        <FileVersion>0.10.1.52</FileVersion>
         <GeneratePackageOnBuild>True</GeneratePackageOnBuild>
         <Title>GuardianConnect SDK Shared Libraries</Title>
-        <Version>0.1.1.52</Version>
+        <Version>0.10.1.52</Version>
         <Authors>Guardian Group of DNSFilter, Inc.</Authors>
         <Copyright>DNSFilter, Inc.</Copyright>
+        <TargetFramework>net8.0-windows</TargetFramework>
     </PropertyGroup>
 
     <ItemGroup>
