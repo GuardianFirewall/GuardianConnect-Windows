@@ -3,7 +3,7 @@
         <Nullable>enable</Nullable>
         <ImplicitUsings>true</ImplicitUsings>
 
-        <TargetFramework>net8.0-windows</TargetFramework>
+        <TargetFramework>net9.0-windows10.0.26100.0</TargetFramework>
 
         <AllowUnsafeBlocks>true</AllowUnsafeBlocks>
         <Configurations>Debug;Release</Configurations>

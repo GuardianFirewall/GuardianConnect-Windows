@@ -1,1 +1,15 @@
 /GuardianConnectSDK/GuardianConnect/bin/
+/GuardianConnectSDK/.vs/GuardianConnectSDK
+/GuardianConnectSDK/GuardianConnect/obj
+/GuardianConnectSDK/GuardianWinService/bin/x64/Release/net8.0-windows
+/GuardianConnectSDK/GuardianWinService/obj/x64
+/GuardianConnectSDK/GuardianWinService/obj
+/GuardianConnectSDK/NativeRoutines/NativeRoutines/x64/Release
+/GuardianConnectSDK/NativeRoutines/obj
+/GuardianConnectSDK/NativeRoutines/x64/Debug
+/GuardianConnectSDK/Shared/bin/x64
+/GuardianConnectSDK/Shared/obj
+/GuardianConnectSDK/x64/Debug
+/GuardianConnectSDK/NativeRoutines/x64/Release
+/GuardianConnectSDK/GuardianWinService/bin/x64/Debug/net9.0-windows10.0.26100.0
+/.idea/vcs.xml

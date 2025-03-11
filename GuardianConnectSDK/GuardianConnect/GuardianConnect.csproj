@@ -4,13 +4,13 @@
     <ImplicitUsings>enable</ImplicitUsings>
     <Nullable>enable</Nullable>
     <AllowUnsafeBlocks>true</AllowUnsafeBlocks>
-    <TargetFramework>net8.0-windows</TargetFramework>
+    <TargetFramework>net9.0-windows10.0.26100.0</TargetFramework>
 
     <Configurations>Release;Debug</Configurations>
     <Platforms>x64;ARM64</Platforms>
-        <AssemblyVersion>0.10.1.52</AssemblyVersion>
-        <FileVersion>0.10.1.52</FileVersion>
-        <Version>0.10.1.52</Version>
+        <AssemblyVersion>0.11.1.1</AssemblyVersion>
+        <FileVersion>0.11.1.1</FileVersion>
+        <Version>0.11.1.1</Version>
         <Title>GuardianConnect</Title>
         <Authors>DNSFilter, Inc.</Authors>
         <GeneratePackageOnBuild>false</GeneratePackageOnBuild>
@@ -36,8 +36,8 @@
   </ItemGroup>
 
     <ItemGroup>
-        <None Include="Guardian.png" Pack="true" PackagePath=""/>
-        <None Include="README.md" Pack="true" PackagePath=""/>
+        <None Include="Guardian.png" Pack="true" PackagePath="" />
+        <None Include="README.md" Pack="true" PackagePath="" />
     </ItemGroup>
 
   <ItemGroup>
