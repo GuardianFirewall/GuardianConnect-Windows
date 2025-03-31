@@ -4,8 +4,8 @@ namespace GuardianConnect.Helpers
 {
     public static class HttpUtils
     {
-        private static HttpClient _client;
-        private static JsonSerializerOptions _serializerOptions;
+        private static HttpClient _client = new HttpClient();
+        private static JsonSerializerOptions? _serializerOptions;
         public static HttpClient Client
         {
             get

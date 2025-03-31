@@ -68,7 +68,9 @@ public class DeviceFilterConfig
 
     public void SyncBlocklist()
     {
-        Preferences.Set(Common.kGRDDeviceFilterConfigBlocklist, GRDVPNHelper.Instance.CurrentDeviceBlocklistConfig.ToString());
+        if (GRDVPNHelper.Instance.CurrentDeviceBlocklistConfig != null)
+            Preferences.Set(Common.kGRDDeviceFilterConfigBlocklist,
+                GRDVPNHelper.Instance.CurrentDeviceBlocklistConfig.ToString());
         // Call GRDGateway setter.
         GRDGateway gw = new GRDGateway();
         gw.SetDeviceFilterConfigsForDeviceId();

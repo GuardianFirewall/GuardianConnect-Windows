@@ -167,6 +167,12 @@ namespace GuardianConnect.Credentials
         public static void RemoveGuardianKeychainItems()
         {
             var rootGrdKey = Registry.CurrentUser.OpenSubKey(GRDKeyPath, true);
+            if (rootGrdKey == null)
+            {
+                Log.Error("RemoveGuardianKeychainItems(): Could not open Guardian Keychain root key.");
+                return;
+            }
+
             foreach (string key in Common.GuardianKeychainItemsKeys)
             {
                 try
@@ -195,8 +201,8 @@ namespace GuardianConnect.Credentials
 
         public static int RemoveKeychainItemForAccount(string accountKeyStr)
         {
-            RegistryKey rk = Registry.CurrentUser.OpenSubKey(GRDKeyPath, true);
-            rk.DeleteValue(accountKeyStr, false);
+            RegistryKey? rk = Registry.CurrentUser.OpenSubKey(GRDKeyPath, true);
+            if (rk != null) rk.DeleteValue(accountKeyStr, false);
 
             return 0;
         }

@@ -11,20 +11,18 @@ namespace GuardianConnect;
 
 public class GRDHousekeepingAPI
 {
-    public static ILogger Logger { get; set; }
-
     public class PETRequest
     {
         public string validationMethod = "pe-token";
-        public string peToken;
+        public string peToken = string.Empty;
     }
 
     public class Credentials
     {
         [JsonProperty("email")]
-        public string Email;
+        public string Email = string.Empty;
         [JsonProperty("password")]
-        public string Password;
+        public string Password = string.Empty;
 
         public Credentials(string userEmail, string userPassword)
         {
@@ -33,8 +31,8 @@ public class GRDHousekeepingAPI
         }
     }
 
-    public static GrdUserLoginResponse LoginResponse { get; set; }
-    public static GRDSubscriberCredential LiveGrdCredential { get; set; }
+    public static GrdUserLoginResponse LoginResponse { get; set; } = new GrdUserLoginResponse();
+    public static GRDSubscriberCredential? LiveGrdCredential { get; set; }
 
     /// endpoint: /api/v1/users/info-for-pe-token
     /// @param token password equivalent token for which to request information for
@@ -65,7 +63,7 @@ public class GRDHousekeepingAPI
             if (response.IsSuccessStatusCode)
             {
                 string result = await response.Content.ReadAsStringAsync();
-                PeTokenResponse peTokenResponse = JsonConvert.DeserializeObject<PeTokenResponse>(result);
+                PeTokenResponse peTokenResponse = JsonConvert.DeserializeObject<PeTokenResponse>(result) ?? new PeTokenResponse();
                 errorResponse.SetData(peTokenResponse).SetResponse(response);
             }
             else
@@ -120,20 +118,20 @@ public class GRDHousekeepingAPI
     {
         ErrorResponse errorResponse;
         // CONN#9
-        Logger.Information("CONN#9");
+        Log.Information("CONN#9");
         // TJE: Called by GRDVPNHelper.GetValidSubscriberCredentialWithCompletion()
         
         // set host to use
-        string connectHost = GRDVPNHelper.Instance.PeToken.ConnectAPIEnv ?? Common.kConnectAPIHostname;
+        string connectHost = GRDVPNHelper.Instance.PeToken?.ConnectAPIEnv ?? Common.kConnectAPIHostname;
         // Validation Method PEToken...
-        string peToken = GRDVPNHelper.Instance.PeToken.Token;
+        string peToken = GRDVPNHelper.Instance.PeToken?.Token;
         if (string.IsNullOrEmpty(peToken))
         {
-            Logger.Error(@"PEToken Object has empty token. Trying string from keychain...");
+            Log.Error(@"PEToken Object has empty token. Trying string from keychain...");
             peToken = GRDKeychain.GetPasswordStringForAccount(IGRDKeychain.kKeychainStr_PEToken_Itself);
             if (string.IsNullOrEmpty(peToken))
             {
-                Logger.Error(@"Failed to retrieve PEToken from keychain");
+                Log.Error(@"Failed to retrieve PEToken from keychain");
                 return new ErrorResponse
                 {
                     Data = null,
@@ -163,20 +161,20 @@ public class GRDHousekeepingAPI
             if (response.IsSuccessStatusCode)
             {
                 string result = await response.Content.ReadAsStringAsync();
-                var jwt = JsonConvert.DeserializeObject<GrdSubscriberCredentialJwt>(result);
-                LiveGrdCredential = new GRDSubscriberCredential(jwt.SubscriberCredential);
+                var jwt = JsonConvert.DeserializeObject<GrdSubscriberCredentialJwt>(result ?? "[]");
+                LiveGrdCredential = new GRDSubscriberCredential(jwt!.SubscriberCredential!);
                 LiveGrdCredential.Store();
-                Logger.Information("CreateSubscriberCredentialForBundleId(): JWT obtained.");
+                Log.Information("CreateSubscriberCredentialForBundleId(): JWT obtained.");
             }
             else
             {
-                Logger.Information("CreateSubscriberCredentialForBundleId(): Error occurred.");
+                Log.Information("CreateSubscriberCredentialForBundleId(): Error occurred.");
                 // ... check response values...
                 int statusCode = (int)response.StatusCode;
                 if (statusCode == 500)
                 {
                     var message = "Housekeeping failed to return subscriber credential";
-                    Logger.Information(message);
+                    Log.Information(message);
                     errorResponse = new ErrorResponse(message, null, true, response);
                     return errorResponse;
 
@@ -184,14 +182,14 @@ public class GRDHousekeepingAPI
                 else if (statusCode == 400)
                 {
                     var message = "Failed to create subscriber credential. Faulty input values";
-                    Logger.Information(message);
+                    Log.Information(message);
                     errorResponse = new ErrorResponse(message, null, true, response);
                     return errorResponse;
                 }
                 else if (statusCode == 401)
                 {
                     var message = "No subscription present";
-                    Logger.Information(message);
+                    Log.Information(message);
                     errorResponse = new ErrorResponse(message, null, true, response);
                     return errorResponse;
 
@@ -201,7 +199,7 @@ public class GRDHousekeepingAPI
                     // Not sending an error message back so that we're not showing a useless error to the user
                     // The app should transition to free/unpaid if required
                     var message = "Subscription expired";
-                    Logger.Information(message);
+                    Log.Information(message);
                     errorResponse = new ErrorResponse(message, null, true, response);
                     return errorResponse;
 
@@ -209,7 +207,7 @@ public class GRDHousekeepingAPI
                 else if (statusCode == 402) // Payment required
                 {
                     var message = "Payment required";
-                    Logger.Information(message);
+                    Log.Information(message);
                     errorResponse = new ErrorResponse(message, null, true, response);
                     return errorResponse;
                 }
@@ -217,12 +215,12 @@ public class GRDHousekeepingAPI
         }
         catch (Exception ex)
         {
-            Logger.Information($"\tERROR {ex.Message}");
+            Log.Information($"\tERROR {ex.Message}");
             errorResponse = new ErrorResponse(ex.Message, ex, true, null);
             return errorResponse;
         }
         //
-        errorResponse = new ErrorResponse(null, null, false, null);
+        errorResponse = new ErrorResponse(string.Empty, null, false, string.Empty);
         errorResponse.Data = LiveGrdCredential.Jwt;
         return errorResponse;
     }

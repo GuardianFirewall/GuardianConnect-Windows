@@ -15,7 +15,7 @@ namespace NativeRoutines
         static wchar_t* ActiveConnectionEntryName;
         static String^ ConnectedEntry;
         static DWORD MakeTheCall(System::String^ givenPhonebookPath, System::String^ entryName);
-        static DWORD SetCredentials(LPCTSTR entry_name, LPCTSTR username, LPCTSTR password);
+//        static DWORD SetCredentials(LPCTSTR entry_name, LPCTSTR username, LPCTSTR password);
         static DWORD ConnectWithEntry(String^ phoneBookPath, System::String^ entryName);
         static Utility::CheckConnectionResult CheckConnection(System::String^ entry_name);
         static Utility::CheckConnectionResult CheckConnection(System::String^ entry_name, HRASCONN& handle);

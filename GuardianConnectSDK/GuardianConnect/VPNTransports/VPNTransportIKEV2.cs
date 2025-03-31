@@ -3,6 +3,7 @@ using System.Net;
 using GuardianConnect.Shared;
 using GuardianConnect.Shared.Extensions;
 using NativeRoutines;
+using Serilog;
 
 namespace GuardianConnect.VPNTransports;
 
@@ -21,7 +22,7 @@ public class VPNTransportIKEV2 :ITransportProvider
 
     public VPNTransportIKEV2()
     {
-        Logger = Common.Logger;
+        Log.Information("VPNTransportIKEV2 logger!");
     }
 
     public virtual ITransportProvider.TransportProtocol ProtocolType => _protocolType;
@@ -68,10 +69,10 @@ public class VPNTransportIKEV2 :ITransportProvider
         Task t = new Task<ErrorResponse>(() =>
 
         {
-            Logger?.Information("StartVPNTunnelWithOptions: Evaluating vpn connection parameters...");
+            Log.Information("StartVPNTunnelWithOptions: Evaluating vpn connection parameters...");
             foreach (string key in options.Keys)
             {
-                Logger?.Information($"Key: '{key}': Value='{(string)options[key]}'");
+                Log.Information($"Key: '{key}': Value='{(string)options[key]}'");
             }
 
             //_dialer.StateChanged += DialerOnStateChanged;
@@ -107,7 +108,7 @@ public class VPNTransportIKEV2 :ITransportProvider
     // Called from the IService WCF entry point
     public virtual void StopVPNTunnel(string entryName)
     {
-        Logger?.Information($"VPNTransportIKEV2.StopVPNTunnel(): Disconnecting entry '{entryName}' ...");
+        Log.Information($"VPNTransportIKEV2.StopVPNTunnel(): Disconnecting entry '{entryName}' ...");
         ConnectionRoutines.DisconnectEntry(entryName);
     }
 
@@ -120,7 +121,7 @@ public class VPNTransportIKEV2 :ITransportProvider
     {
         var t = new Task(() =>
         {
-            Logger?.Information("VPNTransportIKEV2.ConnectoToVpnLongRunning(): Connecting...");
+            Log.Information("VPNTransportIKEV2.ConnectoToVpnLongRunning(): Connecting...");
             ConnectionRoutines.MakeTheCall(null, entryName);
             NotificationHandling.StartConnectionStateWatcher();
         });
@@ -137,19 +138,19 @@ public class VPNTransportIKEV2 :ITransportProvider
         while (!shuttingDown)
         {
             Debug.Write($"[{DateTime.Now:MM/dd/yyyy hh:mm:ss tt]} Polling Task active. ");
-            Logger?.Information("VPNTransportIKEV2.PollConnectionState(): Waiting on state change...");
+            Log.Information("VPNTransportIKEV2.PollConnectionState(): Waiting on state change...");
             var succeeded = EventWaitHandle.TryOpenExisting(Common.VPNSTATECHANGE_EVT_NAME, out EventWaitHandle? VPNStateChangeEventHandle);
             if (!succeeded)
             {
-                Logger?.Debug( $"ERROR opening VPNStateChangeEventHandle");
+                Log.Error( $"ERROR opening VPNStateChangeEventHandle");
                 throw new Exception("VPNConnectionEvent WaitHandle Open Exception");
             }
 
             VPNStateChangeEventHandle?.WaitOne(-1);
-            Logger?.Debug($"UI.GCP.Initialize(): woke from ConnStateChange.");
+            Log.Information($"UI.GCP.Initialize(): woke from ConnStateChange.");
             var cs = NotificationHandling.GetConnectionState();
             var cs2 = GetCurrentVPNState();
-            Logger?.Information($"PollConnectionState: cs = {cs}. cs2 = {cs2}");
+            Log.Information($"PollConnectionState: [NoficationHandling.GetConnectionState] = {cs}. [GetCurrentVPNState] = {cs2}");
             switch (cs)
             {
                 case Utility.CheckConnectionResult.CONNECTED:

@@ -74,7 +74,7 @@ public class DPAPI
                                   typeof(CRYPTPROTECT_PROMPTSTRUCT));
         ps.dwPromptFlags= 0;
         ps.hwndApp      = NullPtr;
-        ps.szPrompt     = null;
+        ps.szPrompt = string.Empty;
     }
  
     /// <summary>

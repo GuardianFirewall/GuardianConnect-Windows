@@ -3,7 +3,7 @@
 
 #include "NativeRoutines.h"
 
-extern class ScopedHeapAlloc {
+class ScopedHeapAlloc {
 public:
     explicit ScopedHeapAlloc(SIZE_T dw_bytes) {
         lp_alloc_mem_ = HeapAlloc(GetProcessHeap(), HEAP_ZERO_MEMORY, dw_bytes);

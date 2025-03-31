@@ -1,21 +1,19 @@
 using GuardianConnect.API.Model;
 using GuardianConnect.Helpers;
 using GuardianConnect.Shared;
+using Serilog;
 
 namespace GuardianConnect.API;
 
 public class GRDServerManager
 {
-    public static Serilog.ILogger Logger { get; private set; } = Serilog.Log.Logger;
-
     public GRDHousekeepingAPI Housekeeping { get; set; }
     public GRDVPNHelper.GRDServerFeatureEnvironment FeatureEnv;
     public bool BetaCapable { get; set; }
 
-    public GRDServerManager(Serilog.ILogger passedInLogger)
+    public GRDServerManager()
     {
-        Logger = passedInLogger;
-        Logger.Information("GRDGateway logger!");
+        Log.Information("GRDGateway logger!");
 
         Housekeeping = new GRDHousekeepingAPI();
         FeatureEnv = GRDVPNHelper.GRDServerFeatureEnvironment.ServerFeatureEnvironmentProduction;
@@ -28,7 +26,7 @@ public class GRDServerManager
     // CHANGE ^-----------------------^
     {
         // CONN#5
-        Logger.Information("CONN#5");
+        Log.Information("CONN#5");
 
         // TJE - taking first host in our region for now.
         RegionalHostRecord regionHostRecord = new RegionalHostRecord();

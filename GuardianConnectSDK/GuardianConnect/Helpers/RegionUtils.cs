@@ -17,12 +17,12 @@ namespace GuardianConnect.Helpers
 
         public static List<string> RegionKeys { get; } = new();
         public static Dictionary<string, string> RegionKeysByDisplay = new();
-        public static string? RegionForOurActualLocation { get; set; }
+        public static string? RegionForOurActualLocation { get; set; } = null;
         public static string? KeyForCurrentlySelectedRegion { get; set; }
 
         public static string GetRegionKeyByDisplayName(string pn)
         {
-            if (pn == "Automatic") return RegionForOurActualLocation;
+            if (pn == "Automatic") return RegionForOurActualLocation ?? string.Empty;
             return regionLookup.Values.First(v => v.DisplayName == pn).RegionName;
         }
 
@@ -36,7 +36,7 @@ namespace GuardianConnect.Helpers
             Log.Information($"LookUpRegionIndexForMyTimeZone: Our time zone ID = '{ourTimeZoneId}'");
             string containingKey = timezonesLookup.Keys
                 .Where(key => timezonesLookup[key].Contains(ourTimeZoneId))
-                .FirstOrDefault();
+                .FirstOrDefault() ?? throw new InvalidOperationException();
             myRegionKey = string.IsNullOrEmpty(containingKey) ? "us-east" : containingKey;
 
             return string.IsNullOrEmpty(containingKey);
@@ -47,78 +47,85 @@ namespace GuardianConnect.Helpers
             Log.Information("GetLatestRegionsList() executing...");
             string errorMessage = string.Empty;
             int responseCode = 0;
-            
-            var _regionsList = new List<GRDRegion>();
+
+            var regionsList = new List<GRDRegion>();
 
             Uri uri = new Uri(GetAllRegionsUrl);
             try
             {
                 Log.Information("GET'ing latest Regions collection from backend...");
-                HttpResponseMessage response = HttpUtils.Client.GetAsync(uri).GetAwaiter().GetResult(); // Task short-circuit jump
-                if (response.IsSuccessStatusCode)
                 {
-                    string content = await response.Content.ReadAsStringAsync();  // Task short-circuit jump
-                    _regionsList = JsonConvert.DeserializeObject<List<GRDRegion>>(content);
-                    Log.Information($"Regions Refresh: Regions Collection loaded with {_regionsList.Count} items");
-                    responseCode = (int)response.StatusCode;
+                    HttpResponseMessage
+                        response = HttpUtils.Client.GetAsync(uri).GetAwaiter().GetResult(); // Task short-circuit jump
+                    if (response.IsSuccessStatusCode)
+                    {
+                        string content = await response.Content.ReadAsStringAsync(); // Task short-circuit jump
+                        regionsList = JsonConvert.DeserializeObject<List<GRDRegion>>(content) ?? new List<GRDRegion>();
+                        Log.Information($"Regions Refresh: Regions Collection loaded with {regionsList.Count} items");
+                        responseCode = (int)response.StatusCode;
+                    }
                 }
             }
             catch (Exception ex)
             {
-                Log.Information($"GetLatestRegionsList(): Exception thrown when calling all-server-regions...: {ex.Message}");
-                _regionsList = new List<GRDRegion>();
+                Log.Information(
+                    $"GetLatestRegionsList(): Exception thrown when calling all-server-regions...: {ex.Message}");
+                regionsList = new List<GRDRegion>();
             }
 
             RegionKeysByDisplay.TryAdd("Automatic", "Automatic");
-            foreach (var regionRec in _regionsList)
+            foreach (var regionRec in regionsList)
             {
                 regionLookup.TryAdd(regionRec.RegionName, regionRec);
                 RegionKeys.Add(regionRec.RegionName);
                 RegionKeysByDisplay.TryAdd(regionRec.DisplayName, regionRec.RegionName);
             }
-            return _regionsList;
+
+            return regionsList;
         }
 
         private static async Task<List<GeoData>> GetLatestTimeZonesForRegions()
         {
             Log.Information("RefreshDataAsync() executing...");
             string errorMessage = string.Empty;
-            int responseCode = 0;
-            
-            var _geoDataCollection = new List<GeoData>();
+
+            var geoDataCollection = new List<GeoData>();
 
             Uri uri = new Uri(GetTimeZonesForRegionsUrl);
             try
             {
                 Log.Information("GET'ing latest Regions collection from backend...");
-                HttpResponseMessage response = HttpUtils.Client.GetAsync(uri).GetAwaiter().GetResult(); // Task short-circuit jump
-                if (response.IsSuccessStatusCode)
+                HttpResponseMessage?
+                    response = HttpUtils.Client?.GetAsync(uri).GetAwaiter().GetResult(); // Task short-circuit jump
+                if (response != null && response.IsSuccessStatusCode)
                 {
-                    string content = await response.Content.ReadAsStringAsync();  // Task short-circuit jump
-                    _geoDataCollection = JsonConvert.DeserializeObject<List<GeoData>>(content);
-                    Log.Information($"Regions Refresh: Regions GeoData Collection loaded with {_geoDataCollection.Count} items");
-                    responseCode = (int)response.StatusCode;
+                    string content = await response.Content.ReadAsStringAsync(); // Task short-circuit jump
+                    geoDataCollection = JsonConvert.DeserializeObject<List<GeoData>>(content) ?? new List<GeoData>();
+                    Log.Information(
+                        $"Regions Refresh: Regions GeoData Collection loaded with {geoDataCollection.Count} items");
                 }
             }
             catch (Exception ex)
             {
-                Log.Information($"RefreshDataAsync(): Exception thrown when calling GetTimeZonesForRegions...: {ex.Message}");
-                _geoDataCollection = new List<GeoData>();
+                Log.Information(
+                    $"RefreshDataAsync(): Exception thrown when calling GetTimeZonesForRegions...: {ex.Message}");
+                geoDataCollection = new List<GeoData>();
             }
 
-            foreach (var geoRec in _geoDataCollection)
+            foreach (var geoRec in geoDataCollection)
             {
-                Log.Information($"GetLatestGeoData: Adding '{geoRec.KeyName}' with {geoRec.Timezones.Count} timezones");
+                Log.Information(
+                    $"GetLatestGeoData: Adding '{geoRec.KeyName}' with {geoRec.Timezones.Count} timezones");
                 timezonesLookup.TryAdd(geoRec.KeyName, geoRec.Timezones);
             }
 
-            return _geoDataCollection;
+            return geoDataCollection;
         }
-        
+
         public static async Task RefreshDataAsync()
         {
-            var _regions = GetLatestRegionsList().GetAwaiter().GetResult();
-            var _geoDataCollection = GetLatestTimeZonesForRegions().GetAwaiter().GetResult();
+            var regions = await GetLatestRegionsList();
+            var geoDataCollection = GetLatestTimeZonesForRegions().GetAwaiter().GetResult();
 
             Log.Information($"Regions Collection has {regionLookup.Count} region records"); 
             Log.Information($"Timezone Collection has {timezonesLookup.Count} timezone records"); 
@@ -140,7 +147,7 @@ namespace GuardianConnect.Helpers
         {
             Log.Information($"GetHostsForRegionKey: Retrieving hosts for region {regionKey}.");
 
-            HttpResponseMessage response = new HttpResponseMessage();
+            HttpResponseMessage response;
             string getHostsForRegionUrl = $"https://{Common.kConnectAPIHostname}/api/v1/servers/hostnames-for-region";
             Uri uri = new Uri(getHostsForRegionUrl);
             try
@@ -156,7 +163,7 @@ namespace GuardianConnect.Helpers
 
                 try
                 {
-                    response = HttpUtils.Client.PostAsync(uri, content).GetAwaiter().GetResult();
+                    response = HttpUtils.Client?.PostAsync(uri, content).GetAwaiter().GetResult() ?? throw new InvalidOperationException();
                 }
                 catch (HttpRequestException hrex)
                 {
@@ -172,11 +179,14 @@ namespace GuardianConnect.Helpers
                 if (response.IsSuccessStatusCode)
                 {
                     string respContent = await response.Content.ReadAsStringAsync();
-                    List<RegionalHostRecord> regionHosts = JsonConvert.DeserializeObject<List<RegionalHostRecord>>(respContent);
-                    if (!_hostLookup.ContainsKey(regionKey)) _hostLookup.Add(regionKey, null);
-                    _hostLookup[regionKey] = regionHosts;
-                    var message = $"RegionUtils.GetHostForRegion: Added {regionHosts.Count} hosts for region '{regionKey}'";
-                    Log.Information(message);
+                    List<RegionalHostRecord> regionHosts = new List<RegionalHostRecord>();
+                    regionHosts = JsonConvert.DeserializeObject<List<RegionalHostRecord>>(respContent) ?? throw new InvalidOperationException();
+                    if (!_hostLookup.ContainsKey(regionKey)) _hostLookup.Add(regionKey, null!);
+                    _hostLookup[regionKey] = regionHosts ?? throw new InvalidOperationException();
+                    {
+                        var message = $"RegionUtils.GetHostForRegion: Added {regionHosts.Count} hosts for region '{regionKey}'";
+                        Log.Information(message);
+                    }
                 }
                 else
                 {

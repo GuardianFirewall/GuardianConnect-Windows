@@ -33,7 +33,6 @@ public class GuardianNPCommandDispatcher :IGuardianNPContract
         _vpnTransportIkev2 = new VPNTransportIKEV2();
         var result = _vpnTransportIkev2.StartVPNTunnelWithOptions(protocolRequest).Result;
 
-        //return result.ErrorNumber == 0;
         return !result.IsError;
     }
 
@@ -66,7 +65,7 @@ public class GuardianNPCommandDispatcher :IGuardianNPContract
         return status;
     }
 
-    public string Ping()
+    public Task<string> Ping()
     {
         throw new NotImplementedException();
     }

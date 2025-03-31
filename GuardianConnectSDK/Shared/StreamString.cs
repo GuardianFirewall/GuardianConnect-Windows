@@ -1,4 +1,5 @@
 using System.IO.Pipes;
+using System.Reflection.Metadata.Ecma335;
 using System.Text;
 using Serilog;
 
@@ -16,6 +17,7 @@ public class StreamString
         streamEncoding = new UnicodeEncoding();
     }
 
+
     public string ReadString()
     {
         int len = 0;
@@ -32,6 +34,27 @@ public class StreamString
         ioStream.Read(inBuffer, 0, len);
 
         return streamEncoding.GetString(inBuffer);
+    }
+
+
+    public async Task<string> ReadStringAsync()
+    {
+        int len = 0;
+
+        len = ioStream.ReadByte() * 256;
+        len += ioStream.ReadByte();
+        if (!((PipeStream)ioStream).IsConnected)
+        {
+            Log.Information("ReadByte stream disconnected");
+            return "";
+        }
+
+        byte[] inBuffer = new byte[len];
+        var readAsync = await ioStream.ReadAsync(inBuffer, 0, len);
+
+        string s = streamEncoding.GetString(inBuffer);
+
+        return Task.FromResult(s).Result;
     }
 
     public int WriteString(string outString)

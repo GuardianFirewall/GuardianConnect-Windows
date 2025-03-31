@@ -87,8 +87,9 @@ public class ClientPipeService : BackgroundService
 
     public override Task StopAsync(CancellationToken cancellationToken)
     {
-        System.Diagnostics.StackTrace t = new System.Diagnostics.StackTrace();
-        Log.Information($"StopAsync StackTrace: \n{t}");
+        //System.Diagnostics.StackTrace t = new System.Diagnostics.StackTrace();
+        //Log.Information("ClientPipeService.StopAsync StackTrace: \n{t}");
+        Log.Information("ClientPipeService.StopAsync called.");
 
         return base.StopAsync(cancellationToken);
     }
@@ -169,39 +170,47 @@ public class ClientPipeService : BackgroundService
                     // written to the pipe its security token will be available.
 
                     // Now - wait for command string from client
-                    string commandString = ss.ReadString();
+                    Log.Information($"ClientPipeService[{threadId}]: Waiting for command from client ...");
+                    string commandString = ss.ReadStringAsync().GetAwaiter().GetResult();
+                    Log.Information($"ClientPipeService[{threadId}]: string from client: {commandString}");
                     if (!pipeServer.IsConnected) continue;
                     char cmdToken = commandString[0];
-                    string
-                        cmdPayload =
-                            commandString.Substring(2); // Skip the '.' between first char cmd enum and params data
-                    IGuardianNPContract.NPCommands cmd =
-                        (IGuardianNPContract.NPCommands)(Int16.Parse(cmdToken.ToString()));
-                    Log.Information($"Server Thread#{threadId}: Cmd={cmd}, payload='{cmdPayload}");
+                    string cmdPayload = commandString.Substring(2); // Skip the '.' between first char cmd enum and params data
+                    IGuardianNPContract.NPCommands cmd = (IGuardianNPContract.NPCommands)(Int16.Parse(cmdToken.ToString()));
+
+                    Log.Information($"ClientPipeService[{threadId}]: Cmd={cmd}, payload='{cmdPayload}");
                     switch (cmd)
                     {
                         case IGuardianNPContract.NPCommands.StartVPNConnection:
+                            Log.Information($"ClientPipeService[{threadId}]: Performing StartVPNConnection");
                             var dictSerial = cmdPayload;
                             var dictObject = JsonConvert.DeserializeObject<Dictionary<string, object>>(dictSerial);
                             var didItStart = cmdDispatcher.StartVPNConnection(dictObject);
+                            Log.Information($"ClientPipeService[{threadId}]: Performing StartVPNConnection");
                             ss.WriteString(didItStart.ToString());
                             break;
                         case IGuardianNPContract.NPCommands.DisconnectVPNConnection:
+                            Log.Information($"ClientPipeService[{threadId}]: Performing DisconnectVPNConnection");
                             string entryName = cmdPayload;
                             cmdDispatcher.DisconnectVPNConnection(entryName);
                             break;
                         case IGuardianNPContract.NPCommands.GetCurrentVpnConnectionStatus:
+                            Log.Information($"ClientPipeService[{threadId}]: Performing GetCurrentVpnConnectionStatus");
                             var statusCheck = cmdDispatcher.GetCurrentVpnConnectionStatus();
                             var statusString = JsonConvert.SerializeObject(statusCheck);
+                            Log.Information($"ClientPipeService[{threadId}]: GetCurrentVpnConnectionStatus - writing statusString '{statusString}' to client");
                             ss.WriteString(statusString);
                             break;
                         case IGuardianNPContract.NPCommands.Ping:
+                            Log.Information($"ClientPipeService[{threadId}]: Performing Ping response to client");
                             ss.WriteString("GFS");
                             break;
                         case IGuardianNPContract.NPCommands.AdministrativeShutdownRequested:
+                            Log.Information($"ClientPipeService[{threadId}]: Performing AdministrativeShutdownRequested");
                             AdministrativeShutdownRequested = true;
                             break;
                         case IGuardianNPContract.NPCommands.UninstallerShutdownOccurring:
+                            Log.Information($"ClientPipeService[{threadId}]: Performing UninstallerShutdownOccurring");
                             AdministrativeShutdownRequested = true;
                             var status = cmdDispatcher.GetCurrentVpnConnectionStatus();
                             if (status.ConnectionState == IGuardianNPContract.ConnectionStateEnum.Connected)
@@ -210,9 +219,10 @@ public class ClientPipeService : BackgroundService
                             }
                             break;
                         case IGuardianNPContract.NPCommands.ToggleLogging:
+                            Log.Information($"ClientPipeService[{threadId}]: Performing ToggleLogging");
                             Common.LogFilterOn = !Common.LogFilterOn;
                             var msg = Common.LogFilterOn ? "ON" : "OFF";
-                            Log.Information($"Logging is now turned {msg}");
+                            Log.Information($"ClientPipeService[{threadId}]: Logging is now turned {msg}");
                             if (Common.LogFilterOn)
                             {
                                 if (cmdPayload.Equals("true", StringComparison.InvariantCultureIgnoreCase))
@@ -228,9 +238,11 @@ public class ClientPipeService : BackgroundService
 
                             break;
                         case IGuardianNPContract.NPCommands.RequestLogLines:
+                            Log.Information($"ClientPipeService[{threadId}]: Performing RequestLogLines");
                             int maxLogLines = int.Parse(cmdPayload);
                             var lastLogLines = Common.GetLastLogLines(maxLogLines);
                             string serializedLogs = JsonConvert.SerializeObject(lastLogLines);
+                            Log.Information($"ClientPipeService[{threadId}]: Writing log lines to client");
                             ss.WriteString(serializedLogs);
                             break;
                         default:
@@ -242,7 +254,7 @@ public class ClientPipeService : BackgroundService
                 // or disconnected.
                 catch (IOException e)
                 {
-                    Log.Error(e, "IOException ERROR: {0}", e.Message);
+                    Log.Error(e, $"ClientPipeService[{threadId}] IOException ERROR: {0}", e.Message);
                 }
                 catch (Exception e)
                 {

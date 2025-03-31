@@ -61,7 +61,7 @@ namespace NativeRoutines
         return arr_s;
     }
 
-    LPCWSTR RasBaseRoutines::GetPhonebookPath(const std::wstring& entry_name, std::string* error)
+    void RasBaseRoutines::GetPhonebookPath(const std::wstring& entry_name, wchar_t* pbkPath, std::string* error)
     {
         // https://docs.microsoft.com/en-us/windows/win32/api/processenv/nf-processenv-expandenvironmentstringsa
         wchar_t AppDataPath[1025] = { 0 };
@@ -72,10 +72,7 @@ namespace NativeRoutines
         }
 
         wchar_t PhonebookPath[2048] = { 0 };
-        swprintf(PhonebookPath, 2048, L"%s\\Microsoft\\Network\\Connections\\Pbk\\rasphone.pbk", AppDataPath);
-
-        return PhonebookPath;
-
+        swprintf(pbkPath, 2048, L"%s\\Microsoft\\Network\\Connections\\Pbk\\rasphone.pbk", AppDataPath);
     }
 
 }
