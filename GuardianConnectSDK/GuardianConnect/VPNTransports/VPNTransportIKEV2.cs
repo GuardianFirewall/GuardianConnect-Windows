@@ -16,9 +16,8 @@ public class VPNTransportIKEV2 :ITransportProvider
     private ITransportProvider.VPNConnectionError _lastVpnError = 0;
     private DateTime _connectedDate = DateTime.MinValue;
     private Task? PollingTask;
-
-
-    public static Serilog.ILogger? Logger;
+    
+   public static Dictionary<string, object> VpnResumeParameters = new Dictionary<string, object>();
 
     public VPNTransportIKEV2()
     {
@@ -64,10 +63,26 @@ public class VPNTransportIKEV2 :ITransportProvider
         return new ErrorResponse();
     }
 
+    public static void PowerSuspendVPNConnection()
+    {
+        string entryName = (string)VpnResumeParameters["PhonebookEntryName"];
+        var vpnTransportIkev2 = new VPNTransportIKEV2();
+        vpnTransportIkev2.StopVPNTunnel(entryName);
+    }
+    
+    public static bool PowerResumeVPNConnection()
+    {
+        var vpnTransportIkev2 = new VPNTransportIKEV2();
+        var result = vpnTransportIkev2.StartVPNTunnelWithOptions(VpnResumeParameters).Result;
+
+        return !result.IsError;
+    }
+    
     public virtual Task<ErrorResponse> StartVPNTunnelWithOptions(Dictionary<string, object> options)
     {
+        VpnResumeParameters = options;
+        
         Task t = new Task<ErrorResponse>(() =>
-
         {
             Log.Information("StartVPNTunnelWithOptions: Evaluating vpn connection parameters...");
             foreach (string key in options.Keys)
@@ -86,7 +101,7 @@ public class VPNTransportIKEV2 :ITransportProvider
             string hostDisplayName = (string)options["hostDisplay"];
 
             // :CALL POINT:
-            CreateRoutines creator = new NativeRoutines.CreateRoutines();
+            CreateRoutines creator = new CreateRoutines();
             var result = creator.CreateTheCall(null, entryName, hostName, creds.UserName, creds.Password);
 
             if (result != 0)

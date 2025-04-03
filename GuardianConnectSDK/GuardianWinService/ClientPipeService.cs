@@ -27,50 +27,56 @@ public class ClientPipeService : BackgroundService
         
         StartServerListeners();
 
-//        await Task.Factory.StartNew(() =>
-//        {
 
-            try
+        try
+        {
+            var heartbeatCounter = 0;
+            var priorMessage =
+                $"ClientPipeService is running... Clients connected: {numberOfClientsConnected}. Cancellation Request is {stoppingToken.IsCancellationRequested}";
+            Log.Information(
+                $"Going into while() loop. stoppingToken.IsCancllationRequestioned = {stoppingToken.IsCancellationRequested}");
+            while (!stoppingToken.IsCancellationRequested)
             {
-                Log.Information(
-                    $"Going into while() loop. stoppingToken.IsCancllationRequestioned = {stoppingToken.IsCancellationRequested}");
-                while (!stoppingToken.IsCancellationRequested)
+                var currentMessage =
+                    $"ClientPipeService is running... Clients connected: {numberOfClientsConnected}. Cancellation Request is {stoppingToken.IsCancellationRequested}";
+
+                if (!currentMessage.Equals(priorMessage))
                 {
-
-                    Log.Information(
-                        $"ClientPipeService is running... Clients connected: {numberOfClientsConnected}. Cancellation Request is {stoppingToken.IsCancellationRequested}");
-
-                    await Task.Delay(60000);
+                    Log.Information(currentMessage);
+                    heartbeatCounter = 0;
+                    priorMessage = currentMessage;
                 }
+                else if (++heartbeatCounter % 5 == 0) Log.Information("ClientPipeService is running...");
 
-                Log.Information(
-                    $"Past while() loop. stoppingToken.IsCancllationRequestioned = {stoppingToken.IsCancellationRequested}");
-
-                StopServerListenerThreads();
+                await Task.Delay(60000);
             }
-            catch (OperationCanceledException oce) when (!oce.CancellationToken.IsCancellationRequested)
-            {
-                Log.Information("OperationCanceledException");
-                // When the stopping token is canceled, for example, a call made from services.msc,
-                // we shouldn't exit with a non-zero exit code. In other words, this is expected...
 
-                Log.Error(oce, "{Message}", oce.Message);
-            }
-            catch (Exception ex)
-            {
-                Log.Error(ex, "{Message}", ex.Message);
+            Log.Information(
+                $"Past while() loop. stoppingToken.IsCancllationRequestioned = {stoppingToken.IsCancellationRequested}");
 
-                // Terminates this process and returns an exit code to the operating system.
-                // This is required to avoid the 'BackgroundServiceExceptionBehavior', which
-                // performs one of two scenarios:
-                // 1. When set to "Ignore": will do nothing at all, errors cause zombie services.
-                // 2. When set to "StopHost": will cleanly stop the host, and log errors.
-                //
-                // In order for the Windows Service Management system to leverage configured
-                // recovery options, we need to terminate the process with a non-zero exit code.
-            }
-//        });
+            StopServerListenerThreads();
+        }
+        catch (OperationCanceledException oce) when (!oce.CancellationToken.IsCancellationRequested)
+        {
+            Log.Information("OperationCanceledException");
+            // When the stopping token is canceled, for example, a call made from services.msc,
+            // we shouldn't exit with a non-zero exit code. In other words, this is expected...
 
+            Log.Error(oce, "{Message}", oce.Message);
+        }
+        catch (Exception ex)
+        {
+            Log.Error(ex, "{Message}", ex.Message);
+
+            // Terminates this process and returns an exit code to the operating system.
+            // This is required to avoid the 'BackgroundServiceExceptionBehavior', which
+            // performs one of two scenarios:
+            // 1. When set to "Ignore": will do nothing at all, errors cause zombie services.
+            // 2. When set to "StopHost": will cleanly stop the host, and log errors.
+            //
+            // In order for the Windows Service Management system to leverage configured
+            // recovery options, we need to terminate the process with a non-zero exit code.
+        }
         Log.Information("ClientPipeService: past Task Creation clause...");
     }
 

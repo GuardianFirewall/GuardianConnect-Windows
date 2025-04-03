@@ -21,6 +21,20 @@ public class Common
     // Define below to 0 to make guardian specific code inactive
     //#define GUARDIAN_INTERNAL 1
 
+    public enum PowerTransitionStates { Suspend, Resume, Running }
+
+    public enum PowerNotificationTypes
+    {
+        PBT_APMPOWERSTATUSCHANGE = 10,  //(0xA) Power status has changed.
+        PBT_APMRESUMEAUTOMATIC = 18,    // (0x12) Operation is resuming automatically from a low-power state.
+                                        // This message is sent every time the system resumes.
+        PBT_APMRESUMESUSPEND = 7,       // (0x7) Operation is resuming from a low-power state.
+                                        // This message is sent after PBT_APMRESUMEAUTOMATIC if the resume
+                                        // is triggered by user input, such as pressing a key.
+        PBT_APMSUSPEND = 4,             // (0x4) System is suspending operation.
+        PBT_POWERSETTINGCHANGE = 32787  //  (0x8013)
+    }
+
     public const string kAppNeedsSelfRepair = @"guardianNeedsSelfRepair";
     public const string kWhetherToSpawnUpdateChecker = "StartUpdateChecker";
     public const string kWhetherLoggingCurrentlyOn = "WhetherLoggingCurrentlyOn";
