@@ -7,8 +7,11 @@ var paths = new[] { @"C:\temp", "GuardianFirewallService", "Diagnostics.log" };
 Common.LogFilePath = Path.Combine(paths);
 Common.SetUpLogging();
 
-PowerTransitionMonitor.PossibleFixSetup();
+#if POWERCATCHER_USING_EVENTS
 PowerTransitionMonitor.SetPowerTransitionEventHandler();
+#else
+PowerTransitionHandler.SetupPowerTransitionHandler();
+#endif
 
 var hb = Host.CreateDefaultBuilder(args);
 hb.UseWindowsService();

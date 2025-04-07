@@ -147,12 +147,13 @@ public class ClientPipeService : BackgroundService
         {
             PipeSecurity pipeSecurity = new PipeSecurity();
             pipeSecurity.AddAccessRule(
-                new PipeAccessRule(new SecurityIdentifier(WellKnownSidType.WorldSid, null), PipeAccessRights.FullControl, AccessControlType.Allow));
+                new PipeAccessRule(new SecurityIdentifier(WellKnownSidType.WorldSid, null), PipeAccessRights.FullControl,
+                    AccessControlType.Allow));
 
             //NamedPipeServerStream pipeServer = new NamedPipeServerStream("GuardianFirewallService", PipeDirection.InOut, numThreads);
             NamedPipeServerStream pipeServer = NamedPipeServerStreamAcl.Create("GuardianFirewallService",
-                PipeDirection.InOut, 8, PipeTransmissionMode.Byte, PipeOptions.Asynchronous, 65536, 65536,
-                pipeSecurity);
+                PipeDirection.InOut, 8, PipeTransmissionMode.Byte, PipeOptions.Asynchronous,
+                65536, 65536, pipeSecurity);
 
             // Wait for a client to connect
             Log.Information($"Pipe Service Thread #{threadId} going to wait for Client Connection...");
