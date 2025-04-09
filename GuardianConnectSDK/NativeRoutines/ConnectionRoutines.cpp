@@ -202,6 +202,18 @@ namespace NativeRoutines
                 break;
             }
         }
+        switch (result)
+        {
+            case Utility::CheckConnectionResult::DISCONNECTED:
+                PrintRoutines::Output("CheckConnectionResult::DISCONNECTED");
+                break;
+            case Utility::CheckConnectionResult::CONNECTED:
+                PrintRoutines::Output("CheckConnectionResult::CONNECTED");
+                break;
+            default:
+                PrintRoutines::Output("CheckConnectionResult::UNKNOWN");
+                break;
+        }
         return result;
     }
 
@@ -264,7 +276,7 @@ namespace NativeRoutines
         // If got success here, it means there is no connected vpn entry.
         if (dw_ret == ERROR_SUCCESS) {
             // TJE - CHECK THIS - do we need to output this every time? Commenting out for now.
-            //PrintRoutines::Output("FindAnyActiveConnection: There is no active connection.");
+            PrintRoutines::Output("FindAnyActiveConnection: There is no active connection.");
             return nullptr;
         }
 

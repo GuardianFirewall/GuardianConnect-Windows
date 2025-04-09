@@ -9,9 +9,9 @@ public static class ClientPipe
 {
     private static readonly ClientPipeImpl Instance = new ClientPipeImpl();
 
-    public static void Connect(string servicePipeName = Common.kGRDServicePipeName)
+    public static bool Connect(string servicePipeName = Common.kGRDServicePipeName)
     {
-        Instance.Connect(servicePipeName);
+        return Instance.Connect(servicePipeName);
     }
 
     public static IGuardianNPContract.CompositeType GetDataUsingDataContract(IGuardianNPContract.CompositeType composite)
@@ -56,21 +56,27 @@ public class ClientPipeImpl : IGuardianNPContract
     private static NamedPipeClientStream _clientStream = new NamedPipeClientStream("NULL");
     private static StreamString ss;
 
-    internal void Connect(string servicePipeName = Common.kGRDServicePipeName)
+    internal bool Connect(string servicePipeName = Common.kGRDServicePipeName)
     {
+        bool whetherPreviouslyConnectedAtSuspend = false;
         try
         {
             _clientStream = new NamedPipeClientStream(".", servicePipeName, PipeDirection.InOut);
             _clientStream.Connect(10 * 1000);
             ss = new StreamString(_clientStream);
-            var testAck = ss.ReadStringAsync();
-            Log.Information($"Client Pipe connected to Service - received '{testAck}'");
+            //var testAck = ss.ReadStringAsync();
+            var testAck = ss.ReadString();
+            Log.Information($"Client Pipe connected to Service. testAck returned '{testAck}'");
+            var pieces = testAck.Split(new char[] { '#' } );
+            whetherPreviouslyConnectedAtSuspend = pieces[2].Equals("true", StringComparison.InvariantCultureIgnoreCase);
         }
         catch (Exception e)
         {
             Log.Error(e, $"Exception when Connecting on pipe: {e.Message}");
             throw;
         }
+
+        return whetherPreviouslyConnectedAtSuspend;
     }
 
     string IGuardianNPContract.GetData(int value)
