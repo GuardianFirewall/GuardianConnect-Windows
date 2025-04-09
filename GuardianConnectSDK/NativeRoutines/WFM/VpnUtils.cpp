@@ -234,33 +234,6 @@ namespace NativeRoutines
 		}
 		return retValue;
 	}
-#if 0
-		// Add filter to block traffic on IP V4 for all applications.
-		//
-		FWPM_FILTER0      fwpFilter;
-		FWPM_SUBLAYER0    fwpFilterSubLayer;
-
-		RtlZeroMemory(&fwpFilter, sizeof(FWPM_FILTER0));
-
-		fwpFilter.layerKey = FWPM_LAYER_ALE_AUTH_RECV_ACCEPT_V4;
-		fwpFilter.action.type = FWP_ACTION_BLOCK;
-
-		if (&fwpFilterSubLayer.subLayerKey != NULL)
-			fwpFilter.subLayerKey = fwpFilterSubLayer.subLayerKey;
-
-		fwpFilter.weight.type = FWP_EMPTY; // auto-weight.
-		fwpFilter.numFilterConditions = 0; // this applies to all application traffic
-		fwpFilter.displayData.name = L"Receive/Accept Layer Block";
-		fwpFilter.displayData.description = L"Filter to block all inbound connections.";
-
-		printf("Adding filter to block all inbound connections.\n");
-		result = FwpmFilterAdd0(engineHandle, &fwpFilter, NULL, NULL);
-
-		if (result != ERROR_SUCCESS)
-			printf("FwpmFilterAdd0 failed. Return value: %d.\n", result);
-		else
-			printf("Filter added successfully.\n");
-#endif
 
 	// Block all IPv6 DNS queries
 	DWORD BlockIPv6Queries(HANDLE engine_handle) {
@@ -449,36 +422,6 @@ namespace NativeRoutines
 
 		return success;
 	}
-
-#if DEADCODE
-	HANDLE OpenWpmSession() {
-		HANDLE engine = nullptr;
-		FWPM_SESSION0 session;
-		memset(&session, 0, sizeof(session)); // Initialize the structure to zero
-
-		session.flags = FWPM_SESSION_FLAG_DYNAMIC;
-		session.displayData.name = L"Guardian VPN Service";
-		session.displayData.description = L"Session for Guardian VPN Service";
-
-		PrintRoutines::Output("OpenWpmSession: [CONNECT#4.1]");
-		auto result =
-			FwpmEngineOpen0(nullptr, RPC_C_AUTHN_WINNT, nullptr, &session, &engine);
-		if (result != ERROR_SUCCESS) {
-			PrintRoutines::Output(Grd::FormatAString("OpenWpmSession: Error from call to FwpmEngineOpen0() :{0:X}", result));
-		}
-		PrintRoutines::Output("OpenWpmSession: [CONNECT#4.2]");
-		return engine;
-	}
-
-	bool CloseWpmSession(HANDLE engine) {
-		auto result = FwpmEngineClose0(engine);
-		bool success = result == ERROR_SUCCESS;
-		if (!success) {
-			PrintRoutines::Output(Grd::FormatAString("OpenWpmSession: Error from call to FwpmEngineClose0() :{0:X}", result));
-		}
-		return success;
-	}
-#endif
 
 	bool VpnUtils::SubscribeRasConnectionNotification(HANDLE event_handle) {
 		// As we pass INVALID_HANDLE_VALUE, we can get connected or disconnected

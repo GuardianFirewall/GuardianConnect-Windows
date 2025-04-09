@@ -38,6 +38,7 @@ public class Common
     public const string kAppNeedsSelfRepair = @"guardianNeedsSelfRepair";
     public const string kWhetherToSpawnUpdateChecker = "StartUpdateChecker";
     public const string kWhetherLoggingCurrentlyOn = "WhetherLoggingCurrentlyOn";
+    public const string kVpnCallParametersForReboot = "VPNCallParametersForReboot";
 
     /// Public production Connect API environment
     public const string kConnectAPIHostname = @"connect-api.guardianapp.com";

@@ -1,8 +1,12 @@
 ﻿using System.Diagnostics;
 using System.Net;
+using ABI.Windows.Data.Json;
+using GuardianConnect.Credentials;
+using GuardianConnect.Helpers;
 using GuardianConnect.Shared;
 using GuardianConnect.Shared.Extensions;
 using NativeRoutines;
+using Newtonsoft.Json;
 using Serilog;
 
 namespace GuardianConnect.VPNTransports;
@@ -111,6 +115,10 @@ public class VPNTransportIKEV2 :ITransportProvider
 
             // TJE - TODO: Add proper error reporting, bubble-up/handling
             ConnectToVpnLongRunning(entryName, creds.UserName, creds.Password);
+            
+            // Save off the calling parameters in case we reboot while connected
+            var vpnResumeParameters = JsonConvert.SerializeObject(VpnResumeParameters);
+            RegistrySettings.UpdateGuardianUserSettings(Common.kVpnCallParametersForReboot, vpnResumeParameters);
 
             ActiveEntryName = entryName;
 
