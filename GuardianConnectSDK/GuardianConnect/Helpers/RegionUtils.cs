@@ -74,7 +74,7 @@ namespace GuardianConnect.Helpers
             }
 
             RegionKeysByDisplay.TryAdd("Automatic", "Automatic");
-            foreach (var regionRec in regionsList)
+            foreach (var regionRec in regionsList.OrderBy(region => region.DisplayName))
             {
                 regionLookup.TryAdd(regionRec.RegionName, regionRec);
                 RegionKeys.Add(regionRec.RegionName);
@@ -147,7 +147,7 @@ namespace GuardianConnect.Helpers
         {
             Log.Information($"GetHostsForRegionKey: Retrieving hosts for region {regionKey}.");
 
-            HttpResponseMessage response;
+            HttpResponseMessage response = new HttpResponseMessage();
             string getHostsForRegionUrl = $"https://{Common.kConnectAPIHostname}/api/v1/servers/hostnames-for-region";
             Uri uri = new Uri(getHostsForRegionUrl);
             try
@@ -179,14 +179,11 @@ namespace GuardianConnect.Helpers
                 if (response.IsSuccessStatusCode)
                 {
                     string respContent = await response.Content.ReadAsStringAsync();
-                    List<RegionalHostRecord> regionHosts = new List<RegionalHostRecord>();
-                    regionHosts = JsonConvert.DeserializeObject<List<RegionalHostRecord>>(respContent) ?? throw new InvalidOperationException();
-                    if (!_hostLookup.ContainsKey(regionKey)) _hostLookup.Add(regionKey, null!);
-                    _hostLookup[regionKey] = regionHosts ?? throw new InvalidOperationException();
-                    {
-                        var message = $"RegionUtils.GetHostForRegion: Added {regionHosts.Count} hosts for region '{regionKey}'";
-                        Log.Information(message);
-                    }
+                    List<RegionalHostRecord> regionHosts = JsonConvert.DeserializeObject<List<RegionalHostRecord>>(respContent);
+                    if (!_hostLookup.ContainsKey(regionKey)) _hostLookup.Add(regionKey, null);
+                    _hostLookup[regionKey] = regionHosts;
+                    var message = $"RegionUtils.GetHostForRegion: Added {regionHosts.Count} hosts for region '{regionKey}'";
+                    Log.Information(message);
                 }
                 else
                 {
