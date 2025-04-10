@@ -13,3 +13,12 @@
 /GuardianConnectSDK/NativeRoutines/x64/Release
 /GuardianConnectSDK/GuardianWinService/bin/x64/Debug/net9.0-windows10.0.26100.0
 /.idea/vcs.xml
+/GuardianConnectSDK/NativeRoutines/NativeRoutines/x64/Release
+/GuardianConnectSDK/NativeRoutines/obj
+/GuardianConnectSDK/Shared/bin/x64/Release
+/GuardianConnectSDK/Shared/obj
+/GuardianConnectSDK/GuardianWinService/bin/x64/Release/net8.0-windows/win-x64
+/GuardianConnectSDK/GuardianWinService/obj
+/GuardianConnectSDK/GuardianConnect/obj
+/GuardianConnectSDK/NativeRoutines/x64/Release
+/.vs

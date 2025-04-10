@@ -70,7 +70,7 @@ namespace GuardianConnect.Helpers
             }
 
             RegionKeysByDisplay.TryAdd("Automatic", "Automatic");
-            foreach (var regionRec in _regionsList)
+            foreach (var regionRec in _regionsList.OrderBy(region => region.DisplayName))
             {
                 regionLookup.TryAdd(regionRec.RegionName, regionRec);
                 RegionKeys.Add(regionRec.RegionName);
