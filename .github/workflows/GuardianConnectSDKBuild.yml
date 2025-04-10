@@ -2,7 +2,9 @@
 name: GuardianConnectSDK build and package
 
 on:
-  workflow_dispatch:    
+  workflow_dispatch:
+    branches: [ "wip" ]
+    
   push:
     branches: [ "main" ]
   pull_request:
