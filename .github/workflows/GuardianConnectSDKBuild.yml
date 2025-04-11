@@ -76,10 +76,6 @@ jobs:
       run: nuget pack GuardianWindowsService.nuspec
       shell: cmd
       
-    # Update GitHub Packages with these nuget packages
-    - name: Update GitHub with nuget packages
-      run: nuget push GuardianConnect.0.14.1.9.nupkg -Source GitHub
-
     # Sign GuardianConnectSDK package with certificate
     # Name GuardianConnectSDK Windows Nuget Package
     # Slug GuardianConnectSDK_Windows_Nuget_Package
@@ -108,3 +104,16 @@ jobs:
       with:
         name: GuardianFirewallService.14.1.9.nupkg
         path: D:\a\GuardianConnect-Windows\GuardianConnect-Windows\GuardianConnectSDK\GuardianFirewallService.0.14.1.9.nupkg
+        
+        
+        # Add github as source for nuget
+    - name: Add GitHub as nuget package source
+      shell: cmd
+      run: dotnet nuget add source --username time4dnsf --password ${{ secrets.GITHUB_TOKEN }} --store-password-in-clear-text --name github "https://nuget.pkg.github.com/GuardianFirewall/index.json"
+        
+#        nuget add source GitHub "https://github.com/guardianfirewall/index.json"
+    
+    # Update GitHub Packages with these nuget packages
+    - name: Update GitHub with nuget packages
+      run: nuget push GuardianConnect.0.14.1.9.nupkg -Source GitHub
+
