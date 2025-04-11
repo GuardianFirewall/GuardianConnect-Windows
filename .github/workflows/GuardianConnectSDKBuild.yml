@@ -75,22 +75,26 @@ jobs:
     - name: Create GuardianWindowsService.nupkg package bundle
       run: nuget pack GuardianWindowsService.nuspec
       shell: cmd
-
-    # Sign GuardianConnectSDK package with certificate
-    # Name GuardianConnectSDK Windows Nuget Package
-    # Slug GuardianConnectSDK_Windows_Nuget_Package
-    - name: Sign GuardianConnectSDK package with certificate
-      run: Install-Module -Name SignPath -Force
-
-        Submit-SigningRequest `
-        -InputArtifactPath "GuardianConnectSDK\\GuardianConnect.0.14.1.9.nupkg" `
-        -ApiToken "${{ secrets.CI_SIGNPATH_USER_TOKEN }}" `
-        -OrganizationId "5c1e4170-8bf7-48b1-8542-78374ccc3471" `
-        -ProjectSlug "Guardian" `
-        -SigningPolicySlug "Guardian_DNSF_Branded" `
-        -OutputArtifactPath "GuardianConnectSDK\\GuardianConnect.0.14.1.9_signed.nupkg" `
-        -ArtifactConfigurationSlug GuardianConnectSDK_Windows_Nuget_Package `
-        -WaitForCompletion
+      
+###    # Update GitHub Packages with these nuget packages
+###    - name: Update GitHub with nuget packages
+###      run: nuget push GuardianConnect.0.14.1.9.nupkg -Source GitHub
+###
+###    # Sign GuardianConnectSDK package with certificate
+###    # Name GuardianConnectSDK Windows Nuget Package
+###    # Slug GuardianConnectSDK_Windows_Nuget_Package
+###    - name: Sign GuardianConnectSDK package with certificate
+###      run: Install-Module -Name SignPath -Force
+###
+###        Submit-SigningRequest `
+###        -InputArtifactPath "GuardianConnectSDK\\GuardianConnect.0.14.1.9.nupkg" `
+###        -ApiToken "${{ secrets.CI_SIGNPATH_USER_TOKEN }}" `
+###        -OrganizationId "5c1e4170-8bf7-48b1-8542-78374ccc3471" `
+###        -ProjectSlug "Guardian" `
+###        -SigningPolicySlug "Guardian_DNSF_Branded" `
+###        -OutputArtifactPath "GuardianConnectSDK\\GuardianConnect.0.14.1.9_signed.nupkg" `
+###        -ArtifactConfigurationSlug GuardianConnectSDK_Windows_Nuget_Package `
+###        -WaitForCompletion
 
       # Upload the MSI package: https://github.com/marketplace/actions/upload-a-build-artifact
     - name: Upload build artifacts - GuardianConnectSDK
