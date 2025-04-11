@@ -13,7 +13,7 @@
     <copyright>Copyright DNSFilter, Inc.</copyright>
     <tags>GuardianConnectSDK Beta Windows</tags>
     <dependencies>
-      <group targetFramework="net8.0"/>
+      <group targetFramework="net9.0"/>
     </dependencies>
   </metadata>
   <files>
@@ -21,7 +21,8 @@
   <file src="Guardian.png"/>
     <!--
     <file src="GuardianWinService\bin\x64\release\net8.0-windows\win-x64\**\*.*" target="lib\net8.0"/>
-    -->
     <file src="GuardianConnect\bin\x64\Release\net8.0-windows\win-x64\*.*" target="lib\net8.0"/>
+    -->
+    <file src="GuardianConnect\bin\x64\Release\net9.0-windows10.0.26100.0\win-x64\*.*" target="lib\net9.0"/>
   </files>
 </package>
