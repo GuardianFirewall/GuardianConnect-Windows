@@ -106,7 +106,7 @@ jobs:
         -ProjectSlug "Guardian" `
         -SigningPolicySlug "Guardian_DNSF_Branded" `
         -OutputArtifactPath "GuardianFirewallService.0.14.1.9_signed.nupkg" `
-        -ArtifactConfigurationSlug GuardianFirewallService_Windows_Nuget_Package `
+        -ArtifactConfigurationSlug GuardianFirewallService_Nuget_Package `
         -WaitForCompletion
       
       # Upload the MSI package: https://github.com/marketplace/actions/upload-a-build-artifact
