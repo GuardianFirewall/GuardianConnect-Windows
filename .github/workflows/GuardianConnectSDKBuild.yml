@@ -83,12 +83,12 @@ jobs:
       run: Install-Module -Name SignPath -Force
 
         Submit-SigningRequest `
-        -InputArtifactPath "GuardianConnectSDK\\GuardianConnect.0.14.1.9.nupkg" `
+        -InputArtifactPath "GuardianConnect.0.14.1.9.nupkg" `
         -ApiToken "${{ secrets.CI_SIGNPATH_USER_TOKEN }}" `
         -OrganizationId "5c1e4170-8bf7-48b1-8542-78374ccc3471" `
         -ProjectSlug "Guardian" `
         -SigningPolicySlug "Guardian_DNSF_Branded" `
-        -OutputArtifactPath "GuardianConnectSDK\\GuardianConnect.0.14.1.9_signed.nupkg" `
+        -OutputArtifactPath "GuardianConnect.0.14.1.9_signed.nupkg" `
         -ArtifactConfigurationSlug GuardianConnectSDK_Windows_Nuget_Package `
         -WaitForCompletion
 
