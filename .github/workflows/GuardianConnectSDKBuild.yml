@@ -115,5 +115,5 @@ jobs:
     
     # Update GitHub Packages with these nuget packages
     - name: Update GitHub with nuget packages
-      run: nuget push GuardianConnect.0.14.1.9.nupkg -Source GitHub
+      run: nuget push GuardianConnect.0.14.1.9.nupkg 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 -Source GitHub
 
