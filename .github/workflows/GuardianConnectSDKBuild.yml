@@ -132,8 +132,8 @@ jobs:
     
     # Update GitHub Packages with these nuget packages
     - name: Update GitHub with nuget packages - SDK
-      run: nuget push GuardianConnect.0.14.1.9_signed.nupkg ${{ secrets.GUARDIANFIREWALL_GH_PKG_TOKEN }} -Source GitHub
+      run: nuget push GuardianConnect.0.14.1.9_signed.nupkg ${{ secrets.GUARDIANFIREWALL_GH_PKG_TOKEN }} -Source GitHub -SkipDuplicate
 
     - name: Update GitHub with nuget packages - Service
-      run: nuget push GuardianFirewallService.0.14.1.9_signed.nupkg ${{ secrets.GUARDIANFIREWALL_GH_PKG_TOKEN }} -Source GitHub
+      run: nuget push GuardianFirewallService.0.14.1.9_signed.nupkg ${{ secrets.GUARDIANFIREWALL_GH_PKG_TOKEN }} -Source GitHub -SkipDuplicate
 
