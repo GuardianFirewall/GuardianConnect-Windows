@@ -13,7 +13,7 @@
     <copyright>Copyright DNSFilter, Inc.</copyright>
     <tags>GuardianConnectSDK Windows Service Beta Windows</tags>
     <dependencies>
-      <group targetFramework="net9.0*"/>
+      <group targetFramework="net9.0"/>
     </dependencies>
   </metadata>
   <files>
