@@ -5,49 +5,70 @@ using Serilog;
 
 namespace GuardianConnect.Helpers;
 
-public class ClientPipe : IGuardianNPContract
+public static class ClientPipe
 {
-    private IGuardianNPContract.NPCommands cmds;
-    private NamedPipeClientStream _clientStream;
-    private StreamString ss;
-    private static bool _instanceCreated = false;
+    private static readonly ClientPipeImpl Instance = new ClientPipeImpl();
 
-    private static ClientPipe? _instance;
-
-    public ClientPipe()
+    public static bool Connect(string servicePipeName = Common.kGRDServicePipeName)
     {
-    }
-    
-    public static ClientPipe Instance
-    {
-        get
-        {
-            if (_instance == null)
-            {
-                // WHAT??? Who's calling the get before we call the CreateInstance()?
-                throw new InvalidOperationException("Client Pipe Instance gotten before set");
-            }
-
-            return _instance;
-        }
+        return Instance.Connect(servicePipeName);
     }
 
-    public static void CreateInstance()
+    public static IGuardianNPContract.CompositeType GetDataUsingDataContract(IGuardianNPContract.CompositeType composite)
     {
-        Log.Information($"ClientPipe - we are now creating instance for use.");
-        _instance = new ClientPipe();
-        _instanceCreated = true;
+        return Instance.GetDataUsingDataContract(composite);
     }
 
-    public ClientPipe Connect(string servicePipeName = Common.kGRDServicePipeName)
+    public static bool StartVPNConnection(Dictionary<string, object> protocolRequest)
     {
+        return Instance.StartVPNConnection(protocolRequest);
+    }
+
+    public static void DisconnectVPNConnection(string entryName)
+    {
+        Instance.DisconnectVPNConnection(entryName);
+    }
+
+    public static IGuardianNPContract.CurrentVPNStatus GetCurrentVpnConnectionStatus()
+    {
+        return Instance.GetCurrentVpnConnectionStatus();
+    }
+
+    public static async Task<string> Ping()
+    {
+        return await Instance.Ping();
+    }
+
+    public static void ToggleLogging(bool whetherToDeleteLogFiles)
+    {
+        Instance.ToggleLogging(whetherToDeleteLogFiles);
+
+    }
+
+    public static async Task<List<string>> GetServiceLogLinesAsync(int maxNumberOfLinesToGet = 200)
+    {
+        return await Instance.GetServiceLogLinesAsync(maxNumberOfLinesToGet);
+    }
+}
+
+public class ClientPipeImpl : IGuardianNPContract
+{
+    private static NamedPipeClientStream _clientStream = new NamedPipeClientStream("NULL");
+    private static StreamString ss;
+
+    internal bool Connect(string servicePipeName = Common.kGRDServicePipeName)
+    {
+        bool whetherPreviouslyConnectedAtSuspend = false;
         try
         {
             _clientStream = new NamedPipeClientStream(".", servicePipeName, PipeDirection.InOut);
-            _clientStream.Connect();
+            _clientStream.Connect(10 * 1000);
             ss = new StreamString(_clientStream);
-            var testACK = ss.ReadString();
-            Log.Information($"Client Pipe connected to Service - received '{testACK}'");
+            //var testAck = ss.ReadStringAsync();
+            var testAck = ss.ReadString();
+            Log.Information($"Client Pipe connected to Service. testAck returned '{testAck}'");
+            var pieces = testAck.Split(new char[] { '#' } );
+            whetherPreviouslyConnectedAtSuspend = pieces[2].Equals("true", StringComparison.InvariantCultureIgnoreCase);
         }
         catch (Exception e)
         {
@@ -55,10 +76,10 @@ public class ClientPipe : IGuardianNPContract
             throw;
         }
 
-        return _instance;
+        return whetherPreviouslyConnectedAtSuspend;
     }
 
-    public string GetData(int value)
+    string IGuardianNPContract.GetData(int value)
     {
         throw new NotImplementedException();
     }
@@ -68,8 +89,13 @@ public class ClientPipe : IGuardianNPContract
         var cmdPayload = JsonConvert.SerializeObject(composite);
         var cmdString = $"{(int)IGuardianNPContract.NPCommands.GetDataUsingDataContract}.{cmdPayload}";
         ss.WriteString(cmdString);
-        var response = ss.ReadString();
+        var response = ss.ReadStringAsync().Result;
         var value = JsonConvert.DeserializeObject<IGuardianNPContract.CompositeType>(response);
+
+        if (value == null)
+        {
+            throw new InvalidOperationException("Service returned null");
+        }
 
         return value;
     }
@@ -79,7 +105,7 @@ public class ClientPipe : IGuardianNPContract
         var cmdPayload = JsonConvert.SerializeObject(protocolRequest);
         var cmdString = $"{(int)IGuardianNPContract.NPCommands.StartVPNConnection}.{cmdPayload}";
         ss.WriteString(cmdString);
-        var started = ss.ReadString();
+        var started = ss.ReadStringAsync().Result;
 
         return started.Equals("True");
     }
@@ -97,6 +123,7 @@ public class ClientPipe : IGuardianNPContract
         var cmdString = $"{(int)IGuardianNPContract.NPCommands.GetCurrentVpnConnectionStatus}.";
         ss.WriteString(cmdString);
         Log.Information("Reading status...");
+        //var statusString = ss.ReadStringAsync().Result;
         var statusString = ss.ReadString();
         var status = JsonConvert.DeserializeObject<IGuardianNPContract.CurrentVPNStatus>(statusString);
         Log.Information($"status is {status.EntryName}, {status.ConnectionState}...");
@@ -104,13 +131,13 @@ public class ClientPipe : IGuardianNPContract
         return status;
     }
 
-    public string Ping()
+    public async Task<string> Ping()
     {
         Log.Information("Pinging service");
         var cmdString = $"{(int)IGuardianNPContract.NPCommands.Ping}.";
         ss.WriteString(cmdString);
         Log.Information("Reading status...");
-        var ping = ss.ReadString();
+        var ping = await ss.ReadStringAsync();
         Log.Information($"Service returned {ping}");
         return ping;
     }
@@ -128,14 +155,15 @@ public class ClientPipe : IGuardianNPContract
         ss.WriteString(cmdString);
     }
 
-    public List<string> GetServiceLogLines(int maxNumberOfLinesToGet = 200)
+    public async Task<List<string>> GetServiceLogLinesAsync(int maxNumberOfLinesToGet = 200)
     {
         Log.Information($"Requesting GuardianFirewall Service's last {maxNumberOfLinesToGet} log lines...");
         var cmdString = $"{(int)IGuardianNPContract.NPCommands.RequestLogLines}.{maxNumberOfLinesToGet}";
         ss.WriteString(cmdString);
         Log.Information("Reading response...");
-        var serializedServiceLogLines = ss.ReadString();
-        var serviceLogLines = JsonConvert.DeserializeObject<List<string>>(serializedServiceLogLines);
+        var serializedServiceLogLines = await ss.ReadStringAsync();
+        var jsonLines = JsonConvert.DeserializeObject<List<string>>(serializedServiceLogLines);
+        var serviceLogLines = jsonLines ?? new List<string>();
         Log.Information($"Number of log lines returned from the service = {serviceLogLines.Count}");
 
         return serviceLogLines;

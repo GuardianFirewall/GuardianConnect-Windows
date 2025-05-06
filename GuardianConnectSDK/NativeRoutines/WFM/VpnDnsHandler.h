@@ -30,14 +30,15 @@ namespace NativeRoutines
         void ScheduleExit();
 
     private:
-        bool SetupPlatformFilters(HANDLE engine_handle, String^ name);
+        bool SetupPlatformFilters(String^ name);
+        bool RemovePlatformFilters(String^ name);
         int GetWaitingIntervalBeforeExit();
         void CloseWatchers();
         void DisconnectVPN();
         void Exit();
         virtual void SubscribeForRasNotifications(HANDLE event_handle);
 
-        HANDLE engine_ = nullptr;
+        static HANDLE engine_;
         HANDLE event_handle_for_vpn_ = nullptr;
         const int kWaitingIntervalBeforeExitSec = 10;
         //raw_ptr<BraveVpnDnsDelegate> delegate_;

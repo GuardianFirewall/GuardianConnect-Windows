@@ -1,200 +1,236 @@
 #include "pch.h"
+#include <msclr/marshal.h>
 #include "VpnDnsHandler.h"
 #include "VpnUtils.h"
 #include "../PrintRoutines.h"
 
 namespace  NativeRoutines
 {
-  ref class PrintRoutines;
-  //ref class VpnUtils;
-  using NativeRoutines::PrintRoutines;
-  
-  //class VpnDnsHandler
-  //{
-    constexpr int kCheckConnectionIntervalInSeconds = 3;
-    bool VpnDnsHandler::SetupPlatformFilters(HANDLE engine_handle,
-                                             String^ name) {
-      return VpnUtils::AddWpmFilters(engine_handle, name);
-    }
-    bool VpnDnsHandler::CloseEngineSession() {
-      return VpnUtils::CloseWpmSession(engine_);
-    }
+	ref class PrintRoutines;
+	using NativeRoutines::PrintRoutines;
+	using namespace System;
+	using namespace System::Runtime::InteropServices;
+
+	HANDLE VpnDnsHandler::engine_ = nullptr;
+
+	//class VpnDnsHandler
+	//{
+	constexpr int kCheckConnectionIntervalInSeconds = 3;
+	bool VpnDnsHandler::SetupPlatformFilters(String^ name) {
+		PrintRoutines::Output("SetupPlatformFilters: [CONNECT#5.1] Attempting to add filters...");
+		return VpnUtils::AddWpmFilters(engine_, name);
+	}
+
+	bool VpnDnsHandler::RemovePlatformFilters(String^ name)
+	{
+		PrintRoutines::Output("RemovePlatformFilters: [DISCONNECT#?.?] Attempting to remove filters...");
+		return VpnUtils::RemoveWpmFilters(engine_, name);
+	}
+	bool VpnDnsHandler::CloseEngineSession() {
+		PrintRoutines::Output("CloseEngineSession: Attempting to close engine session...");
+		return VpnUtils::CloseWpmSession(engine_);
+	}
 
 
-    bool VpnDnsHandler::SetFilters(String^ connection_name) {
-      PrintRoutines::Output(Grd::FormatAString("{0}: {1}", gcnew array<Object^> { *__func__, connection_name }));
-      if (IsActive()) {
-        PrintRoutines::Output(Grd::FormatAString("Filters activated for: {0}", gcnew array<Object^> {connection_name }));
-        return true;
-      }
+	bool VpnDnsHandler::SetFilters(String^ connection_name) {
+		PrintRoutines::Output(
+			Grd::FormatAString("SetFilters:[CONNECT#3.1] Connection is '{0}'", gcnew array<Object^> { connection_name }));
+		if (IsActive()) {
+			PrintRoutines::Output(
+				Grd::FormatAString(
+					"SetFilters: Filters ARE active already for: {0}", gcnew array<Object^> {connection_name }));
+			return true;
+		}
+		PrintRoutines::Output(
+			Grd::FormatAString(
+				"SetFilters:[CONNECT#3.2] Filters are NOT currently active for: {0}. Proceeding to activate them.",
+				gcnew array<Object^> {connection_name }));
 
-      engine_ = VpnUtils::OpenWpmSession();
-      if (!engine_) {
-        PrintRoutines::Output("Failed to open engine session");
-        return false;
-      }
+		engine_ = VpnUtils::OpenWpmSession();
+		if (!engine_) {
+			PrintRoutines::Output("Failed to open engine session");
+			return false;
+		}
 
-      if (!SetupPlatformFilters(engine_, connection_name)) {
-        if (!RemoveFilters(connection_name)) {
-          PrintRoutines::Output("Failed to remove DNS filters");
-        }
-        return false;
-      }
-      return true;
-    }
+		if (!SetupPlatformFilters(connection_name)) {
+			PrintRoutines::Output("SetupPlatformFilters failed so attempting to remove all filters as cleanup...");
+			if (!RemoveFilters(connection_name)) {
+				PrintRoutines::Output("Failed to remove DNS filters");
+			}
+			return false;
+		}
 
-    bool VpnDnsHandler::IsActive() const {
-      return engine_ != nullptr;
-    }
+		PrintRoutines::Output(Grd::FormatAString("SetFilters: Filters are now set and active for: {0}", gcnew array<Object^> {connection_name }));
+		return true;
+	}
 
-    bool VpnDnsHandler::RemoveFilters(String^ connection_name) {
-      PrintRoutines::Output(Grd::FormatAString("{0}: {1}", gcnew array<Object^>
-        {
-          *__func__,
-          connection_name
-        }
-        ));
-      if (!IsActive()) {
-        PrintRoutines::Output("No active filters");
-        return true;
-      }
-      bool success = CloseEngineSession();
-      if (success) {
-        engine_ = nullptr;
-      }
-      return success;
-    }
+	bool VpnDnsHandler::IsActive() const {
+		return engine_ != nullptr;
+	}
 
-    Utility::CheckConnectionResult VpnDnsHandler::GetVpnEntryStatus() {
-      PrintRoutines::Output(Grd::FormatAString("{0}", gcnew array<Object^> {*__func__} ));
-      return ConnectionRoutines::CheckConnection(ConnectionRoutines::ActiveConnectionEntryName->ToString());
-    }
+	bool VpnDnsHandler::RemoveFilters(String^ connection_name) {
+		bool success;
+		PrintRoutines::Output("RemoveFilters: Attempting to remove any active DNS filters...");
+		PrintRoutines::Output(Grd::FormatAString("{0}: {1}", gcnew array<Object^>
+		{
+			*__func__,
+				connection_name
+		}
+		));
+		if (!IsActive()) {
+			PrintRoutines::Output("No active filters");
+			return true;
+		}
 
-    void VpnDnsHandler::DisconnectVPN() {
-        auto result = false;
-      result = ConnectionRoutines::DisconnectEntry(ConnectionRoutines::ActiveConnectionEntryName->ToString());
-      if (!result) {
-        PrintRoutines::Output(Grd::FormatAString("Failed to disconnect entry:{0}", gcnew array<Object^> {GetLastError() }));
-      }
-    }
+		success = RemovePlatformFilters(connection_name); 
+		if (!success) {
+			PrintRoutines::Output("Failed to remove platform filters!");	
+		}
+		success = CloseEngineSession();
+		if (success) {
+			engine_ = nullptr;
+			PrintRoutines::Output("Closed engine session");
+		}
+		else
+		{
+			PrintRoutines::Output("Failed to close engine session");	
+		}
+		return success;
+	}
 
-    void VpnDnsHandler::UpdateFiltersState() {
-      PrintRoutines::Output(Grd::FormatAString("{0}", gcnew array<Object^> {*__func__ }));
-      String^ entryName = gcnew String(ConnectionRoutines::ActiveConnectionEntryName);
-      switch (GetVpnEntryStatus()) {
-      case Utility::CheckConnectionResult::CONNECTED:
-        PrintRoutines::Output("GuardianVPN connected, set filters");
-        if (IsActive()) {
-          PrintRoutines::Output("Filters are already installed");
-          return;
-        }
-        if (!SetFilters(entryName))
-        {
-          PrintRoutines::Output("Failed to set DNS filters");
-          DisconnectVPN(); // TJE ?? to CJ/Will - Disconnect if can't add filters? (Baby/Bathwater)
-          ScheduleExit();
-          return;
-        }
-        VpnUtils::SetFiltersInstalledFlag();
-        break;
-      case Utility::CheckConnectionResult::DISCONNECTED:
-        PrintRoutines::Output("GuardianVPN Disconnected, remove filters");
-        if (!RemoveFilters(entryName))
-        {
-          PrintRoutines::Output("Failed to remove DNS filters");
-          Exit();
-          break;
-        }
-        // Reset service launch counter if dns filters successfully removed.
-        VpnUtils::ResetFiltersInstalledFlag();
-        ScheduleExit();
-        break;
-      default:
-        PrintRoutines::Output(Grd::FormatAString("GuardianVPN is connecting, try later after {0} seconds",
-                 gcnew array<Object^> {kCheckConnectionIntervalInSeconds} ));
-        break;
-      }
-    }
+	Utility::CheckConnectionResult VpnDnsHandler::GetVpnEntryStatus() {
+		PrintRoutines::Output(Grd::FormatAString("GetVpnEntryStatus: Calling ConnectionRoutines::CheckConnection for {0} ...",
+			gcnew array<String^> {  ConnectionRoutines::ConnectedEntry }));
+		return ConnectionRoutines::CheckConnection(ConnectionRoutines::ConnectedEntry);
+	}
 
-    void VpnDnsHandler::CloseWatchers() {
-      if (event_handle_for_vpn_) {
-        CloseHandle(event_handle_for_vpn_);
-        event_handle_for_vpn_ = nullptr;
-      }
-//      periodic_timer_.Stop();
-    }
+	void VpnDnsHandler::DisconnectVPN() {
+		auto result = false;
+		result = ConnectionRoutines::DisconnectEntry(ConnectionRoutines::ConnectedEntry);
+		if (!result) {
+			PrintRoutines::Output(Grd::FormatAString("Failed to disconnect entry:{0}. Result = {1}({2})",
+				ConnectionRoutines::ConnectedEntry, result, gcnew array<Object^> {GetLastError() }));
+		}
+	}
 
-    int VpnDnsHandler::GetWaitingIntervalBeforeExit() {
-      return kWaitingIntervalBeforeExitSec;
-    }
+	void VpnDnsHandler::UpdateFiltersState() {
+		PrintRoutines::Output("UpdateFiltersState: Calling GetVpnEntryStatus()...[CONNECT#1.2.1][DISCONNECT#?.?]");
+		switch (GetVpnEntryStatus()) {
+		case Utility::CheckConnectionResult::CONNECTED:
+			PrintRoutines::Output("UpdateFiltersState: GuardianVPN connected, set filters [CONNECT#1.2.2]");
+			if (IsActive()) {
+				PrintRoutines::Output("UpdateFiltersState: GuardianVPN connected and Filters are already installed [CONNECT#1.2.2a]");
+				return;
+			}
+			PrintRoutines::Output("UpdateFiltersState: GuardianVPN connected, setting filters [CONNECT#1.2.3]");
+			if (!SetFilters(ConnectionRoutines::ConnectedEntry))
+			{
+				PrintRoutines::Output("UpdateFiltersState: Failed to set DNS filters [CONNECT#1.2.3-FAIL]");
+				DisconnectVPN();
+				ScheduleExit();
+				return;
+			}
+			PrintRoutines::Output("UpdateFiltersState: Calling SetFiltersInstalledFlag(): [CONNECT#1.2.3-OK]");
+			VpnUtils::SetFiltersInstalledFlag();
+			break;
+		case Utility::CheckConnectionResult::DISCONNECTED:
+			PrintRoutines::Output("UpdateFiltersState: GuardianVPN Disconnected, remove filters [DISCONNECT#1.2.1]");
+			if (!RemoveFilters(ConnectionRoutines::ConnectedEntry))
+			{
+				PrintRoutines::Output("UpdateFiltersState: Failed to remove DNS filters");
+				Exit();
+				break;
+			}
+			// Reset service launch counter if dns filters successfully removed.
+			VpnUtils::ResetFiltersInstalledFlag();
+			ScheduleExit();
+			break;
+		default:
+			PrintRoutines::Output(Grd::FormatAString("GuardianVPN is connecting, try later after {0} seconds",
+				gcnew array<Object^> {kCheckConnectionIntervalInSeconds}));
+			break;
+		}
+	}
 
-    void VpnDnsHandler::ScheduleExit() {
+	void VpnDnsHandler::CloseWatchers() {
+		if (event_handle_for_vpn_) {
+			CloseHandle(event_handle_for_vpn_);
+			event_handle_for_vpn_ = nullptr;
+		}
+		//      periodic_timer_.Stop();
+	}
+
+	int VpnDnsHandler::GetWaitingIntervalBeforeExit() {
+		return kWaitingIntervalBeforeExitSec;
+	}
+
+	void VpnDnsHandler::ScheduleExit() {
 #if WHATTODO
-      if (exit_timer_.IsRunning()) {
-        return;
-      }
-      exit_timer_.Start(
-          FROM_HERE, base::Seconds(GetWaitingIntervalBeforeExit()),
-          base::BindOnce(&VpnDnsHandler::Exit, weak_factory_.GetWeakPtr()));
+		if (exit_timer_.IsRunning()) {
+			return;
+		}
+		exit_timer_.Start(
+			FROM_HERE, base::Seconds(GetWaitingIntervalBeforeExit()),
+			base::BindOnce(&VpnDnsHandler::Exit, weak_factory_.GetWeakPtr()));
 #endif
-    }
+	}
 
-  // TJE - ASK CJ/WILL - Do we exit if VPN active? 'We' are the GuardianWinService - NOT the UI.
-    void VpnDnsHandler::Exit() {
-      if (GetVpnEntryStatus() == Utility::CheckConnectionResult::CONNECTED) {
-        PrintRoutines::Output(Grd::FormatAString("{0}: vpn is active, do not exit", gcnew array<Object^> { *__func__ }));
-        return;
-      }
-      CloseWatchers();
-      // TJE?? delegate_->SignalExit();
-    }
+	// TJE - ASK CJ/WILL - Do we exit if VPN active? 'We' are the GuardianWinService - NOT the UI.
+	void VpnDnsHandler::Exit() {
+		if (GetVpnEntryStatus() == Utility::CheckConnectionResult::CONNECTED) {
+			PrintRoutines::Output(Grd::FormatAString("{0}: vpn is active, do not exit", gcnew array<Object^> { *__func__ }));
+			return;
+		}
+		CloseWatchers();
+		// TJE?? delegate_->SignalExit();
+	}
 
-    void VpnDnsHandler::OnObjectSignaled(HANDLE object) {
-      PrintRoutines::Output(Grd::FormatAString("{0}", gcnew array<Object^> {*__func__} ));
-      // We receive events from all connections in the system and filter here
-      // only expected brave vpn event.
-      if (object != event_handle_for_vpn_) {
-        return;
-      }
+	void VpnDnsHandler::OnObjectSignaled(HANDLE object) {
+		PrintRoutines::Output(Grd::FormatAString("{0}", gcnew array<Object^> {*__func__}));
+		// We receive events from all connections in the system and filter here
+		// only expected brave vpn event.
+		if (object != event_handle_for_vpn_) {
+			return;
+		}
 #if NEEDED
-      if (exit_timer_.IsRunning()) {
-        exit_timer_.Stop();
-      }
+		if (exit_timer_.IsRunning()) {
+			exit_timer_.Stop();
+		}
 #endif
-      UpdateFiltersState();
-    }
+		UpdateFiltersState();
+	}
 
-    void VpnDnsHandler::SubscribeForRasNotifications(HANDLE event_handle) {
-      PrintRoutines::Output(Grd::FormatAString("{0}", gcnew array<Object^> {*__func__} ));
+	void VpnDnsHandler::SubscribeForRasNotifications(HANDLE event_handle) {
+		PrintRoutines::Output(Grd::FormatAString("{0}", gcnew array<Object^> {*__func__}));
 #if NOTYET
-      if (!SubscribeRasConnectionNotification(event_handle)) {
-        PrintRoutines::Output(FormatAString("{0} "Failed to subscripbe for vpn notifications";
-      }
-    }
+		if (!SubscribeRasConnectionNotification(event_handle)) {
+			PrintRoutines::Output(FormatAString("{0} "Failed to subscripbe for vpn notifications";
+		}
+	}
 
-    void VpnDnsHandler::StartVPNConnectionChangeMonitoring() {
-      DCHECK(!event_handle_for_vpn_);
-      DCHECK(!IsActive());
+	void VpnDnsHandler::StartVPNConnectionChangeMonitoring() {
+		DCHECK(!event_handle_for_vpn_);
+		DCHECK(!IsActive());
 
-      event_handle_for_vpn_ = CreateEvent(NULL, false, false, NULL);
-      SubscribeForRasNotifications(event_handle_for_vpn_);
+		event_handle_for_vpn_ = CreateEvent(NULL, false, false, NULL);
+		SubscribeForRasNotifications(event_handle_for_vpn_);
 
-      connected_disconnected_event_watcher_.StartWatchingMultipleTimes(
-          event_handle_for_vpn_, this);
+		connected_disconnected_event_watcher_.StartWatchingMultipleTimes(
+			event_handle_for_vpn_, this);
 
-      periodic_timer_.Start(FROM_HERE,
-                            base::Seconds(kCheckConnectionIntervalInSeconds),
-                            base::BindRepeating(&VpnDnsHandler::UpdateFiltersState,
-                                                weak_factory_.GetWeakPtr()));
-      UpdateFiltersState();
+		periodic_timer_.Start(FROM_HERE,
+			base::Seconds(kCheckConnectionIntervalInSeconds),
+			base::BindRepeating(&VpnDnsHandler::UpdateFiltersState,
+				weak_factory_.GetWeakPtr()));
+		UpdateFiltersState();
 #endif
-    }
+	}
 
 #if NEEDED
-    bool VpnDnsHandler::IsExitTimerRunningForTesting() {
-      return exit_timer_.IsRunning();
-    }
+	bool VpnDnsHandler::IsExitTimerRunningForTesting() {
+		return exit_timer_.IsRunning();
+	}
 #endif
-//  };
+	//  };
 }
-    
+

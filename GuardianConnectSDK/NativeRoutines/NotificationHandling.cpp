@@ -163,7 +163,6 @@ namespace NativeRoutines
             return;
         }
 
-        LPCTSTR entryNameOut;
         PrintRoutines::Output("WaiterThread received indication that the Ras VPN state has changed.");
         CurrentConnectionState =
             ConnectionRoutines::FindAnyActiveConnection() == nullptr
@@ -172,14 +171,20 @@ namespace NativeRoutines
         
         PrintRoutines::Output(
             Grd::FormatAString("WaiterThread: Connection State is NOW {0}.", gcnew array<Object^> { CurrentConnectionState} ));
+#if OLDWAY
         BOOL eventSet = SetEvent(VPNClientNotifierHandle);
         if (eventSet == 0)
         {
-            PrintRoutines::Output("SetEvent of VPN Listeners Event failed");
-            GetLastError();
+            DWORD dwLastError = GetLastError();
+            PrintRoutines::Output("SetEvent of VPN Listeners Event failed!");
+            PrintRoutines::Output(Grd::FormatAString("Error:  {0:X} ...\n",
+                gcnew array<Object^> {dwLastError}));
         }
+#else
+        PrintRoutines::Output("WaiterThread: Post-wait fallthrough for RasConnState, calling SetVPNConnnectionChangeEvent() to prime event...");
+        SetVPNConnectionChangeEvent();
+#endif
         
         PrintRoutines::Output("Connection Event Waiter thread now exiting...");
-        SetVPNConnectionChangeEvent();
     }
 }

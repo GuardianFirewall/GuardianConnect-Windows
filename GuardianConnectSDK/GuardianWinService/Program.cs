@@ -7,6 +7,8 @@ var paths = new[] { @"C:\temp", "GuardianFirewallService", "Diagnostics.log" };
 Common.LogFilePath = Path.Combine(paths);
 Common.SetUpLogging();
 
+PowerTransitionHandler.SetupPowerTransitionHandler();
+
 var hb = Host.CreateDefaultBuilder(args);
 hb.UseWindowsService();
 hb.ConfigureServices((services) => new Startup().ConfigureServices(services));

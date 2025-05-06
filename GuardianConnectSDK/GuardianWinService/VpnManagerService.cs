@@ -4,6 +4,7 @@ using System.Security.Principal;
 using GuardianConnect.Shared;
 using GuardianConnect.VPNTransports;
 using Microsoft.Extensions.Hosting;
+using Serilog;
 
 
 namespace GuardianWinService;
@@ -11,24 +12,20 @@ namespace GuardianWinService;
 public class VpnManagerService : BackgroundService
 {
 
-    public Serilog.ILogger Logger { get; set; }
-    
     protected override async Task ExecuteAsync(CancellationToken stoppingToken)
     {
-        Logger = Common.Logger;
-        VPNTransportIKEV2.Logger = Common.Logger;
-        Logger.Information("VPNMGR: TESTING LOG");
-        Logger.Information("VpnManager running at: {time}", DateTimeOffset.Now);
+        Log.Information("VPNMGR: TESTING LOG");
+        Log.Information("VpnManager running at: {time}", DateTimeOffset.Now);
 
-        stoppingToken.Register(() => Logger.Information("VpnManagerService is stopping."));
+        stoppingToken.Register(() => Log.Information("VpnManagerService is stopping."));
 
-        Logger.Information(
+        Log.Information(
             $"VpnManagerService: creating task...stoppingToken.IsCancllationRequestioned = {stoppingToken.IsCancellationRequested}");
-        Logger.Information("VpnManagerService: In task...");
+        Log.Information("VpnManagerService: In task...");
         VPNTransportIKEV2 vpnikeInstance = new VPNTransportIKEV2();
 
-        Logger.Information("Creating Change Event");
-        Logger.Information($"stoppingToken.IsCancllationRequestioned = {stoppingToken.IsCancellationRequested}");
+        Log.Information("Creating Change Event");
+        Log.Information($"stoppingToken.IsCancllationRequestioned = {stoppingToken.IsCancellationRequested}");
         // Create VPNChange Event so Service and UI can wait for notification - OURS - not Ras'
         EventWaitHandleSecurity mSec = new EventWaitHandleSecurity();
         var Everyone = new SecurityIdentifier(WellKnownSidType.WorldSid, null);
@@ -40,14 +37,14 @@ public class VpnManagerService : BackgroundService
             new EventWaitHandle(false, EventResetMode.ManualReset, Common.VPNSTATECHANGE_EVT_NAME);
         VPNStateChangeEventHandle.SetAccessControl(mSec);
 
-        Logger.Information("Checking for active connection...");
-        Logger.Information($"stoppingToken.IsCancllationRequestioned = {stoppingToken.IsCancellationRequested}");
+        Log.Information("Checking for active connection...");
+        Log.Information($"stoppingToken.IsCancllationRequestioned = {stoppingToken.IsCancellationRequested}");
         // Let's see if there's an active connection
         if (VPNTransportIKEV2.GetCurrentVPNState() == ITransportProvider.VPNProviderStatus.VPNStatusConnected)
         {
             // Now spawn watcher at native level so we trap CONNECT/DISCONNECT notifications
-            Logger.Information("VpnManagerService: Calling StartConnectionStateWatcher...");
-            Logger.Information($"stoppingToken.IsCancllationRequestioned = {stoppingToken.IsCancellationRequested}");
+            Log.Information("VpnManagerService: Calling StartConnectionStateWatcher...");
+            Log.Information($"stoppingToken.IsCancllationRequestioned = {stoppingToken.IsCancellationRequested}");
             NotificationHandling.StartConnectionStateWatcher();
         }
 
@@ -55,31 +52,42 @@ public class VpnManagerService : BackgroundService
 
         try
         {
-            Logger.Information(
+            var heartbeatCounter = 0;
+            var priorMessage =
+                    $"VpnService is running... Cancellation Request is {stoppingToken.IsCancellationRequested}";
+            Log.Information(
                 $"Going into while() loop. stoppingToken.IsCancllationRequestioned = {stoppingToken.IsCancellationRequested}");
             while (!stoppingToken.IsCancellationRequested)
             {
-                Logger.Information(
-                    $"VpnService is running... Cancellation Request is {stoppingToken.IsCancellationRequested}");
+                var currentMessage =
+                    $"VpnService is running... Cancellation Request is {stoppingToken.IsCancellationRequested}";
 
+                if (!currentMessage.Equals(priorMessage))
+                {
+                    Log.Information(currentMessage);
+                    heartbeatCounter = 0;
+                    priorMessage = currentMessage;
+                }
+                else if (++heartbeatCounter % 5 == 0) Log.Information("VpnService is running...");
+                
                 // Do stuff with vpnManager here
                 await Task.Delay(60000);
             }
 
-            Logger.Information(
+            Log.Information(
                 $"Past while() loop. stoppingToken.IsCancllationRequestioned = {stoppingToken.IsCancellationRequested}");
         }
         catch (OperationCanceledException oce) when (!oce.CancellationToken.IsCancellationRequested)
         {
-            Logger.Information("OperationCanceledException");
+            Log.Information("OperationCanceledException");
             // When the stopping token is canceled, for example, a call made from services.msc,
             // we shouldn't exit with a non-zero exit code. In other words, this is expected...
 
-            Logger.Error(oce, "{Message}", oce.Message);
+            Log.Error(oce, "{Message}", oce.Message);
         }
         catch (Exception ex)
         {
-            Logger.Error(ex, "{Message}", ex.Message);
+            Log.Error(ex, "{Message}", ex.Message);
 
             // Terminates this process and returns an exit code to the operating system.
             // This is required to avoid the 'BackgroundServiceExceptionBehavior', which
@@ -91,6 +99,6 @@ public class VpnManagerService : BackgroundService
             // recovery options, we need to terminate the process with a non-zero exit code.
         }
 
-        Logger.Information("VpnManagerService: past Task Creation clause...");
+        Log.Information("VpnManagerService: past Task Creation clause...");
     }
 }

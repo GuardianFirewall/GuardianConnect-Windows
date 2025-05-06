@@ -1,12 +1,5 @@
-﻿using System;
-using System.Collections.Generic;
-using System.Linq;
-using System.Text;
-using System.Threading;
-using System.Threading.Tasks;
-using GuardianConnect.Shared;
+﻿using GuardianConnect.Shared;
 using Microsoft.Extensions.Hosting;
-using Serilog;
 
 namespace GuardianWinService
 {
@@ -18,6 +11,7 @@ namespace GuardianWinService
         {
 
             Common.Logger.Information("In ServiceManager's ExecuteAsync()...");
+            
             var vpnSvc = new VpnManagerService();
             var clientSvc = new ClientPipeService();
 
@@ -39,6 +33,7 @@ namespace GuardianWinService
 
         public Task StopAsync(CancellationToken cancellationToken)
         {
+            Common.Logger.Information("In ServiceManager's StopAsync()...");
             throw new NotImplementedException();
         }
     }

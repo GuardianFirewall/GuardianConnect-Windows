@@ -37,7 +37,7 @@ namespace GuardianConnect.Credentials
             Logger.Information($"GRDCredentialsManager.DataToCredentials(): CredentialsList has {CredentialsList.Count}");
         }
 
-        internal static GRDCredential MainCredentials => CredentialsList.Find(c => c.MainCredential);
+        internal static GRDCredential? MainCredentials => CredentialsList.Find(c => c.MainCredential);
 
         internal static List<GRDCredential> FilteredCredentials => CredentialsList.Where(c => !c.MainCredential).ToList();
 

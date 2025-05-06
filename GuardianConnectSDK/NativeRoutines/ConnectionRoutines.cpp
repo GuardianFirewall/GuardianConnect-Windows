@@ -28,6 +28,7 @@ namespace NativeRoutines
         return retVal;
     }
 
+#if NOTNEEDED
     // https://docs.microsoft.com/en-us/windows/win32/api/ras/nf-ras-rassetcredentialsa
     DWORD ConnectionRoutines::SetCredentials(LPCTSTR entry_name, LPCTSTR username, LPCTSTR password)
     {
@@ -41,9 +42,9 @@ namespace NativeRoutines
         wcscpy_s(credentials.szPassword, 256, password);
 
         std::string error_get_phone_book_path;
-        LPCWSTR phone_book_path =
-            RasBaseRoutines::GetPhonebookPath(entry_name, &error_get_phone_book_path);
-        DWORD dwRet = RasSetCredentials(phone_book_path, entry_name, &credentials, FALSE);
+        wchar_t phonebookPath[1025];
+        RasBaseRoutines::GetPhonebookPath(entry_name, phonebookPath, &error_get_phone_book_path);
+        DWORD dwRet = RasSetCredentials(phonebookPath, entry_name, &credentials, FALSE);
         if (dwRet != ERROR_SUCCESS)
         {
             PrintRoutines::PrintRasError(dwRet);
@@ -52,6 +53,7 @@ namespace NativeRoutines
 
         return ERROR_SUCCESS;
     }
+#endif
 
     DWORD ConnectionRoutines::ConnectWithEntry(String^ givenPhonebookPath, String^ entryName)
     {
@@ -68,10 +70,6 @@ namespace NativeRoutines
                 gcnew array<String^> { __FUNCTION__ }));
             return ERROR_SUCCESS;
         }
-
-        std::string error_get_phone_book_path;
-        LPCWSTR phone_book_path =
-            RasBaseRoutines::GetPhonebookPath(entry_name, &error_get_phone_book_path);
 
         // Continue with making connection
         LPRASDIALPARAMSW lpRasDialParams = nullptr;
@@ -95,10 +93,14 @@ namespace NativeRoutines
         credentials.dwSize = sizeof(RASCREDENTIALSW);
         credentials.dwMask = RASCM_UserName | RASCM_Password;
 
+        PrintRoutines::Output(L"ConnectWithEntry(): Calling RasGetCredentialsW...\n");
         DWORD dwRet = RasGetCredentialsW(given_Phonebook_path, entry_name, &credentials);
         if (dwRet != ERROR_SUCCESS)
         {
             HeapFree(GetProcessHeap(), 0, (LPVOID)lpRasDialParams);
+			String^ errorRetCode = gcnew String(std::to_string(dwRet).c_str());
+            PrintRoutines::Output(Grd::FormatAString("{0}: **** ERROR **** Return from RasGetCredentials: {1:x}.",
+                gcnew array<String^> { __FUNCTION__, errorRetCode}));
             PrintRoutines::PrintRasError(dwRet);
             return dwRet;
         }
@@ -106,32 +108,36 @@ namespace NativeRoutines
         wcscpy_s(lpRasDialParams->szPassword, 256, credentials.szPassword);
 
         wprintf(L"Connecting to `%s`...\n", entry_name);
-        PrintRoutines::Output(System::String::Format("Connecting to '{0}'", entryName));
+        PrintRoutines::Output(System::String::Format("ConnectWithEntry: Connecting to '{0}' with call to RasDial...", entryName));
 
         HRASCONN hRasConn = nullptr;
         dwRet = RasDialW(nullptr, given_Phonebook_path, lpRasDialParams, NULL, nullptr, &hRasConn);
         
         if (dwRet != ERROR_SUCCESS)
         {
+			String^ errorRetCode = gcnew String(std::to_string(dwRet).c_str());
+            PrintRoutines::Output(Grd::FormatAString("{0}: **** ERROR **** Return from RasDial: {1:x}.",
+                gcnew array<String^> { __FUNCTION__, errorRetCode}));
             HeapFree(GetProcessHeap(), 0, (LPVOID)lpRasDialParams);
             PrintRoutines::PrintRasError(dwRet);
             return dwRet;
         }
         wprintf(L"SUCCESS!\n");
-        PrintRoutines::Output("SUCCESS!");
+        PrintRoutines::Output("ConnectWithEntry: SUCCESS return from RasDial! [CONNECT#1.1]");
+		ConnectedEntry = entryName;
 
         // store handle if needed, etc
         NotificationHandling::RasConnectionHandle =  hRasConn;
         //..
-        // Trigger VPNConnectionEvent for watchers
-        //NotificationHandling::SetVPNConnectionChangeEvent();
 
         HeapFree(GetProcessHeap(), 0, (LPVOID)lpRasDialParams);
 
         // New - call Brave's routines for adding filtering
         VpnDnsHandler* vpn_dns_handler = new VpnDnsHandler();
+		PrintRoutines::Output("ConnectWithEntry: Calling VpnDnsHandler::UpdateFiltersState()... [CONNECT#1.2]");
         vpn_dns_handler->UpdateFiltersState();
 
+		PrintRoutines::Output("ConnectWithEntry: Back from VpnDnsHandler::UpdateFiltersState()...[CONNECT#1.3]");
         return ERROR_SUCCESS;
     }
 
@@ -143,7 +149,7 @@ namespace NativeRoutines
 
     Utility::CheckConnectionResult ConnectionRoutines::CheckConnection(String^ entryName, HRASCONN& handleOut)
     {
-        PrintRoutines::Output(String::Format("Check connection state for {0}", entryName));
+        PrintRoutines::Output(String::Format("Check connection state for '{0}'", entryName));
         pin_ptr<const wchar_t> entry_name = ::PtrToStringChars(entryName);
 
         DWORD dw_cb = 0;
@@ -196,6 +202,18 @@ namespace NativeRoutines
                 break;
             }
         }
+        switch (result)
+        {
+            case Utility::CheckConnectionResult::DISCONNECTED:
+                PrintRoutines::Output("CheckConnectionResult::DISCONNECTED");
+                break;
+            case Utility::CheckConnectionResult::CONNECTED:
+                PrintRoutines::Output("CheckConnectionResult::CONNECTED");
+                break;
+            default:
+                PrintRoutines::Output("CheckConnectionResult::UNKNOWN");
+                break;
+        }
         return result;
     }
 
@@ -215,13 +233,13 @@ namespace NativeRoutines
 
         switch (ras_conn_status.rasconnstate) {
         case RASCS_ConnectDevice:
-//            PrintRoutines::Output("Connecting device...");
+            PrintRoutines::Output("GetConnectionState: Connecting device...");
             return Utility::CheckConnectionResult::CONNECTING;
         case RASCS_Connected:
-//            PrintRoutines::Output("Connected");
+            PrintRoutines::Output("GetConnectionState: Connected");
             return Utility::CheckConnectionResult::CONNECTED;
         case RASCS_Disconnected:
-//            PrintRoutines::Output("Disconnected");
+            PrintRoutines::Output("GetConnectionState: Disconnected");
             return Utility::CheckConnectionResult::DISCONNECTED;
         default:
             break;
@@ -258,7 +276,7 @@ namespace NativeRoutines
         // If got success here, it means there is no connected vpn entry.
         if (dw_ret == ERROR_SUCCESS) {
             // TJE - CHECK THIS - do we need to output this every time? Commenting out for now.
-            //PrintRoutines::Output("FindAnyActiveConnection: There is no active connection.");
+            PrintRoutines::Output("FindAnyActiveConnection: There is no active connection.");
             return nullptr;
         }
 
@@ -293,13 +311,15 @@ namespace NativeRoutines
             result = GetConnectionState(lp_ras_conn[i].hrasconn);
             if (result == Utility::CheckConnectionResult::CONNECTED) {
                 wprintf(L"FAAC: szEntryName = '%s'\n", lp_ras_conn[i].szEntryName);
-                int len = wcslen(lp_ras_conn[i].szEntryName);
-                wprintf(L"len of above is %d\n", len);
+                size_t len = wcslen(lp_ras_conn[i].szEntryName);
                 wchar_t activeName[2048] = { 0 };
                 wcscpy_s(activeName, len+1, lp_ras_conn[i].szEntryName);
                 ActiveConnectionEntryName = activeName;
                 ConnectedEntry = gcnew String(activeName);
 
+
+                PrintRoutines::Output(Grd::FormatAString("FindAnyActiveConnection: Entry '{0}' is in a CONNECTED or CONNECTING state.",
+                    ConnectedEntry ));
                 wprintf(L"FAAC: ActiveConnectionEntryName = '%s'\n", ActiveConnectionEntryName);
                 
                 return lp_ras_conn[i].hrasconn;
@@ -323,7 +343,6 @@ namespace NativeRoutines
         bool disconnectResult = false;
         HRASCONN entryHandle = NULL;
 
-        LPCTSTR activeEntryName;
         HRASCONN activeConnectionHandle = FindAnyActiveConnection();
         
         String^ entryName = ConnectedEntry;

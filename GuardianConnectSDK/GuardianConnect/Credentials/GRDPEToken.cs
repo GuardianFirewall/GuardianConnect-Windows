@@ -19,10 +19,10 @@ namespace GuardianConnect.Credentials
         public DateTime ExpirationDate { get; set; }
 
         public long ExpirationDateUnix { get; set; }
+
+        public string SubscriptionType { get; set; } = string.Empty;
         
-        public string SubscriptionType { get; set; }
-        
-        public string SubscriptionTypePretty { get; set; }
+        public string SubscriptionTypePretty { get; set; } = string.Empty;
 
         public static GRDPEToken GetCurrentPEToken()
         {
@@ -47,13 +47,14 @@ namespace GuardianConnect.Credentials
 
         public GRDPEToken InitFromDictionary(Dictionary<string, object> dict)
         {
+            if (dict.Count == 0) return new GRDPEToken();
             GRDPEToken peToken = new GRDPEToken();
-            if (dict.ContainsKey("Token")) peToken.Token = dict["Token"].ToString();
+            if (dict.ContainsKey("Token")) peToken.Token = dict["Token"].ToString() ?? throw new InvalidOperationException();
             if (dict.ContainsKey("expirationDateUnix")) peToken.ExpirationDateUnix = (long)dict["ExpirationDateUnix"];
-            if (dict.ContainsKey("ExpirationDate")) peToken.ExpirationDate = DateTime.Parse(dict["ExpirationDate"].ToString());
+            if (dict.ContainsKey("ExpirationDate")) peToken.ExpirationDate = DateTime.Parse(dict["ExpirationDate"].ToString() ?? throw new InvalidOperationException());
             if (dict.ContainsKey("ConnectAPIEnv")) peToken.ConnectAPIEnv = dict["ConnectAPIEnv"]?.ToString() ?? Common.kConnectAPIHostname;
-            if (dict.ContainsKey("SubscriptionType")) peToken.SubscriptionType = dict["SubscriptionType"].ToString();
-            if (dict.ContainsKey("SubscriptionTypePretty")) peToken.SubscriptionTypePretty = dict["SubscriptionTypePretty"].ToString();
+            if (dict.ContainsKey("SubscriptionType")) peToken.SubscriptionType = dict["SubscriptionType"].ToString() ?? throw new InvalidOperationException();
+            if (dict.ContainsKey("SubscriptionTypePretty")) peToken.SubscriptionTypePretty = dict["SubscriptionTypePretty"].ToString() ?? throw new InvalidOperationException();
             return peToken;
         }
 

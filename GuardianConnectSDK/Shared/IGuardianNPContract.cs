@@ -58,7 +58,7 @@ public interface IGuardianNPContract
 
     CurrentVPNStatus GetCurrentVpnConnectionStatus();
 
-    string Ping();
+    Task<string> Ping();
 
     void ShutdownService();
 
