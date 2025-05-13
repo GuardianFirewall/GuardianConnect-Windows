@@ -88,8 +88,6 @@ jobs:
         name: GuardianFirewallService.14.1.9.nupkg
         path: D:\a\GuardianConnect-Windows\GuardianConnect-Windows\GuardianConnectSDK\GuardianFirewallService.0.14.1.9.nupkg
     
-    
-    - name: Upload build artifacts - GuardianFirewall Service
     # Sign GuardianConnectSDK package with certificate
     # Name GuardianConnectSDK Windows Nuget Package
     # Slug GuardianConnectSDK_Windows_Nuget_Package
