@@ -125,13 +125,13 @@ jobs:
     - name: Upload build artifacts - GuardianConnectSDK
       uses: actions/upload-artifact@v4
       with:
-        name: GuardianConnectSDK_0.14.2.358.nupkg
+        name: SIGNED_GuardianConnectSDK_0.14.2.358.nupkg
         path: D:\a\GuardianConnect-Windows\GuardianConnect-Windows\GuardianConnectSDK\SIGNED_GuardianConnect.0.14.2.358.nupkg
         
     - name: Upload build artifacts - GuardianFirewall Service
       uses: actions/upload-artifact@v4
       with:
-        name: GuardianFirewallService.14.1.9.nupkg
+        name: SIGNED_GuardianFirewallService.14.1.9.nupkg
         path: D:\a\GuardianConnect-Windows\GuardianConnect-Windows\GuardianConnectSDK\SIGNED_GuardianFirewallService.0.14.1.9.nupkg
         
         
