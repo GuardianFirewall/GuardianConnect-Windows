@@ -77,7 +77,7 @@ namespace GuardianConnect.Helpers
 
          public static void CreateInstance(bool prefBetaServers, GRDServerFeatureEnvironment featureEnv)
          {
-             Log.Information("GRDVPNHelper.CreateInstance() - Entry.");
+             Log.Verbose("GRDVPNHelper.CreateInstance() - Entry.");
              _instanceCreated = true;
              _instance = new GRDVPNHelper(prefBetaServers, featureEnv);
              _instance._grdServerManager = new GRDServerManager();
@@ -135,8 +135,8 @@ namespace GuardianConnect.Helpers
                 var sfm1 =
                     $"{stackFrames[^1].GetMethod()}:{stackFrames[^1].GetFileLineNumber():dd}";
                 Log.Information($"Callers to setting mainCredential...");
-                Log.Information($"{sfm2}");
-                Log.Information($"{sfm1}");
+                Log.Debug($"{sfm2}");
+                Log.Debug($"{sfm1}");
                 _mainCredential = value ?? null;
             }
         }
