@@ -9,9 +9,9 @@ on:
         required: true
         type: choice
         options:
-          - wind0ws-2022
+          - windows-2022
           - windows-latest
-          - windows-arm64
+          - windows-11-arm
     
   push:
     branches: [ "main" ]
