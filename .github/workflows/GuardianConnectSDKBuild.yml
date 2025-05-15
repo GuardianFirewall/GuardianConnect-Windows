@@ -3,7 +3,15 @@ name: GuardianConnectSDK build and package
 
 on:
   workflow_dispatch:
-    branches: [ "wip" ]
+    branches: [ "*" ]
+    inputs:
+      chosen-os:
+        required: true
+        type: choice
+        options:
+          - wind0ws-2022
+          - windows-latest
+          - windows-arm64
     
   push:
     branches: [ "main" ]
