@@ -26,8 +26,10 @@ jobs:
           #os-version: [ windows-latest ]
           #compiler: [ latest, gcc-latest, gcc-6.4.0, gcc-10.2.0, g++-11.2.0, clang, clang-8.0.0, clang-11.1.0, clang++-12.0.1 ]
 
-    runs-on: windows-2022  # For a list of available runner types, refer to
-                             # https://help.github.com/en/actions/reference/workflow-syntax-for-github-actions#jobsjob_idruns-on
+    # For a list of available runner types, refer to
+    # https://help.github.com/en/actions/reference/workflow-syntax-for-github-actions#jobsjob_idruns-on
+    #runs-on: [windows-2022, windows-11-arm]
+    runs-on: ["${{ inputs.chosen-os }}"]
 
     env:
       Solution_Name: GuardianConnectSDK.sln
