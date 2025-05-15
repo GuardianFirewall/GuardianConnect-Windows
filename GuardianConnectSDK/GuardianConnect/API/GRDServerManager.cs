@@ -13,8 +13,6 @@ public class GRDServerManager
 
     public GRDServerManager()
     {
-        Log.Information("GRDGateway logger!");
-
         Housekeeping = new GRDHousekeepingAPI();
         FeatureEnv = GRDVPNHelper.GRDServerFeatureEnvironment.ServerFeatureEnvironmentProduction;
         BetaCapable = false;

@@ -272,7 +272,7 @@ public class Common
         if (!LogFilterOn)
         {
             var lc = new LoggerConfiguration()
-                .MinimumLevel.Verbose()
+                .MinimumLevel.Information()
                 .MinimumLevel.Override("Microsoft", LogEventLevel.Warning)
                 .Enrich.WithProcessId()
                 .Enrich.WithProcessName()
@@ -289,3 +289,4 @@ public class Common
         Logger = Log.Logger;
     }
 }
+190G

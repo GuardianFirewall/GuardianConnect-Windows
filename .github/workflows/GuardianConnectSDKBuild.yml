@@ -26,8 +26,10 @@ jobs:
           #os-version: [ windows-latest ]
           #compiler: [ latest, gcc-latest, gcc-6.4.0, gcc-10.2.0, g++-11.2.0, clang, clang-8.0.0, clang-11.1.0, clang++-12.0.1 ]
 
-    runs-on: windows-2022  # For a list of available runner types, refer to
-                             # https://help.github.com/en/actions/reference/workflow-syntax-for-github-actions#jobsjob_idruns-on
+    # For a list of available runner types, refer to
+    # https://help.github.com/en/actions/reference/workflow-syntax-for-github-actions#jobsjob_idruns-on
+    #runs-on: [windows-2022, windows-11-arm]
+    runs-on: ["${{ inputs.chosen-os }}"]
 
     env:
       Solution_Name: GuardianConnectSDK.sln
@@ -72,10 +74,22 @@ jobs:
       run: nuget pack GuardianConnectSDK_Package.nuspec
       shell: cmd
       
+    - name: Upload build artifacts - GuardianConnectSDK
+      uses: actions/upload-artifact@v4
+      with:
+        name: GuardianConnectSDK_0.14.2.358.nupkg
+        path: D:\a\GuardianConnect-Windows\GuardianConnect-Windows\GuardianConnectSDK\GuardianConnect.0.14.2.358.nupkg
+
     - name: Create GuardianWindowsService.nupkg package bundle
       run: nuget pack GuardianWindowsService.nuspec
       shell: cmd
       
+    - name: Upload build artifacts - GuardianFirewall Service
+      uses: actions/upload-artifact@v4
+      with:
+        name: GuardianFirewallService.14.1.9.nupkg
+        path: D:\a\GuardianConnect-Windows\GuardianConnect-Windows\GuardianConnectSDK\GuardianFirewallService.0.14.1.9.nupkg
+    
     # Sign GuardianConnectSDK package with certificate
     # Name GuardianConnectSDK Windows Nuget Package
     # Slug GuardianConnectSDK_Windows_Nuget_Package
@@ -83,12 +97,12 @@ jobs:
       run: Install-Module -Name SignPath -Force
 
         Submit-SigningRequest `
-        -InputArtifactPath "GuardianConnect.0.14.1.9.nupkg" `
+        -InputArtifactPath "GuardianConnect.0.14.2.358.nupkg" `
         -ApiToken "${{ secrets.CI_SIGNPATH_USER_TOKEN }}" `
         -OrganizationId "5c1e4170-8bf7-48b1-8542-78374ccc3471" `
         -ProjectSlug "Guardian" `
         -SigningPolicySlug "Guardian_DNSF_Branded" `
-        -OutputArtifactPath "GuardianConnect.0.14.1.9_signed.nupkg" `
+        -OutputArtifactPath "SIGNED_GuardianConnect.0.14.2.358.nupkg" `
         -ArtifactConfigurationSlug GuardianConnectSDK_Windows_Nuget_Package `
         -WaitForCompletion
     
@@ -105,22 +119,22 @@ jobs:
         -OrganizationId "5c1e4170-8bf7-48b1-8542-78374ccc3471" `
         -ProjectSlug "Guardian" `
         -SigningPolicySlug "Guardian_DNSF_Branded" `
-        -OutputArtifactPath "GuardianFirewallService.0.14.1.9_signed.nupkg" `
+        -OutputArtifactPath "SIGNED_GuardianFirewallService.0.14.1.9_signed.nupkg" `
         -ArtifactConfigurationSlug GuardianFirewallService_Nuget_Package `
         -WaitForCompletion
       
-      # Upload the MSI package: https://github.com/marketplace/actions/upload-a-build-artifact
+      # Upload the nuget packages: (https://github.com/marketplace/actions/upload-a-build-artifact)
     - name: Upload build artifacts - GuardianConnectSDK
       uses: actions/upload-artifact@v4
       with:
-        name: GuardianConnectSDK_0.14.1.9.nupkg
-        path: D:\a\GuardianConnect-Windows\GuardianConnect-Windows\GuardianConnectSDK\GuardianConnect.0.14.1.9.nupkg
+        name: SIGNED_GuardianConnectSDK_0.14.2.358.nupkg
+        path: D:\a\GuardianConnect-Windows\GuardianConnect-Windows\GuardianConnectSDK\SIGNED_GuardianConnect.0.14.2.358.nupkg
         
     - name: Upload build artifacts - GuardianFirewall Service
       uses: actions/upload-artifact@v4
       with:
-        name: GuardianFirewallService.14.1.9.nupkg
-        path: D:\a\GuardianConnect-Windows\GuardianConnect-Windows\GuardianConnectSDK\GuardianFirewallService.0.14.1.9.nupkg
+        name: SIGNED_GuardianFirewallService.14.1.9.nupkg
+        path: D:\a\GuardianConnect-Windows\GuardianConnect-Windows\GuardianConnectSDK\SIGNED_GuardianFirewallService.0.14.1.9.nupkg
         
         
         # Add github as source for nuget
@@ -132,8 +146,8 @@ jobs:
     
     # Update GitHub Packages with these nuget packages
     - name: Update GitHub with nuget packages - SDK
-      run: nuget push GuardianConnect.0.14.1.9_signed.nupkg ${{ secrets.GUARDIANFIREWALL_GH_PKG_TOKEN }} -Source GitHub -SkipDuplicate
+      run: nuget push SIGNED_GuardianConnect.0.14.2.358.nupkg ${{ secrets.GUARDIANFIREWALL_GH_PKG_TOKEN }} -Source GitHub -SkipDuplicate
 
     - name: Update GitHub with nuget packages - Service
-      run: nuget push GuardianFirewallService.0.14.1.9_signed.nupkg ${{ secrets.GUARDIANFIREWALL_GH_PKG_TOKEN }} -Source GitHub -SkipDuplicate
+      run: nuget push SIGNED_GuardianFirewallService.0.14.1.9_signed.nupkg ${{ secrets.GUARDIANFIREWALL_GH_PKG_TOKEN }} -Source GitHub -SkipDuplicate
 

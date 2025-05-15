@@ -114,8 +114,7 @@ namespace GuardianConnect.Helpers
 
             foreach (var geoRec in geoDataCollection)
             {
-                Log.Information(
-                    $"GetLatestGeoData: Adding '{geoRec.KeyName}' with {geoRec.Timezones.Count} timezones");
+                Log.Verbose( $"GetLatestGeoData: Adding '{geoRec.KeyName}' with {geoRec.Timezones.Count} timezones");
                 timezonesLookup.TryAdd(geoRec.KeyName, geoRec.Timezones);
             }
 
