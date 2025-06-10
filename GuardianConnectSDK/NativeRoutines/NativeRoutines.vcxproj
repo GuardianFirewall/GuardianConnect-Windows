@@ -40,7 +40,7 @@
     <ConfigurationType>DynamicLibrary</ConfigurationType>
     <UseDebugLibraries>true</UseDebugLibraries>
     <PlatformToolset>v143</PlatformToolset>
-    <VCToolsRedistVersion Condition="'$(VCToolsRedistVersion)' == ''">14.40.33807</VCToolsRedistVersion>
+    <VCToolsRedistVersion Condition="'$(VCToolsRedistVersion)' == ''">14.43.34808</VCToolsRedistVersion>
     <CLRSupport>NetCore</CLRSupport>
     <CharacterSet>Unicode</CharacterSet>
     <PreferredToolArchitecture>x64</PreferredToolArchitecture>
@@ -49,8 +49,8 @@
     <ConfigurationType>DynamicLibrary</ConfigurationType>
     <UseDebugLibraries>true</UseDebugLibraries>
     <PlatformToolset>v143</PlatformToolset>
-    <VCToolsVersion Condition="'$(VCToolsVersion)' == ''">14.40.33807</VCToolsVersion>
-    <VCToolsRedistVersion Condition="'$(VCToolsRedistVersion)' == ''">14.40.33807</VCToolsRedistVersion>
+    <VCToolsVersion Condition="'$(VCToolsVersion)' == ''">14.43.34808</VCToolsVersion>
+    <VCToolsRedistVersion Condition="'$(VCToolsRedistVersion)' == ''">14.43.34808</VCToolsRedistVersion>
     <CLRSupport>NetCore</CLRSupport>
     <CharacterSet>Unicode</CharacterSet>
     <PreferredToolArchitecture>ARM64</PreferredToolArchitecture>
@@ -61,7 +61,7 @@
     <PlatformToolset>v143</PlatformToolset>
     <VCToolsVersion Condition="'$(VCToolsVersion)' == ''">
     </VCToolsVersion>
-    <VCToolsRedistVersion Condition="'$(VCToolsRedistVersion)' == ''">14.40.33807</VCToolsRedistVersion>
+    <VCToolsRedistVersion Condition="'$(VCToolsRedistVersion)' == ''">14.43.34808</VCToolsRedistVersion>
     <CLRSupport>NetCore</CLRSupport>
     <CharacterSet>Unicode</CharacterSet>
   </PropertyGroup>
@@ -69,8 +69,8 @@
     <ConfigurationType>DynamicLibrary</ConfigurationType>
     <UseDebugLibraries>false</UseDebugLibraries>
     <PlatformToolset>v143</PlatformToolset>
-    <VCToolsVersion Condition="'$(VCToolsVersion)' == ''">14.40.33807</VCToolsVersion>
-    <VCToolsRedistVersion Condition="'$(VCToolsRedistVersion)' == ''">14.40.33807</VCToolsRedistVersion>
+    <VCToolsVersion Condition="'$(VCToolsVersion)' == ''">14.43.34808</VCToolsVersion>
+    <VCToolsRedistVersion Condition="'$(VCToolsRedistVersion)' == ''">14.43.34808</VCToolsRedistVersion>
     <CLRSupport>NetCore</CLRSupport>
     <CharacterSet>Unicode</CharacterSet>
   </PropertyGroup>
