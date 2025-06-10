@@ -19,6 +19,6 @@
   <files>
   <file src=".\README.md" target="lib\net9.0"/>
   <file src="Guardian.png"/>
-    <file src="GuardianWinService\bin\x64\release\net9.0-windows10.0.26100.0\win-x64\**\*.*" target="GuardianFirewallService\bin\net9.0"/>
+    <file src="GuardianWinService\bin\$CPU\release\net9.0-windows10.0.26100.0\win-$CPU\**\*.*" target="GuardianFirewallService\bin\net9.0"/>
   </files>
 </package>
