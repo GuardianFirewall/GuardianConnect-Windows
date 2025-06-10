@@ -1,12 +1,12 @@
 
-name: GuardianConnectSDK build and package
+name: GuardianConnectSDK ARM build and package
 
 on:
   workflow_dispatch:
     branches: [ "*" ]
     
   push:
-    branches: [ "main" ]
+    branches: [ "main", "logging-reclass" ]
   pull_request:
     branches: [ "main" ]
 
