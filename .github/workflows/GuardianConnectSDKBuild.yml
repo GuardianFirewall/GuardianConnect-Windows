@@ -8,10 +8,8 @@ on:
       chosen-os:
         required: true
         type: choice
-        options:
-          - windows-2022
-          - windows-latest
-          - Windows-11-Arm
+        labels:
+          - w11-arm
     
   push:
     branches: [ "main" ]
