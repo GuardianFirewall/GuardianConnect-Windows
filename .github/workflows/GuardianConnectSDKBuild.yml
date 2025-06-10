@@ -11,7 +11,7 @@ on:
         options:
           - windows-2022
           - windows-latest
-          - Windows-11-ARM
+          - Windows-11-Arm
     
   push:
     branches: [ "main" ]
