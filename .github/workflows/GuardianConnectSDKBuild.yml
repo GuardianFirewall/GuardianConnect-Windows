@@ -3,7 +3,7 @@ name: GuardianConnectSDK build and package
 
 on:
   push:
-    branches: [ "main" ]
+    branches: [ "main", "logging-reclass" ]
   pull_request:
     branches: [ "main" ]
 
