@@ -1,7 +1,10 @@
 ﻿using System.Diagnostics;
+using Microsoft.Extensions.Configuration;
 using Serilog;
+using Serilog.Configuration;
 using Serilog.Events;
 using Serilog.Enrichers.WithCaller;
+using Serilog.Formatting.Json;
 
 namespace GuardianConnect.Shared;
 
@@ -181,7 +184,12 @@ public class Common
     public const string VPNSTATECHANGE_EVT_NAME = "Global\\GRDRASCONNLISTENEREVENT";
     public static ILogger Logger { get; set; } = null!;
 
+    private static Dictionary<LoggingLevels, Serilog.LoggerConfiguration> LevelBasedLoggerConfigurations = new Dictionary<LoggingLevels, Serilog.LoggerConfiguration>();
+
+    public enum LoggingLevels { Debug, Verbose, Information, Warning, Error }
     public static ILogger GetLogger() { return Logger; }
+    public const LoggingLevels DefaultMinimumLogLevel = LoggingLevels.Information;
+    public static LoggingLevels CurrentMinimumLogLevel { get; set; } = DefaultMinimumLogLevel;
 
     public static string LogFilePath { get; set; } = "INVALID:";
     public static bool LogFilterOn { get; set; }
@@ -271,22 +279,33 @@ public class Common
 
         if (!LogFilterOn)
         {
-            var lc = new LoggerConfiguration()
-                .MinimumLevel.Information()
-                .MinimumLevel.Override("Microsoft", LogEventLevel.Warning)
-                .Enrich.WithProcessId()
-                .Enrich.WithProcessName()
-                .Enrich.WithThreadId()
-                .Enrich.WithThreadName()
-                .Enrich.WithCaller(true, 2)
-                .WriteTo.Conditional(evt => !LogFilterOn, wt => wt.File(LogFilePath, shared: true));
-            Log.Logger = lc.CreateLogger();
-            Log.Logger.Information(
-                $"Serilog logger set up in GuardianFirewall Service - Process ID: {Environment.ProcessId}");
-            Log.Verbose("Testing Log singleton...");
+            var dlc = new LoggerConfiguration().MinimumLevel.Debug().MinimumLevel.Override("Microsoft", LogEventLevel.Warning)
+                .Enrich.WithProcessId().Enrich.WithThreadId().Enrich.WithThreadName().Enrich.WithCaller(false, 0)
+                .WriteTo.Conditional(evt => !LogFilterOn, wt => wt.File(LogFilePath, shared: true,
+                    outputTemplate: "{Timestamp:yyyy-MM-dd HH:mm:ss:ffffff-K} {ProcessId}.{ThreadId}[{ThreadName}]):{Caller} [{Level:u3}] {Message}{NewLine}{Exception}"));
+            LevelBasedLoggerConfigurations.Add(LoggingLevels.Debug, dlc);
+                
+            var vlc = new LoggerConfiguration().MinimumLevel.Verbose().MinimumLevel.Override("Microsoft", LogEventLevel.Warning)
+                .Enrich.WithProcessId().Enrich.WithThreadId()
+                .WriteTo.Conditional(evt => !LogFilterOn, wt => wt.File(LogFilePath, shared: true,
+                    outputTemplate: "{Timestamp:yyyy-MM-dd HH:mm:ss:ffffff-K} {ProcessId}.{ThreadId}) [{Level:u3}] {Message}{NewLine}{Exception}"));
+            LevelBasedLoggerConfigurations.Add(LoggingLevels.Verbose, vlc);
+
+            var ilc = new LoggerConfiguration().MinimumLevel.Information().MinimumLevel.Override("Microsoft", LogEventLevel.Warning)
+                .Enrich.WithProcessId().Enrich.WithThreadId()
+                .WriteTo.Conditional(evt => !LogFilterOn, wt => wt.File(LogFilePath, shared: true,
+                    outputTemplate: "{Timestamp:yyyy-MM-dd HH:mm:ss:ffffff-K} {ProcessId}.{ThreadId}) [{Level:u3}] {Message}{NewLine}{Exception}"));
+            LevelBasedLoggerConfigurations.Add(LoggingLevels.Information, ilc);
+
+            SetMinimumLogLevelToCurrentLevel();
         }
 
         Logger = Log.Logger;
     }
+
+    public static void SetMinimumLogLevelToCurrentLevel()
+    {
+        Log.Logger = LevelBasedLoggerConfigurations[CurrentMinimumLogLevel].CreateLogger();
+        Log.Logger.Information($"Serilog logger set up. Current Minimum Log Level starting at '{CurrentMinimumLogLevel}'");
+    }
 }
-190G

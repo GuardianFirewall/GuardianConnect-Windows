@@ -1,6 +1,7 @@
 using GuardianConnect.Shared;
 using GuardianConnect.VPNTransports;
 using NativeRoutines;
+using Serilog;
 
 namespace GuardianWinService;
 
@@ -76,4 +77,11 @@ public class GuardianNPCommandDispatcher :IGuardianNPContract
     }
 
     public void ToggleLogging(bool whetherToDeleteLogFiles) {}
+
+    public void SwitchServiceLoggingLevel(Common.LoggingLevels loggingLevel)
+    {
+        Log.Warning($"Command sent to switch log level from {Common.CurrentMinimumLogLevel} to {loggingLevel}");
+        Common.CurrentMinimumLogLevel = loggingLevel;
+        Common.SetMinimumLogLevelToCurrentLevel();
+    }
 }

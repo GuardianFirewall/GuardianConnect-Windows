@@ -45,7 +45,8 @@ public interface IGuardianNPContract
         AdministrativeShutdownRequested,
         UninstallerShutdownOccurring,
         ToggleLogging,
-        RequestLogLines
+        RequestLogLines,
+        SwitchLoggingLevel
     }
 
     string GetData(int value);
@@ -63,4 +64,6 @@ public interface IGuardianNPContract
     void ShutdownService();
 
     void ToggleLogging(bool whetherToDeleteLogFiles);
+    
+    void SwitchServiceLoggingLevel(Common.LoggingLevels loggingLevel );
 }
