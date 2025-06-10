@@ -43,7 +43,15 @@ jobs:
     - name: Get a dir
       run: dir
       shell: cmd
+      
+    - name: Get a dir of MSVC toolset available
+      run: dir 'C:\Program Files\Microsoft Visual Studio\2022\Enterprise\VC\Tools\MSVC\'
+      shell: cmd
 
+    - name: barf quickly
+      run: barf
+      shell: cmd
+      
     # Get CPU Architecture from Github variable
     - name: Get CPU from GH's $RUNNER_ARCH
       run: |
