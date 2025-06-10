@@ -45,7 +45,7 @@ jobs:
       shell: cmd
       
     - name: Get a dir of MSVC toolset available
-      run: dir 'C:\Program Files\Microsoft Visual Studio\2022\Enterprise\VC\Tools\MSVC\'
+      run: dir "C:\Program Files\Microsoft Visual Studio\2022\Enterprise\VC\Tools\MSVC\"
       shell: cmd
 
     - name: barf quickly
