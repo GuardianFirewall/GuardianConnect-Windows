@@ -190,7 +190,7 @@ jobs:
           -OrganizationId "5c1e4170-8bf7-48b1-8542-78374ccc3471" `
           -ProjectSlug "Guardian" `
           -SigningPolicySlug "Guardian_DNSF_Branded" `
-          -OutputArtifactPath "SIGNED_GuardianConnect.0.14.5.356_signed-${{env.CPU}}.nupkg" `
+          -OutputArtifactPath "SIGNED_GuardianConnect.0.14.5.356-${{env.CPU}}.nupkg" `
           -ArtifactConfigurationSlug GuardianConnectSDK_Windows_Nuget_Package `
           -WaitForCompletion
       
