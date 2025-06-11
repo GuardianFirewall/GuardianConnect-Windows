@@ -79,7 +79,7 @@ jobs:
       run: msbuild /t:restore /t:Build /p:Platform=${{env.CPU}} /p:Configuration=Release /p:RuntimeIdentifier=win-${{env.CPU}} GuardianWinService\GuardianWinService.csproj
 
     - name: Create GuardianConnect.nupkg package bundle
-      run: nuget pack GuardianConnectSDK_Package.nuspec -properties "CPU=${{env.CPU}}"
+      run: nuget pack GuardianConnectSDK_Package_${{env.CPU}}.nuspec
       shell: cmd
       
     - name: Upload build artifacts - GuardianConnectSDK
@@ -89,7 +89,7 @@ jobs:
         path: D:\a\GuardianConnect-Windows\GuardianConnect-Windows\GuardianConnectSDK\GuardianConnect.0.14.5.356.nupkg
 
     - name: Create GuardianWindowsService.nupkg package bundle
-      run: nuget pack GuardianWindowsService.nuspec -properties "CPU=${{env.CPU}}"
+      run: nuget pack GuardianWindowsService_${{env.CPU}}.nuspec
       shell: cmd
       
     - name: Upload build artifacts - GuardianFirewall Service
