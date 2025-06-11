@@ -5,10 +5,10 @@ on:
   workflow_dispatch:
     branches: [ "*" ]
     
-  push:
-    branches: [ "main", "logging-reclass" ]
-  pull_request:
-    branches: [ "main" ]
+#  push:
+#    branches: [ "main", "logging-reclass" ]
+#  pull_request:
+#    branches: [ "main" ]
 
 defaults:
   run:
@@ -43,15 +43,7 @@ jobs:
     - name: Get a dir
       run: dir
       shell: cmd
-      
-    - name: Get a dir of MSVC toolset available
-      run: dir "C:\Program Files\Microsoft Visual Studio\2022\Enterprise\VC\Tools\MSVC\"
-      shell: cmd
 
-#    - name: barf quickly
-#      run: barf
-#      shell: cmd
-      
     # Get CPU Architecture from Github variable
     - name: Get CPU from GH's $RUNNER_ARCH
       run: |
@@ -85,8 +77,8 @@ jobs:
     - name: Upload build artifacts - GuardianConnectSDK
       uses: actions/upload-artifact@v4
       with:
-        name: GuardianConnectSDK_0.14.5.356.nupkg
-        path: D:\a\GuardianConnect-Windows\GuardianConnect-Windows\GuardianConnectSDK\GuardianConnect.0.14.5.356.nupkg
+        name: GuardianConnectSDK_0.14.5.356_${{env.CPU}}.nupkg
+        path: D:\a\GuardianConnect-Windows\GuardianConnect-Windows\GuardianConnectSDK\GuardianConnect.0.14.5.356_${{env.CPU}}.nupkg
 
     - name: Create GuardianWindowsService.nupkg package bundle
       run: nuget pack GuardianWindowsService_${{env.CPU}}.nuspec
@@ -95,8 +87,8 @@ jobs:
     - name: Upload build artifacts - GuardianFirewall Service
       uses: actions/upload-artifact@v4
       with:
-        name: GuardianFirewallService.14.1.9.nupkg
-        path: D:\a\GuardianConnect-Windows\GuardianConnect-Windows\GuardianConnectSDK\GuardianFirewallService.0.14.5.356.nupkg
+        name: GuardianFirewallService.14.5.356_${{env.CPU}}.nupkg
+        path: D:\a\GuardianConnect-Windows\GuardianConnect-Windows\GuardianConnectSDK\GuardianFirewallService.0.14.5.356_${{env.CPU}}.nupkg
     
     # Sign GuardianConnectSDK package with certificate
     # Name GuardianConnectSDK Windows Nuget Package
@@ -105,12 +97,12 @@ jobs:
       run: Install-Module -Name SignPath -Force
 
         Submit-SigningRequest `
-        -InputArtifactPath "GuardianConnect.0.14.5.356.nupkg" `
+        -InputArtifactPath "GuardianConnect.0.14.5.356_${{env.CPU}}.nupkg" `
         -ApiToken "${{ secrets.CI_SIGNPATH_USER_TOKEN }}" `
         -OrganizationId "5c1e4170-8bf7-48b1-8542-78374ccc3471" `
         -ProjectSlug "Guardian" `
         -SigningPolicySlug "Guardian_DNSF_Branded" `
-        -OutputArtifactPath "SIGNED_GuardianConnect.0.14.5.356.nupkg" `
+        -OutputArtifactPath "SIGNED_GuardianConnect.0.14.5.356_${{env.CPU}}.nupkg" `
         -ArtifactConfigurationSlug GuardianConnectSDK_Windows_Nuget_Package `
         -WaitForCompletion
     
@@ -122,12 +114,12 @@ jobs:
       run: Install-Module -Name SignPath -Force
         
         Submit-SigningRequest `
-        -InputArtifactPath "GuardianFirewallService.0.14.5.356.nupkg" `
+        -InputArtifactPath "GuardianFirewallService.0.14.5.356_${{env.CPU}}.nupkg" `
         -ApiToken "${{ secrets.CI_SIGNPATH_USER_TOKEN }}" `
         -OrganizationId "5c1e4170-8bf7-48b1-8542-78374ccc3471" `
         -ProjectSlug "Guardian" `
         -SigningPolicySlug "Guardian_DNSF_Branded" `
-        -OutputArtifactPath "SIGNED_GuardianFirewallService.0.14.5.356_signed.nupkg" `
+        -OutputArtifactPath "SIGNED_GuardianFirewallService.0.14.5.356_signed_${{env.CPU}}.nupkg" `
         -ArtifactConfigurationSlug GuardianFirewallService_Nuget_Package `
         -WaitForCompletion
       
@@ -135,14 +127,14 @@ jobs:
     - name: Upload build artifacts - GuardianConnectSDK
       uses: actions/upload-artifact@v4
       with:
-        name: SIGNED_GuardianConnectSDK_0.14.5.356.nupkg
-        path: D:\a\GuardianConnect-Windows\GuardianConnect-Windows\GuardianConnectSDK\SIGNED_GuardianConnect.0.14.5.356.nupkg
+        name: SIGNED_GuardianConnectSDK_0.14.5.356_${{env.CPU}}.nupkg
+        path: D:\a\GuardianConnect-Windows\GuardianConnect-Windows\GuardianConnectSDK\SIGNED_GuardianConnect.0.14.5.356_${{env.CPU}}.nupkg
         
     - name: Upload build artifacts - GuardianFirewall Service
       uses: actions/upload-artifact@v4
       with:
-        name: SIGNED_GuardianFirewallService.14.1.9.nupkg
-        path: D:\a\GuardianConnect-Windows\GuardianConnect-Windows\GuardianConnectSDK\SIGNED_GuardianFirewallService.0.14.5.356.nupkg
+        name: SIGNED_GuardianFirewallService.14.5.356_${{env.CPU}}.nupkg
+        path: D:\a\GuardianConnect-Windows\GuardianConnect-Windows\GuardianConnectSDK\SIGNED_GuardianFirewallService.0.14.5.356_${{env.CPU}}.nupkg
         
         
         # Add github as source for nuget
