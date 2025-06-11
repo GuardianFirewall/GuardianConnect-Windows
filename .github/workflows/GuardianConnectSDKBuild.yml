@@ -121,10 +121,10 @@ jobs:
         
     # Update GitHub Packages with these nuget packages
     - name: Update GitHub with nuget packages - SDK
-      run: nuget push SIGNED_GuardianConnect.0.14.5.356.nupkg ${{ secrets.GUARDIANFIREWALL_GH_PKG_TOKEN }} -Source GitHub -SkipDuplicate
+      run: nuget push SIGNED_GuardianConnect.0.14.5.356-${{env.CPU}}.nupkg ${{ secrets.GUARDIANFIREWALL_GH_PKG_TOKEN }} -Source GitHub -SkipDuplicate
 
     - name: Update GitHub with nuget packages - Service
-      run: nuget push SIGNED_GuardianFirewallService.0.14.5.356_signed.nupkg ${{ secrets.GUARDIANFIREWALL_GH_PKG_TOKEN }} -Source GitHub -SkipDuplicate
+      run: nuget push SIGNED_GuardianFirewallService.0.14.5.356-${{env.CPU}}.nupkg ${{ secrets.GUARDIANFIREWALL_GH_PKG_TOKEN }} -Source GitHub -SkipDuplicate
 
 
   build-arm64:
@@ -175,7 +175,7 @@ jobs:
         shell: cmd
 
       - name: Create GuardianWindowsService.nupkg package bundle
-        run: nuget pack GuardianWindowsService-${{env.CPU}}.nuspec
+        run: nuget pack GuardianWindowsService_${{env.CPU}}.nuspec
         shell: cmd
 
       # Sign GuardianConnectSDK package with certificate
