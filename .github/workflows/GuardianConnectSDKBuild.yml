@@ -3,10 +3,10 @@ name: GuardianConnectSDK build and package
 
 on:
   workflow_dispatch:
-    branches: [ "wip" ]
+    branches: [ "*" ]
     
   push:
-    branches: [ "main" ]
+    branches: [ "main", "logging-reclass" ]
   pull_request:
     branches: [ "main" ]
 
@@ -16,20 +16,15 @@ defaults:
     
 jobs:
 
-  build:
+  build-x64:
 
     strategy:
       matrix:
         configuration: [Release]
           
-          # How to specify this??
-          #os-version: [ windows-latest ]
-          #compiler: [ latest, gcc-latest, gcc-6.4.0, gcc-10.2.0, g++-11.2.0, clang, clang-8.0.0, clang-11.1.0, clang++-12.0.1 ]
-
     # For a list of available runner types, refer to
     # https://help.github.com/en/actions/reference/workflow-syntax-for-github-actions#jobsjob_idruns-on
-    #runs-on: [windows-2022, windows-11-arm]
-    runs-on: ["${{ inputs.chosen-os }}"]
+    runs-on: windows-2022
 
     env:
       Solution_Name: GuardianConnectSDK.sln
@@ -58,38 +53,20 @@ jobs:
     - name: Setup MSBuild.exe
       uses: microsoft/setup-msbuild@v2
 
-    # Restore the application to populate the obj folder with RuntimeIdentifiers
-#    - name: Restore the application
-#      run: msbuild $env:Solution_Name /t:Restore /p:Configuration=$env:Configuration
-#      env:
-#        Configuration: ${{ matrix.configuration }}
-
     - name: Build GuardianConnect
-      run: msbuild /t:restore /t:Build /p:Platform=$ENV:CPU /p:Configuration=Release /p:RuntimeIdentifier=win-$ENV:CPU GuardianConnect
+      run: msbuild /t:restore /t:Build /p:Platform=${{env.CPU}} /p:Configuration=Release /p:RuntimeIdentifier=win-${{env.CPU}} GuardianConnect
       
     - name: Build GuardianFirewall Service
-      run: msbuild /t:restore /t:Build /p:Platform=$ENV:CPU /p:Configuration=Release /p:RuntimeIdentifier=win-$ENV:CPU GuardianWinService\GuardianWinService.csproj
+      run: msbuild /t:restore /t:Build /p:Platform=${{env.CPU}} /p:Configuration=Release /p:RuntimeIdentifier=win-${{env.CPU}} GuardianWinService\GuardianWinService.csproj
 
     - name: Create GuardianConnect.nupkg package bundle
-      run: nuget pack GuardianConnectSDK_Package.nuspec
+      run: nuget pack GuardianConnectSDK_Package_${{env.CPU}}.nuspec
       shell: cmd
       
-    - name: Upload build artifacts - GuardianConnectSDK
-      uses: actions/upload-artifact@v4
-      with:
-        name: GuardianConnectSDK_0.14.2.358.nupkg
-        path: D:\a\GuardianConnect-Windows\GuardianConnect-Windows\GuardianConnectSDK\GuardianConnect.0.14.2.358.nupkg
-
     - name: Create GuardianWindowsService.nupkg package bundle
-      run: nuget pack GuardianWindowsService.nuspec
+      run: nuget pack GuardianWindowsService_${{env.CPU}}.nuspec
       shell: cmd
       
-    - name: Upload build artifacts - GuardianFirewall Service
-      uses: actions/upload-artifact@v4
-      with:
-        name: GuardianFirewallService.14.1.9.nupkg
-        path: D:\a\GuardianConnect-Windows\GuardianConnect-Windows\GuardianConnectSDK\GuardianFirewallService.0.14.1.9.nupkg
-    
     # Sign GuardianConnectSDK package with certificate
     # Name GuardianConnectSDK Windows Nuget Package
     # Slug GuardianConnectSDK_Windows_Nuget_Package
@@ -97,12 +74,12 @@ jobs:
       run: Install-Module -Name SignPath -Force
 
         Submit-SigningRequest `
-        -InputArtifactPath "GuardianConnect.0.14.2.358.nupkg" `
+        -InputArtifactPath "GuardianConnect.0.14.5.356-${{env.CPU}}.nupkg" `
         -ApiToken "${{ secrets.CI_SIGNPATH_USER_TOKEN }}" `
         -OrganizationId "5c1e4170-8bf7-48b1-8542-78374ccc3471" `
         -ProjectSlug "Guardian" `
         -SigningPolicySlug "Guardian_DNSF_Branded" `
-        -OutputArtifactPath "SIGNED_GuardianConnect.0.14.2.358.nupkg" `
+        -OutputArtifactPath "SIGNED_GuardianConnect.0.14.5.356-${{env.CPU}}.nupkg" `
         -ArtifactConfigurationSlug GuardianConnectSDK_Windows_Nuget_Package `
         -WaitForCompletion
     
@@ -114,12 +91,12 @@ jobs:
       run: Install-Module -Name SignPath -Force
         
         Submit-SigningRequest `
-        -InputArtifactPath "GuardianFirewallService.0.14.1.9.nupkg" `
+        -InputArtifactPath "GuardianFirewallService.0.14.5.356-${{env.CPU}}.nupkg" `
         -ApiToken "${{ secrets.CI_SIGNPATH_USER_TOKEN }}" `
         -OrganizationId "5c1e4170-8bf7-48b1-8542-78374ccc3471" `
         -ProjectSlug "Guardian" `
         -SigningPolicySlug "Guardian_DNSF_Branded" `
-        -OutputArtifactPath "SIGNED_GuardianFirewallService.0.14.1.9_signed.nupkg" `
+        -OutputArtifactPath "SIGNED_GuardianFirewallService.0.14.5.356-${{env.CPU}}.nupkg" `
         -ArtifactConfigurationSlug GuardianFirewallService_Nuget_Package `
         -WaitForCompletion
       
@@ -127,14 +104,14 @@ jobs:
     - name: Upload build artifacts - GuardianConnectSDK
       uses: actions/upload-artifact@v4
       with:
-        name: SIGNED_GuardianConnectSDK_0.14.2.358.nupkg
-        path: D:\a\GuardianConnect-Windows\GuardianConnect-Windows\GuardianConnectSDK\SIGNED_GuardianConnect.0.14.2.358.nupkg
+        name: SIGNED_GuardianConnectSDK_0.14.5.356-${{env.CPU}}.nupkg
+        path: D:\a\GuardianConnect-Windows\GuardianConnect-Windows\GuardianConnectSDK\SIGNED_GuardianConnect.0.14.5.356-${{env.CPU}}.nupkg
         
     - name: Upload build artifacts - GuardianFirewall Service
       uses: actions/upload-artifact@v4
       with:
-        name: SIGNED_GuardianFirewallService.14.1.9.nupkg
-        path: D:\a\GuardianConnect-Windows\GuardianConnect-Windows\GuardianConnectSDK\SIGNED_GuardianFirewallService.0.14.1.9.nupkg
+        name: SIGNED_GuardianFirewallService.14.5.356-${{env.CPU}}.nupkg
+        path: D:\a\GuardianConnect-Windows\GuardianConnect-Windows\GuardianConnectSDK\SIGNED_GuardianFirewallService.0.14.5.356-${{env.CPU}}.nupkg
         
         
         # Add github as source for nuget
@@ -142,12 +119,120 @@ jobs:
       shell: cmd
       run: dotnet nuget add source --username time4dnsf --password ${{ secrets.GITHUB_TOKEN }} --store-password-in-clear-text --name github "https://nuget.pkg.github.com/GuardianFirewall/index.json"
         
-#        nuget add source GitHub "https://github.com/guardianfirewall/index.json"
-    
     # Update GitHub Packages with these nuget packages
     - name: Update GitHub with nuget packages - SDK
-      run: nuget push SIGNED_GuardianConnect.0.14.2.358.nupkg ${{ secrets.GUARDIANFIREWALL_GH_PKG_TOKEN }} -Source GitHub -SkipDuplicate
+      run: nuget push SIGNED_GuardianConnect.0.14.5.356-${{env.CPU}}.nupkg ${{ secrets.GUARDIANFIREWALL_GH_PKG_TOKEN }} -Source GitHub -SkipDuplicate
 
     - name: Update GitHub with nuget packages - Service
-      run: nuget push SIGNED_GuardianFirewallService.0.14.1.9_signed.nupkg ${{ secrets.GUARDIANFIREWALL_GH_PKG_TOKEN }} -Source GitHub -SkipDuplicate
+      run: nuget push SIGNED_GuardianFirewallService.0.14.5.356-${{env.CPU}}.nupkg ${{ secrets.GUARDIANFIREWALL_GH_PKG_TOKEN }} -Source GitHub -SkipDuplicate
 
+
+  build-arm64:
+
+    strategy:
+      matrix:
+        configuration: [Release]
+    
+    # For a list of available runner types, refer to
+    # https://help.github.com/en/actions/reference/workflow-syntax-for-github-actions#jobsjob_idruns-on
+    runs-on: w11-arm
+
+    env:
+      Solution_Name: GuardianConnectSDK.sln
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v3
+        with:
+          fetch-depth: 0
+
+      - name: Get a dir
+        run: dir
+        shell: cmd
+      
+      # Get CPU Architecture from Github variable
+      - name: Get CPU from GH's $RUNNER_ARCH
+        run: |
+          $cpu = $env:RUNNER_ARCH.replace('X', 'x').replace('ARM', 'arm')
+          echo "CPU=$cpu" | Out-File -FilePath $Env:GITHUB_ENV -Encoding utf8 -Append
+      
+      # Show env
+      - name: Show env after above with colon syntax
+        run: echo "$env:CPU"
+      
+      # Add  MSBuild to the PATH: https://github.com/microsoft/setup-msbuild
+      - name: Setup MSBuild.exe
+        uses: microsoft/setup-msbuild@v2
+
+      - name: Build GuardianConnect
+        run: msbuild /t:restore /t:Build /p:Platform=${{env.CPU}} /p:Configuration=Release /p:RuntimeIdentifier=win-${{env.CPU}} GuardianConnect
+
+      - name: Build GuardianFirewall Service
+        run: msbuild /t:restore /t:Build /p:Platform=${{env.CPU}} /p:Configuration=Release /p:RuntimeIdentifier=win-${{env.CPU}} GuardianWinService\GuardianWinService.csproj
+
+      - name: Create GuardianConnect.nupkg package bundle
+        run: nuget pack GuardianConnectSDK_Package_${{env.CPU}}.nuspec
+        shell: cmd
+
+      - name: Create GuardianWindowsService.nupkg package bundle
+        run: nuget pack GuardianWindowsService_${{env.CPU}}.nuspec
+        shell: cmd
+
+      # Sign GuardianConnectSDK package with certificate
+      # Name GuardianConnectSDK Windows Nuget Package
+      # Slug GuardianConnectSDK_Windows_Nuget_Package
+      - name: Sign GuardianConnectSDK package with certificate
+        run: Install-Module -Name SignPath -Force
+          
+          Submit-SigningRequest `
+          -InputArtifactPath "GuardianConnect.0.14.5.356-${{env.CPU}}.nupkg" `
+          -ApiToken "${{ secrets.CI_SIGNPATH_USER_TOKEN }}" `
+          -OrganizationId "5c1e4170-8bf7-48b1-8542-78374ccc3471" `
+          -ProjectSlug "Guardian" `
+          -SigningPolicySlug "Guardian_DNSF_Branded" `
+          -OutputArtifactPath "SIGNED_GuardianConnect.0.14.5.356-${{env.CPU}}.nupkg" `
+          -ArtifactConfigurationSlug GuardianConnectSDK_Windows_Nuget_Package `
+          -WaitForCompletion
+      
+      
+      # Sign GuardianFirewallService package with certificate
+      # Name GuardianFirewallService Windows Nuget Package
+      # Slug GuardianConnectSDK_Windows_Nuget_Package
+      - name: Sign GuardianFirewallService package with certificate
+        run: Install-Module -Name SignPath -Force
+          
+          Submit-SigningRequest `
+          -InputArtifactPath "GuardianFirewallService.0.14.5.356-${{env.CPU}}.nupkg" `
+          -ApiToken "${{ secrets.CI_SIGNPATH_USER_TOKEN }}" `
+          -OrganizationId "5c1e4170-8bf7-48b1-8542-78374ccc3471" `
+          -ProjectSlug "Guardian" `
+          -SigningPolicySlug "Guardian_DNSF_Branded" `
+          -OutputArtifactPath "SIGNED_GuardianFirewallService.0.14.5.356-${{env.CPU}}.nupkg" `
+          -ArtifactConfigurationSlug GuardianFirewallService_Nuget_Package `
+          -WaitForCompletion
+        
+        # Upload the nuget packages: (https://github.com/marketplace/actions/upload-a-build-artifact)
+      - name: Upload build artifacts - GuardianConnectSDK
+        uses: actions/upload-artifact@v4
+        with:
+          name: SIGNED_GuardianConnectSDK_0.14.5.356-${{env.CPU}}.nupkg
+          path: D:\a\GuardianConnect-Windows\GuardianConnect-Windows\GuardianConnectSDK\SIGNED_GuardianConnect.0.14.5.356-${{env.CPU}}.nupkg
+
+      - name: Upload build artifacts - GuardianFirewall Service
+        uses: actions/upload-artifact@v4
+        with:
+          name: SIGNED_GuardianFirewallService.14.5.356-${{env.CPU}}.nupkg
+          path: D:\a\GuardianConnect-Windows\GuardianConnect-Windows\GuardianConnectSDK\SIGNED_GuardianFirewallService.0.14.5.356-${{env.CPU}}.nupkg
+          
+          
+          # Add github as source for nuget
+      - name: Add GitHub as nuget package source
+        shell: cmd
+        run: dotnet nuget add source --username time4dnsf --password ${{ secrets.GITHUB_TOKEN }} --store-password-in-clear-text --name github "https://nuget.pkg.github.com/GuardianFirewall/index.json"
+      
+      # Update GitHub Packages with these nuget packages
+      - name: Update GitHub with nuget packages - SDK
+        run: nuget push SIGNED_GuardianConnect.0.14.5.356-${{env.CPU}}.nupkg ${{ secrets.GUARDIANFIREWALL_GH_PKG_TOKEN }} -Source GitHub -SkipDuplicate
+
+      - name: Update GitHub with nuget packages - Service
+        run: nuget push SIGNED_GuardianFirewallService.0.14.5.356-${{env.CPU}}.nupkg ${{ secrets.GUARDIANFIREWALL_GH_PKG_TOKEN }} -Source GitHub -SkipDuplicate

@@ -2,7 +2,7 @@
 <package >
   <metadata>
     <id>GuardianFirewallService</id>
-    <version>0.14.1.9</version>
+    <version>0.14.5.356-arm64</version>
     <title>GuardianFirewall Service Nuget Package</title>
     <authors>DNSFilter, Inc.</authors>
     <license type="expression">MIT</license>
@@ -19,6 +19,6 @@
   <files>
   <file src=".\README.md" target="lib\net9.0"/>
   <file src="Guardian.png"/>
-    <file src="GuardianWinService\bin\x64\release\net9.0-windows10.0.26100.0\win-x64\**\*.*" target="GuardianFirewallService\bin\net9.0"/>
+    <file src="GuardianWinService\bin\arm64\release\net9.0-windows10.0.26100.0\win-arm64\**\*.*" target="GuardianFirewallService\bin\net9.0"/>
   </files>
 </package>

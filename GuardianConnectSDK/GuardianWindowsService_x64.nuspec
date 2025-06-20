@@ -1,0 +1,24 @@
+<?xml version="1.0" encoding="utf-8"?>
+<package >
+  <metadata>
+    <id>GuardianFirewallService</id>
+    <version>0.14.5.356-x64</version>
+    <title>GuardianFirewall Service Nuget Package</title>
+    <authors>DNSFilter, Inc.</authors>
+    <license type="expression">MIT</license>
+    <icon>Guardian.png</icon>
+    <projectUrl>https://github.com/GuardianFirewall/guardianconnect-windows</projectUrl>
+    <description>Use this Nuget package to interact with the Guardian Firewall VPN Infrastructure</description>
+    <releaseNotes>0.14.1: Beta Release of Guardian Windows Service package based on .NET 9.0.2</releaseNotes>
+    <copyright>Copyright DNSFilter, Inc.</copyright>
+    <tags>GuardianConnectSDK Windows Service Beta Windows</tags>
+    <dependencies>
+      <group targetFramework="net9.0"/>
+    </dependencies>
+  </metadata>
+  <files>
+  <file src=".\README.md" target="lib\net9.0"/>
+  <file src="Guardian.png"/>
+    <file src="GuardianWinService\bin\x64\release\net9.0-windows10.0.26100.0\win-x64\**\*.*" target="GuardianFirewallService\bin\net9.0"/>
+  </files>
+</package>

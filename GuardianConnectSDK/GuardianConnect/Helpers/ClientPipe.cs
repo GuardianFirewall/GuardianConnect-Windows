@@ -49,6 +49,12 @@ public static class ClientPipe
     {
         return await Instance.GetServiceLogLinesAsync(maxNumberOfLinesToGet);
     }
+
+    public static void SwitchServiceLoggingLevel(Common.LoggingLevels loggingLevel)
+    {
+        Instance.SwitchServiceLoggingLevel(loggingLevel);
+    }
+        
 }
 
 public class ClientPipeImpl : IGuardianNPContract
@@ -167,5 +173,13 @@ public class ClientPipeImpl : IGuardianNPContract
         Log.Information($"Number of log lines returned from the service = {serviceLogLines.Count}");
 
         return serviceLogLines;
+    }
+
+    public void SwitchServiceLoggingLevel(Common.LoggingLevels loggingLevel)
+    {
+        Log.Warning($"Sending command to service to switch logging level to {loggingLevel}");
+        var cmdString = $"{(int)IGuardianNPContract.NPCommands.SwitchLoggingLevel}.{loggingLevel}";
+        ss.WriteString(cmdString);
+        
     }
 }
