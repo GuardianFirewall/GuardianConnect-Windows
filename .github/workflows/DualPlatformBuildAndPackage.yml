@@ -58,10 +58,10 @@ jobs:
       run: msbuild /t:restore /t:Build /p:Platform=arm64 /p:Configuration=Release /p:RuntimeIdentifier=win-arm64 GuardianConnect\GuardianConnect.csproj
       
     - name: Build GuardianFirewall Service for x64 CPU
-      run: msbuild /t:restore /t:Build /p:Platform=x64 /p:Configuration=Release /p:RuntimeIdentifier=win-x64 GuardianWinService\GuardianWinService.csproj
+      run: msbuild /t:restore /t:Build /p:Platform=x64 /p:Configuration=Release /p:RuntimeIdentifier=win-x64 GuardianFirewallService\GuardianFirewallService.csproj
 
     - name: Build GuardianFirewall Service for arm64 CPU
-      run: msbuild /t:restore /t:Build /p:Platform=arm64 /p:Configuration=Release /p:RuntimeIdentifier=win-arm64 GuardianWinService\GuardianWinService.csproj
+      run: msbuild /t:restore /t:Build /p:Platform=arm64 /p:Configuration=Release /p:RuntimeIdentifier=win-arm64 GuardianFirewallService\GuardianFirewallService.csproj
 
 #    - name: Set version from Directory.Build.props
 #    run: |
