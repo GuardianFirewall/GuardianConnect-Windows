@@ -79,6 +79,7 @@ jobs:
       run: |
         $version = Select-String '<Version>(.+?)</Version>' Directory.Build.Props | % { $_.Matches[0].Groups[1].Value }
         "VERSION=$version" | Out-File -FilePath $env:GITHUB_ENV -Append
+        echo "VERSION="${{ env.VERSION }}
 
     - name: Create GuardianConnect.nupkg package bundle containing both CPU builds
       run: nuget pack GuardianConnectSDK.nuspec -Version ${{env.PKGVERSION}}
