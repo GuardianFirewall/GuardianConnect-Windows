@@ -78,7 +78,7 @@ jobs:
       shell: cmd
       
     - name: Create GuardianFirewallService.nupkg package bundle
-      run: nuget pack GuardianFirewallService.nuspec
+      run: nuget pack GuardianFirewallService.nuspec -Version ${{env.PKGVERSION}}
       shell: cmd
       
     # Sign GuardianConnectSDK package with certificate
