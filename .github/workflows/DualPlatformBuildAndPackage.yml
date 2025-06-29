@@ -60,8 +60,9 @@ jobs:
           echo "::set-output name=my_property_value::$myPropertyValue"
 
     - name: Use the extracted value
-      run: echo "My property value is ${{ steps.extract_prop.outputs.my_property_value }}"
-        VERSION=$myPropertyValue" | Out-File -FilePath $env:GITHUB_ENV -Append
+      run: |
+        echo "My property value is ${{ steps.extract_prop.outputs.my_property_value }}"
+        VERSION=$myPropertyValue | Out-File -FilePath $env:GITHUB_ENV -Append
         echo "VERSION="${{ env.VERSION }}
 
 
