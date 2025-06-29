@@ -66,9 +66,13 @@ jobs:
     - name: Set version from Directory.Build.props
     run: |
     # Extract the version from Directory.Build.props
-    VERSION=$(grep -oP '<Version>\K[^<]+' Directory.Build.props)
+    #VERSION=$(grep -oP '<Version>\K[^<]+' Directory.Build.props)
+    VCOPILOT=$(grep -oP '<Version>\K[^<]+' Directory.Build.Props)
     # Set the version as an environment variable
-    echo "PKGVERSION=$VERSION" >> $GITHUB_ENV
+    echo "PKGVERSION=$VCOPILOT" >> $GITHUB_ENV
+
+    ## Powershell example syntax from CoPilot
+    ##    Select-String '<Version>(.+?)</Version>' Directory.Build.Props | % { $_.Matches[0].Groups[1].Value }
 
     - name: Create GuardianConnect.nupkg package bundle containing both CPU builds
       run: nuget pack GuardianConnectSDK.nuspec -Version ${{env.PKGVERSION}}
