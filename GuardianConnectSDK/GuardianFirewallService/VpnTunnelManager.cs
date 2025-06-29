@@ -2,7 +2,7 @@ using System;
 using GuardianConnect;
 using GuardianConnect.Shared;
 
-namespace GuardianWinService;
+namespace GuardianFirewallService;
 
 public class VpnTunnelManager : ITransportProvider
 {

@@ -325,7 +325,7 @@ namespace GuardianConnect.Helpers
             
             // Do connection call here
             errorResponse = await ConnectVpnWithConfiguredCredentials();
-            // TODO - Followup here with either result from GRDGatewayAPI.GetServerStatus or actual WCF call over to GuardianWinService to make Ras CreateEntry->ConnectEntry calls
+            // TODO - Followup here with either result from GRDGatewayAPI.GetServerStatus or actual WCF call over to GuardianFirewallService to make Ras CreateEntry->ConnectEntry calls
 
             IsBusy = false;
             return errorResponse;

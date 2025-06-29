@@ -3,7 +3,7 @@ using GuardianConnect.VPNTransports;
 using Serilog;
 using Microsoft.Win32;
 
-namespace GuardianWinService;
+namespace GuardianFirewallService;
 
 public static class PowerTransitionHandler
 {

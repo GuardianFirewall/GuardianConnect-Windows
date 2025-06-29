@@ -175,7 +175,7 @@ namespace  NativeRoutines
 #endif
 	}
 
-	// TJE - ASK CJ/WILL - Do we exit if VPN active? 'We' are the GuardianWinService - NOT the UI.
+	// TJE - ASK CJ/WILL - Do we exit if VPN active? 'We' are the GuardianFirewallService - NOT the UI.
 	void VpnDnsHandler::Exit() {
 		if (GetVpnEntryStatus() == Utility::CheckConnectionResult::CONNECTED) {
 			PrintRoutines::Output(Grd::FormatAString("{0}: vpn is active, do not exit", gcnew array<Object^> { *__func__ }));

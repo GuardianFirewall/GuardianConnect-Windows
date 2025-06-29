@@ -58,3 +58,7 @@
 /GuardianConnectSDK/BuildOutput
 /GuardianConnectSDK/GuardianConnect/BuildOutput/GuardianFirewallService/x64/Release
 /GuardianConnectSDK/NativeRoutines/NativeRoutines/x64/Debug
+/GuardianConnectSDK/GuardianFirewallService/obj
+/GuardianConnectSDK/NativeRoutines/NativeRoutines/arm64/Release/NativeRoutines.tlog
+/GuardianConnectSDK/NativeRoutines/NativeRoutines/arm64/Release
+*.swp

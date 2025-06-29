@@ -1,6 +1,6 @@
 ﻿using System.Text;
 using GuardianConnect.Shared;
-using GuardianWinService;
+using GuardianFirewallService;
 using Microsoft.Extensions.Hosting;
 using Serilog;
 
