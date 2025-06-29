@@ -47,6 +47,24 @@ jobs:
     - name: Show env after above with colon syntax
       run: echo "$env:CPU"
 
+    - name: Extract value from Directory.Build.props
+      id: extract_prop
+      shell: pwsh
+      run: |
+          [xml]$xmlContent = Get-Content -Path "Directory.Build.props"
+
+          # Assuming you want to extract the value of a property named "MyProperty"
+          $myPropertyValue = $xmlContent.Project.PropertyGroup.Version
+
+          # Set the extracted value as a step output
+          echo "::set-output name=my_property_value::$myPropertyValue"
+
+    - name: Use the extracted value
+      run: echo "My property value is ${{ steps.extract_prop.outputs.my_property_value }}"
+        VERSION=$myPropertyValue" | Out-File -FilePath $env:GITHUB_ENV -Append
+        echo "VERSION="${{ env.VERSION }}
+
+
     # Add  MSBuild to the PATH: https://github.com/microsoft/setup-msbuild
     - name: Setup MSBuild.exe
       uses: microsoft/setup-msbuild@v2
