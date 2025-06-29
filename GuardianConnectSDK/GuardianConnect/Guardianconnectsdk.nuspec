@@ -2,6 +2,7 @@
 <package >
   <metadata>
     <id>GuardianConnect</id>
+    <version>1.0.0.0</version>
     <title>GuardianConnect SDK Nuget Bundle Package</title>
     <authors>DNSFilter, Inc.</authors>
     <license type="expression">MIT</license>
@@ -12,7 +13,10 @@
     <copyright>Copyright DNSFilter, Inc.</copyright>
     <tags>GuardianConnectSDK Windows Beta</tags>
     <dependencies>
+<!--
       <group targetFramework="$(TargetFramework)"/>
+-->
+      <group targetFramework="net9.0"/>
     </dependencies>
   </metadata>
   <files>
@@ -22,6 +26,7 @@
     <file src="GuardianConnect\bin\$(Platform)\Release\$(TargetFramework)\*.*" target="lib\$(TargetFramework)\$(Platform)"/>
     <file src="$(SolutionDir)\BuildOutput\runtimes\$(TargetFramework)\$(Platform)\*.*" target="lib\runtimes\$(TargetFramework)\$(Platform)"/>
     -->
-    <file src="$(SolutionDir)\BuildOutput\runtimes\$(TargetFramework)\*.*" target="lib\runtimes\$(TargetFramework)\"/>
+    
+    <file src="$(SolutionDir)\BuildOutput\runtimes\net9.0-windows\**\*.*" target="lib\runtimes\net9.0-windows\"/>
   </files>
 </package>

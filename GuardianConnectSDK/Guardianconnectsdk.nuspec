@@ -1,0 +1,43 @@
+<?xml version="1.0" encoding="utf-8"?>
+<package >
+  <metadata>
+    <id>GuardianConnect</id>
+    <version>16.0.0.30</version>
+    <title>GuardianConnect SDK</title>
+    <authors>DNSFilter, Inc.</authors>
+    <license type="expression">MIT</license>
+    <icon>Guardian.png</icon>
+    <projectUrl>https://github.com/GuardianFirewall/guardianconnect-windows</projectUrl>
+    <description>Use this Nuget package to interact with the Guardian Firewall VPN Infrastructure</description>
+    <releaseNotes>$(Version): Beta Release as SDK package</releaseNotes>
+    <copyright>Copyright DNSFilter, Inc.</copyright>
+    <tags>GuardianConnectSDK Windows Beta</tags>
+    <dependencies>
+    </dependencies>
+  </metadata>
+  <files>
+  <file src=".\README.md" target="content"/>
+  <file src="Guardian.png"/>
+    <!--
+    <file src="GuardianConnect\bin\$(Platform)\Release\$(TargetFramework)\*.*" target="lib\$(TargetFramework)\$(Platform)"/>
+    <file src="$(SolutionDir)\BuildOutput\runtimes\$(TargetFramework)\$(Platform)\*.*" target="lib\runtimes\$(TargetFramework)\$(Platform)"/>
+    <file src=".\BuildOutput\runtimes\net9.0-windows\**\*.*" target="lib\runtimes\net9.0-windows\"/>
+        <OutDir>$(SolutionDir)\BuildOutput\$(PackageId)\runtimes\win10-$(Platform)\$(TargetFramework)\lib\</OutDir>
+	  <file src="BuildOutput\runtimes\win10-x64\lib\net9.0-windows\*.dll" target="runtimes\win10-x64\lib\net9.0-windows\" />
+	  <file src="BuildOutput\runtimes\win10-arm64\lib\net9.0-windows\*.dll" target="runtimes\win10-arm64\lib\net9.0-windows\" />
+	  <file src="BuildOutput\runtimes\win10-x64\lib\net9.0\*.dll" target="lib\net9.0" />
+
+    <file src="BuildOutput\runtimes\win10-arm64\lib\net9.0\*.dll" target="runtimes\win-arm64\native" />
+    -->
+
+	  <!-- x64 -->
+	  <file src="BuildOutput\runtimes\win10-x64\lib\net9.0-windows\*.dll" target="runtimes\win-x64\lib\net9.0" />
+	  <file src="BuildOutput\runtimes\win10-x64\lib\net9.0-windows\*.dll" target="lib\net9.0" />
+
+	  <!-- arm64 -->
+	  <file src="BuildOutput\runtimes\win10-arm64\lib\net9.0-windows\*.dll" target="runtimes\win-arm64\lib\net9.0" />
+	  <!-- TODO
+	  <file src="BuildOutput\runtimes\win10-arm64\lib\net9.0-windows\*.dll" target="lib\net9.0" />
+      -->
+  </files>
+</package>

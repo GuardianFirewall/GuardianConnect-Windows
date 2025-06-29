@@ -1,4 +1,4 @@
-#include "pch.h"
+//#include "pch.h"
 #include <msclr/marshal.h>
 #include "VpnDnsHandler.h"
 #include "VpnUtils.h"

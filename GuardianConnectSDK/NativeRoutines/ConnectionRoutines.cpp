@@ -1,4 +1,4 @@
-#include "pch.h"
+//#include "pch.h"
 #include "ConnectionRoutines.h"
 #include <vcclr.h>
 #include "NativeRoutines.h"

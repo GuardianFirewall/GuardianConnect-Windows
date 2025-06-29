@@ -1,4 +1,4 @@
-#include "pch.h"
+//#include "pch.h"
 #include "PrintRoutines.h"
 using namespace System;
 using namespace Serilog;

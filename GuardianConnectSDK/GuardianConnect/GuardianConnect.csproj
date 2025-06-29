@@ -4,32 +4,25 @@
     <ImplicitUsings>enable</ImplicitUsings>
     <Nullable>enable</Nullable>
     <AllowUnsafeBlocks>true</AllowUnsafeBlocks>
-    <TargetFramework>net9.0-windows10.0.26100.0</TargetFramework>
 
-    <Configurations>Release;Debug</Configurations>
-    <Platforms>x64;ARM64</Platforms>
-        <AssemblyVersion>0.14.5.356</AssemblyVersion>
-        <FileVersion>0.14.5.356</FileVersion>
-        <Version>0.14.5.356</Version>
-        <Title>GuardianConnect</Title>
-        <Authors>DNSFilter, Inc.</Authors>
-        <GeneratePackageOnBuild>false</GeneratePackageOnBuild>
+        <GeneratePackageOnBuild>False</GeneratePackageOnBuild>
         <PackageIcon>Guardian.png</PackageIcon>
-        <RepositoryUrl>https://github.com/GuardianFirewall/GuardianConnect-Windows</RepositoryUrl>
+	  <!--
+	  <TargetFramework>net9.0-windows10.0.26100.0</TargetFramework>
+      -->
+        <Platforms>x64;ARM64</Platforms>
   </PropertyGroup>
 
-  <ItemGroup>
-    <PackageReference Include="Newtonsoft.Json" Version="13.0.3" />
-    <PackageReference Include="Serilog" Version="4.2.0" />
-    <PackageReference Include="Serilog.Enrichers.Thread" Version="4.0.0" />
-    <PackageReference Include="Serilog.Extensions.Logging" Version="9.0.0" />
-    <PackageReference Include="Serilog.Settings.AppSettings" Version="3.0.0" />
-    <PackageReference Include="Serilog.Settings.Configuration" Version="9.0.0" />
-    <PackageReference Include="Serilog.Sinks.Console" Version="6.0.0" />
-    <PackageReference Include="Serilog.Sinks.Debug" Version="3.0.0" />
-    <PackageReference Include="Serilog.Sinks.File" Version="6.0.0" />
-  </ItemGroup>
-
+    <PropertyGroup>
+        <id>GuardianConnect</id>
+        <Authors>DNSFilter, Inc.</Authors>
+        <RepositoryUrl>https://github.com/GuardianFirewall/GuardianConnect-Windows</RepositoryUrl>
+        <PackageId>GuardianConnect</PackageId>
+        <title>GuardianConnect SDK Nuget Bundle Package</title>
+        <PackageIconUrl>Guardian.png</PackageIconUrl>
+        <tags>GuardianConnectSDK</tags>
+    </PropertyGroup>
+    
   <ItemGroup>
     <ProjectReference Include="..\NativeRoutines\NativeRoutines.vcxproj" />
     <ProjectReference Include="..\Shared\GuardianConnect.Shared.csproj" />

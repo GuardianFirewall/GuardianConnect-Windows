@@ -1,6 +1,7 @@
 ﻿using System.Diagnostics;
+using System.Diagnostics.CodeAnalysis;
 using System.Net;
-using ABI.Windows.Data.Json;
+//using ABI.Windows.Data.Json;
 using GuardianConnect.Credentials;
 using GuardianConnect.Helpers;
 using GuardianConnect.Shared;
@@ -11,6 +12,7 @@ using Serilog;
 
 namespace GuardianConnect.VPNTransports;
 
+[SuppressMessage("Interoperability", "CA1416:Validate platform compatibility")]
 public class VPNTransportIKEV2 :ITransportProvider
 {
     private static bool shuttingDown = false;
