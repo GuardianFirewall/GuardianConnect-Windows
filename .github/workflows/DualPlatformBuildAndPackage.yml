@@ -47,6 +47,16 @@ jobs:
     - name: Show env after above with colon syntax
       run: echo "$env:CPU"
 
+    - name: Extract Version and set as env var
+      shell: pwsh
+      run: |
+            $version = Select-String '<Version>(.+?)</Version>' Directory.Build.Props | % { $_.Matches[0].Groups[1].Value }
+            "VERSION=$version" | Out-File -FilePath $env:GITHUB_ENV -Encoding utf8 -Append
+
+    - name: Use the extracted value
+      run: |
+        echo "VERSION="${{ env.VERSION }}
+
     - name: Extract value from Directory.Build.props
       id: extract_prop
       shell: pwsh
@@ -55,7 +65,7 @@ jobs:
           $myPropertyValue = $xmlContent.Project.PropertyGroup.Version
           VERSION=$myPropertyValue | Out-File -FilePath $env:GITHUB_ENV -Append
 
-    - name: Use the extracted value
+    - name: Use the extracted value again
       run: |
         echo "VERSION="${{ env.VERSION }}
 
