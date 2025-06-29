@@ -63,12 +63,22 @@ jobs:
     - name: Build GuardianFirewall Service for arm64 CPU
       run: msbuild /t:restore /t:Build /p:Platform=arm64 /p:Configuration=Release /p:RuntimeIdentifier=win-arm64 GuardianWinService\GuardianWinService.csproj
 
-    - name: Set version from Directory.Build.props
-    run: |
+#    - name: Set version from Directory.Build.props
+#    run: |
     # Extract the version from Directory.Build.props
-    VERSION=$(grep -oP '<Version>\K[^<]+' Directory.Build.props)
-    # Set the version as an environment variable
-    echo "PKGVERSION=$VERSION" >> $GITHUB_ENV
+    #VERSION=$(grep -oP '<Version>\K[^<]+' Directory.Build.props)
+#    VCOPILOT=$(grep -oP '<Version>\K[^<]+' Directory.Build.Props)
+#    # Set the version as an environment variable
+#    echo "PKGVERSION=$VCOPILOT" >> $GITHUB_ENV
+
+    ## Powershell example syntax from CoPilot
+    ##    Select-String '<Version>(.+?)</Version>' Directory.Build.Props | % { $_.Matches[0].Groups[1].Value }
+
+    - name: Extract Version and set as env var
+      shell: pwsh
+      run: |
+        $version = Select-String '<Version>(.+?)</Version>' Directory.Build.Props | % { $_.Matches[0].Groups[1].Value }
+        "VERSION=$version" | Out-File -FilePath $env:GITHUB_ENV -Append
 
     - name: Create GuardianConnect.nupkg package bundle containing both CPU builds
       run: nuget pack GuardianConnectSDK.nuspec -Version ${{env.PKGVERSION}}
