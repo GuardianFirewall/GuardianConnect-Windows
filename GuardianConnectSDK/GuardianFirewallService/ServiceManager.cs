@@ -1,7 +1,7 @@
 ﻿using GuardianConnect.Shared;
 using Microsoft.Extensions.Hosting;
 
-namespace GuardianWinService
+namespace GuardianFirewallService
 {
     public class ServiceManager : IHostedService
     {

@@ -6,7 +6,7 @@ using Serilog;
 using GuardianConnect.Shared;
 using Newtonsoft.Json;
 
-namespace GuardianWinService;
+namespace GuardianFirewallService;
 
 public class ClientPipeService : BackgroundService
 {

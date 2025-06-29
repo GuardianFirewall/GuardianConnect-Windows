@@ -25,8 +25,7 @@
     <Keyword>NetCoreCProj</Keyword>
     <RootNamespace>NativeRoutines</RootNamespace>
     <TargetFramework>net9.0</TargetFramework>
-    <WindowsTargetPlatformVersion>10.0</WindowsTargetPlatformVersion>
-    <WindowsTargetPlatformMinVersion>10.0.26100.0</WindowsTargetPlatformMinVersion>
+		<tags>GuardianConnectSDK</tags>
   </PropertyGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.Default.props" />
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'" Label="Configuration">
@@ -44,12 +43,13 @@
     <CLRSupport>NetCore</CLRSupport>
     <CharacterSet>Unicode</CharacterSet>
     <PreferredToolArchitecture>x64</PreferredToolArchitecture>
+    <VCToolsVersion>14.44.35207</VCToolsVersion>
   </PropertyGroup>
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Debug|ARM64'" Label="Configuration">
     <ConfigurationType>DynamicLibrary</ConfigurationType>
     <UseDebugLibraries>true</UseDebugLibraries>
     <PlatformToolset>v143</PlatformToolset>
-    <VCToolsVersion Condition="'$(VCToolsVersion)' == ''">14.43.34808</VCToolsVersion>
+    <VCToolsVersion Condition="'$(VCToolsVersion)' == ''">14.44.35207</VCToolsVersion>
     <VCToolsRedistVersion Condition="'$(VCToolsRedistVersion)' == ''">14.43.34808</VCToolsRedistVersion>
     <CLRSupport>NetCore</CLRSupport>
     <CharacterSet>Unicode</CharacterSet>
@@ -59,8 +59,7 @@
     <ConfigurationType>DynamicLibrary</ConfigurationType>
     <UseDebugLibraries>false</UseDebugLibraries>
     <PlatformToolset>v143</PlatformToolset>
-    <VCToolsVersion Condition="'$(VCToolsVersion)' == ''">
-    </VCToolsVersion>
+    <VCToolsVersion Condition="'$(VCToolsVersion)' == ''">14.44.35207</VCToolsVersion>
     <VCToolsRedistVersion Condition="'$(VCToolsRedistVersion)' == ''">14.43.34808</VCToolsRedistVersion>
     <CLRSupport>NetCore</CLRSupport>
     <CharacterSet>Unicode</CharacterSet>
@@ -69,8 +68,8 @@
     <ConfigurationType>DynamicLibrary</ConfigurationType>
     <UseDebugLibraries>false</UseDebugLibraries>
     <PlatformToolset>v143</PlatformToolset>
-    <VCToolsVersion Condition="'$(VCToolsVersion)' == ''">14.43.34808</VCToolsVersion>
-    <VCToolsRedistVersion Condition="'$(VCToolsRedistVersion)' == ''">14.43.34808</VCToolsRedistVersion>
+    <VCToolsVersion Condition="'$(VCToolsVersion)' == ''">$(VCTVersion)</VCToolsVersion>
+    <VCToolsRedistVersion Condition="'$(VCToolsRedistVersion)' == ''">$(VCRedistVersion)</VCToolsRedistVersion>
     <CLRSupport>NetCore</CLRSupport>
     <CharacterSet>Unicode</CharacterSet>
   </PropertyGroup>
@@ -79,17 +78,14 @@
   </ImportGroup>
   <ImportGroup Label="Shared">
   </ImportGroup>
+  <Import Project="$(UserRootDir)\Microsoft.Cpp.$(Platform).user.props" Condition="exists('$(UserRootDir)\Microsoft.Cpp.$(Platform).user.props')" Label="LocalAppDataPlatform" />
   <ImportGroup Label="PropertySheets" Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">
-    <Import Project="$(UserRootDir)\Microsoft.Cpp.$(Platform).user.props" Condition="exists('$(UserRootDir)\Microsoft.Cpp.$(Platform).user.props')" Label="LocalAppDataPlatform" />
   </ImportGroup>
   <ImportGroup Label="PropertySheets" Condition="'$(Configuration)|$(Platform)'=='Debug|ARM64'">
-    <Import Project="$(UserRootDir)\Microsoft.Cpp.$(Platform).user.props" Condition="exists('$(UserRootDir)\Microsoft.Cpp.$(Platform).user.props')" Label="LocalAppDataPlatform" />
   </ImportGroup>
   <ImportGroup Label="PropertySheets" Condition="'$(Configuration)|$(Platform)'=='Release|x64'">
-    <Import Project="$(UserRootDir)\Microsoft.Cpp.$(Platform).user.props" Condition="exists('$(UserRootDir)\Microsoft.Cpp.$(Platform).user.props')" Label="LocalAppDataPlatform" />
   </ImportGroup>
   <ImportGroup Condition="'$(Configuration)|$(Platform)'=='Release|ARM64'" Label="PropertySheets">
-    <Import Project="$(UserRootDir)\Microsoft.Cpp.$(Platform).user.props" Condition="exists('$(UserRootDir)\Microsoft.Cpp.$(Platform).user.props')" Label="LocalAppDataPlatform" />
   </ImportGroup>
   <PropertyGroup Label="UserMacros" />
   <PropertyGroup />
@@ -111,12 +107,15 @@
   </PropertyGroup>
   <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">
     <ClCompile>
-      <PrecompiledHeader>Use</PrecompiledHeader>
+      <PrecompiledHeader>NotUsing</PrecompiledHeader>
+      <!--
       <PrecompiledHeaderFile>pch.h</PrecompiledHeaderFile>
+      -->
       <WarningLevel>Level3</WarningLevel>
       <PreprocessorDefinitions>_DEBUG;%(PreprocessorDefinitions)</PreprocessorDefinitions>
       <GenerateSourceDependencies>true</GenerateSourceDependencies>
       <LanguageStandard>Default</LanguageStandard>
+      <RuntimeLibrary>MultiThreadedDebugDLL</RuntimeLibrary>
     </ClCompile>
     <Link>
       <AdditionalDependencies>rasapi32.lib;Ws2_32.lib;Fwpuclnt.lib;Iphlpapi.lib;advapi32.lib</AdditionalDependencies>
@@ -127,11 +126,12 @@
   </ItemDefinitionGroup>
   <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Debug|ARM64'">
     <ClCompile>
-      <PrecompiledHeader>Use</PrecompiledHeader>
+      <PrecompiledHeader>NotUsing</PrecompiledHeader>
       <PrecompiledHeaderFile>pch.h</PrecompiledHeaderFile>
       <WarningLevel>Level3</WarningLevel>
       <PreprocessorDefinitions>_DEBUG;%(PreprocessorDefinitions)</PreprocessorDefinitions>
       <GenerateSourceDependencies>true</GenerateSourceDependencies>
+      <RuntimeLibrary>MultiThreadedDebugDLL</RuntimeLibrary>
     </ClCompile>
     <Link>
       <AdditionalDependencies>rasapi32.lib;Ws2_32.lib;Fwpuclnt.lib;Iphlpapi.lib;advapi32.lib</AdditionalDependencies>
@@ -164,12 +164,13 @@
   </ItemDefinitionGroup>
   <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Release|x64'">
     <ClCompile>
-      <PrecompiledHeader>Use</PrecompiledHeader>
+      <PrecompiledHeader>NotUsing</PrecompiledHeader>
       <PrecompiledHeaderFile>pch.h</PrecompiledHeaderFile>
       <WarningLevel>Level3</WarningLevel>
       <PreprocessorDefinitions>NDEBUG;%(PreprocessorDefinitions)</PreprocessorDefinitions>
       <Optimization>Disabled</Optimization>
       <LanguageStandard>Default</LanguageStandard>
+      <RuntimeLibrary>MultiThreadedDLL</RuntimeLibrary>
     </ClCompile>
     <Link>
       <AdditionalDependencies>rasapi32.lib;Ws2_32.lib;Fwpuclnt.lib;Iphlpapi.lib;advapi32.lib</AdditionalDependencies>
@@ -180,11 +181,12 @@
   </ItemDefinitionGroup>
   <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Release|ARM64'">
     <ClCompile>
-      <PrecompiledHeader>Use</PrecompiledHeader>
+      <PrecompiledHeader>NotUsing</PrecompiledHeader>
       <PrecompiledHeaderFile>pch.h</PrecompiledHeaderFile>
       <WarningLevel>Level3</WarningLevel>
       <PreprocessorDefinitions>NDEBUG;%(PreprocessorDefinitions)</PreprocessorDefinitions>
       <Optimization>Disabled</Optimization>
+      <RuntimeLibrary>MultiThreadedDLL</RuntimeLibrary>
     </ClCompile>
     <Link>
       <AdditionalDependencies>rasapi32.lib;Ws2_32.lib;Fwpuclnt.lib;Iphlpapi.lib;advapi32.lib</AdditionalDependencies>
@@ -199,7 +201,6 @@
     <ClInclude Include="CreateRoutines.h" />
     <ClInclude Include="NativeRoutines.h" />
     <ClInclude Include="NotificationHandling.h" />
-    <ClInclude Include="pch.h" />
     <ClInclude Include="PrintRoutines.h" />
     <ClInclude Include="RasBaseRoutines.h" />
     <ClInclude Include="Resource.h" />
@@ -214,14 +215,6 @@
     <ClCompile Include="CreateRoutines.cpp" />
     <ClCompile Include="NativeRoutines.cpp" />
     <ClCompile Include="NotificationHandling.cpp" />
-    <ClCompile Include="pch.cpp">
-      <PrecompiledHeader Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">Create</PrecompiledHeader>
-      <PrecompiledHeader Condition="'$(Configuration)|$(Platform)'=='Debug|ARM64'">Create</PrecompiledHeader>
-      <PrecompiledHeader Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">Create</PrecompiledHeader>
-      <PrecompiledHeader Condition="'$(Configuration)|$(Platform)'=='Release|Win32'">Create</PrecompiledHeader>
-      <PrecompiledHeader Condition="'$(Configuration)|$(Platform)'=='Release|x64'">Create</PrecompiledHeader>
-      <PrecompiledHeader Condition="'$(Configuration)|$(Platform)'=='Release|ARM64'">Create</PrecompiledHeader>
-    </ClCompile>
     <ClCompile Include="PrintRoutines.cpp" />
     <ClCompile Include="RasBaseRoutines.cpp" />
     <ClCompile Include="ScopedHeapAlloc.cpp" />

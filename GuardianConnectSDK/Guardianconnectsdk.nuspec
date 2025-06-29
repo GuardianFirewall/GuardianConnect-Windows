@@ -2,7 +2,8 @@
 <package >
   <metadata>
     <id>GuardianConnect</id>
-    <title>GuardianConnect SDK Nuget Bundle Package</title>
+    <version>16.0.31</version>
+    <title>GuardianConnect SDK</title>
     <authors>DNSFilter, Inc.</authors>
     <license type="expression">MIT</license>
     <icon>Guardian.png</icon>
@@ -12,16 +13,20 @@
     <copyright>Copyright DNSFilter, Inc.</copyright>
     <tags>GuardianConnectSDK Windows Beta</tags>
     <dependencies>
-      <group targetFramework="$(TargetFramework)"/>
     </dependencies>
   </metadata>
   <files>
-  <file src=".\README.md" target="lib"/>
+  <file src=".\README.md" target="content"/>
   <file src="Guardian.png"/>
-    <!--
-    <file src="GuardianConnect\bin\$(Platform)\Release\$(TargetFramework)\*.*" target="lib\$(TargetFramework)\$(Platform)"/>
-    <file src="$(SolutionDir)\BuildOutput\runtimes\$(TargetFramework)\$(Platform)\*.*" target="lib\runtimes\$(TargetFramework)\$(Platform)"/>
-    -->
-    <file src="$(SolutionDir)\BuildOutput\runtimes\$(TargetFramework)\*.*" target="lib\runtimes\$(TargetFramework)\"/>
+
+	  <!-- x64 -->
+	  <file src="BuildOutput\GuardianConnect\runtimes\win10-x64\lib\net9.0-windows\*.dll" target="runtimes\win-x64\lib\net9.0" />
+	  <file src="BuildOutput\GuardianConnect\runtimes\win10-x64\lib\net9.0-windows\*.dll" target="lib\net9.0" />
+
+	  <!-- arm64 -->
+	  <file src="BuildOutput\GuardianConnect\runtimes\win10-arm64\lib\net9.0-windows\*.dll" target="runtimes\win-arm64\lib\net9.0" />
+	  <!-- TODO
+	  <file src="BuildOutput\GuardianConnect\runtimes\win10-arm64\lib\net9.0-windows\*.dll" target="lib\net9.0" />
+      -->
   </files>
 </package>

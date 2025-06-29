@@ -3,7 +3,7 @@ using GuardianConnect.VPNTransports;
 using NativeRoutines;
 using Serilog;
 
-namespace GuardianWinService;
+namespace GuardianFirewallService;
 
 //public class GuardianNPCommandDispatcher :IGuardianNPContract
 public class GuardianNPCommandDispatcher :IGuardianNPContract

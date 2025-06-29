@@ -2,7 +2,7 @@
 using Microsoft.Extensions.Hosting;
 using Serilog;
 
-namespace GuardianWinService;
+namespace GuardianFirewallService;
 
 public class Startup
 {
