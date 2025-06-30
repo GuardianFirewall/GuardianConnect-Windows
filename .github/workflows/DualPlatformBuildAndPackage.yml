@@ -47,6 +47,16 @@ jobs:
     - name: Show env after above with colon syntax
       run: echo "$env:CPU"
 
+    - name: Extract Version and set as env var
+      shell: pwsh
+      run: |
+            $version = Select-String '<Version>(.+?)</Version>' Directory.Build.Props | % { $_.Matches[0].Groups[1].Value }
+            "PKGVERSION=$version" | Out-File -FilePath $env:GITHUB_ENV -Encoding utf8 -Append
+
+    - name: Use the extracted value
+      run: |
+        echo "PKGVERSION="${{ env.PKGVERSION }}
+
     # Add  MSBuild to the PATH: https://github.com/microsoft/setup-msbuild
     - name: Setup MSBuild.exe
       uses: microsoft/setup-msbuild@v2
@@ -58,34 +68,17 @@ jobs:
       run: msbuild /t:restore /t:Build /p:Platform=arm64 /p:Configuration=Release /p:RuntimeIdentifier=win-arm64 GuardianConnect\GuardianConnect.csproj
       
     - name: Build GuardianFirewall Service for x64 CPU
-      run: msbuild /t:restore /t:Build /p:Platform=x64 /p:Configuration=Release /p:RuntimeIdentifier=win-x64 GuardianWinService\GuardianWinService.csproj
+      run: msbuild /t:restore /t:Build /p:Platform=x64 /p:Configuration=Release /p:RuntimeIdentifier=win-x64 GuardianFirewallService\GuardianFirewallService.csproj
 
     - name: Build GuardianFirewall Service for arm64 CPU
-      run: msbuild /t:restore /t:Build /p:Platform=arm64 /p:Configuration=Release /p:RuntimeIdentifier=win-arm64 GuardianWinService\GuardianWinService.csproj
-
-#    - name: Set version from Directory.Build.props
-#    run: |
-    # Extract the version from Directory.Build.props
-    #VERSION=$(grep -oP '<Version>\K[^<]+' Directory.Build.props)
-#    VCOPILOT=$(grep -oP '<Version>\K[^<]+' Directory.Build.Props)
-#    # Set the version as an environment variable
-#    echo "PKGVERSION=$VCOPILOT" >> $GITHUB_ENV
-
-    ## Powershell example syntax from CoPilot
-    ##    Select-String '<Version>(.+?)</Version>' Directory.Build.Props | % { $_.Matches[0].Groups[1].Value }
-
-    - name: Extract Version and set as env var
-      shell: pwsh
-      run: |
-        $version = Select-String '<Version>(.+?)</Version>' Directory.Build.Props | % { $_.Matches[0].Groups[1].Value }
-        "VERSION=$version" | Out-File -FilePath $env:GITHUB_ENV -Append
+      run: msbuild /t:restore /t:Build /p:Platform=arm64 /p:Configuration=Release /p:RuntimeIdentifier=win-arm64 GuardianFirewallService\GuardianFirewallService.csproj
 
     - name: Create GuardianConnect.nupkg package bundle containing both CPU builds
       run: nuget pack GuardianConnectSDK.nuspec -Version ${{env.PKGVERSION}}
       shell: cmd
       
     - name: Create GuardianFirewallService.nupkg package bundle
-      run: nuget pack GuardianFirewallService.nuspec
+      run: nuget pack GuardianFirewallService.nuspec -Version ${{env.PKGVERSION}}
       shell: cmd
       
     # Sign GuardianConnectSDK package with certificate
@@ -104,6 +97,12 @@ jobs:
         -ArtifactConfigurationSlug GuardianConnectSDK_Windows_Nuget_Package `
         -WaitForCompletion
     
+##    - name: Upload build artifacts - GuardianFirewall Service - UNSIGNED SO WE CAN GIVE AS SAMPLE TO SIGNPATH
+##      uses: actions/upload-artifact@v4
+##      with:
+##        name: GuardianFirewallService.${{env.PKGVERSION}}.nupkg 
+##        path: D:\a\GuardianConnect-Windows\GuardianConnect-Windows\GuardianConnectSDK\GuardianFirewallService.${{env.PKGVERSION}}.nupkg 
+        
     
     # Sign GuardianFirewallService package with certificate
     # Name GuardianFirewallService Windows Nuget Package
@@ -142,7 +141,7 @@ jobs:
         
     # Update GitHub Packages with these nuget packages
     - name: Update GitHub with nuget packages - SDK
-      run: nuget push SIGNED_GuardianFirewallService.${{env.PKGVERSION}}.nupkg `${{ secrets.GUARDIANFIREWALL_GH_PKG_TOKEN }} -Source GitHub -SkipDuplicate
+      run: nuget push SIGNED_GuardianConnect.${{env.PKGVERSION}}.nupkg `${{ secrets.GUARDIANFIREWALL_GH_PKG_TOKEN }} -Source GitHub -SkipDuplicate
 
     - name: Update GitHub with nuget packages - Service
       run: nuget push SIGNED_GuardianFirewallService.${{env.PKGVERSION}}.nupkg ${{ secrets.GUARDIANFIREWALL_GH_PKG_TOKEN }} -Source GitHub -SkipDuplicate
