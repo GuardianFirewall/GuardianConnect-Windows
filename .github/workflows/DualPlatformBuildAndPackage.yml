@@ -97,11 +97,11 @@ jobs:
         -ArtifactConfigurationSlug GuardianConnectSDK_Windows_Nuget_Package `
         -WaitForCompletion
     
-    - name: Upload build artifacts - GuardianFirewall Service - UNSIGNED SO WE CAN GIVE AS SAMPLE TO SIGNPATH
-      uses: actions/upload-artifact@v4
-      with:
-        name: GuardianFirewallService.${{env.PKGVERSION}}.nupkg 
-        path: D:\a\GuardianConnect-Windows\GuardianConnect-Windows\GuardianConnectSDK\GuardianFirewallService.${{env.PKGVERSION}}.nupkg 
+##    - name: Upload build artifacts - GuardianFirewall Service - UNSIGNED SO WE CAN GIVE AS SAMPLE TO SIGNPATH
+##      uses: actions/upload-artifact@v4
+##      with:
+##        name: GuardianFirewallService.${{env.PKGVERSION}}.nupkg 
+##        path: D:\a\GuardianConnect-Windows\GuardianConnect-Windows\GuardianConnectSDK\GuardianFirewallService.${{env.PKGVERSION}}.nupkg 
         
     
     # Sign GuardianFirewallService package with certificate
@@ -141,7 +141,7 @@ jobs:
         
     # Update GitHub Packages with these nuget packages
     - name: Update GitHub with nuget packages - SDK
-      run: nuget push SIGNED_GuardianFirewallService.${{env.PKGVERSION}}.nupkg `${{ secrets.GUARDIANFIREWALL_GH_PKG_TOKEN }} -Source GitHub -SkipDuplicate
+      run: nuget push SIGNED_GuardianConnect.${{env.PKGVERSION}}.nupkg `${{ secrets.GUARDIANFIREWALL_GH_PKG_TOKEN }} -Source GitHub -SkipDuplicate
 
     - name: Update GitHub with nuget packages - Service
       run: nuget push SIGNED_GuardianFirewallService.${{env.PKGVERSION}}.nupkg ${{ secrets.GUARDIANFIREWALL_GH_PKG_TOKEN }} -Source GitHub -SkipDuplicate
