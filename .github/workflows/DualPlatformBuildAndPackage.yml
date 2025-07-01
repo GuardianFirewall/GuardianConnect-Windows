@@ -16,7 +16,7 @@ defaults:
     
 jobs:
 
-  build-x64:
+  build-both-architectures:
 
     strategy:
       matrix:
@@ -73,6 +73,12 @@ jobs:
     - name: Build GuardianFirewall Service for arm64 CPU
       run: msbuild /t:restore /t:Build /p:Platform=arm64 /p:Configuration=Release /p:RuntimeIdentifier=win-arm64 GuardianFirewallService\GuardianFirewallService.csproj
 
+    - name: Upload build artifacts - GuardianFirewall Service Executable for ARM64 itself - single file so we can verify if it works
+      uses: actions/upload-artifact@v4
+      with:
+        name: GuardianFirewallService.exe
+        path: D:\a\GuardianConnect-Windows\GuardianConnect-Windows\GuardianConnectSDK\BuildOutput\GuardianFirewallService\runtimes\win10-arm64\lib\net9.0-windows\GuardianFirewallService.exe
+        
     - name: Create GuardianConnect.nupkg package bundle containing both CPU builds
       run: nuget pack GuardianConnectSDK.nuspec -Version ${{env.PKGVERSION}}
       shell: cmd
@@ -81,6 +87,12 @@ jobs:
       run: nuget pack GuardianFirewallService.nuspec -Version ${{env.PKGVERSION}}
       shell: cmd
       
+    - name: Upload build artifacts - GuardianFirewall Service - UNSIGNED SO WE CAN GIVE AS SAMPLE TO SIGNPATH
+      uses: actions/upload-artifact@v4
+      with:
+        name: GuardianFirewallService.${{env.PKGVERSION}}.nupkg 
+        path: D:\a\GuardianConnect-Windows\GuardianConnect-Windows\GuardianConnectSDK\GuardianFirewallService.${{env.PKGVERSION}}.nupkg 
+        
     # Sign GuardianConnectSDK package with certificate
     # Name GuardianConnectSDK Windows Nuget Package
     # Slug GuardianConnectSDK_Windows_Nuget_Package
@@ -96,13 +108,6 @@ jobs:
         -OutputArtifactPath "SIGNED_GuardianConnect.${{env.PKGVERSION}}.nupkg"  `
         -ArtifactConfigurationSlug GuardianConnectSDK_Windows_Nuget_Package `
         -WaitForCompletion
-    
-##    - name: Upload build artifacts - GuardianFirewall Service - UNSIGNED SO WE CAN GIVE AS SAMPLE TO SIGNPATH
-##      uses: actions/upload-artifact@v4
-##      with:
-##        name: GuardianFirewallService.${{env.PKGVERSION}}.nupkg 
-##        path: D:\a\GuardianConnect-Windows\GuardianConnect-Windows\GuardianConnectSDK\GuardianFirewallService.${{env.PKGVERSION}}.nupkg 
-        
     
     # Sign GuardianFirewallService package with certificate
     # Name GuardianFirewallService Windows Nuget Package
