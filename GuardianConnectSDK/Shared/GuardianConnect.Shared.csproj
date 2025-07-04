@@ -16,7 +16,7 @@
         <Copyright>DNSFilter, Inc.</Copyright>
         <PackageIcon>Guardian.ico</PackageIcon>
 		<tags>GuardianConnectSDK</tags>
-		<Platforms>x64;ARM64;AnyCPU</Platforms>
+		<Platforms>x64;ARM64</Platforms>
     </PropertyGroup>
 
     <!--

@@ -24,7 +24,7 @@
     <ProjectGuid>{3E6F0E3D-60AE-4000-8EB3-0D05B919162E}</ProjectGuid>
     <Keyword>NetCoreCProj</Keyword>
     <RootNamespace>NativeRoutines</RootNamespace>
-    <TargetFramework>net9.0</TargetFramework>
+    <TargetFramework>net9.0-windows</TargetFramework>
 		<tags>GuardianConnectSDK</tags>
   </PropertyGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.Default.props" />
