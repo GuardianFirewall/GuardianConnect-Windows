@@ -107,8 +107,8 @@ Global
 		{58962893-2813-DAFF-B908-B0E4F4BF0BA4}.Release|ARM64.ActiveCfg = Release|ARM64
 		{58962893-2813-DAFF-B908-B0E4F4BF0BA4}.Release|ARM64EC.ActiveCfg = Release|Any CPU
 		{58962893-2813-DAFF-B908-B0E4F4BF0BA4}.Release|ARM64EC.Build.0 = Release|Any CPU
-		{58962893-2813-DAFF-B908-B0E4F4BF0BA4}.Release|x64.ActiveCfg = Release|Any CPU
-		{58962893-2813-DAFF-B908-B0E4F4BF0BA4}.Release|x64.Build.0 = Release|Any CPU
+		{58962893-2813-DAFF-B908-B0E4F4BF0BA4}.Release|x64.ActiveCfg = Release|x64
+		{58962893-2813-DAFF-B908-B0E4F4BF0BA4}.Release|x64.Build.0 = Release|x64
 	EndGlobalSection
 	GlobalSection(SolutionProperties) = preSolution
 		HideSolutionNode = FALSE
