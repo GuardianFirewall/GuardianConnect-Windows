@@ -22,11 +22,6 @@
         <PackageIconUrl>Guardian.png</PackageIconUrl>
         <tags>GuardianConnectSDK</tags>
     </PropertyGroup>
-    
-  <ItemGroup>
-    <ProjectReference Include="..\NativeRoutines\NativeRoutines.vcxproj" />
-    <ProjectReference Include="..\Shared\GuardianConnect.Shared.csproj" />
-  </ItemGroup>
 
     <ItemGroup>
         <None Include="Guardian.png" Pack="true" PackagePath="" />
