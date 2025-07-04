@@ -64,3 +64,4 @@
 *.swp
 /GuardianConnectSDK/.idea/.idea.GuardianConnectSDK/.idea/indexLayout.xml
 *.nupkg
+/GuardianConnectSDK/_.swo
