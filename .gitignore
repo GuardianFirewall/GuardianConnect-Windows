@@ -66,3 +66,4 @@
 *.nupkg
 /GuardianConnectSDK/_.swo
 /GuardianConnectSDK/.vs/ProjectEvaluation
+/GuardianConnectSDK/NativeRoutinesLoadTest/obj
