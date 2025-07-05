@@ -2,7 +2,7 @@
 <package >
   <metadata>
     <id>GuardianConnect</id>
-    <version>16.2.36</version>
+    <version>16.5.40</version>
     <title>GuardianConnect SDK</title>
     <authors>DNSFilter, Inc.</authors>
     <license type="expression">MIT</license>
@@ -20,9 +20,10 @@
   <file src="Guardian.png"/>
 
 	  <!-- Placeholder for the GuardianConnect SDK for lib so that nuget resolution works - go figure. -->
-  <file src="BuildOutput\GuardianConnect\runtimes\win10-x64\lib\net9.0-windows\GuardianConnect.dll" target="lib\net9.0\GuardianConnect.dll"  />
-  <file src="BuildOutput\GuardianConnect\runtimes\win10-x64\lib\net9.0-windows\GuardianConnect.Shared.dll" target="lib\net9.0\GuardianConnect.Shared.dll"  />
-  <file src="BuildOutput\GuardianConnect\runtimes\win10-x64\lib\net9.0-windows\NativeRoutines.dll" target="lib\net9.0\NativeRoutines.dll"  />
+  <file src="BuildOutput\GuardianConnect\runtimes\win10-arm64\lib\net9.0-windows\GuardianConnect.dll" target="lib\net9.0\GuardianConnect.dll"  />
+  <file src="BuildOutput\GuardianConnect\runtimes\win10-arm64\lib\net9.0-windows\GuardianConnect.Shared.dll" target="lib\net9.0\GuardianConnect.Shared.dll"  />
+  <file src="BuildOutput\GuardianConnect\runtimes\win10-arm64\lib\net9.0-windows\NativeRoutines.dll" target="lib\net9.0\NativeRoutines.dll"  />
+  <file src="BuildOutput\GuardianConnect\runtimes\win10-arm64\lib\net9.0-windows\Ijwhost.dll" target="lib\net9.0\Ijwhost.dll"  />
 
 	  <!-- Compile-time ref assemblies -->
   <!--
