@@ -83,6 +83,7 @@ jobs:
     - name: Zip Guardian binaries for SignPath deep-signing
       #run: PackagingHelpers\bin\7-zip\7z a -bb3 "${{ env.unsignedzipfile }}" @PackagingHelpers\Input\ListOfGuardianFilesToSign.fls
       run: 7z a -bb3 BuildOutput\UnsignedGuardianBinaries.zip @ListOfGuardianFilesToSign.fls
+      shell: cmd
 
     - name: Upload the zip so we can submit to SignPath as template
       uses: actions/upload-artifact@v4
@@ -97,7 +98,7 @@ jobs:
       # Test what has just been zipped
     - name: Unzip the newly-created file to list Guardian binaries for SignPath deep-signing
       run: |
-          7z l -bb3 "${{ env.unsignedzipfile }}" 
+          7z l -bb3 BuildOutput\UnsignedGuardianBinaries.zip 
 
       # Sign Guardian binaries only  Executable with certificate
     - name: Sign Guardian Binaries Installer Executable with certificate
