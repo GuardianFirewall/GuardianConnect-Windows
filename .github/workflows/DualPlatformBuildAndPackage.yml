@@ -82,7 +82,7 @@ jobs:
      # Zip up our binaries for specific zip signing in SignPath
     - name: Zip Guardian binaries for SignPath deep-signing
       #run: PackagingHelpers\bin\7-zip\7z a -bb3 "${{ env.unsignedzipfile }}" @PackagingHelpers\Input\ListOfGuardianFilesToSign.fls
-      run: 7z a -bb3 BuildOutput\UnsignedGuardianBinaries.zip @ListOfGuardianFilesToSign.fls
+      run: 7z a -bb3 BuildOutput\UnsignedGuardianBinaries.zip @ListOfGuardianConnectSDKFilesToSign.fls
       shell: cmd
 
     - name: Upload the zip so we can submit to SignPath as template
