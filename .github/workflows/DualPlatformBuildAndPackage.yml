@@ -93,7 +93,7 @@ jobs:
       uses: actions/upload-artifact@v4
       with:
         name: GuardianZipBundle
-        path: .\UnsignedGuardianBinaries.zip
+        path: GuardianConnectSDK\UnsignedGuardianBinaries.zip
         if-no-files-found: error
 
         # BARF
@@ -103,7 +103,7 @@ jobs:
       # Test what has just been zipped
     - name: Unzip the newly-created file to list Guardian binaries for SignPath deep-signing
       run: |
-          7z l -bb3 BuildOutput\UnsignedGuardianBinaries.zip 
+          7z l -bb3 GuardianConnectSDK\UnsignedGuardianBinaries.zip 
 
       # Sign Guardian binaries only  Executable with certificate
     - name: Sign Guardian Binaries Installer Executable with certificate
