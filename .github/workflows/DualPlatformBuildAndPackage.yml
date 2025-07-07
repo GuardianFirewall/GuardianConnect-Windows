@@ -87,20 +87,8 @@ jobs:
       run: 7z a -bb3 .\UnsignedGuardianBinaries.zip @ListOfGuardianConnectSDKFilesToSign.fls
       shell: cmd
 
-    - name: Upload the zip so we can submit to SignPath as template
-      uses: actions/upload-artifact@v4
-      with:
-        name: GuardianZipBundle
-        path:  "${{ env.unsignedzipfile }}"
-        if-no-files-found: error
-
-      # Test what has just been zipped
-    - name: Unzip the newly-created file to list Guardian binaries for SignPath deep-signing
-      run: |
-          7z l -bb3 GuardianConnectSDK\UnsignedGuardianBinaries.zip 
-
       # Sign Guardian binaries only  Executable with certificate
-    - name: Sign Guardian Binaries Installer Executable with certificate
+    - name: Sign Guardian Binaries with certificate
       run: Install-Module -Name SignPath -Force
         
         Submit-SigningRequest `
