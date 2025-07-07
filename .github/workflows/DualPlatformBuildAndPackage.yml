@@ -85,6 +85,10 @@ jobs:
       run: 7z a -bb3 .\UnsignedGuardianBinaries.zip @ListOfGuardianConnectSDKFilesToSign.fls
       shell: cmd
 
+    - name: find the zip we just made
+      run: dir /s UnsignedGuardianBinaries.*
+      shell: cmd
+
     - name: Upload the zip so we can submit to SignPath as template
       uses: actions/upload-artifact@v4
       with:
