@@ -19,6 +19,7 @@ Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "Solution Items", "Solution 
 		GHCPGCSDK.nuspec = GHCPGCSDK.nuspec
 		Guardianconnectsdk.nuspec = Guardianconnectsdk.nuspec
 		GuardianFirewallService.nuspec = GuardianFirewallService.nuspec
+		ListOfGuardianConnectSDKFilesToSign.fls = ListOfGuardianConnectSDKFilesToSign.fls
 	EndProjectSection
 EndProject
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "NativeRoutinesLoadTest", "NativeRoutinesLoadTest\NativeRoutinesLoadTest.csproj", "{EEA9A091-B917-21F9-AFDA-5504CDF90333}"
