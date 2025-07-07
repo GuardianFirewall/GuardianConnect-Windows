@@ -2,7 +2,7 @@
 <package >
   <metadata>
     <id>GuardianConnect</id>
-    <version>16.5.40</version>
+    <version>16.7.41</version>
     <title>GuardianConnect SDK</title>
     <authors>DNSFilter, Inc.</authors>
     <license type="expression">MIT</license>
@@ -16,7 +16,8 @@
     </dependencies>
   </metadata>
   <files>
-  <file src=".\README.md" target="content"/>
+	  <file src="GuardianConnect.targets" target="buildTransitive\GuardianConnect.targets" />
+	  <file src=".\README.md" target="content"/>
   <file src="Guardian.png"/>
 
 	  <!-- Placeholder for the GuardianConnect SDK for lib so that nuget resolution works - go figure. -->
@@ -26,7 +27,6 @@
   <file src="BuildOutput\GuardianConnect\runtimes\win10-arm64\lib\net9.0-windows\Ijwhost.dll" target="lib\net9.0\Ijwhost.dll"  />
 
 	  <!-- Compile-time ref assemblies -->
-  <!--
   <file src="BuildOutput\GuardianConnect\runtimes\win10-arm64\lib\net9.0-windows\Guardian.png" target="ref\runtimes\win10-arm64\lib\net9.0\Guardian.png"  />
   <file src="BuildOutput\GuardianConnect\runtimes\win10-arm64\lib\net9.0-windows\GuardianConnect.deps.json" target="ref\runtimes\win10-arm64\lib\net9.0\GuardianConnect.deps.json"  />
   <file src="BuildOutput\GuardianConnect\runtimes\win10-arm64\lib\net9.0-windows\GuardianConnect.dll" target="ref\runtimes\win10-arm64\lib\net9.0\GuardianConnect.dll"  />
@@ -38,7 +38,7 @@
   <file src="BuildOutput\GuardianConnect\runtimes\win10-arm64\lib\net9.0-windows\NativeRoutines.pdb" target="ref\runtimes\win10-arm64\lib\net9.0\NativeRoutines.pdb"  />
 
   <file src="BuildOutput\GuardianConnect\runtimes\win10-x64\lib\net9.0-windows\Guardian.png" target="ref\runtimes\win10-x64\lib\net9.0\Guardian.png"  />
-  <file src="BuildOutput\GuardianConnect\runtimes\win10-x64\lib\net9.0-windows\GuardianConnect.deps.json" target="ref\runtimes\win10-x64\lib\net9.0\GuardianConnect.deps.json"  />
+  <!--<file src="BuildOutput\GuardianConnect\runtimes\win10-x64\lib\net9.0-windows\GuardianConnect.deps.json" target="ref\runtimes\win10-x64\lib\net9.0\GuardianConnect.deps.json"  />-->
   <file src="BuildOutput\GuardianConnect\runtimes\win10-x64\lib\net9.0-windows\GuardianConnect.dll" target="ref\runtimes\win10-x64\lib\net9.0\GuardianConnect.dll"   />
   <file src="BuildOutput\GuardianConnect\runtimes\win10-x64\lib\net9.0-windows\GuardianConnect.pdb" target="ref\runtimes\win10-x64\lib\net9.0\GuardianConnect.pdb"   />
   <file src="BuildOutput\GuardianConnect\runtimes\win10-x64\lib\net9.0-windows\GuardianConnect.Shared.dll" target="ref\runtimes\win10-x64\lib\net9.0\GuardianConnect.Shared.dll"   />
@@ -46,7 +46,6 @@
   <file src="BuildOutput\GuardianConnect\runtimes\win10-x64\lib\net9.0-windows\Ijwhost.dll" target="ref\runtimes\win10-x64\lib\net9.0\Ijwhost.dll"   />
   <file src="BuildOutput\GuardianConnect\runtimes\win10-x64\lib\net9.0-windows\NativeRoutines.dll" target="ref\runtimes\win10-x64\lib\net9.0\NativeRoutines.dll"   />
   <file src="BuildOutput\GuardianConnect\runtimes\win10-x64\lib\net9.0-windows\NativeRoutines.pdb" target="ref\runtimes\win10-x64\lib\net9.0\NativeRoutines.pdb"   />
-  -->
 
 	  <!-- Runtime assemblies -->
   <file src="BuildOutput\GuardianConnect\runtimes\win10-arm64\lib\net9.0-windows\GuardianConnect.dll" target="runtimes\win10-arm64\lib\net9.0\GuardianConnect.dll"  />
@@ -57,7 +56,7 @@
   <file src="BuildOutput\GuardianConnect\runtimes\win10-arm64\lib\net9.0-windows\GuardianConnect.pdb" target="runtimes\win10-arm64\lib\net9.0\GuardianConnect.pdb"  />
   <file src="BuildOutput\GuardianConnect\runtimes\win10-arm64\lib\net9.0-windows\GuardianConnect.Shared.pdb" target="runtimes\win10-arm64\lib\net9.0\GuardianConnect.Shared.pdb"  />
   <file src="BuildOutput\GuardianConnect\runtimes\win10-arm64\lib\net9.0-windows\Guardian.png" target="runtimes\win10-arm64\lib\net9.0\Guardian.png"  />
-  <file src="BuildOutput\GuardianConnect\runtimes\win10-arm64\lib\net9.0-windows\GuardianConnect.deps.json" target="runtimes\win10-arm64\lib\net9.0\GuardianConnect.deps.json"  />
+  <!--<file src="BuildOutput\GuardianConnect\runtimes\win10-arm64\lib\net9.0-windows\GuardianConnect.deps.json" target="runtimes\win10-arm64\lib\net9.0\GuardianConnect.deps.json"  />-->
 
   <file src="BuildOutput\GuardianConnect\runtimes\win10-x64\lib\net9.0-windows\GuardianConnect.dll" target="runtimes\win10-x64\lib\net9.0\GuardianConnect.dll"   />
   <file src="BuildOutput\GuardianConnect\runtimes\win10-x64\lib\net9.0-windows\GuardianConnect.Shared.dll" target="runtimes\win10-x64\lib\net9.0\GuardianConnect.Shared.dll"   />
@@ -67,7 +66,7 @@
   <file src="BuildOutput\GuardianConnect\runtimes\win10-x64\lib\net9.0-windows\NativeRoutines.pdb" target="runtimes\win10-x64\lib\net9.0\NativeRoutines.pdb"   />
   <file src="BuildOutput\GuardianConnect\runtimes\win10-x64\lib\net9.0-windows\GuardianConnect.pdb" target="runtimes\win10-x64\lib\net9.0\GuardianConnect.pdb"   />
   <file src="BuildOutput\GuardianConnect\runtimes\win10-x64\lib\net9.0-windows\Guardian.png" target="runtimes\win10-x64\lib\net9.0\Guardian.png"  />
-  <file src="BuildOutput\GuardianConnect\runtimes\win10-x64\lib\net9.0-windows\GuardianConnect.deps.json" target="runtimes\win10-x64\lib\net9.0\GuardianConnect.deps.json"  />
+  <!--<file src="BuildOutput\GuardianConnect\runtimes\win10-x64\lib\net9.0-windows\GuardianConnect.deps.json" target="runtimes\win10-x64\lib\net9.0\GuardianConnect.deps.json"  />-->
   
 	  <!-- TODO
 	  <file src="BuildOutput\GuardianConnect\runtimes\win10-arm64\lib\net9.0-windows\*.dll" target="lib\net9.0" />
