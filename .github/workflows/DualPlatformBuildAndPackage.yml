@@ -26,8 +26,8 @@ jobs:
 
     env:
       Solution_Name: GuardianConnectSDK.sln
-      unsignedzipfile: "GuardianConnectSDK\\UnsignedGuardianBinaries.zip"
-      signedzipfile: "GuardianConnectSDK\\SignedGuardianBinaries.zip"
+      unsignedzipfile: "UnsignedGuardianBinaries.zip"
+      signedzipfile: "SignedGuardianBinaries.zip"
 
     steps:
     - name: Checkout
