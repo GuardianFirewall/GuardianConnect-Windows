@@ -26,6 +26,8 @@ jobs:
 
     env:
       Solution_Name: GuardianConnectSDK.sln
+      unsignedzipfile: "GuardianConnectSDK\\UnsignedGuardianBinaries.zip"
+      signedzipfile: "GuardianConnectSDK\\SignedGuardianBinaries.zip"
 
     steps:
     - name: Checkout
@@ -85,21 +87,13 @@ jobs:
       run: 7z a -bb3 .\UnsignedGuardianBinaries.zip @ListOfGuardianConnectSDKFilesToSign.fls
       shell: cmd
 
-    - name: find the zip we just made
-      run: dir /s UnsignedGuardianBinaries.*
-      shell: cmd
-
     - name: Upload the zip so we can submit to SignPath as template
       uses: actions/upload-artifact@v4
       with:
         name: GuardianZipBundle
-        path: GuardianConnectSDK\UnsignedGuardianBinaries.zip
+        path:  "${{ env.unsignedzipfile }}"
         if-no-files-found: error
 
-        # BARF
-    - name: BARF
-      run: FOOBAR
-        
       # Test what has just been zipped
     - name: Unzip the newly-created file to list Guardian binaries for SignPath deep-signing
       run: |
@@ -116,20 +110,24 @@ jobs:
         -ProjectSlug "Guardian" `
         -SigningPolicySlug "Guardian_DNSF_Branded" `
         -OutputArtifactPath "${{ env.signedzipfile }}" `
-        -ArtifactConfigurationSlug  GuardianConnect_Binaries_Only `
+        -ArtifactConfigurationSlug  GuardianConnectWindowsBinariesZip `
         -WaitForCompletion
       
       # Unzip what has just been signed
     - name: Unzip the newly-created file to list Guardian binaries for SignPath deep-signing
-      run: PackagingHelpers\bin\7-zip\7z x -aoa -bb3 "${{ env.signedzipfile }}"
+      run: 7z x -aoa -bb3 "${{ env.signedzipfile }}"
 
-    ###
-    - name: Upload build artifacts - GuardianFirewall Service Executable for ARM64 itself - single file so we can verify if it works
-      uses: actions/upload-artifact@v4
-      with:
-        name: GuardianFirewallService.exe
-        path: D:\a\GuardianConnect-Windows\GuardianConnect-Windows\GuardianConnectSDK\BuildOutput\GuardianFirewallService\runtimes\win10-arm64\lib\net9.0-windows\GuardianFirewallService.exe
+        # BARF
+#    - name: BARF
+#      run: FOOBAR
         
+    ###
+###    - name: Upload build artifacts - GuardianFirewall Service Executable for ARM64 itself - single file so we can verify if it works
+###      uses: actions/upload-artifact@v4
+###      with:
+###        name: GuardianFirewallService.exe
+###        path: D:\a\GuardianConnect-Windows\GuardianConnect-Windows\GuardianConnectSDK\BuildOutput\GuardianFirewallService\runtimes\win10-arm64\lib\net9.0-windows\GuardianFirewallService.exe
+###        
     - name: Create GuardianConnect.nupkg package bundle containing both CPU builds
       run: nuget pack GuardianConnectSDK.nuspec -Version ${{env.PKGVERSION}}
       shell: cmd
