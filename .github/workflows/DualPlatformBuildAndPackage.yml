@@ -82,7 +82,7 @@ jobs:
     ## so that the nuget package builds flow easier (we have limited pathing and variables in the nuspecs). And then we can also sign the Nuget packages later on.
 
     - name: Run sigcheck64 utility to verify binaries
-      run: sigcheck64 -s -a BuildOutput\GuardianConnect\runtimes\win10-x64\lib\net9.0-windows\*.dll
+      run: bin\sigcheck64 -s -a BuildOutput\GuardianConnect\runtimes\win10-x64\lib\net9.0-windows\*.dll
       shell: cmd
 
      # Zip up our binaries for specific zip signing in SignPath
