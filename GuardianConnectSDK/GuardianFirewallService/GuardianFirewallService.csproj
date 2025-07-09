@@ -4,12 +4,6 @@
         <ImplicitUsings>true</ImplicitUsings>
 		<tags>GuardianFirewallService</tags>
 
-		<!--
-        <TargetFramework>net9.0-windows10.0.26100.0</TargetFramework>
-        <AssemblyVersion>0.14.5.356</AssemblyVersion>
-        <FileVersion>0.14.5.356</FileVersion>
-        -->
-
         <AllowUnsafeBlocks>true</AllowUnsafeBlocks>
         <Configurations>Debug;Release</Configurations>
         <Platforms>x64;ARM64</Platforms>
@@ -54,21 +48,6 @@
         <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
       </None>
       <None Update="logsettings.json">
-        <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
-      </None>
-      <None Update="NecessaryInstallPackages\dotnet-hosting-8.0.2-win.exe">
-        <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
-      </None>
-      <None Update="NecessaryInstallPackages\dotnet-runtime-8.0.7-win-arm64.exe">
-        <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
-      </None>
-      <None Update="NecessaryInstallPackages\dotnet-runtime-8.0.7-win-x64.exe">
-        <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
-      </None>
-      <None Update="NecessaryInstallPackages\VC_redist.arm64.exe">
-        <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
-      </None>
-      <None Update="NecessaryInstallPackages\VC_redist.x64.exe">
         <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
       </None>
       <None Update="uninstallfromservices.cmd">

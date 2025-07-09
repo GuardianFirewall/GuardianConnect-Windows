@@ -1,24 +1,16 @@
 <Project>
     <PropertyGroup>
         <Platforms>x64;ARM64</Platforms>
-		<!-- VALUE NOT WORKING
-        <TargetFramework>net9.0-windows7.0</TargetFramework>
-        -->
-        <!-- previous values -->
         <TargetFramework>net9.0-windows</TargetFramework>
         <WindowsTargetPlatformVersion>10.0</WindowsTargetPlatformVersion>
-		<!-- VALUE NOT WORKING
-        <WindowsTargetPlatformMinVersion>10.0.26100.0</WindowsTargetPlatformMinVersion>
-        -->
-        <!-- previous values -->
 
         <Configurations>Release;Debug</Configurations>
         <Authors>DNSFilter, Inc.</Authors>
         <RepositoryUrl>https://github.com/GuardianFirewall/GuardianConnect-Windows</RepositoryUrl>
         
-        <AssemblyVersion>0.16.8.50</AssemblyVersion>
-        <FileVersion>0.16.8.50</FileVersion>
-        <Version>0.16.8.50</Version>
+        <AssemblyVersion>0.16.9.61</AssemblyVersion>
+        <FileVersion>0.16.9.61</FileVersion>
+        <Version>0.16.9.61</Version>
     </PropertyGroup>
     
     <PropertyGroup>

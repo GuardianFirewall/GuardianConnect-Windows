@@ -2,7 +2,7 @@
 <package >
   <metadata>
     <id>GuardianConnect</id>
-    <version>16.8.50</version>
+    <version>0.16.9.61</version>
     <title>GuardianConnect SDK</title>
     <authors>DNSFilter, Inc.</authors>
     <license type="expression">MIT</license>
