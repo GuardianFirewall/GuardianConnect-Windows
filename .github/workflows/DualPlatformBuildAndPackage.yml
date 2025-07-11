@@ -141,12 +141,12 @@ jobs:
       run: Install-Module -Name SignPath -Force
 
         Submit-SigningRequest `
-        -InputArtifactPath "GuardianConnect.${{env.PKGVERSION}}.nupkg" `
+        -InputArtifactPath "GuardianConnectSDK.${{env.PKGVERSION}}.nupkg" `
         -ApiToken "${{ secrets.CI_SIGNPATH_USER_TOKEN }}" `
         -OrganizationId "5c1e4170-8bf7-48b1-8542-78374ccc3471" `
         -ProjectSlug "Guardian" `
         -SigningPolicySlug "Guardian_DNSF_Branded" `
-        -OutputArtifactPath "SIGNED_GuardianConnect.${{env.PKGVERSION}}.nupkg"  `
+        -OutputArtifactPath "SIGNED_GuardianConnectSDK.${{env.PKGVERSION}}.nupkg"  `
         -ArtifactConfigurationSlug GuardianConnectSDK_Windows_Nuget_Package `
         -WaitForCompletion
     
@@ -170,8 +170,8 @@ jobs:
     - name: Upload build artifacts - GuardianConnectSDK
       uses: actions/upload-artifact@v4
       with:
-        name: SIGNED_GuardianConnect.${{env.PKGVERSION}}.nupkg
-        path: D:\a\GuardianConnect-Windows\GuardianConnect-Windows\GuardianConnectSDK\SIGNED_GuardianConnect.${{env.PKGVERSION}}.nupkg
+        name: SIGNED_GuardianConnectSDK.${{env.PKGVERSION}}.nupkg
+        path: D:\a\GuardianConnect-Windows\GuardianConnect-Windows\GuardianConnectSDK\SIGNED_GuardianConnectSDK.${{env.PKGVERSION}}.nupkg
         
     - name: Upload build artifacts - GuardianFirewall Service
       uses: actions/upload-artifact@v4
@@ -187,7 +187,7 @@ jobs:
         
     # Update GitHub Packages with these nuget packages
     - name: Update GitHub with nuget packages - SDK
-      run: nuget push SIGNED_GuardianConnect.${{env.PKGVERSION}}.nupkg `${{ secrets.GUARDIANFIREWALL_GH_PKG_TOKEN }} -Source GitHub -SkipDuplicate
+      run: nuget push SIGNED_GuardianConnectSDK.${{env.PKGVERSION}}.nupkg `${{ secrets.GUARDIANFIREWALL_GH_PKG_TOKEN }} -Source GitHub -SkipDuplicate
 
     - name: Update GitHub with nuget packages - Service
       run: nuget push SIGNED_GuardianFirewallService.${{env.PKGVERSION}}.nupkg ${{ secrets.GUARDIANFIREWALL_GH_PKG_TOKEN }} -Source GitHub -SkipDuplicate
