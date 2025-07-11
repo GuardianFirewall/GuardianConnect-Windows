@@ -51,5 +51,12 @@
     <!-- TODO
     <file src="BuildOutput\GuardianConnect\runtimes\win10-arm64\lib\net9.0-windows\*.dll" target="lib\net9.0" />
     -->
+    
+    <!-- DIFFERENT APPROACH AS NEEDED - INCLUDE SOURCE CODE OF THE THREE PROJECTS FOR GUARDIAN FIREWALL UI CLIENT:
+      GuardianConnect\**, Shared\**, NativeRoutines\**
+      -->
+    <file src="Shared\**\*.*" target="src\Shared"/>
+    <file src="GuardianConnect\**\*.*" target="src\GuardianConnect"/>
+    <file src="NativeRoutines\**\*.*" target="src\NativeRoutines"/>
   </files>
 </package>
