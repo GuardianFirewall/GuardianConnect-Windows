@@ -2,7 +2,7 @@
 <package >
   <metadata>
     <id>GuardianConnectSDK</id>
-    <version>0.16.16.1</version>
+    <version>0.17.17.2</version>
     <title>GuardianConnect SDK Nuget Bundle Package</title>
     <authors>DNSFilter, Inc.</authors>
     <license type="expression">MIT</license>
@@ -55,8 +55,8 @@
     <!-- DIFFERENT APPROACH AS NEEDED - INCLUDE SOURCE CODE OF THE THREE PROJECTS FOR GUARDIAN FIREWALL UI CLIENT:
       GuardianConnect\**, Shared\**, NativeRoutines\**
       -->
-    <file src="Shared\**\*.*" target="src\Shared"/>
-    <file src="GuardianConnect\**\*.*" target="src\GuardianConnect"/>
-    <file src="NativeRoutines\**\*.*" target="src\NativeRoutines"/>
+    <file src="Shared\**\*.*" target="src\Shared" exclude="Shared\obj"/>
+    <file src="GuardianConnect\**\*.*" target="src\GuardianConnect" exclude="GuardianConnect\obj"/>
+    <file src="NativeRoutines\**\*.*" target="src\NativeRoutines" exclude="NativeRoutines\obj"/>
   </files>
 </package>
