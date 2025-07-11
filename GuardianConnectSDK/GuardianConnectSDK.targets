@@ -1,7 +1,10 @@
 <Project xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
 	<ItemGroup>
 		<!-- Set CopyToOutputDirectory for a specific DLL in the package -->
-		<Content Include="$(MSBuildThisFileDirectory)..\runtimes\win-$(Platform)\net9.0-windows\*.*">
+		<Content Include="$(MSBuildThisFileDirectory)..\runtimes\win10-$(Platform)\lib\net9.0\*.*">
+			<CopyToOutputDirectory>Always</CopyToOutputDirectory>
+		</Content>
+		<Content Include="$(MSBuildThisFileDirectory)..\runtimes\win10-$(Platform)\native\*.*">
 			<CopyToOutputDirectory>Always</CopyToOutputDirectory>
 		</Content>
 	</ItemGroup>
@@ -10,6 +13,6 @@
 		<TargetFramework>net9.0-windows</TargetFramework>
 		<!-- Set the platform for the package -->
 		<Platform>$(Platform)</Platform>
-		<PackageId>GuardianConnect</PackageId>
+		<PackageId>GuardianConnectSDK</PackageId>
 	</PropertyGroup>
 </Project>
