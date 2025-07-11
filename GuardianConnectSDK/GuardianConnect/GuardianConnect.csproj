@@ -13,16 +13,6 @@
         <Platforms>x64;ARM64</Platforms>
   </PropertyGroup>
 
-    <PropertyGroup>
-        <id>GuardianConnect</id>
-        <Authors>DNSFilter, Inc.</Authors>
-        <RepositoryUrl>https://github.com/GuardianFirewall/GuardianConnect-Windows</RepositoryUrl>
-        <PackageId>GuardianConnect</PackageId>
-        <title>GuardianConnect SDK Nuget Bundle Package</title>
-        <PackageIconUrl>Guardian.png</PackageIconUrl>
-        <tags>GuardianConnectSDK</tags>
-    </PropertyGroup>
-
     <ItemGroup>
         <None Include="Guardian.png" Pack="true" PackagePath="" />
         <None Include="README.md" Pack="true" PackagePath="" />
