@@ -9,6 +9,11 @@
         <PackageIcon>Guardian.ico</PackageIcon>
 		<tags>GuardianConnectSDK</tags>
 		<Platforms>x64;ARM64</Platforms>
+        <!--
+        <GenerateReferenceAssembly>true</GenerateReferenceAssembly>
+        <ProduceReferenceAssembly>true</ProduceReferenceAssembly>
+        <Deterministic>true</Deterministic>
+        -->
     </PropertyGroup>
 
     <ItemGroup>

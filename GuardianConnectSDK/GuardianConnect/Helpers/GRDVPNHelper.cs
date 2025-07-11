@@ -281,6 +281,19 @@ namespace GuardianConnect.Helpers
         // TJE TODO NOTE 100323 - Instead of Mac version of the flow across multiple similar - will instead use one
         // With intermixed calls for credentials or server selection/setting
         // *******************
+
+        /// <summary>
+        /// Used as a helper to calling clients to return the name of the active connection, else null if not
+        /// </summary>
+        /// <returns>String of Connection Name</returns>
+        public bool GetCurrentVPNState(out string connectionName)
+        {
+            Log.Information("In GetNameOfActiveConnection()");
+            var state = ClientPipe.GetCurrentVpnConnectionStatus();
+            var isConnected  = state.ConnectionState == IGuardianNPContract.ConnectionStateEnum.Connected;
+            connectionName = state.EntryName;
+            return isConnected;
+        }
         
         /// Used to create a new VPN connection if an active subscription exists. This is the main function to call when no EAP credentials
         /// or subscriber credentials exist yet and
