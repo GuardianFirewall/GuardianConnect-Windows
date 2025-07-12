@@ -199,11 +199,17 @@ jobs:
         -WaitForCompletion
       
       # Upload the nuget packages: (https://github.com/marketplace/actions/upload-a-build-artifact)
-    - name: Upload build artifacts - GuardianConnectSDK
+    - name: Upload build artifacts - GuardianConnectSDK_x64
       uses: actions/upload-artifact@v4
       with:
-        name: SIGNED_GuardianConnectSDK.${{env.PKGVERSION}}.nupkg
-        path: D:\a\GuardianConnect-Windows\GuardianConnect-Windows\GuardianConnectSDK\SIGNED_GuardianConnectSDK.${{env.PKGVERSION}}.nupkg
+        name: SIGNED_GuardianConnectSDK_x64.${{env.PKGVERSION}}.nupkg
+        path: D:\a\GuardianConnect-Windows\GuardianConnect-Windows\GuardianConnectSDK\SIGNED_GuardianConnectSDK_x64.${{env.PKGVERSION}}.nupkg
+
+    - name: Upload build artifacts - GuardianConnectSDK_ARM64
+      uses: actions/upload-artifact@v4
+      with:
+        name: SIGNED_GuardianConnectSDK_ARM64.${{env.PKGVERSION}}.nupkg
+        path: D:\a\GuardianConnect-Windows\GuardianConnect-Windows\GuardianConnectSDK\SIGNED_GuardianConnectSDK_ARM64.${{env.PKGVERSION}}.nupkg
         
     - name: Upload build artifacts - GuardianFirewall Service
       uses: actions/upload-artifact@v4
@@ -218,8 +224,10 @@ jobs:
       run: dotnet nuget add source --username time4dnsf --password ${{ secrets.GITHUB_TOKEN }} --store-password-in-clear-text --name github "https://nuget.pkg.github.com/GuardianFirewall/index.json"
         
     # Update GitHub Packages with these nuget packages
-    - name: Update GitHub with nuget packages - SDK
-      run: nuget push SIGNED_GuardianConnectSDK.${{env.PKGVERSION}}.nupkg `${{ secrets.GUARDIANFIREWALL_GH_PKG_TOKEN }} -Source GitHub -SkipDuplicate
+    - name: Update GitHub with nuget packages - SDK x64
+      run: nuget push SIGNED_GuardianConnectSDK_x64.${{env.PKGVERSION}}.nupkg `${{ secrets.GUARDIANFIREWALL_GH_PKG_TOKEN }} -Source GitHub -SkipDuplicate
+    - name: Update GitHub with nuget packages - SDK ARM64
+      run: nuget push SIGNED_GuardianConnectSDK_ARM64.${{env.PKGVERSION}}.nupkg `${{ secrets.GUARDIANFIREWALL_GH_PKG_TOKEN }} -Source GitHub -SkipDuplicate
 
     - name: Update GitHub with nuget packages - Service
       run: nuget push SIGNED_GuardianFirewallService.${{env.PKGVERSION}}.nupkg ${{ secrets.GUARDIANFIREWALL_GH_PKG_TOKEN }} -Source GitHub -SkipDuplicate
