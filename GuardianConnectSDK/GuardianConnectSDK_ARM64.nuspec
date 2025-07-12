@@ -1,8 +1,8 @@
 <?xml version="1.0" encoding="utf-8"?>
 <package >
   <metadata>
-    <id>GuardianConnectSDK_ARM64)</id>
-    <version>0.18.18.5</version>
+    <id>GuardianConnectSDK_ARM64</id>
+    <version>0.18.18.6</version>
     <title>GuardianConnect SDK Nuget Bundle Package for arm64</title>
     <authors>DNSFilter, Inc.</authors>
     <license type="expression">MIT</license>
