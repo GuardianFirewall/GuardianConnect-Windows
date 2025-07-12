@@ -8,9 +8,9 @@
         <Authors>DNSFilter, Inc.</Authors>
         <RepositoryUrl>https://github.com/GuardianFirewall/GuardianConnect-Windows</RepositoryUrl>
         
-        <AssemblyVersion>0.17.17.2</AssemblyVersion>
-        <FileVersion>0.17.17.2</FileVersion>
-        <Version>0.17.17.2</Version>
+        <AssemblyVersion>0.18.18.5</AssemblyVersion>
+        <FileVersion>0.18.18.5</FileVersion>
+        <Version>0.18.18.5</Version>
     </PropertyGroup>
     
     <PropertyGroup>

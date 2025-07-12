@@ -21,42 +21,42 @@
 		<file src=".\README.md" target="." />
 		<file src="Guardian.png" target="."/>
 		<!-- x64 -->
-		<file src="BuildOutput\GuardianFirewallService\runtimes\win10-x64\lib\net9.0-windows\*.dll" target="ref\net9.0\win-x64\" />
-		<file src="BuildOutput\GuardianFirewallService\runtimes\win10-x64\lib\net9.0-windows\appsettings.Development.json" target="ref\net9.0\win-x64" />
-		<file src="BuildOutput\GuardianFirewallService\runtimes\win10-x64\lib\net9.0-windows\appsettings.json" target="ref\net9.0\win-x64" />
-		<file src="BuildOutput\GuardianFirewallService\runtimes\win10-x64\lib\net9.0-windows\Guardian.ico" target="ref\net9.0\win-x64" />
-		<file src="BuildOutput\GuardianFirewallService\runtimes\win10-x64\lib\net9.0-windows\Guardian.png" target="ref\net9.0\win-x64" />
-		<file src="BuildOutput\GuardianFirewallService\runtimes\win10-x64\lib\net9.0-windows\GuardianFirewallService.deps.json" target="ref\net9.0\win-x64" />
-		<file src="BuildOutput\GuardianFirewallService\runtimes\win10-x64\lib\net9.0-windows\GuardianFirewallService.exe" target="ref\net9.0\win-x64" />
-		<file src="BuildOutput\GuardianFirewallService\runtimes\win10-x64\lib\net9.0-windows\GuardianFirewallService.runtimeconfig.json" target="ref\net9.0\win-x64" />
-		<file src="BuildOutput\GuardianFirewallService\runtimes\win10-x64\lib\net9.0-windows\installassvc.cmd" target="ref\net9.0\win-x64" />
-		<file src="BuildOutput\GuardianFirewallService\runtimes\win10-x64\lib\net9.0-windows\logsettings.json" target="ref\net9.0\win-x64" />
-		<file src="BuildOutput\GuardianFirewallService\runtimes\win10-x64\lib\net9.0-windows\uninstallfromservices.cmd" target="ref\net9.0\win-x64" />
+		<file src="BuildOutput\GuardianFirewallService\runtimes\win10-x64\lib\net9.0-windows\*.dll" target="ref\net9.0-windows\win-x64\" />
+		<file src="BuildOutput\GuardianFirewallService\runtimes\win10-x64\lib\net9.0-windows\appsettings.Development.json" target="ref\net9.0-windows\win-x64" />
+		<file src="BuildOutput\GuardianFirewallService\runtimes\win10-x64\lib\net9.0-windows\appsettings.json" target="ref\net9.0-windows\win-x64" />
+		<file src="BuildOutput\GuardianFirewallService\runtimes\win10-x64\lib\net9.0-windows\Guardian.ico" target="ref\net9.0-windows\win-x64" />
+		<file src="BuildOutput\GuardianFirewallService\runtimes\win10-x64\lib\net9.0-windows\Guardian.png" target="ref\net9.0-windows\win-x64" />
+		<file src="BuildOutput\GuardianFirewallService\runtimes\win10-x64\lib\net9.0-windows\GuardianFirewallService.deps.json" target="ref\net9.0-windows\win-x64" />
+		<file src="BuildOutput\GuardianFirewallService\runtimes\win10-x64\lib\net9.0-windows\GuardianFirewallService.exe" target="ref\net9.0-windows\win-x64" />
+		<file src="BuildOutput\GuardianFirewallService\runtimes\win10-x64\lib\net9.0-windows\GuardianFirewallService.runtimeconfig.json" target="ref\net9.0-windows\win-x64" />
+		<file src="BuildOutput\GuardianFirewallService\runtimes\win10-x64\lib\net9.0-windows\installassvc.cmd" target="ref\net9.0-windows\win-x64" />
+		<file src="BuildOutput\GuardianFirewallService\runtimes\win10-x64\lib\net9.0-windows\logsettings.json" target="ref\net9.0-windows\win-x64" />
+		<file src="BuildOutput\GuardianFirewallService\runtimes\win10-x64\lib\net9.0-windows\uninstallfromservices.cmd" target="ref\net9.0-windows\win-x64" />
 
-		<file src="BuildOutput\GuardianFirewallService\runtimes\win10-x64\lib\net9.0-windows\*.dll" target="runtimes\win-x64\lib\net9.0" />
-		<file src="BuildOutput\GuardianFirewallService\runtimes\win10-x64\lib\net9.0-windows\appsettings.Development.json" target="runtimes\win-x64\lib\net9.0" />
-		<file src="BuildOutput\GuardianFirewallService\runtimes\win10-x64\lib\net9.0-windows\appsettings.json" target="runtimes\win-x64\lib\net9.0" />
-		<file src="BuildOutput\GuardianFirewallService\runtimes\win10-x64\lib\net9.0-windows\Guardian.ico" target="runtimes\win-x64\lib\net9.0" />
-		<file src="BuildOutput\GuardianFirewallService\runtimes\win10-x64\lib\net9.0-windows\Guardian.png" target="runtimes\win-x64\lib\net9.0" />
-		<file src="BuildOutput\GuardianFirewallService\runtimes\win10-x64\lib\net9.0-windows\GuardianFirewallService.deps.json" target="runtimes\win-x64\lib\net9.0" />
-		<file src="BuildOutput\GuardianFirewallService\runtimes\win10-x64\lib\net9.0-windows\GuardianFirewallService.exe" target="runtimes\win-x64\lib\net9.0" />
-		<file src="BuildOutput\GuardianFirewallService\runtimes\win10-x64\lib\net9.0-windows\GuardianFirewallService.runtimeconfig.json" target="runtimes\win-x64\lib\net9.0" />
-		<file src="BuildOutput\GuardianFirewallService\runtimes\win10-x64\lib\net9.0-windows\installassvc.cmd" target="runtimes\win-x64\lib\net9.0" />
-		<file src="BuildOutput\GuardianFirewallService\runtimes\win10-x64\lib\net9.0-windows\logsettings.json" target="runtimes\win-x64\lib\net9.0" />
-		<file src="BuildOutput\GuardianFirewallService\runtimes\win10-x64\lib\net9.0-windows\uninstallfromservices.cmd" target="runtimes\win-x64\lib\net9.0" />
+		<file src="BuildOutput\GuardianFirewallService\runtimes\win10-x64\lib\net9.0-windows\*.dll" target="runtimes\win-x64\lib\net9.0-windows" />
+		<file src="BuildOutput\GuardianFirewallService\runtimes\win10-x64\lib\net9.0-windows\appsettings.Development.json" target="runtimes\win-x64\lib\net9.0-windows" />
+		<file src="BuildOutput\GuardianFirewallService\runtimes\win10-x64\lib\net9.0-windows\appsettings.json" target="runtimes\win-x64\lib\net9.0-windows" />
+		<file src="BuildOutput\GuardianFirewallService\runtimes\win10-x64\lib\net9.0-windows\Guardian.ico" target="runtimes\win-x64\lib\net9.0-windows" />
+		<file src="BuildOutput\GuardianFirewallService\runtimes\win10-x64\lib\net9.0-windows\Guardian.png" target="runtimes\win-x64\lib\net9.0-windows" />
+		<file src="BuildOutput\GuardianFirewallService\runtimes\win10-x64\lib\net9.0-windows\GuardianFirewallService.deps.json" target="runtimes\win-x64\lib\net9.0-windows" />
+		<file src="BuildOutput\GuardianFirewallService\runtimes\win10-x64\lib\net9.0-windows\GuardianFirewallService.exe" target="runtimes\win-x64\lib\net9.0-windows" />
+		<file src="BuildOutput\GuardianFirewallService\runtimes\win10-x64\lib\net9.0-windows\GuardianFirewallService.runtimeconfig.json" target="runtimes\win-x64\lib\net9.0-windows" />
+		<file src="BuildOutput\GuardianFirewallService\runtimes\win10-x64\lib\net9.0-windows\installassvc.cmd" target="runtimes\win-x64\lib\net9.0-windows" />
+		<file src="BuildOutput\GuardianFirewallService\runtimes\win10-x64\lib\net9.0-windows\logsettings.json" target="runtimes\win-x64\lib\net9.0-windows" />
+		<file src="BuildOutput\GuardianFirewallService\runtimes\win10-x64\lib\net9.0-windows\uninstallfromservices.cmd" target="runtimes\win-x64\lib\net9.0-windows" />
 
 		<!-- arm64 -->
-		<file src="BuildOutput\GuardianFirewallService\runtimes\win10-arm64\lib\net9.0-windows\*.dll" target="runtimes\win-arm64\lib\net9.0" />
-		<file src="BuildOutput\GuardianFirewallService\runtimes\win10-arm64\lib\net9.0-windows\appsettings.Development.json" target="runtimes\win-arm64\lib\net9.0" />
-		<file src="BuildOutput\GuardianFirewallService\runtimes\win10-arm64\lib\net9.0-windows\appsettings.json" target="runtimes\win-arm64\lib\net9.0" />
-		<file src="BuildOutput\GuardianFirewallService\runtimes\win10-arm64\lib\net9.0-windows\Guardian.ico" target="runtimes\win-arm64\lib\net9.0" />
-		<file src="BuildOutput\GuardianFirewallService\runtimes\win10-arm64\lib\net9.0-windows\Guardian.png" target="runtimes\win-arm64\lib\net9.0" />
-		<file src="BuildOutput\GuardianFirewallService\runtimes\win10-arm64\lib\net9.0-windows\GuardianFirewallService.deps.json" target="runtimes\win-arm64\lib\net9.0" />
-		<file src="BuildOutput\GuardianFirewallService\runtimes\win10-arm64\lib\net9.0-windows\GuardianFirewallService.exe" target="runtimes\win-arm64\lib\net9.0" />
-		<file src="BuildOutput\GuardianFirewallService\runtimes\win10-arm64\lib\net9.0-windows\GuardianFirewallService.runtimeconfig.json" target="runtimes\win-arm64\lib\net9.0" />
-		<file src="BuildOutput\GuardianFirewallService\runtimes\win10-arm64\lib\net9.0-windows\installassvc.cmd" target="runtimes\win-arm64\lib\net9.0" />
-		<file src="BuildOutput\GuardianFirewallService\runtimes\win10-arm64\lib\net9.0-windows\logsettings.json" target="runtimes\win-arm64\lib\net9.0" />
-		<file src="BuildOutput\GuardianFirewallService\runtimes\win10-arm64\lib\net9.0-windows\uninstallfromservices.cmd" target="runtimes\win-arm64\lib\net9.0" />
+		<file src="BuildOutput\GuardianFirewallService\runtimes\win10-arm64\lib\net9.0-windows\*.dll" target="runtimes\win-arm64\lib\net9.0-windows" />
+		<file src="BuildOutput\GuardianFirewallService\runtimes\win10-arm64\lib\net9.0-windows\appsettings.Development.json" target="runtimes\win-arm64\lib\net9.0-windows" />
+		<file src="BuildOutput\GuardianFirewallService\runtimes\win10-arm64\lib\net9.0-windows\appsettings.json" target="runtimes\win-arm64\lib\net9.0-windows" />
+		<file src="BuildOutput\GuardianFirewallService\runtimes\win10-arm64\lib\net9.0-windows\Guardian.ico" target="runtimes\win-arm64\lib\net9.0-windows" />
+		<file src="BuildOutput\GuardianFirewallService\runtimes\win10-arm64\lib\net9.0-windows\Guardian.png" target="runtimes\win-arm64\lib\net9.0-windows" />
+		<file src="BuildOutput\GuardianFirewallService\runtimes\win10-arm64\lib\net9.0-windows\GuardianFirewallService.deps.json" target="runtimes\win-arm64\lib\net9.0-windows" />
+		<file src="BuildOutput\GuardianFirewallService\runtimes\win10-arm64\lib\net9.0-windows\GuardianFirewallService.exe" target="runtimes\win-arm64\lib\net9.0-windows" />
+		<file src="BuildOutput\GuardianFirewallService\runtimes\win10-arm64\lib\net9.0-windows\GuardianFirewallService.runtimeconfig.json" target="runtimes\win-arm64\lib\net9.0-windows" />
+		<file src="BuildOutput\GuardianFirewallService\runtimes\win10-arm64\lib\net9.0-windows\installassvc.cmd" target="runtimes\win-arm64\lib\net9.0-windows" />
+		<file src="BuildOutput\GuardianFirewallService\runtimes\win10-arm64\lib\net9.0-windows\logsettings.json" target="runtimes\win-arm64\lib\net9.0-windows" />
+		<file src="BuildOutput\GuardianFirewallService\runtimes\win10-arm64\lib\net9.0-windows\uninstallfromservices.cmd" target="runtimes\win-arm64\lib\net9.0-windows" />
 
 
 		<!-- TODO - PUT PDB's IN SEPARATE NUPKG?? -->

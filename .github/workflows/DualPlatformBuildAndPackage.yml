@@ -120,10 +120,26 @@ jobs:
 ###        name: GuardianFirewallService.exe
 ###        path: D:\a\GuardianConnect-Windows\GuardianConnect-Windows\GuardianConnectSDK\BuildOutput\GuardianFirewallService\runtimes\win10-arm64\lib\net9.0-windows\GuardianFirewallService.exe
 ###        
-    - name: Create GuardianConnect.nupkg package bundle containing both CPU builds
-      run: nuget pack GuardianConnectSDK.nuspec -Version ${{env.PKGVERSION}}
+    - name: Create GuardianConnectSDK_x64.nupkg package bundle for EACH CPU build - x64 first
+      run: nuget pack GuardianConnectSDK_x64.nuspec -Version ${{env.PKGVERSION}}
+      shell: cmd
+    
+    - name: Create GuardianConnectSDK_ARM64.nupkg package bundle for EACH CPU build - then ARM64
+      run: nuget pack GuardianConnectSDK_ARM64.nuspec -Version ${{env.PKGVERSION}}
       shell: cmd
       
+    - name: Upload build artifacts - both SDKs - x64 first- UNSIGNED SO WE CAN GIVE AS SAMPLE TO SIGNPATH
+      uses: actions/upload-artifact@v4
+      with:
+        name: "GuardianConnectSDK_x64.${{env.PKGVERSION}}.nupkg"
+        path: D:\a\GuardianConnect-Windows\GuardianConnect-Windows\GuardianConnectSDK\GuardianConnectSDK_x64.${{env.PKGVERSION}}.nupkg
+
+    - name: Upload build artifacts - both SDKs - now ARM64 - UNSIGNED SO WE CAN GIVE AS SAMPLE TO SIGNPATH
+      uses: actions/upload-artifact@v4
+      with:
+        name: "GuardianConnectSDK_ARM64.${{env.PKGVERSION}}.nupkg"
+        path: D:\a\GuardianConnect-Windows\GuardianConnect-Windows\GuardianConnectSDK\GuardianConnectSDK_ARM64.${{env.PKGVERSION}}.nupkg
+    
     - name: Create GuardianFirewallService.nupkg package bundle
       run: nuget pack GuardianFirewallService.nuspec -Version ${{env.PKGVERSION}}
       shell: cmd
@@ -134,6 +150,9 @@ jobs:
         name: GuardianFirewallService.${{env.PKGVERSION}}.nupkg 
         path: D:\a\GuardianConnect-Windows\GuardianConnect-Windows\GuardianConnectSDK\GuardianFirewallService.${{env.PKGVERSION}}.nupkg 
         
+    - name: BARF OUT HERE
+      run: FOOBAR
+      
     # Sign GuardianConnectSDK package with certificate
     # Name GuardianConnectSDK Windows Nuget Package
     # Slug GuardianConnectSDK_Windows_Nuget_Package
