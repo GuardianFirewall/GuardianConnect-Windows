@@ -16,7 +16,7 @@ defaults:
     
 jobs:
 
-  build-x64:
+  build-both-architectures:
 
     strategy:
       matrix:
@@ -26,6 +26,8 @@ jobs:
 
     env:
       Solution_Name: GuardianConnectSDK.sln
+      unsignedzipfile: "UnsignedGuardianBinaries.zip"
+      signedzipfile: "SignedGuardianBinaries.zip"
 
     steps:
     - name: Checkout
@@ -73,36 +75,112 @@ jobs:
     - name: Build GuardianFirewall Service for arm64 CPU
       run: msbuild /t:restore /t:Build /p:Platform=arm64 /p:Configuration=Release /p:RuntimeIdentifier=win-arm64 GuardianFirewallService\GuardianFirewallService.csproj
 
-    - name: Create GuardianConnect.nupkg package bundle containing both CPU builds
-      run: nuget pack GuardianConnectSDK.nuspec -Version ${{env.PKGVERSION}}
-      shell: cmd
-      
-    - name: Create GuardianFirewallService.nupkg package bundle
-      run: nuget pack GuardianFirewallService.nuspec -Version ${{env.PKGVERSION}}
-      shell: cmd
-      
-    # Sign GuardianConnectSDK package with certificate
-    # Name GuardianConnectSDK Windows Nuget Package
-    # Slug GuardianConnectSDK_Windows_Nuget_Package
-    - name: Sign GuardianConnectSDK package with certificate
-      run: Install-Module -Name SignPath -Force
+    ## PAUSE HERE - Going to ONLY gather and upload the Guardian assets to SignPath in a zip. Both x64 and arm64.
+    ## GuardianConnect.Shared.dll, GuardianConnect.dll, NativeRoutines.dll, GuardianFirewallService.exe and GuardianFirewallService.dll
+    ## Second thought - we will just do that for both the GuardianConnect build output AND the GuardianFirewallService build output - so a little redundant on the GC binaries
+    ## as it is much easier to add the binaries in-place to the zip, sign the binaries in that zip file, then extract with overlay in-place
+    ## so that the nuget package builds flow easier (we have limited pathing and variables in the nuspecs). And then we can also sign the Nuget packages later on.
 
+##    - name: Run sigcheck64 utility to verify binaries
+##      run: bin\sigcheck64 -nobanner -accepteula  -s -a BuildOutput\GuardianConnect\runtimes\win10-x64\lib\net9.0-windows\Guardian*.dll
+##      shell: cmd
+
+     # Zip up our binaries for specific zip signing in SignPath
+    - name: Zip Guardian binaries for SignPath deep-signing
+      #run: PackagingHelpers\bin\7-zip\7z a -bb3 "${{ env.unsignedzipfile }}" @PackagingHelpers\Input\ListOfGuardianFilesToSign.fls
+      run: 7z a -bb3 .\UnsignedGuardianBinaries.zip @ListOfGuardianConnectSDKFilesToSign.fls
+      shell: cmd
+
+      # Sign Guardian binaries only  Executable with certificate
+    - name: Sign Guardian Binaries with certificate
+      run: Install-Module -Name SignPath -Force
+        
         Submit-SigningRequest `
-        -InputArtifactPath "GuardianConnect.${{env.PKGVERSION}}.nupkg" `
+        -InputArtifactPath "${{ env.unsignedzipfile }}" `
         -ApiToken "${{ secrets.CI_SIGNPATH_USER_TOKEN }}" `
         -OrganizationId "5c1e4170-8bf7-48b1-8542-78374ccc3471" `
         -ProjectSlug "Guardian" `
         -SigningPolicySlug "Guardian_DNSF_Branded" `
-        -OutputArtifactPath "SIGNED_GuardianConnect.${{env.PKGVERSION}}.nupkg"  `
-        -ArtifactConfigurationSlug GuardianConnectSDK_Windows_Nuget_Package `
+        -OutputArtifactPath "${{ env.signedzipfile }}" `
+        -ArtifactConfigurationSlug  GuardianConnectWindowsBinariesZip `
         -WaitForCompletion
-    
-##    - name: Upload build artifacts - GuardianFirewall Service - UNSIGNED SO WE CAN GIVE AS SAMPLE TO SIGNPATH
-##      uses: actions/upload-artifact@v4
-##      with:
-##        name: GuardianFirewallService.${{env.PKGVERSION}}.nupkg 
-##        path: D:\a\GuardianConnect-Windows\GuardianConnect-Windows\GuardianConnectSDK\GuardianFirewallService.${{env.PKGVERSION}}.nupkg 
+      
+      # Unzip what has just been signed
+    - name: Unzip the newly-created file to list Guardian binaries for SignPath deep-signing
+      run: 7z x -aoa -bb3 "${{ env.signedzipfile }}"
+
+        # BARF
+#    - name: BARF
+#      run: FOOBAR
         
+    ###
+###    - name: Upload build artifacts - GuardianFirewall Service Executable for ARM64 itself - single file so we can verify if it works
+###      uses: actions/upload-artifact@v4
+###      with:
+###        name: GuardianFirewallService.exe
+###        path: D:\a\GuardianConnect-Windows\GuardianConnect-Windows\GuardianConnectSDK\BuildOutput\GuardianFirewallService\runtimes\win10-arm64\lib\net9.0-windows\GuardianFirewallService.exe
+###        
+    - name: Create GuardianConnectSDK_x64.nupkg package bundle for EACH CPU build - x64 first
+      run: nuget pack GuardianConnectSDK_x64.nuspec -Version ${{env.PKGVERSION}}
+      shell: cmd
+    
+    - name: Create GuardianConnectSDK_ARM64.nupkg package bundle for EACH CPU build - then ARM64
+      run: nuget pack GuardianConnectSDK_ARM64.nuspec -Version ${{env.PKGVERSION}}
+      shell: cmd
+      
+    - name: Upload build artifacts - both SDKs - x64 first- UNSIGNED SO WE CAN GIVE AS SAMPLE TO SIGNPATH
+      uses: actions/upload-artifact@v4
+      with:
+        name: "GuardianConnectSDK_x64.${{env.PKGVERSION}}.nupkg"
+        path: D:\a\GuardianConnect-Windows\GuardianConnect-Windows\GuardianConnectSDK\GuardianConnectSDK_x64.${{env.PKGVERSION}}.nupkg
+
+    - name: Upload build artifacts - both SDKs - now ARM64 - UNSIGNED SO WE CAN GIVE AS SAMPLE TO SIGNPATH
+      uses: actions/upload-artifact@v4
+      with:
+        name: "GuardianConnectSDK_ARM64.${{env.PKGVERSION}}.nupkg"
+        path: D:\a\GuardianConnect-Windows\GuardianConnect-Windows\GuardianConnectSDK\GuardianConnectSDK_ARM64.${{env.PKGVERSION}}.nupkg
+    
+    - name: Create GuardianFirewallService.nupkg package bundle
+      run: nuget pack GuardianFirewallService.nuspec -Version ${{env.PKGVERSION}}
+      shell: cmd
+      
+    - name: Upload build artifacts - GuardianFirewall Service - UNSIGNED SO WE CAN GIVE AS SAMPLE TO SIGNPATH
+      uses: actions/upload-artifact@v4
+      with:
+        name: GuardianFirewallService.${{env.PKGVERSION}}.nupkg 
+        path: D:\a\GuardianConnect-Windows\GuardianConnect-Windows\GuardianConnectSDK\GuardianFirewallService.${{env.PKGVERSION}}.nupkg 
+        
+      # Sign GuardianConnectSDK x64 package with certificate
+      # Name GuardianConnectSDK<Platform> Nuget Package
+      # Slug GuardianConnectSDK_<Platform>_Nuget_Package
+    - name: Sign GuardianConnectSDK_x64 package with certificate
+      run: Install-Module -Name SignPath -Force
+
+        Submit-SigningRequest `
+        -InputArtifactPath "GuardianConnectSDK_x64.${{env.PKGVERSION}}.nupkg" `
+        -ApiToken "${{ secrets.CI_SIGNPATH_USER_TOKEN }}" `
+        -OrganizationId "5c1e4170-8bf7-48b1-8542-78374ccc3471" `
+        -ProjectSlug "Guardian" `
+        -SigningPolicySlug "Guardian_DNSF_Branded" `
+        -OutputArtifactPath "SIGNED_GuardianConnectSDK_x64.${{env.PKGVERSION}}.nupkg"  `
+        -ArtifactConfigurationSlug GuardianConnectSDK_x64_Nuget_Package `
+        -WaitForCompletion
+      
+    # Sign GuardianConnectSDK ARM64 package with certificate
+    # Name GuardianConnectSDK ARM64 Nuget Package
+    # Slug GuardianConnectSDK_ARM64_Nuget_Package
+    - name: Sign GuardianConnectSDK_ARM64 package with certificate
+      run: Install-Module -Name SignPath -Force
+
+        Submit-SigningRequest `
+        -InputArtifactPath "GuardianConnectSDK_ARM64.${{env.PKGVERSION}}.nupkg" `
+        -ApiToken "${{ secrets.CI_SIGNPATH_USER_TOKEN }}" `
+        -OrganizationId "5c1e4170-8bf7-48b1-8542-78374ccc3471" `
+        -ProjectSlug "Guardian" `
+        -SigningPolicySlug "Guardian_DNSF_Branded" `
+        -OutputArtifactPath "SIGNED_GuardianConnectSDK_ARM64.${{env.PKGVERSION}}.nupkg"  `
+        -ArtifactConfigurationSlug GuardianConnectSDK_ARM64_Nuget_Package `
+        -WaitForCompletion
     
     # Sign GuardianFirewallService package with certificate
     # Name GuardianFirewallService Windows Nuget Package
@@ -121,11 +199,17 @@ jobs:
         -WaitForCompletion
       
       # Upload the nuget packages: (https://github.com/marketplace/actions/upload-a-build-artifact)
-    - name: Upload build artifacts - GuardianConnectSDK
+    - name: Upload build artifacts - GuardianConnectSDK_x64
       uses: actions/upload-artifact@v4
       with:
-        name: SIGNED_GuardianConnect.${{env.PKGVERSION}}.nupkg
-        path: D:\a\GuardianConnect-Windows\GuardianConnect-Windows\GuardianConnectSDK\SIGNED_GuardianConnect.${{env.PKGVERSION}}.nupkg
+        name: SIGNED_GuardianConnectSDK_x64.${{env.PKGVERSION}}.nupkg
+        path: D:\a\GuardianConnect-Windows\GuardianConnect-Windows\GuardianConnectSDK\SIGNED_GuardianConnectSDK_x64.${{env.PKGVERSION}}.nupkg
+
+    - name: Upload build artifacts - GuardianConnectSDK_ARM64
+      uses: actions/upload-artifact@v4
+      with:
+        name: SIGNED_GuardianConnectSDK_ARM64.${{env.PKGVERSION}}.nupkg
+        path: D:\a\GuardianConnect-Windows\GuardianConnect-Windows\GuardianConnectSDK\SIGNED_GuardianConnectSDK_ARM64.${{env.PKGVERSION}}.nupkg
         
     - name: Upload build artifacts - GuardianFirewall Service
       uses: actions/upload-artifact@v4
@@ -140,8 +224,10 @@ jobs:
       run: dotnet nuget add source --username time4dnsf --password ${{ secrets.GITHUB_TOKEN }} --store-password-in-clear-text --name github "https://nuget.pkg.github.com/GuardianFirewall/index.json"
         
     # Update GitHub Packages with these nuget packages
-    - name: Update GitHub with nuget packages - SDK
-      run: nuget push SIGNED_GuardianConnect.${{env.PKGVERSION}}.nupkg `${{ secrets.GUARDIANFIREWALL_GH_PKG_TOKEN }} -Source GitHub -SkipDuplicate
+    - name: Update GitHub with nuget packages - SDK x64
+      run: nuget push SIGNED_GuardianConnectSDK_x64.${{env.PKGVERSION}}.nupkg `${{ secrets.GUARDIANFIREWALL_GH_PKG_TOKEN }} -Source GitHub -SkipDuplicate
+    - name: Update GitHub with nuget packages - SDK ARM64
+      run: nuget push SIGNED_GuardianConnectSDK_ARM64.${{env.PKGVERSION}}.nupkg `${{ secrets.GUARDIANFIREWALL_GH_PKG_TOKEN }} -Source GitHub -SkipDuplicate
 
     - name: Update GitHub with nuget packages - Service
       run: nuget push SIGNED_GuardianFirewallService.${{env.PKGVERSION}}.nupkg ${{ secrets.GUARDIANFIREWALL_GH_PKG_TOKEN }} -Source GitHub -SkipDuplicate

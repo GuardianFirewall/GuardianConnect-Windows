@@ -63,3 +63,7 @@
 /GuardianConnectSDK/NativeRoutines/NativeRoutines/arm64/Release
 *.swp
 /GuardianConnectSDK/.idea/.idea.GuardianConnectSDK/.idea/indexLayout.xml
+*.nupkg
+/GuardianConnectSDK/_.swo
+/GuardianConnectSDK/.vs/ProjectEvaluation
+/GuardianConnectSDK/NativeRoutinesLoadTest/obj

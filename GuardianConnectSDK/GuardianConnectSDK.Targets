@@ -1,0 +1,18 @@
+<Project xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
+	<ItemGroup>
+		<!-- Set CopyToOutputDirectory for a specific DLL in the package -->
+		<Content Include="$(MSBuildThisFileDirectory)..\runtimes\win10-$(Platform)\lib\net9.0\*.*">
+			<CopyToOutputDirectory>Always</CopyToOutputDirectory>
+		</Content>
+		<Content Include="$(MSBuildThisFileDirectory)..\runtimes\win10-$(Platform)\native\*.*">
+			<CopyToOutputDirectory>Always</CopyToOutputDirectory>
+		</Content>
+	</ItemGroup>
+<!--	<PropertyGroup>
+		&lt;!&ndash; Set the target framework for the package &ndash;&gt;
+		<TargetFramework>net9.0-windows</TargetFramework>
+		&lt;!&ndash; Set the platform for the package &ndash;&gt;
+		<Platform>$(Platform)</Platform>
+		<PackageId>GuardianConnectSDK</PackageId>
+	</PropertyGroup>-->
+</Project>
