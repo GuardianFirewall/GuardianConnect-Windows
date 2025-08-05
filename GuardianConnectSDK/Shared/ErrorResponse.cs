@@ -7,13 +7,15 @@ public record ErrorResponse(
     Object? ThrownExceptionArg = null,
     bool IsErrorArg = false,
     object? ResponseArg = null,
-    object? DataArg = null)
+    object? DataArg = null,
+    HttpResponseMessage? HttpResponse = null)
 {
     public bool IsError = IsErrorArg;
     public string Message = MessageArg;
     public object? ThrownException = ThrownExceptionArg;
     public object? Response = ResponseArg;
     public object? Data = DataArg;
+    public HttpResponseMessage HttpResponse = HttpResponse;
 
     public static ErrorResponse FromException(Exception exception)
     {
@@ -33,7 +35,7 @@ public record ErrorResponse(
     
     public string GetReasonPhrase()
     {
-        var resp = (HttpResponseMessage)Response!;
+        var resp = (HttpResponseMessage)Response ?? new HttpResponseMessage();
         return resp.ReasonPhrase ?? "";
     }
 
