@@ -21,6 +21,7 @@ public static class ErrorResponseExtensions
     {
         er.IsError = !response.IsSuccessStatusCode;
         er.Message = response.ReasonPhrase ?? "";
+        er.HttpResponse = response;
         return er;
     }
     

@@ -118,7 +118,7 @@
       <RuntimeLibrary>MultiThreadedDebugDLL</RuntimeLibrary>
     </ClCompile>
     <Link>
-      <AdditionalDependencies>rasapi32.lib;Ws2_32.lib;Fwpuclnt.lib;Iphlpapi.lib;advapi32.lib</AdditionalDependencies>
+      <AdditionalDependencies>rasapi32.lib;Ws2_32.lib;Fwpuclnt.lib;Iphlpapi.lib;advapi32.lib;powrprof.lib</AdditionalDependencies>
     </Link>
     <ProjectReference>
       <UseLibraryDependencyInputs>true</UseLibraryDependencyInputs>
@@ -134,7 +134,7 @@
       <RuntimeLibrary>MultiThreadedDebugDLL</RuntimeLibrary>
     </ClCompile>
     <Link>
-      <AdditionalDependencies>rasapi32.lib;Ws2_32.lib;Fwpuclnt.lib;Iphlpapi.lib;advapi32.lib</AdditionalDependencies>
+      <AdditionalDependencies>rasapi32.lib;Ws2_32.lib;Fwpuclnt.lib;Iphlpapi.lib;advapi32.lib;powrprof.lib</AdditionalDependencies>
     </Link>
     <ProjectReference>
       <UseLibraryDependencyInputs>true</UseLibraryDependencyInputs>
@@ -173,7 +173,7 @@
       <RuntimeLibrary>MultiThreadedDLL</RuntimeLibrary>
     </ClCompile>
     <Link>
-      <AdditionalDependencies>rasapi32.lib;Ws2_32.lib;Fwpuclnt.lib;Iphlpapi.lib;advapi32.lib</AdditionalDependencies>
+      <AdditionalDependencies>rasapi32.lib;Ws2_32.lib;Fwpuclnt.lib;Iphlpapi.lib;advapi32.lib;powrprof.lib</AdditionalDependencies>
     </Link>
     <ProjectReference>
       <UseLibraryDependencyInputs>true</UseLibraryDependencyInputs>
@@ -189,7 +189,7 @@
       <RuntimeLibrary>MultiThreadedDLL</RuntimeLibrary>
     </ClCompile>
     <Link>
-      <AdditionalDependencies>rasapi32.lib;Ws2_32.lib;Fwpuclnt.lib;Iphlpapi.lib;advapi32.lib</AdditionalDependencies>
+      <AdditionalDependencies>rasapi32.lib;Ws2_32.lib;Fwpuclnt.lib;Iphlpapi.lib;advapi32.lib;powrprof.lib</AdditionalDependencies>
       <ShowProgress>LinkVerbose</ShowProgress>
     </Link>
     <ProjectReference>

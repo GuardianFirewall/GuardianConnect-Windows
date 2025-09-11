@@ -70,21 +70,24 @@ public class GRDGateway
 
     /// endpoint: /vpnsrv/api/server-status
     /// hits the endpoint for the current VPN host to check if a VPN connection can be established
-    internal async Task<ErrorResponse> GetServerStatus()
+    internal async Task<ErrorResponse> GetServerStatus(string hostOverride, bool clientCall = false)
     {
+        var vpnHost = hostOverride;
         ErrorResponse errorResponse = new ErrorResponse();
         HttpResponseMessage response = new HttpResponseMessage();
-        // CONN#12
-        Log.Information("CONN#12");
+        Log.Information(
+            "In GetServerStatus. Called from Guardian Firewall "
+            + (clientCall ? "Client CONN#12" : "Service Power Resume"));
 
-        if (CanMakeApiRequests == false)
+        if (clientCall && CanMakeApiRequests == false)
         {
             HttpResponseMessage errorMessage = new HttpResponseMessage(HttpStatusCode.ServiceUnavailable);
             errorResponse.SetResponse(errorMessage).SetErrorMessage("Can not make API requests at this time.");
             return errorResponse;
         }
 
-        Uri reqUri = new Uri($"https://{BaseHostName}/vpnsrv/api/server-status");
+        Log.Information($"GetServerStatus: Making status call to host {vpnHost} ...");
+        Uri reqUri = new Uri($"https://{vpnHost}/vpnsrv/api/server-status");
         HttpRequestMessage request = new HttpRequestMessage(HttpMethod.Get, reqUri);
 
         try
@@ -93,12 +96,33 @@ public class GRDGateway
         }
         catch (Exception e)
         {
+            // Let's be a little quiet if calling from Guardian Firewall Service - that's only
+            // done during Power Resume for polling the network stack readiness. We don't want
+            // to flood the log with Exception stacks when we know we're looping on failure until
+            // TCP/IP network stack is settled.
+            
+            if (clientCall) Log.Error(e, "Exception thrown in GetServerStatus on server status");
             errorResponse.SetException(e);
+            return errorResponse;
         }
 
         errorResponse.SetResponse(response);
+        Log.Information($"GetServerStatus: returning response: {errorResponse.Message}");
         return errorResponse;
     }
+
+    /// endpoint: /vpnsrv/api/server-status
+    /// hits the endpoint for the current VPN host to check if a VPN connection can be established
+    /// This signature of method uses host from main credentials in GRDVPNHelper
+    /// and calls dual-use (service/client) version that takes host parameter
+    internal async Task<ErrorResponse> GetServerStatus()
+    {
+        var vpnHost = ApiHostname;
+        var t = await GetServerStatus(vpnHost, true);
+
+        return t;
+    }
+
 
     #region v1.3 APIs
 

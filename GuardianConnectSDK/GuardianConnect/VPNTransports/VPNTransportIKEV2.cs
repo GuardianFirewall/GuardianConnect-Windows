@@ -76,19 +76,25 @@ public class VPNTransportIKEV2 :ITransportProvider
         vpnTransportIkev2.StopVPNTunnel(entryName);
     }
     
-    public static bool PowerResumeVPNConnection()
+    public static ErrorResponse PowerResumeVPNConnection()
     {
         var vpnTransportIkev2 = new VPNTransportIKEV2();
-        var result = vpnTransportIkev2.StartVPNTunnelWithOptions(VpnResumeParameters).Result;
+// TJE - don't do this - we already have phonebook entry created. Just MakeTheCall
+//        var result = vpnTransportIkev2.StartVPNTunnelWithOptions(VpnResumeParameters).Result;
+        var userName = (string)VpnResumeParameters["eapUser"];
+        var password = (string)VpnResumeParameters["eapPassword"];
 
-        return !result.IsError;
+        var entryName = (string)VpnResumeParameters["PhonebookEntryName"];
+        var result = vpnTransportIkev2.ConnectToVpnLongRunning(entryName, userName, password);
+
+        return result;
     }
     
     public virtual Task<ErrorResponse> StartVPNTunnelWithOptions(Dictionary<string, object> options)
     {
         VpnResumeParameters = options;
         
-        Task t = new Task<ErrorResponse>(() =>
+        Task<ErrorResponse> t = new Task<ErrorResponse>(() =>
         {
             Log.Information("StartVPNTunnelWithOptions: Evaluating vpn connection parameters...");
             foreach (string key in options.Keys)
@@ -116,7 +122,9 @@ public class VPNTransportIKEV2 :ITransportProvider
             }
 
             // TJE - TODO: Add proper error reporting, bubble-up/handling
-            ConnectToVpnLongRunning(entryName, creds.UserName, creds.Password);
+            ErrorResponse connectionCallResult = ConnectToVpnLongRunning(entryName, creds.UserName, creds.Password);
+
+            if (connectionCallResult.IsError) return connectionCallResult;
             
             // Save off the calling parameters in case we reboot while connected
             var vpnResumeParameters = JsonConvert.SerializeObject(VpnResumeParameters);
@@ -127,7 +135,7 @@ public class VPNTransportIKEV2 :ITransportProvider
             return new ErrorResponse();
         });
         t.Start();
-        return Task.FromResult(new ErrorResponse());
+        return t;
     }
 
     // Called from the IService WCF entry point
@@ -142,15 +150,29 @@ public class VPNTransportIKEV2 :ITransportProvider
         throw new NotImplementedException();
     }
 
-    public void ConnectToVpnLongRunning(string entryName, string tempUser, string tempPassword)
+    public ErrorResponse ConnectToVpnLongRunning(string entryName, string tempUser, string tempPassword)
     {
-        var t = new Task(() =>
+        var t = new Task<ErrorResponse>(() =>
         {
+            var errorResult = new ErrorResponse();
             Log.Information("VPNTransportIKEV2.ConnectoToVpnLongRunning(): Connecting...");
-            ConnectionRoutines.MakeTheCall(null, entryName);
-            NotificationHandling.StartConnectionStateWatcher();
+            var rasDialRetVal = ConnectionRoutines.MakeTheCall(null, entryName);
+            if (rasDialRetVal == 0) // no premature errors from bad calling data/conventions or state of network/RRAS subsystem
+            {
+                NotificationHandling.StartConnectionStateWatcher();
+                errorResult.Message = "VPN Connection Successful!";
+            }
+            else
+            {
+                errorResult.SetData(rasDialRetVal.ToString());
+                errorResult.IsError = true;
+                errorResult.Message = $"An error occurred when making RASDial VPN Connection call. Return value is  {rasDialRetVal}";
+            }
+            return errorResult;
         });
         t.Start();
+
+        return t.Result;
     }
 
     public void StartMonitoringTask()
@@ -162,7 +184,6 @@ public class VPNTransportIKEV2 :ITransportProvider
     {
         while (!shuttingDown)
         {
-            Debug.Write($"[{DateTime.Now:MM/dd/yyyy hh:mm:ss tt]} Polling Task active. ");
             Log.Information("VPNTransportIKEV2.PollConnectionState(): Waiting on state change...");
             var succeeded = EventWaitHandle.TryOpenExisting(Common.VPNSTATECHANGE_EVT_NAME, out EventWaitHandle? VPNStateChangeEventHandle);
             if (!succeeded)
@@ -172,9 +193,10 @@ public class VPNTransportIKEV2 :ITransportProvider
             }
 
             VPNStateChangeEventHandle?.WaitOne(-1);
-            Log.Information($"UI.GCP.Initialize(): woke from ConnStateChange.");
+            Log.Information($"PollConnectionState(): woke from ConnStateChange.");
             var cs = NotificationHandling.GetConnectionState();
             var cs2 = GetCurrentVPNState();
+            // TJE 080125: TODO: FIND AND FIX THIS DISCREPANCY!!!!!! DON'T USE TWO - SHED THE WRONG ONE!!!
             Log.Information($"PollConnectionState: [NoficationHandling.GetConnectionState] = {cs}. [GetCurrentVPNState] = {cs2}");
             switch (cs)
             {

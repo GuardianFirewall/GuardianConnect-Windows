@@ -38,6 +38,10 @@ public class Common
         PBT_POWERSETTINGCHANGE = 32787  //  (0x8013)
     }
 
+    public const string kServicePowerResumeReconnectAttempts = "ServicePowerResumeAttempts";
+    public const string DefaultPowerResumeReconnectAttempts = "10";
+    public const string kPowerResumeReconnectWatcherTries = "ClientPowerResumeWatcherTries";
+    
     public const string kAppNeedsSelfRepair = @"guardianNeedsSelfRepair";
     public const string kWhetherToSpawnUpdateChecker = "StartUpdateChecker";
     public const string kWhetherLoggingCurrentlyOn = "WhetherLoggingCurrentlyOn";

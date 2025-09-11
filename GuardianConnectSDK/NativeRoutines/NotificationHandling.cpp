@@ -3,6 +3,9 @@
 
 #include "ConnectionRoutines.h"
 #include "PrintRoutines.h"
+#include <powerbase.h>
+#include <powrprof.h>
+#include <powersetting.h>
 
 namespace NativeRoutines
 {
@@ -11,6 +14,7 @@ namespace NativeRoutines
     Utility::CheckConnectionResult CurrentConnectionState;
     static HANDLE HRasConnState = NULL;
     HANDLE HandleOfWaiterThread;
+    HPOWERNOTIFY g_hPowerNotify = NULL; // Store the registration handle
 
     void NotificationHandling::StartConnectionStateWatcher()
     {
@@ -181,10 +185,67 @@ namespace NativeRoutines
                 gcnew array<Object^> {dwLastError}));
         }
 #else
-        PrintRoutines::Output("WaiterThread: Post-wait fallthrough for RasConnState, calling SetVPNConnnectionChangeEvent() to prime event...");
-        SetVPNConnectionChangeEvent();
+        PrintRoutines::Output("WaiterThread: Post-wait fallthrough for RasConnState, calling ResetVPNConnnectionChangeEvent() to prime event...");
+        ResetVPNConnectionChangeEvent();
 #endif
         
         PrintRoutines::Output("Connection Event Waiter thread now exiting...");
+    }
+
+    DWORD NotificationHandling::RegisterForPowerEvents()
+    {
+        PrintRoutines::Output("RegisterForPowerEvents()");
+
+        
+        // Register for suspend/resume notifications
+        DEVICE_NOTIFY_SUBSCRIBE_PARAMETERS params;
+        params.Callback = (PDEVICE_NOTIFY_CALLBACK_ROUTINE)DeviceNotifyCallbackRoutine;
+        params.Context = NULL; // Optional context data
+
+        DWORD result = PowerRegisterSuspendResumeNotification(
+            DEVICE_NOTIFY_CALLBACK,
+            &params,
+            &g_hPowerNotify
+        );
+
+        if (result != ERROR_SUCCESS) {
+            // Handle error (e.g., log it)
+            PrintRoutines::Output("RegisterForPowerEvents(): PowerRegisterSuspendResumeNotification failed!");
+        }
+        return result;
+    }
+
+    ULONG WINAPI NotificationHandling::DeviceNotifyCallbackRoutine(
+    PVOID Context,
+    ULONG Type,
+    PVOID Setting ) {
+        // Handle the power event based on 'Type'
+        switch (Type) {
+        case PBT_APMSUSPEND:
+            // System is suspending
+            PrintRoutines::Output("************* PowerEvents - DeviceNotifyCallback: System is suspending...");
+            // Perform actions before suspend (e.g., save state)
+            break;
+        case PBT_APMRESUMESUSPEND:
+            // System is resuming from suspend
+            PrintRoutines::Output("************* PowerEvents - DeviceNotifyCallback: System is resuming from suspend...");
+            // Perform actions after resume (e.g., restore state)
+            break;
+        case PBT_APMRESUMEAUTOMATIC:
+            // System is resuming automatically (e.g., after a brief sleep)
+            PrintRoutines::Output("************* PowerEvents - DeviceNotifyCallback: System is resuming automatically ...");
+            break;
+            // Add other relevant power events if needed
+        }
+        return ERROR_SUCCESS; // Important to return ERROR_SUCCESS
+    }
+
+    void WINAPI NotificationHandling::UnregisterFromPowerNotifications()
+    {
+        if (g_hPowerNotify != NULL) {
+            PrintRoutines::Output("UnregisterFromPowerNotifications()");
+            PowerUnregisterSuspendResumeNotification(g_hPowerNotify);
+            g_hPowerNotify = NULL;
+        }
     }
 }

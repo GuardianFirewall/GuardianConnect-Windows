@@ -2,3 +2,4 @@
 
 [assembly: InternalsVisibleTo("KeychainDPAPIRoundtripTest")]
 [assembly: InternalsVisibleTo("BasicRequrementsTests")]
+[assembly: InternalsVisibleTo("GuardianFirewallService")]

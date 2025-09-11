@@ -23,7 +23,7 @@ public class Startup
 
         Log.Information("Startup: Adding HostedService ClientPipeService ...");
         services.AddHostedService<ClientPipeService>();
-
+        
         Log.Information("========= Leaving Startup.ConfigureServices...");
     }
 }
