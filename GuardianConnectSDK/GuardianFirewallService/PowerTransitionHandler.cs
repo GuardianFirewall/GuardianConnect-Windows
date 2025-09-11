@@ -9,6 +9,7 @@ using Microsoft.Win32;
 using NativeRoutines;
 using Newtonsoft.Json;
 using System.Management;
+using System.Net.NetworkInformation;
 
 namespace GuardianFirewallService;
 
@@ -28,10 +29,34 @@ public static class PowerTransitionHandler
     internal static void SetupPowerTransitionHandler()
     {
         SystemEvents.PowerModeChanged += SystemEventsOnPowerModeChanged;
+        NetworkChange.NetworkAvailabilityChanged += NetworkChangeOnNetworkAvailabilityChanged;
         PowerTransitionMonitor.RegisterForPowerNotifications(PowerChangeNotifyCallbackRoutine);
         NotificationHandling.RegisterForPowerEvents();
         InitPowerEvents();
 
+    }
+
+    private static void NetworkChangeOnNetworkAvailabilityChanged(object? sender, NetworkAvailabilityEventArgs e)
+    {
+        // Check network availability.
+        // If unavailable and we've already set Suspend mode (handled), then ignore, else set Suspend and do PerformSuspend...
+        // If available and we were already in Resume or Running, then ignore, else set Resume and do PerformResume...
+
+        if (e.IsAvailable)
+        {
+            if (CurrentPowerTransitionState == Common.PowerTransitionStates.Running
+                || CurrentPowerTransitionState == Common.PowerTransitionStates.Resume)
+                return;
+            CurrentPowerTransitionState = Common.PowerTransitionStates.Resume;
+            PerformResumeActions();    
+        }
+        else
+        {
+            if (!e.IsAvailable && CurrentPowerTransitionState == Common.PowerTransitionStates.Suspend)
+                return;
+            CurrentPowerTransitionState = Common.PowerTransitionStates.Suspend;
+            PerformSuspendActions();
+        }
     }
 
     private static uint PowerChangeNotifyCallbackRoutine(IntPtr Context, uint powerNotificationType, IntPtr Setting)
