@@ -184,7 +184,6 @@ public class VPNTransportIKEV2 :ITransportProvider
     {
         while (!shuttingDown)
         {
-            Debug.Write($"[{DateTime.Now:MM/dd/yyyy hh:mm:ss tt]} Polling Task active. ");
             Log.Information("VPNTransportIKEV2.PollConnectionState(): Waiting on state change...");
             var succeeded = EventWaitHandle.TryOpenExisting(Common.VPNSTATECHANGE_EVT_NAME, out EventWaitHandle? VPNStateChangeEventHandle);
             if (!succeeded)
