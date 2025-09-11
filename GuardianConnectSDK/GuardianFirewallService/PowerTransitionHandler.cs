@@ -6,33 +6,43 @@ using GuardianConnect.Shared.Extensions;
 using GuardianConnect.VPNTransports;
 using Serilog;
 using Microsoft.Win32;
+using NativeRoutines;
 using Newtonsoft.Json;
+using System.Management;
 
 namespace GuardianFirewallService;
 
 public static class PowerTransitionHandler
 {
     private static Common.PowerTransitionStates CurrentPowerTransitionState = Common.PowerTransitionStates.Running;
-    private static ITransportProvider.VPNProviderStatus VPNStatusAtSuspendTime = ITransportProvider.VPNProviderStatus.VPNStatusInvalid;
+
+    private static ITransportProvider.VPNProviderStatus VPNStatusAtSuspendTime =
+        ITransportProvider.VPNProviderStatus.VPNStatusInvalid;
 
     internal static bool ConnectedAtSuspendTime() =>
         VPNStatusAtSuspendTime == ITransportProvider.VPNProviderStatus.VPNStatusConnected;
 
-    internal static void ResetVpnStatusAtSuspendTime() => VPNStatusAtSuspendTime = ITransportProvider.VPNProviderStatus.VPNStatusInvalid;
+    internal static void ResetVpnStatusAtSuspendTime() =>
+        VPNStatusAtSuspendTime = ITransportProvider.VPNProviderStatus.VPNStatusInvalid;
 
     internal static void SetupPowerTransitionHandler()
     {
         SystemEvents.PowerModeChanged += SystemEventsOnPowerModeChanged;
         PowerTransitionMonitor.RegisterForPowerNotifications(PowerChangeNotifyCallbackRoutine);
+        NotificationHandling.RegisterForPowerEvents();
+        InitPowerEvents();
+
     }
-    
+
     private static uint PowerChangeNotifyCallbackRoutine(IntPtr Context, uint powerNotificationType, IntPtr Setting)
     {
         int settingValue = Setting.ToInt32();
         int contextValue = Context.ToInt32();
-        Common.PowerNotificationTypes incomingPowerNotificationType = (Common.PowerNotificationTypes)Enum.ToObject(typeof(Common.PowerNotificationTypes), powerNotificationType);
-        Log.Information($"************** PowerChangeNotifyCallbackRoutine - powerNotificationType = {incomingPowerNotificationType}, Context={contextValue}, Setting={settingValue}");
-        
+        Common.PowerNotificationTypes incomingPowerNotificationType =
+            (Common.PowerNotificationTypes)Enum.ToObject(typeof(Common.PowerNotificationTypes), powerNotificationType);
+        Log.Information(
+            $"************** PowerChangeNotifyCallbackRoutine - powerNotificationType = {incomingPowerNotificationType}, Context={contextValue}, Setting={settingValue}");
+
         // Do something per notification
         switch (incomingPowerNotificationType)
         {
@@ -55,32 +65,39 @@ public static class PowerTransitionHandler
         }
 
         return 0;
-    } 
-    
-    
+    }
+
+
     private static void SystemEventsOnPowerModeChanged(object sender, PowerModeChangedEventArgs e)
     {
         switch (e.Mode)
         {
             case PowerModes.Suspend:
-                Log.Information("*************** SystemEventsOnPowerModeChanged: SYSTEM IS SUSPENDING! - WE WILL SUSPEND ANY BACKGROUND TASKS.");
+                Log.Information(
+                    "*************** SystemEventsOnPowerModeChanged: SYSTEM IS SUSPENDING! - WE WILL SUSPEND ANY BACKGROUND TASKS.");
                 if (CurrentPowerTransitionState == Common.PowerTransitionStates.Running)
                 {
                     CurrentPowerTransitionState = Common.PowerTransitionStates.Suspend;
                     PerformSuspendActions();
                 }
+
                 break;
             case PowerModes.Resume:
-                Log.Information("*************** SystemEventsOnPowerModeChanged: SYSTEM IS RESUMING! - WE WILL RESUME ANY BACKGROUND TASKS.");
+                Log.Information(
+                    "*************** SystemEventsOnPowerModeChanged: SYSTEM IS RESUMING! - WE WILL RESUME ANY BACKGROUND TASKS.");
                 if (CurrentPowerTransitionState == Common.PowerTransitionStates.Suspend)
                 {
                     CurrentPowerTransitionState = Common.PowerTransitionStates.Resume;
                     PerformResumeActions();
                 }
+
                 break;
+// TJE 082025: This is a Battery/AC state change - not going to log this for now - too noisy on laptops
+//#if TRACKINGTHIS
             case PowerModes.StatusChange:
-                Log.Information("*************** SystemEventsOnPowerModeChanged: SYSTEM HAS POWER STATUS CHANGE!!");
+                Log.Verbose("*************** SystemEventsOnPowerModeChanged: SYSTEM HAS POWER STATUS CHANGE!!");
                 break;
+//#endif
         }
     }
 
@@ -111,20 +128,24 @@ public static class PowerTransitionHandler
             var defaultRetries = Common.DefaultPowerResumeReconnectAttempts;
             var SavedResumeParemeters =
                 RegistrySettings.RetrieveGuardianUserSettings(Common.kVpnCallParametersForReboot);
-            var VpnResumeParameters = JsonConvert.DeserializeObject(SavedResumeParemeters, typeof(Dictionary<string, object>)) as Dictionary<string, object>;
-            
+            var VpnResumeParameters =
+                JsonConvert.DeserializeObject(SavedResumeParemeters, typeof(Dictionary<string, object>)) as
+                    Dictionary<string, object>;
+
             var host = (string)VpnResumeParameters["hostName"];
             Log.Information("************** PerformResumeActions - VPN WAS CONNECTED AT SUSPENSION.");
-            Log.Information( $"************** Check network stack readiness by attempting a status check of the vpn host '{host}");
+            Log.Information(
+                $"************** Check network stack readiness by attempting a status check of the vpn host '{host}");
             var countValue = RegistrySettings.RetrieveGuardianUserSettings(Common.kServicePowerResumeReconnectAttempts);
             if (string.IsNullOrEmpty(countValue)) countValue = defaultRetries;
             int maxRetriesCount = int.Parse(countValue);
             int readinessCheckCount = maxRetriesCount;
-            
+
             var header = "PerformResumeActions (waiting for host availability): GetServerStatus returned:";
             do
             {
-                Log.Information($"Calling status of host '{host}' to verify if network is ready - retry # {maxRetriesCount - --readinessCheckCount}");
+                Log.Information(
+                    $"Calling status of host '{host}' to verify if network is ready - retry # {maxRetriesCount - --readinessCheckCount}");
                 GRDGateway gw = new GRDGateway();
                 errorResponse = gw.GetServerStatus(host).Result;
                 Log.Information($"{header}: errorResponse from GetServerStatus: {errorResponse}");
@@ -134,24 +155,67 @@ public static class PowerTransitionHandler
                         $"************** PerformResumeActions - NO error returned from GetServerStatus. Response message = '{errorResponse.Message}. StatusCode={errorResponse.HttpResponse.StatusCode}");
                     break; // ok - not an error - so then let's break and try to connect
                 }
-                
+
                 Task.Delay(5000).Wait();
             } while (--readinessCheckCount != 0);
-            
+
             // let's fall through and see if we can connect anyway
             // Let's reconnect
             int connectionAttemptCount = maxRetriesCount;
             do
             {
-                Log.Information($" Calling VPNTransportIKEV2.PowerResumeVPNConnection... attempt #{maxRetriesCount - --connectionAttemptCount}");
+                Log.Information(
+                    $" Calling VPNTransportIKEV2.PowerResumeVPNConnection... attempt #{maxRetriesCount - --connectionAttemptCount}");
                 errorResponse = VPNTransportIKEV2.PowerResumeVPNConnection();
                 if (errorResponse.IsError) Task.Delay(5000).Wait();
-            } while (connectionAttemptCount != 0 &&  errorResponse.IsError);
+            } while (connectionAttemptCount != 0 && errorResponse.IsError);
+
             Log.Information(errorResponse.IsError
                 ? "**************** PerformResumeActions failed!"
-            : "**************** PerformResumeActions successful!");
+                : "**************** PerformResumeActions successful!");
         }
 
         CurrentPowerTransitionState = Common.PowerTransitionStates.Running;
     }
+
+    #region USEWMI
+    private static ManagementEventWatcher managementEventWatcher;
+
+    private static readonly Dictionary<string, string> powerValues = new Dictionary<string, string>
+    {
+        { "4", "Entering Suspend" },
+        { "7", "Resume from Suspend" },
+        { "10", "Power Status Change" },
+        { "11", "OEM Event" },
+        { "18", "Resume Automatic" }
+    };
+
+    public static void InitPowerEvents()
+    {
+        var q = new WqlEventQuery();
+        var scope = new ManagementScope("root\\CIMV2");
+
+        q.EventClassName = "Win32_PowerManagementEvent";
+        managementEventWatcher = new ManagementEventWatcher(scope, q);
+        managementEventWatcher.EventArrived += PowerEventArrive;
+        managementEventWatcher.Start();
+    }
+
+    private static void PowerEventArrive(object sender, EventArrivedEventArgs e)
+    {
+        foreach (PropertyData pd in e.NewEvent.Properties)
+        {
+            if (pd == null || pd.Value == null) continue;
+            var name = powerValues.ContainsKey(pd.Value.ToString())
+                ? powerValues[pd.Value.ToString()]
+                : pd.Value.ToString();
+            Log.Information("PowerEvent:" + name);
+        }
+    }
+
+    public static void Stop()
+    {
+        managementEventWatcher.Stop();
+    }
+    #endregion USEWMI
 }

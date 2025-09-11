@@ -1,5 +1,6 @@
 ﻿using GuardianConnect.Shared;
 using Microsoft.Extensions.Hosting;
+using NativeRoutines;
 
 namespace GuardianFirewallService
 {
@@ -11,6 +12,8 @@ namespace GuardianFirewallService
         {
 
             Common.Logger.Information("In ServiceManager's ExecuteAsync()...");
+
+            NotificationHandling.RegisterForPowerEvents();
             
             var vpnSvc = new VpnManagerService();
             var clientSvc = new ClientPipeService();
@@ -34,7 +37,8 @@ namespace GuardianFirewallService
         public Task StopAsync(CancellationToken cancellationToken)
         {
             Common.Logger.Information("In ServiceManager's StopAsync()...");
-            throw new NotImplementedException();
+            //throw new NotImplementedException();
+            return Task.CompletedTask;
         }
     }
 }

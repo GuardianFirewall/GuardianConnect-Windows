@@ -28,6 +28,7 @@
         <PackageReference Include="Microsoft.Extensions.DependencyInjection" Version="9.0.3" />
         <PackageReference Include="Microsoft.Extensions.Hosting.WindowsServices" Version="9.0.3" />
         <PackageReference Include="Microsoft.Win32.SystemEvents" Version="9.0.3" />
+        <PackageReference Include="System.Management" Version="9.0.8" />
         <PackageReference Include="System.Threading.AccessControl" Version="9.0.3" />
     </ItemGroup>
 	<!--

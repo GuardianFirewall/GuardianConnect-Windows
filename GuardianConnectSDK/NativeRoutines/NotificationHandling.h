@@ -1,6 +1,7 @@
 #pragma once
 #include "NativeRoutines.h"
 #include "Utility.h"
+#include <powrprof.h>
 
 namespace NativeRoutines
 {
@@ -17,9 +18,12 @@ namespace NativeRoutines
         static HANDLE NotificationHandling::VPNClientNotifierHandle;
         static String^ lNameOfEventForVPNStateListeners = L"GRDRASCONNLISTENEREVENT";
 
+        static DEVICE_NOTIFY_CALLBACK_ROUTINE DeviceNotifyCallbackRoutine;
+        static DWORD RegisterForPowerEvents();
+        static void UnregisterFromPowerNotifications();
+        
     internal:
         static HRASCONN RasConnectionHandle;
         static void WaiterThread();
-        
     };
 }

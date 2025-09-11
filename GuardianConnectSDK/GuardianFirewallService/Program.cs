@@ -24,5 +24,8 @@ var hb = Host.CreateDefaultBuilder(args);
 hb.UseWindowsService();
 hb.ConfigureServices((services) => new Startup().ConfigureServices(services));
 
+// DO WE NEED THIS??
+PowerHandlerService powerHandlerService = new PowerHandlerService();
+
 var host = hb.Build();
 await host.RunAsync();
