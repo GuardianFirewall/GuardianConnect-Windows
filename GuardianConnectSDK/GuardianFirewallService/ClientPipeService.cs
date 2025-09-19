@@ -195,6 +195,7 @@ public class ClientPipeService : BackgroundService
                             var didItStart = cmdDispatcher.StartVPNConnection(dictObject);
                             Log.Information($"ClientPipeService[{threadId}]: Exiting StartVPNConnection");
                             var startResponseJson = JsonConvert.SerializeObject(didItStart);
+                            Log.Information($"ClientPipeService.StartVPNConnection - string is '{startResponseJson}'");
                             ss.WriteString(startResponseJson);
                             break;
                         case IGuardianNPContract.NPCommands.DisconnectVPNConnection:
