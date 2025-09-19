@@ -193,8 +193,9 @@ public class ClientPipeService : BackgroundService
                             var dictSerial = cmdPayload;
                             var dictObject = JsonConvert.DeserializeObject<Dictionary<string, object>>(dictSerial);
                             var didItStart = cmdDispatcher.StartVPNConnection(dictObject);
-                            Log.Information($"ClientPipeService[{threadId}]: Performing StartVPNConnection");
-                            ss.WriteString(didItStart.ToString());
+                            Log.Information($"ClientPipeService[{threadId}]: Exiting StartVPNConnection");
+                            var startResponseJson = JsonConvert.SerializeObject(didItStart);
+                            ss.WriteString(startResponseJson);
                             break;
                         case IGuardianNPContract.NPCommands.DisconnectVPNConnection:
                             Log.Information($"ClientPipeService[{threadId}]: Performing DisconnectVPNConnection");
