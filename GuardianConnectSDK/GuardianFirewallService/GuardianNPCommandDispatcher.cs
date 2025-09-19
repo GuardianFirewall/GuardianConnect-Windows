@@ -28,13 +28,13 @@ public class GuardianNPCommandDispatcher :IGuardianNPContract
         return composite;
     }
 
-    public bool StartVPNConnection(Dictionary<string, object> protocolRequest)
+    public ErrorResponse StartVPNConnection(Dictionary<string, object> protocolRequest)
     {
         //return true;
         _vpnTransportIkev2 = new VPNTransportIKEV2();
         var result = _vpnTransportIkev2.StartVPNTunnelWithOptions(protocolRequest).Result;
 
-        return !result.IsError;
+        return result;
     }
 
     public void DisconnectVPNConnection(string entryName)

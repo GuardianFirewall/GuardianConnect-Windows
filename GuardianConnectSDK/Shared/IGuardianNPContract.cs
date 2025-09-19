@@ -53,7 +53,7 @@ public interface IGuardianNPContract
 
     CompositeType GetDataUsingDataContract(CompositeType composite);
     
-    bool StartVPNConnection(Dictionary<string, object> protocolRequest);
+    ErrorResponse StartVPNConnection(Dictionary<string, object> protocolRequest);
 
     void DisconnectVPNConnection(string entryName);
 

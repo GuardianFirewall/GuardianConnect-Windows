@@ -545,7 +545,7 @@ namespace GuardianConnect.Helpers
                 await Task.Run(() =>
                 {
                     Log.Information("Calling ClientPipe.StartVPNConnection()...");
-                    errorResponse.IsError = !ClientPipe.StartVPNConnection(vpnValues);
+                    errorResponse = ClientPipe.StartVPNConnection(vpnValues);
                     if (errorResponse.IsError)
                     {
                         Log.Error($"FAILURE to establish VPN connection. ErrorResponse = {errorResponse}");

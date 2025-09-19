@@ -22,7 +22,7 @@ public static class PowerTransitionMonitor
     
     public static void RegisterForPowerNotifications(DEVICE_NOTIFY_CALLBACK_ROUTINE callback)
     {
-        Log.Information("************** PossibleSuspendResume Fix Setup...");
+        Log.Information("************** PowerTransitionMonitor.RegisterForPowerNotifications: Registering for Power Nofitications...");
         DEVICE_NOTIFY_SUBSCRIBE_PARAMETERS dnsp = new DEVICE_NOTIFY_SUBSCRIBE_PARAMETERS();
         dnsp.Callback = callback;
 
@@ -30,7 +30,7 @@ public static class PowerTransitionMonitor
         Marshal.StructureToPtr(dnsp, pDeviceNotify, false);
         IntPtr pRegistrationHandle = IntPtr.Zero;
         uint nRet = PowerRegisterSuspendResumeNotification(DEVICE_NOTIFY_CALLBACK, pDeviceNotify, out pRegistrationHandle);
-        Log.Information($"************** PossibleFixSetup: return value from PowerRegisterSuspendResumeNotification: {nRet:X8}");
+        Log.Information($"************** PowerTransitionMonitor.RegisterForPowerNotifications: return value from PowerRegisterSuspendResumeNotification: {nRet:X8}");
         Marshal.FreeHGlobal(pDeviceNotify);
     }
 
