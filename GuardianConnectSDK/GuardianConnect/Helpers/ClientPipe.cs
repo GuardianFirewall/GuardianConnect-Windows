@@ -19,7 +19,7 @@ public static class ClientPipe
         return Instance.GetDataUsingDataContract(composite);
     }
 
-    public static bool StartVPNConnection(Dictionary<string, object> protocolRequest)
+    public static ErrorResponse StartVPNConnection(Dictionary<string, object> protocolRequest)
     {
         return Instance.StartVPNConnection(protocolRequest);
     }
@@ -106,14 +106,15 @@ public class ClientPipeImpl : IGuardianNPContract
         return value;
     }
 
-    public bool StartVPNConnection(Dictionary<string, object> protocolRequest)
+    public ErrorResponse StartVPNConnection(Dictionary<string, object> protocolRequest)
     {
         var cmdPayload = JsonConvert.SerializeObject(protocolRequest);
         var cmdString = $"{(int)IGuardianNPContract.NPCommands.StartVPNConnection}.{cmdPayload}";
         ss.WriteString(cmdString);
-        var started = ss.ReadStringAsync().Result;
+        var startedJson = ss.ReadStringAsync().Result;
+        var startedErrorResponse = JsonConvert.DeserializeObject<ErrorResponse>(startedJson);
 
-        return started.Equals("True");
+        return startedErrorResponse ?? new ErrorResponse();
     }
 
     public void DisconnectVPNConnection(string entryName)
