@@ -106,6 +106,10 @@ namespace  NativeRoutines
 
 	void VpnDnsHandler::DisconnectVPN() {
 		auto result = false;
+
+		// TODO - stop the RAS Connection Watcher Thread
+		//
+		
 		result = ConnectionRoutines::DisconnectEntry(ConnectionRoutines::ConnectedEntry);
 		if (!result) {
 			PrintRoutines::Output(Grd::FormatAString("Failed to disconnect entry:{0}. Result = {1}({2})",
@@ -202,28 +206,32 @@ namespace  NativeRoutines
 
 	void VpnDnsHandler::SubscribeForRasNotifications(HANDLE event_handle) {
 		PrintRoutines::Output(Grd::FormatAString("{0}", gcnew array<Object^> {*__func__}));
-#if NOTYET
-		if (!SubscribeRasConnectionNotification(event_handle)) {
-			PrintRoutines::Output(FormatAString("{0} "Failed to subscripbe for vpn notifications";
+//#if NOTYET
+		if (!VpnUtils::SubscribeRasConnectionNotification(event_handle)) {
+			PrintRoutines::Output(Grd::FormatAString("Failed to subscribe for vpn notifications"));
 		}
 	}
 
 	void VpnDnsHandler::StartVPNConnectionChangeMonitoring() {
-		DCHECK(!event_handle_for_vpn_);
-		DCHECK(!IsActive());
+		//DCHECK(!event_handle_for_vpn_);
+		//DCHECK(!IsActive());
 
 		event_handle_for_vpn_ = CreateEvent(NULL, false, false, NULL);
 		SubscribeForRasNotifications(event_handle_for_vpn_);
 
+#if REPLACE_THIS_WITH_EVENT_WATCHER
 		connected_disconnected_event_watcher_.StartWatchingMultipleTimes(
 			event_handle_for_vpn_, this);
+#endif
 
+#if SKIP
 		periodic_timer_.Start(FROM_HERE,
 			base::Seconds(kCheckConnectionIntervalInSeconds),
 			base::BindRepeating(&VpnDnsHandler::UpdateFiltersState,
 				weak_factory_.GetWeakPtr()));
 		UpdateFiltersState();
 #endif
+//#endif
 	}
 
 #if NEEDED

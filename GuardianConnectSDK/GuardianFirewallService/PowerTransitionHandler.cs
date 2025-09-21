@@ -15,6 +15,14 @@ namespace GuardianFirewallService;
 
 public static class PowerTransitionHandler
 {
+    private const string ast20 = "********************";
+    private const string at20 = "@@@@@@@@@@@@@@@@@@@@";
+    private const string dash20 = "--------------------";
+    private const string eql20 = "====================";
+    private const string pct20 = "%%%%%%%%%%%%%%%%%%%%";
+    private const string hash20 = "####################";
+    private const string plus20 = "++++++++++++++++++++";
+    
     private static Common.PowerTransitionStates CurrentPowerTransitionState = Common.PowerTransitionStates.Running;
 
     private static ITransportProvider.VPNProviderStatus VPNStatusAtSuspendTime =
@@ -42,19 +50,31 @@ public static class PowerTransitionHandler
         // If unavailable and we've already set Suspend mode (handled), then ignore, else set Suspend and do PerformSuspend...
         // If available and we were already in Resume or Running, then ignore, else set Resume and do PerformResume...
 
+        Log.Information($"{at20} Network availability changed to {e.IsAvailable} {at20}");
         if (e.IsAvailable)
         {
             if (CurrentPowerTransitionState == Common.PowerTransitionStates.Running
                 || CurrentPowerTransitionState == Common.PowerTransitionStates.Resume)
+            {
+                Log.Information($"{at20} CurentPowerTransitionState is already {CurrentPowerTransitionState} so ignoring NC... {at20}");
                 return;
+            }
+
             CurrentPowerTransitionState = Common.PowerTransitionStates.Resume;
+            Log.Information($"{at20} CurrentPowerTransitionState set to 'Resume' - calling PerformResumeActions... {at20}");
             PerformResumeActions();    
         }
         else
         {
-            if (!e.IsAvailable && CurrentPowerTransitionState == Common.PowerTransitionStates.Suspend)
+            if (CurrentPowerTransitionState == Common.PowerTransitionStates.Suspend)
+            {
+                Log.Information(
+                    $"{at20} Ignoring Network UNAVAILABLE event since we already have CurrentPowerTransitionState set to 'Suspend' {at20}");
                 return;
+            }
+
             CurrentPowerTransitionState = Common.PowerTransitionStates.Suspend;
+            Log.Information($"{at20} CurrentPowerTransitionState set to 'Suspend' - calling PerformSuspendActions... {at20}");
             PerformSuspendActions();
         }
     }
