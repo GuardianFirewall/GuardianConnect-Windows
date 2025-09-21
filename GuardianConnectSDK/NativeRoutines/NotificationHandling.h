@@ -16,6 +16,7 @@ namespace NativeRoutines
         static void NotificationHandling::ResetVPNConnectionChangeEvent();
         static void NotificationHandling::SetVPNConnectionChangeEvent();
         static HANDLE NotificationHandling::VPNClientNotifierHandle;
+        static void NotificationHandling::RasConnectionChangeWaiterThread(HANDLE event);
         static String^ lNameOfEventForVPNStateListeners = L"GRDRASCONNLISTENEREVENT";
 
         static DEVICE_NOTIFY_CALLBACK_ROUTINE DeviceNotifyCallbackRoutine;

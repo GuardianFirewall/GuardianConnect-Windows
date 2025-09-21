@@ -16,42 +16,50 @@ public static class ClientPipe
 
     public static IGuardianNPContract.CompositeType GetDataUsingDataContract(IGuardianNPContract.CompositeType composite)
     {
+        if (!Instance.IsConnected) Instance.OpenNamedPipe();
         return Instance.GetDataUsingDataContract(composite);
     }
 
     public static ErrorResponse StartVPNConnection(Dictionary<string, object> protocolRequest)
     {
+        if (!Instance.IsConnected) Instance.OpenNamedPipe();
         return Instance.StartVPNConnection(protocolRequest);
     }
 
     public static void DisconnectVPNConnection(string entryName)
     {
+        if (!Instance.IsConnected) Instance.OpenNamedPipe();
         Instance.DisconnectVPNConnection(entryName);
     }
 
     public static IGuardianNPContract.CurrentVPNStatus GetCurrentVpnConnectionStatus()
     {
+        if (!Instance.IsConnected) Instance.OpenNamedPipe();
         return Instance.GetCurrentVpnConnectionStatus();
     }
 
     public static async Task<string> Ping()
     {
+        if (!Instance.IsConnected) Instance.OpenNamedPipe();
         return await Instance.Ping();
     }
 
     public static void ToggleLogging(bool whetherToDeleteLogFiles)
     {
+        if (!Instance.IsConnected) Instance.OpenNamedPipe();
         Instance.ToggleLogging(whetherToDeleteLogFiles);
 
     }
 
     public static async Task<List<string>> GetServiceLogLinesAsync(int maxNumberOfLinesToGet = 200)
     {
+        if (!Instance.IsConnected) Instance.OpenNamedPipe();
         return await Instance.GetServiceLogLinesAsync(maxNumberOfLinesToGet);
     }
 
     public static void SwitchServiceLoggingLevel(Common.LoggingLevels loggingLevel)
     {
+        if (!Instance.IsConnected) Instance.OpenNamedPipe();
         Instance.SwitchServiceLoggingLevel(loggingLevel);
     }
         
@@ -62,13 +70,21 @@ public class ClientPipeImpl : IGuardianNPContract
     private static NamedPipeClientStream _clientStream = new NamedPipeClientStream("NULL");
     private static StreamString ss;
 
+    internal bool IsConnected => _clientStream.IsConnected;
+
+    internal void OpenNamedPipe(string servicePipeName = Common.kGRDServicePipeName)
+    {
+        _clientStream = new NamedPipeClientStream(".", servicePipeName, PipeDirection.InOut);
+        _clientStream.Connect(10 * 1000);
+        
+    }
+    
     internal bool Connect(string servicePipeName = Common.kGRDServicePipeName)
     {
         bool whetherPreviouslyConnectedAtSuspend = false;
         try
         {
-            _clientStream = new NamedPipeClientStream(".", servicePipeName, PipeDirection.InOut);
-            _clientStream.Connect(10 * 1000);
+            OpenNamedPipe(servicePipeName);
             ss = new StreamString(_clientStream);
             //var testAck = ss.ReadStringAsync();
             var testAck = ss.ReadString();

@@ -192,6 +192,15 @@ namespace NativeRoutines
         PrintRoutines::Output("Connection Event Waiter thread now exiting...");
     }
 
+    // Try this here - RAS Connection/Disconnection event waiter thread
+    void NotificationHandling::RasConnectionChangeWaiterThread(HANDLE event)
+    {
+        PrintRoutines::Output("RasConnectionChangeWaiterThread spawned for connection events ...");
+        DWORD dwWaitResult = WaitForSingleObject( event, INFINITE);
+        
+        PrintRoutines::Output("RasConnectionChangeWaiterThread RECEIVED NOTIFICATION OF RAS CONNECTION!");
+    }
+
     DWORD NotificationHandling::RegisterForPowerEvents()
     {
         PrintRoutines::Output("RegisterForPowerEvents()");
@@ -248,4 +257,6 @@ namespace NativeRoutines
             g_hPowerNotify = NULL;
         }
     }
+
+    // Placeholder for callback from RasConnection Notification Event
 }

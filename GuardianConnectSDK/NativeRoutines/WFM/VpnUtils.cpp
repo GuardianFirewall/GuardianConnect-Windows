@@ -438,6 +438,7 @@ namespace NativeRoutines
 		}
 		return success;
 	}
+	
 	void VpnUtils::SetFiltersInstalledFlag() {
 		String^ regValuePath = L"\\Software\\GuardianVPN";
 		String^ regFiltersPath = L"filters";
