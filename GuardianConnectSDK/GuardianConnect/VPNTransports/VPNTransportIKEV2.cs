@@ -78,6 +78,7 @@ public class VPNTransportIKEV2 :ITransportProvider
     
     public static ErrorResponse PowerResumeVPNConnection()
     {
+        Log.Information("*************** PowerResumeVPNConnection **************** - Entry...");
         var vpnTransportIkev2 = new VPNTransportIKEV2();
 // TJE - don't do this - we already have phonebook entry created. Just MakeTheCall
 //        var result = vpnTransportIkev2.StartVPNTunnelWithOptions(VpnResumeParameters).Result;
@@ -85,6 +86,7 @@ public class VPNTransportIKEV2 :ITransportProvider
         var password = (string)VpnResumeParameters["eapPassword"];
 
         var entryName = (string)VpnResumeParameters["PhonebookEntryName"];
+        Log.Information("*************** PowerResumeVPNConnection **************** - Calling ConnectToVPNLongRunning to re-establish connection...");
         var result = vpnTransportIkev2.ConnectToVpnLongRunning(entryName, userName, password);
 
         return result;
@@ -214,6 +216,7 @@ public class VPNTransportIKEV2 :ITransportProvider
                     _vpnStatus = ITransportProvider.VPNProviderStatus.VPNStatusDisconnected;
                     if (!NotificationHandling.WasDisconnectPlanned)
                     {
+                        Log.Information($"**************************** UNPLANNED DISCONNECT. CALLING PowerResumeVPNConnection() !");
                         PowerResumeVPNConnection();
                     }
                     break;
