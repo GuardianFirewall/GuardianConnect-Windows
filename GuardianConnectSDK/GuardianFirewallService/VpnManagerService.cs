@@ -33,8 +33,7 @@ public class VpnManagerService : BackgroundService
             EventWaitHandleRights.Synchronize | EventWaitHandleRights.Modify, AccessControlType.Allow);
         mSec.AddAccessRule(rule);
 
-        EventWaitHandle VPNStateChangeEventHandle =
-            new EventWaitHandle(false, EventResetMode.ManualReset, Common.VPNSTATECHANGE_EVT_NAME);
+        EventWaitHandle VPNStateChangeEventHandle = new EventWaitHandle(false, EventResetMode.ManualReset, Common.VPNEVENT_CLIENTNOTIFIER_NAME);
         VPNStateChangeEventHandle.SetAccessControl(mSec);
 
         Log.Information("Checking for active connection...");
@@ -45,7 +44,7 @@ public class VpnManagerService : BackgroundService
             // Now spawn watcher at native level so we trap CONNECT/DISCONNECT notifications
             Log.Information("VpnManagerService: Calling StartConnectionStateWatcher...");
             Log.Information($"stoppingToken.IsCancllationRequestioned = {stoppingToken.IsCancellationRequested}");
-            NotificationHandling.StartConnectionStateWatcher();
+            NotificationHandling.StartRasConnectStateWatcher();
         }
 
         vpnikeInstance.StartMonitoringTask();
@@ -53,10 +52,8 @@ public class VpnManagerService : BackgroundService
         try
         {
             var heartbeatCounter = 0;
-            var priorMessage =
-                    $"VpnService is running... Cancellation Request is {stoppingToken.IsCancellationRequested}";
-            Log.Information(
-                $"Going into while() loop. stoppingToken.IsCancllationRequestioned = {stoppingToken.IsCancellationRequested}");
+            var priorMessage = $"VpnService is running... Cancellation Request is {stoppingToken.IsCancellationRequested}";
+            Log.Information( $"Going into while() loop. stoppingToken.IsCancllationRequestioned = {stoppingToken.IsCancellationRequested}");
             while (!stoppingToken.IsCancellationRequested)
             {
                 var currentMessage =

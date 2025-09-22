@@ -10,22 +10,22 @@ namespace NativeRoutines
     public:
         static bool WasDisconnectPlanned = false;
         static String^ LastKnownConnectedEntry;
-        static void StartConnectionStateWatcher();
+        static void StartRasConnectStateWatcher();
         static Utility::CheckConnectionResult GetConnectionState();
         static DWORD WaitForVPNConnectionChange(int millis);
-        static DWORD CreateVPNConnectionChangeEvent();
-        static void NotificationHandling::ResetVPNConnectionChangeEvent();
-        static void NotificationHandling::SetVPNConnectionChangeEvent();
+        static DWORD CreateClientNotificationEvent();
+        static void NotificationHandling::ResetClientNotificationEvent();
+        static void NotificationHandling::SetClientNotificationEvent();
         static HANDLE NotificationHandling::VPNClientNotifierHandle;
-        static void NotificationHandling::RasConnectionChangeWaiterThread(HANDLE event);
+//        static void NotificationHandling::RasConnChangeWaiterThread(HANDLE event);
         static String^ lNameOfEventForVPNStateListeners = L"GRDRASCONNLISTENEREVENT";
 
-        static DEVICE_NOTIFY_CALLBACK_ROUTINE DeviceNotifyCallbackRoutine;
-        static DWORD RegisterForPowerEvents();
-        static void UnregisterFromPowerNotifications();
+//        static DEVICE_NOTIFY_CALLBACK_ROUTINE DeviceNotifyCallbackRoutine;
+//        static DWORD RegisterForPowerEvents();
+//        static void UnregisterFromPowerNotifications();
         
     internal:
         static HRASCONN RasConnectionHandle;
-        static void WaiterThread();
+        static void RasConnChangeWaiterThread();
     };
 }
