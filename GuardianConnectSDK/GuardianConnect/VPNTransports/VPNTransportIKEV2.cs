@@ -126,6 +126,8 @@ public class VPNTransportIKEV2 :ITransportProvider
 
             if (connectionCallResult.IsError) return connectionCallResult;
             
+            NotificationHandling.WasDisconnectPlanned = false;
+            
             // Save off the calling parameters in case we reboot while connected
             var vpnResumeParameters = JsonConvert.SerializeObject(VpnResumeParameters);
             RegistrySettings.UpdateGuardianUserSettings(Common.kVpnCallParametersForReboot, vpnResumeParameters);
@@ -142,6 +144,7 @@ public class VPNTransportIKEV2 :ITransportProvider
     public virtual void StopVPNTunnel(string entryName)
     {
         Log.Information($"VPNTransportIKEV2.StopVPNTunnel(): Disconnecting entry '{entryName}' ...");
+        NotificationHandling.WasDisconnectPlanned = true;
         ConnectionRoutines.DisconnectEntry(entryName);
     }
 
@@ -207,7 +210,12 @@ public class VPNTransportIKEV2 :ITransportProvider
                     _vpnStatus = ITransportProvider.VPNProviderStatus.VPNStatusConnecting;
                     break;
                 case Utility.CheckConnectionResult.DISCONNECTED:
+                    // TEST THIS - check flag if intended disconnect or not (i.e., after sleep)
                     _vpnStatus = ITransportProvider.VPNProviderStatus.VPNStatusDisconnected;
+                    if (!NotificationHandling.WasDisconnectPlanned)
+                    {
+                        PowerResumeVPNConnection();
+                    }
                     break;
                 case Utility.CheckConnectionResult.DISCONNECTING:
                     _vpnStatus = ITransportProvider.VPNProviderStatus.VPNStatusDisconnecting;

@@ -8,6 +8,7 @@ namespace NativeRoutines
     public ref class NotificationHandling
     {
     public:
+        static bool WasDisconnectPlanned = false;
         static String^ LastKnownConnectedEntry;
         static void StartConnectionStateWatcher();
         static Utility::CheckConnectionResult GetConnectionState();

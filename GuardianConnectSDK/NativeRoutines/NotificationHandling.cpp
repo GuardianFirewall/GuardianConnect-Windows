@@ -7,6 +7,8 @@
 #include <powrprof.h>
 #include <powersetting.h>
 
+#include "WFM/VpnDnsHandler.h"
+
 namespace NativeRoutines
 {
 
@@ -185,6 +187,14 @@ namespace NativeRoutines
                 gcnew array<Object^> {dwLastError}));
         }
 #else
+        if (!WasDisconnectPlanned)
+        {
+            PrintRoutines::Output("WaiterThread: Post-wait fallthrough for RasConnState, DISCONNECT WAS NOT PLANNED!!");
+            // Put Filter reset here?
+            VpnDnsHandler* vdh = new VpnDnsHandler();
+            vdh->RemoveFilters(ConnectionRoutines::ConnectedEntry);
+            SetVPNConnectionChangeEvent(); // Is this correct??
+        }
         PrintRoutines::Output("WaiterThread: Post-wait fallthrough for RasConnState, calling ResetVPNConnnectionChangeEvent() to prime event...");
         ResetVPNConnectionChangeEvent();
 #endif
