@@ -18,7 +18,7 @@ namespace NativeRoutines
     HANDLE HandleOfWaiterThread;
     HPOWERNOTIFY g_hPowerNotify = NULL; // Store the registration handle
 
-    void NotificationHandling::StartConnectionStateWatcher()
+    void NotificationHandling::StartRasConnectStateWatcher()
     {
         // Let's do check first
         HRASCONN handleToActiveConnection = ConnectionRoutines::FindAnyActiveConnection();
@@ -56,99 +56,16 @@ namespace NativeRoutines
 
         // Now spawn thread to wait
         PrintRoutines::Output("StartConnectionStateWatcher(): Spawning WaiterThread...");
-        Threading::Thread ^waiterThread = gcnew Threading::Thread(gcnew Threading::ThreadStart(WaiterThread));
+        Threading::Thread ^waiterThread = gcnew Threading::Thread(gcnew Threading::ThreadStart(RasConnChangeWaiterThread));
         waiterThread->Start();
     }
 
-    DWORD NotificationHandling::CreateVPNConnectionChangeEvent()
-    {
-        SECURITY_DESCRIPTOR secDesc;
-        bool bInitOk = InitializeSecurityDescriptor(&secDesc, SECURITY_DESCRIPTOR_REVISION);
-        PSECURITY_DESCRIPTOR pSecDesc = &secDesc;
-        PACL pDacl = NULL;
-        SetSecurityDescriptorDacl(pSecDesc, true, pDacl, false);
-        SetSecurityDescriptorSacl(pSecDesc, false, pDacl, false);
-
-        SECURITY_ATTRIBUTES secAttr;
-        LPSECURITY_ATTRIBUTES lpSecAttr = &secAttr;
-        secAttr.nLength = sizeof(secAttr);
-        secAttr.lpSecurityDescriptor = pSecDesc;
-
-
-
-        VPNClientNotifierHandle = CreateEventW(lpSecAttr, true, false, VPNSTATECHANGE_EVT_NAME);
-        if (VPNClientNotifierHandle == nullptr)
-        {
-            PrintRoutines::Output("CreateVPNConnectionChangeEvent(): CreateEventW() for listeners returned error:");
-            PrintRoutines::Output(Grd::FormatAString("Error:  {0} ...\n", gcnew array<Object^> {GetLastError()}));
-            return GetLastError();
-        }
-        ResetVPNConnectionChangeEvent(); // Just to be sure
-        return SUCCESS;
-    }
-    
-    DWORD NotificationHandling::WaitForVPNConnectionChange(int millis)
-    {
-        PrintRoutines::Output("WaitForVPNConnectionChange() Entry.");
-        PrintRoutines::Output(
-            "WaitForVPNConnectionChange() About to sit on VPNClientNotiferHandle...");
-        HANDLE localVPNClientNotifierHandle = OpenEventW(SYNCHRONIZE, true,  VPNSTATECHANGE_EVT_NAME);
-        if (localVPNClientNotifierHandle == nullptr)
-        {
-            PrintRoutines::Output("WaitForVPNConnectionChange(): OpenEventW() for listeners returned error:");
-            PrintRoutines::Output(Grd::FormatAString("Error:  {0} ...\n", gcnew array<Object^> {GetLastError()}));
-        }
-        
-        DWORD dwRet = WaitForSingleObject(localVPNClientNotifierHandle, millis);
-        if (dwRet == -1)
-        {
-            DWORD gleRet = GetLastError();
-            PrintRoutines::Output(Grd::FormatAString( "WaitForVPNConnectionChange() Error returned is {0}", gcnew array<Object^> { gleRet }));
-            PrintRoutines::PrintSystemError(gleRet);
-        }
-        PrintRoutines::Output( "WaitForVPNConnectionChange() Back from waiting.");
-
-        return dwRet;
-    }
-
-    void NotificationHandling::ResetVPNConnectionChangeEvent()
-    {
-        PrintRoutines::Output("Resetting VPNConnectionChangeEvent");
-
-        HANDLE localH = OpenEventW(SYNCHRONIZE | EVENT_MODIFY_STATE, true,  VPNSTATECHANGE_EVT_NAME);
-        if (localH == NULL)
-        {
-            PrintRoutines::Output("ResetVPNConnectionChangeEvent(): OpenEventW() for listeners returned error:");
-            PrintRoutines::Output(Grd::FormatAString("Error:  {0} ...\n", gcnew array<Object^> {GetLastError()}));
-        }
-        
-        ResetEvent(localH);
-    }
-
-    void NotificationHandling::SetVPNConnectionChangeEvent()
-    {
-        PrintRoutines::Output("Setting VPNConnectionChangeEvent");
-        HANDLE localH = OpenEventW(SYNCHRONIZE | EVENT_MODIFY_STATE, true,  VPNSTATECHANGE_EVT_NAME);
-        if (localH == NULL)
-        {
-            PrintRoutines::Output("SetVPNConnectionChangeEvent(): OpenEventW() for listeners returned error:");
-            PrintRoutines::Output(Grd::FormatAString("Error:  {0} ...\n", gcnew array<Object^> {GetLastError()}));
-        }
-        
-        SetEvent(localH);
-    }
-
-    Utility::CheckConnectionResult NotificationHandling::GetConnectionState()
-    {
-        return CurrentConnectionState;
-    }
-
-    void NotificationHandling::WaiterThread()
+    void NotificationHandling::RasConnChangeWaiterThread()
     {
         PrintRoutines::Output("WaiterThread spawned for connection events ...");
         PrintRoutines::Output("WaiterThread: Going to CreateEvent for listeners to sit on...");
         
-        VPNClientNotifierHandle = OpenEventW(SYNCHRONIZE, true,  VPNSTATECHANGE_EVT_NAME);
+        VPNClientNotifierHandle = OpenEventW(SYNCHRONIZE, true,  VPNEVENT_CLIENTNOTIFIER_NAME);
         if (VPNClientNotifierHandle == NULL)
         {
             PrintRoutines::Output("WaiterThread(): OpenEventW() for listeners returned error:");
@@ -195,79 +112,98 @@ namespace NativeRoutines
             PrintRoutines::Output("WaiterThread: Post-wait fallthrough for RasConnState: REMOVING WFP FILTERS!!");
             vdh->RemoveFilters(ConnectionRoutines::ConnectedEntry);
             PrintRoutines::Output("WaiterThread: Post-wait fallthrough for RasConnState: SETTING VPNConnectionChangeEvent !!");
-            SetVPNConnectionChangeEvent(); // Is this correct??
+            SetClientNotificationEvent(); // Is this correct??
         }
         PrintRoutines::Output("WaiterThread: Post-wait fallthrough for RasConnState, calling ResetVPNConnnectionChangeEvent() to prime event...");
-        ResetVPNConnectionChangeEvent();
+        ResetClientNotificationEvent();
 #endif
         
         PrintRoutines::Output("Connection Event Waiter thread now exiting...");
     }
+    
+    // --------------- Section for Notifying client of a change of the state of a VPN connection
 
-    // Try this here - RAS Connection/Disconnection event waiter thread
-    void NotificationHandling::RasConnectionChangeWaiterThread(HANDLE event)
+    DWORD NotificationHandling::CreateClientNotificationEvent()
     {
-        PrintRoutines::Output("RasConnectionChangeWaiterThread spawned for connection events ...");
-        DWORD dwWaitResult = WaitForSingleObject( event, INFINITE);
+        SECURITY_DESCRIPTOR secDesc;
+        bool bInitOk = InitializeSecurityDescriptor(&secDesc, SECURITY_DESCRIPTOR_REVISION);
+        PSECURITY_DESCRIPTOR pSecDesc = &secDesc;
+        PACL pDacl = NULL;
+        SetSecurityDescriptorDacl(pSecDesc, true, pDacl, false);
+        SetSecurityDescriptorSacl(pSecDesc, false, pDacl, false);
+
+        SECURITY_ATTRIBUTES secAttr;
+        LPSECURITY_ATTRIBUTES lpSecAttr = &secAttr;
+        secAttr.nLength = sizeof(secAttr);
+        secAttr.lpSecurityDescriptor = pSecDesc;
+
+
+
+        VPNClientNotifierHandle = CreateEventW(lpSecAttr, true, false, VPNEVENT_CLIENTNOTIFIER_NAME);
+        if (VPNClientNotifierHandle == nullptr)
+        {
+            PrintRoutines::Output("CreateVPNConnectionChangeEvent(): CreateEventW() for listeners returned error:");
+            PrintRoutines::Output(Grd::FormatAString("Error:  {0} ...\n", gcnew array<Object^> {GetLastError()}));
+            return GetLastError();
+        }
+        ResetClientNotificationEvent(); // Just to be sure
+        return SUCCESS;
+    }
+    
+    DWORD NotificationHandling::WaitForVPNConnectionChange(int millis)
+    {
+        PrintRoutines::Output("WaitForVPNConnectionChange() Entry.");
+        PrintRoutines::Output(
+            "WaitForVPNConnectionChange() About to sit on VPNClientNotiferHandle...");
+        HANDLE localVPNClientNotifierHandle = OpenEventW(SYNCHRONIZE, true,  VPNEVENT_CLIENTNOTIFIER_NAME);
+        if (localVPNClientNotifierHandle == nullptr)
+        {
+            PrintRoutines::Output("WaitForVPNConnectionChange(): OpenEventW() for listeners returned error:");
+            PrintRoutines::Output(Grd::FormatAString("Error:  {0} ...\n", gcnew array<Object^> {GetLastError()}));
+        }
         
-        PrintRoutines::Output("RasConnectionChangeWaiterThread RECEIVED NOTIFICATION OF RAS CONNECTION!");
+        DWORD dwRet = WaitForSingleObject(localVPNClientNotifierHandle, millis);
+        if (dwRet == -1)
+        {
+            DWORD gleRet = GetLastError();
+            PrintRoutines::Output(Grd::FormatAString( "WaitForVPNConnectionChange() Error returned is {0}", gcnew array<Object^> { gleRet }));
+            PrintRoutines::PrintSystemError(gleRet);
+        }
+        PrintRoutines::Output( "WaitForVPNConnectionChange() Back from waiting.");
+
+        return dwRet;
     }
 
-    DWORD NotificationHandling::RegisterForPowerEvents()
+    void NotificationHandling::ResetClientNotificationEvent()
     {
-        PrintRoutines::Output("RegisterForPowerEvents()");
+        PrintRoutines::Output("Resetting ClientNotificationEvent");
 
+        HANDLE localH = OpenEventW(SYNCHRONIZE | EVENT_MODIFY_STATE, true,  VPNEVENT_CLIENTNOTIFIER_NAME);
+        if (localH == NULL)
+        {
+            PrintRoutines::Output("ResetClientNotificationEvent(): OpenEventW() for listeners returned error:");
+            PrintRoutines::Output(Grd::FormatAString("Error:  {0} ...\n", gcnew array<Object^> {GetLastError()}));
+        }
         
-        // Register for suspend/resume notifications
-        DEVICE_NOTIFY_SUBSCRIBE_PARAMETERS params;
-        params.Callback = (PDEVICE_NOTIFY_CALLBACK_ROUTINE)DeviceNotifyCallbackRoutine;
-        params.Context = NULL; // Optional context data
-
-        DWORD result = PowerRegisterSuspendResumeNotification(
-            DEVICE_NOTIFY_CALLBACK,
-            &params,
-            &g_hPowerNotify
-        );
-
-        if (result != ERROR_SUCCESS) {
-            // Handle error (e.g., log it)
-            PrintRoutines::Output("RegisterForPowerEvents(): PowerRegisterSuspendResumeNotification failed!");
-        }
-        return result;
+        ResetEvent(localH);
     }
 
-    ULONG WINAPI NotificationHandling::DeviceNotifyCallbackRoutine(
-    PVOID Context,
-    ULONG Type,
-    PVOID Setting ) {
-        // Handle the power event based on 'Type'
-        switch (Type) {
-        case PBT_APMSUSPEND:
-            // System is suspending
-            PrintRoutines::Output("************* PowerEvents - DeviceNotifyCallback: System is suspending...");
-            // Perform actions before suspend (e.g., save state)
-            break;
-        case PBT_APMRESUMESUSPEND:
-            // System is resuming from suspend
-            PrintRoutines::Output("************* PowerEvents - DeviceNotifyCallback: System is resuming from suspend...");
-            // Perform actions after resume (e.g., restore state)
-            break;
-        case PBT_APMRESUMEAUTOMATIC:
-            // System is resuming automatically (e.g., after a brief sleep)
-            PrintRoutines::Output("************* PowerEvents - DeviceNotifyCallback: System is resuming automatically ...");
-            break;
-            // Add other relevant power events if needed
-        }
-        return ERROR_SUCCESS; // Important to return ERROR_SUCCESS
-    }
-
-    void WINAPI NotificationHandling::UnregisterFromPowerNotifications()
+    void NotificationHandling::SetClientNotificationEvent()
     {
-        if (g_hPowerNotify != NULL) {
-            PrintRoutines::Output("UnregisterFromPowerNotifications()");
-            PowerUnregisterSuspendResumeNotification(g_hPowerNotify);
-            g_hPowerNotify = NULL;
+        PrintRoutines::Output("Setting ClientNotificationEvent");
+        HANDLE localH = OpenEventW(SYNCHRONIZE | EVENT_MODIFY_STATE, true,  VPNEVENT_CLIENTNOTIFIER_NAME);
+        if (localH == NULL)
+        {
+            PrintRoutines::Output("SetClientNotificationEvent(): OpenEventW() for listeners returned error:");
+            PrintRoutines::Output(Grd::FormatAString("Error:  {0} ...\n", gcnew array<Object^> {GetLastError()}));
         }
+        
+        SetEvent(localH);
+    }
+
+    Utility::CheckConnectionResult NotificationHandling::GetConnectionState()
+    {
+        return CurrentConnectionState;
     }
 
     // Placeholder for callback from RasConnection Notification Event

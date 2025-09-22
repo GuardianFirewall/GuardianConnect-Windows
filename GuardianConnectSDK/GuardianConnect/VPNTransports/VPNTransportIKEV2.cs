@@ -164,7 +164,7 @@ public class VPNTransportIKEV2 :ITransportProvider
             var rasDialRetVal = ConnectionRoutines.MakeTheCall(null, entryName);
             if (rasDialRetVal == 0) // no premature errors from bad calling data/conventions or state of network/RRAS subsystem
             {
-                NotificationHandling.StartConnectionStateWatcher();
+                NotificationHandling.StartRasConnectStateWatcher();
                 errorResult.Message = "VPN Connection Successful!";
             }
             else
@@ -190,7 +190,7 @@ public class VPNTransportIKEV2 :ITransportProvider
         while (!shuttingDown)
         {
             Log.Information("VPNTransportIKEV2.PollConnectionState(): Waiting on state change...");
-            var succeeded = EventWaitHandle.TryOpenExisting(Common.VPNSTATECHANGE_EVT_NAME, out EventWaitHandle? VPNStateChangeEventHandle);
+            var succeeded = EventWaitHandle.TryOpenExisting(Common.VPNEVENT_CLIENTNOTIFIER_NAME, out EventWaitHandle? VPNStateChangeEventHandle);
             if (!succeeded)
             {
                 Log.Error( $"ERROR opening VPNStateChangeEventHandle");

@@ -39,7 +39,7 @@ public static class PowerTransitionHandler
         SystemEvents.PowerModeChanged += SystemEventsOnPowerModeChanged;
         NetworkChange.NetworkAvailabilityChanged += NetworkChangeOnNetworkAvailabilityChanged;
         PowerTransitionMonitor.RegisterForPowerNotifications(PowerChangeNotifyCallbackRoutine);
-        NotificationHandling.RegisterForPowerEvents();
+//        NotificationHandling.RegisterForPowerEvents();
         InitPowerEvents();
 
     }
