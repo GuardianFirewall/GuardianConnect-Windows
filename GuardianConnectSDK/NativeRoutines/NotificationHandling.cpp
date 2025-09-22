@@ -192,7 +192,9 @@ namespace NativeRoutines
             PrintRoutines::Output("WaiterThread: Post-wait fallthrough for RasConnState, DISCONNECT WAS NOT PLANNED!!");
             // Put Filter reset here?
             VpnDnsHandler* vdh = new VpnDnsHandler();
+            PrintRoutines::Output("WaiterThread: Post-wait fallthrough for RasConnState: REMOVING WFP FILTERS!!");
             vdh->RemoveFilters(ConnectionRoutines::ConnectedEntry);
+            PrintRoutines::Output("WaiterThread: Post-wait fallthrough for RasConnState: SETTING VPNConnectionChangeEvent !!");
             SetVPNConnectionChangeEvent(); // Is this correct??
         }
         PrintRoutines::Output("WaiterThread: Post-wait fallthrough for RasConnState, calling ResetVPNConnnectionChangeEvent() to prime event...");

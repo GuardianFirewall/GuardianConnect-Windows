@@ -74,6 +74,7 @@ public class ClientPipeImpl : IGuardianNPContract
 
     internal void OpenNamedPipe(string servicePipeName = Common.kGRDServicePipeName)
     {
+        Log.Information("ClientPipeImpl.OpenNamedPipe: Opening Pipe Stream...");
         _clientStream = new NamedPipeClientStream(".", servicePipeName, PipeDirection.InOut);
         _clientStream.Connect(10 * 1000);
         
@@ -84,6 +85,7 @@ public class ClientPipeImpl : IGuardianNPContract
         bool whetherPreviouslyConnectedAtSuspend = false;
         try
         {
+            Log.Information("ClientPipeImpl.Connect: Calling OpenNamedPipe...");
             OpenNamedPipe(servicePipeName);
             ss = new StreamString(_clientStream);
             //var testAck = ss.ReadStringAsync();
