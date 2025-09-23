@@ -185,7 +185,7 @@ public class Common
     public const string kPETOKENNOTSET = "PE TOKEN IS NOT SET";
 
     // Other useful definitions and constants
-    public const string VPNEVENT_CLIENTNOTIFIER_NAME = "Global\\GRDRASCONNLISTENEREVENT";
+    public const string VPNEVENT_CLIENTNOTIFIER = "Global\\GRDRASCONNLISTENEREVENT";
     public static ILogger Logger { get; set; } = null!;
 
     private static Dictionary<LoggingLevels, Serilog.LoggerConfiguration> LevelBasedLoggerConfigurations = new Dictionary<LoggingLevels, Serilog.LoggerConfiguration>();
