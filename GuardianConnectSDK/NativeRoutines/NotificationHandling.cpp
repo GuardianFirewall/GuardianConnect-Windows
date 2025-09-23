@@ -62,13 +62,13 @@ namespace NativeRoutines
 
     void NotificationHandling::RasConnChangeWaiterThread()
     {
-        PrintRoutines::Output("WaiterThread spawned for connection events ...");
-        PrintRoutines::Output("WaiterThread: Going to CreateEvent for listeners to sit on...");
+        PrintRoutines::Output("RasConnChangedWaiterThread spawned for connection events ...");
+        PrintRoutines::Output("RasConnChangedWaiterThread: Going to CreateEvent for listeners to sit on...");
         
         VPNClientNotifierHandle = OpenEventW(SYNCHRONIZE, true,  VPNEVENT_CLIENTNOTIFIER_NAME);
         if (VPNClientNotifierHandle == NULL)
         {
-            PrintRoutines::Output("WaiterThread(): OpenEventW() for listeners returned error:");
+            PrintRoutines::Output("RasConnChangedWaiterThread(): OpenEventW() for listeners returned error:");
             PrintRoutines::Output(Grd::FormatAString("Error:  {0} ...\n",
                 gcnew array<Object^> {GetLastError()}));
         }
@@ -81,19 +81,19 @@ namespace NativeRoutines
         if (dwWaitResult == 0xffffffff)
         {
             DWORD dwLastError = GetLastError();
-            PrintRoutines::Output("WaiterThread: Error WAIT_FAILED returned from WaitForSingleObject. Error is: ");
+            PrintRoutines::Output("RasConnChangedWaiterThread: Error WAIT_FAILED returned from WaitForSingleObject. Error is: ");
             PrintRoutines::PrintSystemError(dwLastError);
             return;
         }
 
-        PrintRoutines::Output("WaiterThread received indication that the Ras VPN state has changed.");
+        PrintRoutines::Output("RasConnChangedWaiterThread received indication that the Ras VPN state has changed.");
         CurrentConnectionState =
             ConnectionRoutines::FindAnyActiveConnection() == nullptr
                 ? Utility::CheckConnectionResult::DISCONNECTED
                 : Utility::CheckConnectionResult::CONNECTED;
         
         PrintRoutines::Output(
-            Grd::FormatAString("WaiterThread: Connection State is NOW {0}.", gcnew array<Object^> { CurrentConnectionState} ));
+            Grd::FormatAString("RasConnChangedWaiterThread: Connection State is NOW {0}.", gcnew array<Object^> { CurrentConnectionState} ));
 #if OLDWAY
         BOOL eventSet = SetEvent(VPNClientNotifierHandle);
         if (eventSet == 0)
@@ -106,16 +106,16 @@ namespace NativeRoutines
 #else
         if (!WasDisconnectPlanned)
         {
-            PrintRoutines::Output("WaiterThread: Post-wait fallthrough for RasConnState, DISCONNECT WAS NOT PLANNED!!");
+            PrintRoutines::Output("RasConnChangedWaiterThread: Post-wait fallthrough for RasConnState, DISCONNECT WAS NOT PLANNED!!");
             // Put Filter reset here?
             VpnDnsHandler* vdh = new VpnDnsHandler();
-            PrintRoutines::Output("WaiterThread: Post-wait fallthrough for RasConnState: REMOVING WFP FILTERS!!");
+            PrintRoutines::Output("RasConnChangedWaiterThread: Post-wait fallthrough for RasConnState: REMOVING WFP FILTERS!!");
             vdh->RemoveFilters(ConnectionRoutines::ConnectedEntry);
-            PrintRoutines::Output("WaiterThread: Post-wait fallthrough for RasConnState: SETTING VPNConnectionChangeEvent !!");
+            PrintRoutines::Output("RasConnChangedWaiterThread: Post-wait fallthrough for RasConnState: SETTING VPNConnectionChangeEvent !!");
             SetClientNotificationEvent(); // Is this correct??
         }
-        PrintRoutines::Output("WaiterThread: Post-wait fallthrough for RasConnState, calling ResetVPNConnnectionChangeEvent() to prime event...");
-        ResetClientNotificationEvent();
+        PrintRoutines::Output("RasConnChangedWaiterThread: Post-wait fallthrough for RasConnState, calling ResetVPNConnnectionChangeEvent() to prime event...");
+//        ResetClientNotificationEvent();
 #endif
         
         PrintRoutines::Output("Connection Event Waiter thread now exiting...");
