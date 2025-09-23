@@ -198,6 +198,7 @@ public class VPNTransportIKEV2 :ITransportProvider
             }
 
             VPNStateChangeEventHandle?.WaitOne(-1);
+            NotificationHandling.ResetClientNotificationEvent();
             Log.Information($"PollConnectionState(): woke from ConnStateChange.");
             var cs = NotificationHandling.GetConnectionState();
             var cs2 = GetCurrentVPNState();
