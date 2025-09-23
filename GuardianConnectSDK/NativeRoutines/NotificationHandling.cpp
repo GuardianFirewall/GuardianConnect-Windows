@@ -65,7 +65,7 @@ namespace NativeRoutines
         PrintRoutines::Output("RasConnChangedWaiterThread spawned for connection events ...");
         PrintRoutines::Output("RasConnChangedWaiterThread: Going to CreateEvent for listeners to sit on...");
         
-        VPNClientNotifierHandle = OpenEventW(SYNCHRONIZE, true,  VPNEVENT_CLIENTNOTIFIER_NAME);
+        VPNClientNotifierHandle = OpenEventW(SYNCHRONIZE, true,  VPNEVENT_CLIENTNOTIFIER);
         if (VPNClientNotifierHandle == NULL)
         {
             PrintRoutines::Output("RasConnChangedWaiterThread(): OpenEventW() for listeners returned error:");
@@ -139,7 +139,7 @@ namespace NativeRoutines
 
 
 
-        VPNClientNotifierHandle = CreateEventW(lpSecAttr, true, false, VPNEVENT_CLIENTNOTIFIER_NAME);
+        VPNClientNotifierHandle = CreateEventW(lpSecAttr, true, false, VPNEVENT_CLIENTNOTIFIER);
         if (VPNClientNotifierHandle == nullptr)
         {
             PrintRoutines::Output("CreateVPNConnectionChangeEvent(): CreateEventW() for listeners returned error:");
@@ -155,7 +155,7 @@ namespace NativeRoutines
         PrintRoutines::Output("WaitForVPNConnectionChange() Entry.");
         PrintRoutines::Output(
             "WaitForVPNConnectionChange() About to sit on VPNClientNotiferHandle...");
-        HANDLE localVPNClientNotifierHandle = OpenEventW(SYNCHRONIZE, true,  VPNEVENT_CLIENTNOTIFIER_NAME);
+        HANDLE localVPNClientNotifierHandle = OpenEventW(SYNCHRONIZE, true,  VPNEVENT_CLIENTNOTIFIER);
         if (localVPNClientNotifierHandle == nullptr)
         {
             PrintRoutines::Output("WaitForVPNConnectionChange(): OpenEventW() for listeners returned error:");
@@ -178,7 +178,7 @@ namespace NativeRoutines
     {
         PrintRoutines::Output("Resetting ClientNotificationEvent");
 
-        HANDLE localH = OpenEventW(SYNCHRONIZE | EVENT_MODIFY_STATE, true,  VPNEVENT_CLIENTNOTIFIER_NAME);
+        HANDLE localH = OpenEventW(SYNCHRONIZE | EVENT_MODIFY_STATE, true,  VPNEVENT_CLIENTNOTIFIER);
         if (localH == NULL)
         {
             PrintRoutines::Output("ResetClientNotificationEvent(): OpenEventW() for listeners returned error:");
@@ -191,7 +191,7 @@ namespace NativeRoutines
     void NotificationHandling::SetClientNotificationEvent()
     {
         PrintRoutines::Output("Setting ClientNotificationEvent");
-        HANDLE localH = OpenEventW(SYNCHRONIZE | EVENT_MODIFY_STATE, true,  VPNEVENT_CLIENTNOTIFIER_NAME);
+        HANDLE localH = OpenEventW(SYNCHRONIZE | EVENT_MODIFY_STATE, true,  VPNEVENT_CLIENTNOTIFIER);
         if (localH == NULL)
         {
             PrintRoutines::Output("SetClientNotificationEvent(): OpenEventW() for listeners returned error:");

@@ -190,7 +190,7 @@ public class VPNTransportIKEV2 :ITransportProvider
         while (!shuttingDown)
         {
             Log.Information("VPNTransportIKEV2.PollConnectionState(): Waiting on state change...");
-            var succeeded = EventWaitHandle.TryOpenExisting(Common.VPNEVENT_CLIENTNOTIFIER_NAME, out EventWaitHandle? VPNStateChangeEventHandle);
+            var succeeded = EventWaitHandle.TryOpenExisting(Common.VPNEVENT_CLIENTNOTIFIER, out EventWaitHandle? VPNStateChangeEventHandle);
             if (!succeeded)
             {
                 Log.Error( $"ERROR opening VPNStateChangeEventHandle");

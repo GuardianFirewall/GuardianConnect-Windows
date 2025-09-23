@@ -33,7 +33,7 @@ public class VpnManagerService : BackgroundService
             EventWaitHandleRights.Synchronize | EventWaitHandleRights.Modify, AccessControlType.Allow);
         mSec.AddAccessRule(rule);
 
-        EventWaitHandle VPNStateChangeEventHandle = new EventWaitHandle(false, EventResetMode.ManualReset, Common.VPNEVENT_CLIENTNOTIFIER_NAME);
+        EventWaitHandle VPNStateChangeEventHandle = new EventWaitHandle(false, EventResetMode.ManualReset, Common.VPNEVENT_CLIENTNOTIFIER);
         VPNStateChangeEventHandle.SetAccessControl(mSec);
 
         Log.Information("Checking for active connection...");
