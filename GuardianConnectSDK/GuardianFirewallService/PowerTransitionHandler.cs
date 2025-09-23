@@ -40,6 +40,8 @@ public static class PowerTransitionHandler
         NetworkChange.NetworkAvailabilityChanged += NetworkChangeOnNetworkAvailabilityChanged;
         PowerTransitionMonitor.RegisterForPowerNotifications(PowerChangeNotifyCallbackRoutine);
 //        NotificationHandling.RegisterForPowerEvents();
+        // Add Resume function to VPNTransportIKEV2 delegate for sake of Disconnect recovery
+        VPNTransportIKEV2.PowerResumeActions = PerformResumeActions;
         InitPowerEvents();
 
     }
@@ -160,7 +162,7 @@ public static class PowerTransitionHandler
         }
     }
 
-    private static void PerformResumeActions()
+    internal static void PerformResumeActions()
     {
         var successful = false;
         Log.Information("*************** PerformResumeActions ...");
