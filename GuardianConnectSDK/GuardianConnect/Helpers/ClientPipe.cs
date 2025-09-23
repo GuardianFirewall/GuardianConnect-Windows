@@ -76,8 +76,24 @@ public class ClientPipeImpl : IGuardianNPContract
     {
         Log.Information("ClientPipeImpl.OpenNamedPipe: Opening Pipe Stream...");
         _clientStream = new NamedPipeClientStream(".", servicePipeName, PipeDirection.InOut);
-        _clientStream.Connect(10 * 1000);
-        
+        Log.Information("ClientPipeImpl.OpenNamedPipe: Going into Opening loop until success or retries exhausted...");
+        int retries = 10;
+        while (retries-- > 0 && !_clientStream.IsConnected)
+        {
+            try
+            {
+                _clientStream.Connect(10 * 1000);
+                Log.Information($"ClientPipeImpl.OpenNamedPipe: {retries} left to attempt opening of Client Pipe Stream...");
+            }
+            catch (Exception e)
+            {
+                if (!IsConnected)
+                {
+                    Log.Error("!!!!!!!!!!!!!!!!!!!! ClientPipeImpl.OpenNamedPipe could NOT connect to Pipe Stream...");
+                    throw;
+                }
+            }
+        }
     }
     
     internal bool Connect(string servicePipeName = Common.kGRDServicePipeName)

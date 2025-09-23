@@ -4,11 +4,11 @@ using Serilog;
 
 namespace GuardianFirewallService;
 
-public class Startup
+internal static class Startup
 {
     // This method gets called by the runtime. Use this method to add services to the container.
     // For more information on how to configure your application, visit https://go.microsoft.com/fwlink/?LinkID=398940
-    public void ConfigureServices(IServiceCollection services)
+    internal static void ConfigureServices(IServiceCollection services)
     {
         Log.Information($"Startup: Past Builder logging");
         
@@ -26,4 +26,23 @@ public class Startup
         
         Log.Information("========= Leaving Startup.ConfigureServices...");
     }
+    
+    internal static void SetUpFaultHandlers()
+    {
+        // S.O.P. for .NET application death
+        AppDomain.CurrentDomain.UnhandledException += (s, e) =>
+        {
+            var errorMessage = $"AppDomain caught unhandled exception: Sender:{s}, Exception:{e}";
+            Log.Error((Exception)e.ExceptionObject, errorMessage);
+            Environment.Exit(-1);
+        };
+        TaskScheduler.UnobservedTaskException += (s, e) =>
+        {
+            var errorMessage = $"TaskScheduler threw exception: Sender:{s}, Exception:{e}";
+            var innerFlatten = e.Exception.Flatten().Message;
+            Log.Error((Exception)e.Exception, $"Error: {errorMessage}, Inner: {innerFlatten}");
+            Environment.Exit(-1);
+        };
+    }
+
 }

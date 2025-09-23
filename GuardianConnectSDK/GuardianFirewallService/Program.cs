@@ -1,5 +1,4 @@
-﻿using System.Text;
-using GuardianConnect.Shared;
+﻿using GuardianConnect.Shared;
 using GuardianFirewallService;
 using Microsoft.Extensions.Hosting;
 using Serilog;
@@ -21,6 +20,10 @@ if (Environment.UserName != $"{Environment.MachineName}$")
     Environment.Exit(-1);
 }
 
+// Set up default application fault handlers
+Log.Information($"{filler} Program: Calling StartupSetupFaultHandlers... {filler}");
+Startup.SetUpFaultHandlers();
+
 Log.Information($"{filler} Program: Calling SetupPowerTransitionHandler... {filler}");
 PowerTransitionHandler.SetupPowerTransitionHandler();
 Log.Information($"{filler} Program: Return SetupPowerTransitionHandler... {filler}");
@@ -33,7 +36,7 @@ Log.Information($"{filler} Program: Calling UseWindowService... {filler}");
 hb.UseWindowsService();
 
 Log.Information($"{filler} Program: Calling ConfigureServices... {filler}");
-hb.ConfigureServices((services) => new Startup().ConfigureServices(services));
+hb.ConfigureServices((services) => Startup.ConfigureServices(services));
 Log.Information($"{filler} Program: Return from ConfigureServices... {filler}");
 
 var host = hb.Build();
