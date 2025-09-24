@@ -3,7 +3,7 @@
 	<metadata>
 		<id>GuardianFirewallService</id>
 		<!-- THIS VERSION IS NOT USED IN THE BUILD, IT IS SET IN THE BUILD PIPELINE -->
-		<version>0.19.1.13</version>
+		<version>0.19.1.14</version>
 		<title>GuardianFirewall Service</title>
 		<authors>DNSFilter, Inc.</authors>
 		<license type="expression">MIT</license>
