@@ -25,11 +25,14 @@ public static class PowerTransitionHandler
     
     private static Common.PowerTransitionStates CurrentPowerTransitionState = Common.PowerTransitionStates.Running;
 
-    private static ITransportProvider.VPNProviderStatus VPNStatusAtSuspendTime =
-        ITransportProvider.VPNProviderStatus.VPNStatusInvalid;
+    private static ITransportProvider.VPNProviderStatus VPNStatusAtSuspendTime = ITransportProvider.VPNProviderStatus.VPNStatusInvalid;
 
-    internal static bool ConnectedAtSuspendTime() =>
-        VPNStatusAtSuspendTime == ITransportProvider.VPNProviderStatus.VPNStatusConnected;
+    internal static bool ConnectedAtSuspendTime() => VPNStatusAtSuspendTime == ITransportProvider.VPNProviderStatus.VPNStatusConnected;
+    internal static void SetConnectedAtSuspendTime()
+    {
+        VPNStatusAtSuspendTime = ITransportProvider.VPNProviderStatus.VPNStatusConnected;
+        Log.Information($"SetVPNStateAtSuspendTime() called from Poller... VPNStatusAtSuspendTime now set to {VPNStatusAtSuspendTime}");
+    }
 
     internal static void ResetVpnStatusAtSuspendTime() =>
         VPNStatusAtSuspendTime = ITransportProvider.VPNProviderStatus.VPNStatusInvalid;
@@ -42,6 +45,7 @@ public static class PowerTransitionHandler
 //        NotificationHandling.RegisterForPowerEvents();
         // Add Resume function to VPNTransportIKEV2 delegate for sake of Disconnect recovery
         VPNTransportIKEV2.PowerResumeActions = PerformResumeActions;
+        VPNTransportIKEV2.SetVPNStateAtSuspend = SetConnectedAtSuspendTime;
         InitPowerEvents();
 
     }
