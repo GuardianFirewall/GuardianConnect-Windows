@@ -24,8 +24,9 @@ public class VPNTransportIKEV2 :ITransportProvider
     private Task? PollingTask;
     
    public static Dictionary<string, object> VpnResumeParameters = new Dictionary<string, object>();
-   public delegate void PowerResumeEventHandlerCallback();
-   public static PowerResumeEventHandlerCallback PowerResumeActions = () => { };
+   public delegate void PowerEventHandlerCallback();
+   public static PowerEventHandlerCallback PowerResumeActions = () => { };
+   public static PowerEventHandlerCallback SetVPNStateAtSuspend = () => { };
 
     public VPNTransportIKEV2()
     {
@@ -219,9 +220,10 @@ public class VPNTransportIKEV2 :ITransportProvider
                     _vpnStatus = ITransportProvider.VPNProviderStatus.VPNStatusDisconnected;
                     if (!NotificationHandling.WasDisconnectPlanned)
                     {
-                        Log.Information($"****************** UNPLANNED DISCONNECT. CALLING UNPLANNED DISCONNECT. CALLING PowerTransitionHandler.PerformResumeActions() !");
+                        Log.Information( "****************** UNPLANNED DISCONNECT. Setting VPNStateAtSuspend to CONNECTED for when resuming...");
                         //PowerResumeVPNConnection();
-                        PowerResumeActions();
+                        //PowerResumeActions(); /* This is delegate into PowerHandler in PowerTransitionHandler
+                        SetVPNStateAtSuspend();
                     }
                     break;
                 case Utility.CheckConnectionResult.DISCONNECTING:
