@@ -12,7 +12,6 @@ namespace NativeRoutines
         static String^ LastKnownConnectedEntry;
         static void StartRasConnectStateWatcher();
         static Utility::CheckConnectionResult GetConnectionState();
-        static DWORD WaitForVPNConnectionChange(int millis);
         static DWORD CreateClientNotificationEvent();
         static void NotificationHandling::ResetClientNotificationEvent();
         static void NotificationHandling::SetClientNotificationEvent();
