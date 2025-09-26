@@ -284,7 +284,10 @@ public class Common
         if (!LogFilterOn)
         {
             var dlc = new LoggerConfiguration().MinimumLevel.Debug().MinimumLevel.Override("Microsoft", LogEventLevel.Warning)
-                .Enrich.WithProcessId().Enrich.WithThreadId().Enrich.WithThreadName().Enrich.WithCaller(false, 0)
+                .Enrich.WithProcessId()
+                .Enrich.WithThreadId()
+                .Enrich.WithThreadName()
+                .Enrich.WithCaller(false, 0)
                 .WriteTo.Conditional(evt => !LogFilterOn, wt => wt.File(LogFilePath, shared: true,
                     outputTemplate: "{Timestamp:yyyy-MM-dd HH:mm:ss:ffffff-K} {ProcessId}.{ThreadId}[{ThreadName}]):{Caller} [{Level:u3}] {Message}{NewLine}{Exception}"));
             LevelBasedLoggerConfigurations.Add(LoggingLevels.Debug, dlc);
@@ -296,9 +299,12 @@ public class Common
             LevelBasedLoggerConfigurations.Add(LoggingLevels.Verbose, vlc);
 
             var ilc = new LoggerConfiguration().MinimumLevel.Information().MinimumLevel.Override("Microsoft", LogEventLevel.Warning)
-                .Enrich.WithProcessId().Enrich.WithThreadId()
+                .Enrich.WithProcessId()
+                .Enrich.WithThreadId()
+                .Enrich.WithThreadName()
                 .WriteTo.Conditional(evt => !LogFilterOn, wt => wt.File(LogFilePath, shared: true,
-                    outputTemplate: "{Timestamp:yyyy-MM-dd HH:mm:ss:ffffff-K} {ProcessId}.{ThreadId}) [{Level:u3}] {Message}{NewLine}{Exception}"));
+                    outputTemplate: "{Timestamp:yyyy-MM-dd HH:mm:ss:ffffff-K} {ProcessId}.{ThreadId}) [{Level:u3}] {Message}{NewLine}{Exception}",
+                    buffered:false, flushToDiskInterval:TimeSpan.FromMilliseconds(500)));
             LevelBasedLoggerConfigurations.Add(LoggingLevels.Information, ilc);
 
             SetMinimumLogLevelToCurrentLevel();

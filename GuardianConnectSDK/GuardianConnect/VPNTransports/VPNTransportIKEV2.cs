@@ -27,6 +27,7 @@ public class VPNTransportIKEV2 :ITransportProvider
    public delegate void PowerEventHandlerCallback();
    public static PowerEventHandlerCallback PowerResumeActions = () => { };
    public static PowerEventHandlerCallback SetVPNStateAtSuspend = () => { };
+   public static PowerEventHandlerCallback ResetVPNStateAtSuspend = () => { };
 
     public VPNTransportIKEV2()
     {
@@ -132,6 +133,7 @@ public class VPNTransportIKEV2 :ITransportProvider
             if (connectionCallResult.IsError) return connectionCallResult;
             
             NotificationHandling.WasDisconnectPlanned = false;
+            SetVPNStateAtSuspend(); // CHECK THIS - moving to here - makes sense after non-error Connect command return
             
             // Save off the calling parameters in case we reboot while connected
             var vpnResumeParameters = JsonConvert.SerializeObject(VpnResumeParameters);
@@ -150,6 +152,7 @@ public class VPNTransportIKEV2 :ITransportProvider
     {
         Log.Information($"VPNTransportIKEV2.StopVPNTunnel(): Disconnecting entry '{entryName}' ...");
         NotificationHandling.WasDisconnectPlanned = true;
+        ResetVPNStateAtSuspend(); // CHECK THIS - moving to here - makes sense after non-error Disconnect command return
         ConnectionRoutines.DisconnectEntry(entryName);
     }
 
@@ -192,7 +195,7 @@ public class VPNTransportIKEV2 :ITransportProvider
     {
         while (!shuttingDown)
         {
-            Log.Information("VPNTransportIKEV2.PollConnectionState(): Waiting on state change...");
+            Log.Information("PollConnectionState(): Waiting on state change...");
             var succeeded = EventWaitHandle.TryOpenExisting(Common.VPNEVENT_CLIENTNOTIFIER, out EventWaitHandle? VPNStateChangeEventHandle);
             if (!succeeded)
             {
@@ -220,7 +223,7 @@ public class VPNTransportIKEV2 :ITransportProvider
                     _vpnStatus = ITransportProvider.VPNProviderStatus.VPNStatusDisconnected;
                     if (!NotificationHandling.WasDisconnectPlanned)
                     {
-                        Log.Information( "****************** UNPLANNED DISCONNECT. Setting VPNStateAtSuspend to CONNECTED for when resuming...");
+                        Log.Information( "PollConnectionState: ****************** UNPLANNED DISCONNECT. Setting VPNStateAtSuspend to CONNECTED for when resuming...");
                         //PowerResumeVPNConnection();
                         //PowerResumeActions(); /* This is delegate into PowerHandler in PowerTransitionHandler
                         SetVPNStateAtSuspend();
