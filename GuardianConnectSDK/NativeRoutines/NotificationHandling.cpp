@@ -150,30 +150,6 @@ namespace NativeRoutines
         return SUCCESS;
     }
     
-    DWORD NotificationHandling::WaitForVPNConnectionChange(int millis)
-    {
-        PrintRoutines::Output("WaitForVPNConnectionChange() Entry.");
-        PrintRoutines::Output(
-            "WaitForVPNConnectionChange() About to sit on VPNClientNotiferHandle...");
-        HANDLE localVPNClientNotifierHandle = OpenEventW(SYNCHRONIZE, true,  VPNEVENT_CLIENTNOTIFIER);
-        if (localVPNClientNotifierHandle == nullptr)
-        {
-            PrintRoutines::Output("WaitForVPNConnectionChange(): OpenEventW() for listeners returned error:");
-            PrintRoutines::Output(Grd::FormatAString("Error:  {0} ...\n", gcnew array<Object^> {GetLastError()}));
-        }
-        
-        DWORD dwRet = WaitForSingleObject(localVPNClientNotifierHandle, millis);
-        if (dwRet == -1)
-        {
-            DWORD gleRet = GetLastError();
-            PrintRoutines::Output(Grd::FormatAString( "WaitForVPNConnectionChange() Error returned is {0}", gcnew array<Object^> { gleRet }));
-            PrintRoutines::PrintSystemError(gleRet);
-        }
-        PrintRoutines::Output( "WaitForVPNConnectionChange() Back from waiting.");
-
-        return dwRet;
-    }
-
     void NotificationHandling::ResetClientNotificationEvent()
     {
         PrintRoutines::Output("Resetting ClientNotificationEvent");

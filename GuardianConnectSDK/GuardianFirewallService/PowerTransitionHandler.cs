@@ -46,6 +46,7 @@ public static class PowerTransitionHandler
         // Add Resume function to VPNTransportIKEV2 delegate for sake of Disconnect recovery
         VPNTransportIKEV2.PowerResumeActions = PerformResumeActions;
         VPNTransportIKEV2.SetVPNStateAtSuspend = SetConnectedAtSuspendTime;
+        VPNTransportIKEV2.ResetVPNStateAtSuspend = ResetVpnStatusAtSuspendTime;
         InitPowerEvents();
 
     }
