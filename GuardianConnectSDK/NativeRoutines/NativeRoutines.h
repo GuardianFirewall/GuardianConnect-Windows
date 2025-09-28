@@ -23,7 +23,8 @@
 using namespace System;
 
 namespace NativeRoutines {
-#define VPNEVENT_CLIENTNOTIFIER L"Global\\GRDRASCONNLISTENEREVENT"
+#define VPNEVT_NAME_SVRSIDE L"Global\\GRDRASCONNSERVICESIGNAL"
+#define VPNEVT_NAME_CLIENTSIDE L"Global\\GRDRASCONNCLIENTSIGNAL"
     
     public class Grd
     {

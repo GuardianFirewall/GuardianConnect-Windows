@@ -29,8 +29,6 @@ namespace NativeRoutines
         }
 
         // ... else - we need to set the triggers for connection state change
-        RasConnectionHandle = handleToActiveConnection;
-
         if (HRasConnState != NULL)
         {
             PrintRoutines::Output("StartConnectionStateWatcher(): CreateEventW() already has handle created. Skipping...");
@@ -45,8 +43,7 @@ namespace NativeRoutines
             }
         }
 
-        DWORD dwRet = RasConnectionNotificationW(RasConnectionHandle, HRasConnState, RASCN_Connection | RASCN_Disconnection);
-
+        DWORD dwRet = RasConnectionNotificationW(ConnectionRoutines::RasConnectionHandle, HRasConnState, RASCN_Connection | RASCN_Disconnection);
         if (dwRet != ERROR_SUCCESS)
         {
             PrintRoutines::Output("StartConnectionStateWatcher(): ERROR returned from RasConnectionNotificationW()!");
@@ -63,21 +60,15 @@ namespace NativeRoutines
     void NotificationHandling::RasConnChangeWaiterThread()
     {
         PrintRoutines::Output("RasConnChangedWaiterThread spawned for connection events ...");
-        PrintRoutines::Output("RasConnChangedWaiterThread: Going to CreateEvent for listeners to sit on...");
+        PrintRoutines::Output("RasConnChangedWaiterThread: Setting listener events so that they can react ...");
+
+        SetEvent(VPNServiceNotifierHandle);
+        SetEvent(VPNClientNotifierHandle);
         
-        VPNClientNotifierHandle = OpenEventW(SYNCHRONIZE, true,  VPNEVENT_CLIENTNOTIFIER);
-        if (VPNClientNotifierHandle == NULL)
-        {
-            PrintRoutines::Output("RasConnChangedWaiterThread(): OpenEventW() for listeners returned error:");
-            PrintRoutines::Output(Grd::FormatAString("Error:  {0} ...\n",
-                gcnew array<Object^> {GetLastError()}));
-        }
-        
-        PrintRoutines::Output(Grd::FormatAString("Thread {0} waiting for write event...",
+        PrintRoutines::Output(Grd::FormatAString("Thread {0} waiting for RASConnectionNotification event...",
                 gcnew array<Object^> { GetCurrentThreadId() }));
     
         DWORD dwWaitResult = WaitForSingleObject( HRasConnState, INFINITE);
-
         if (dwWaitResult == 0xffffffff)
         {
             DWORD dwLastError = GetLastError();
@@ -94,16 +85,23 @@ namespace NativeRoutines
         
         PrintRoutines::Output(
             Grd::FormatAString("RasConnChangedWaiterThread: Connection State is NOW {0}.", gcnew array<Object^> { CurrentConnectionState} ));
-#if OLDWAY
-        BOOL eventSet = SetEvent(VPNClientNotifierHandle);
+        BOOL eventSet = SetEvent(VPNServiceNotifierHandle);
         if (eventSet == 0)
         {
             DWORD dwLastError = GetLastError();
-            PrintRoutines::Output("SetEvent of VPN Listeners Event failed!");
+            PrintRoutines::Output("SetEvent of Server-Side VPN Listeners Event failed!");
             PrintRoutines::Output(Grd::FormatAString("Error:  {0:X} ...\n",
                 gcnew array<Object^> {dwLastError}));
         }
-#else
+        eventSet = SetEvent(VPNClientNotifierHandle);
+        if (eventSet == 0)
+        {
+            DWORD dwLastError = GetLastError();
+            PrintRoutines::Output("SetEvent of Client-Side VPN Listeners Event failed!");
+            PrintRoutines::Output(Grd::FormatAString("Error:  {0:X} ...\n",
+                gcnew array<Object^> {dwLastError}));
+        }
+#if ISTHISNEEDED // put this in IVPNTransportIKEV2.cs PollConnectionState() with hook into ConnectionRoutions to do the call into VpnDnsHandler
         if (!WasDisconnectPlanned)
         {
             PrintRoutines::Output("RasConnChangedWaiterThread: Post-wait fallthrough for RasConnState, DISCONNECT WAS NOT PLANNED!!");
@@ -123,7 +121,7 @@ namespace NativeRoutines
     
     // --------------- Section for Notifying client of a change of the state of a VPN connection
 
-    DWORD NotificationHandling::CreateClientNotificationEvent()
+    DWORD NotificationHandling::CreateListenerNotifyEvents()
     {
         SECURITY_DESCRIPTOR secDesc;
         bool bInitOk = InitializeSecurityDescriptor(&secDesc, SECURITY_DESCRIPTOR_REVISION);
@@ -139,44 +137,24 @@ namespace NativeRoutines
 
 
 
-        VPNClientNotifierHandle = CreateEventW(lpSecAttr, true, false, VPNEVENT_CLIENTNOTIFIER);
+        VPNServiceNotifierHandle = CreateEventW(lpSecAttr, true, false, VPNEVT_NAME_SVRSIDE);
+        if (VPNServiceNotifierHandle == nullptr)
+        {
+            PrintRoutines::Output("CreateVPNConnectionChangeEvent(): CreateEventW() for listeners returned error:");
+            PrintRoutines::Output(Grd::FormatAString("Error:  {0} ...\n", gcnew array<Object^> {GetLastError()}));
+            return GetLastError();
+        }
+        VPNClientNotifierHandle = CreateEventW(lpSecAttr, true, false, VPNEVT_NAME_CLIENTSIDE);
         if (VPNClientNotifierHandle == nullptr)
         {
             PrintRoutines::Output("CreateVPNConnectionChangeEvent(): CreateEventW() for listeners returned error:");
             PrintRoutines::Output(Grd::FormatAString("Error:  {0} ...\n", gcnew array<Object^> {GetLastError()}));
             return GetLastError();
         }
-        ResetClientNotificationEvent(); // Just to be sure
+        //ResetClientNotificationEvent(); // Just to be sure
         return SUCCESS;
     }
     
-    void NotificationHandling::ResetClientNotificationEvent()
-    {
-        PrintRoutines::Output("Resetting ClientNotificationEvent");
-
-        HANDLE localH = OpenEventW(SYNCHRONIZE | EVENT_MODIFY_STATE, true,  VPNEVENT_CLIENTNOTIFIER);
-        if (localH == NULL)
-        {
-            PrintRoutines::Output("ResetClientNotificationEvent(): OpenEventW() for listeners returned error:");
-            PrintRoutines::Output(Grd::FormatAString("Error:  {0} ...\n", gcnew array<Object^> {GetLastError()}));
-        }
-        
-        ResetEvent(localH);
-    }
-
-    void NotificationHandling::SetClientNotificationEvent()
-    {
-        PrintRoutines::Output("Setting ClientNotificationEvent");
-        HANDLE localH = OpenEventW(SYNCHRONIZE | EVENT_MODIFY_STATE, true,  VPNEVENT_CLIENTNOTIFIER);
-        if (localH == NULL)
-        {
-            PrintRoutines::Output("SetClientNotificationEvent(): OpenEventW() for listeners returned error:");
-            PrintRoutines::Output(Grd::FormatAString("Error:  {0} ...\n", gcnew array<Object^> {GetLastError()}));
-        }
-        
-        SetEvent(localH);
-    }
-
     Utility::CheckConnectionResult NotificationHandling::GetConnectionState()
     {
         return CurrentConnectionState;

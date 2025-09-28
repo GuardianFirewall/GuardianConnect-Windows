@@ -127,7 +127,7 @@ namespace NativeRoutines
 		ConnectedEntry = entryName;
 
         // store handle if needed, etc
-        NotificationHandling::RasConnectionHandle =  hRasConn;
+        RasConnectionHandle =  hRasConn;
         //..
 
         HeapFree(GetProcessHeap(), 0, (LPVOID)lpRasDialParams);
@@ -197,7 +197,8 @@ namespace NativeRoutines
         for (DWORD i = 0; i < dw_connections; i++) {
             wchar_t* rasConnEntryName = (lp_ras_conn[i].szEntryName);
             if (!wcscmp(entry_name, rasConnEntryName)) {
-                result = GetConnectionState(lp_ras_conn[i].hrasconn);
+                LPRASCONNSTATUS lpras_conn_status;
+                result = GetConnectionState(lp_ras_conn[i].hrasconn, lpras_conn_status);
                 handleOut = lp_ras_conn[i].hrasconn;
                 break;
             }
@@ -217,15 +218,16 @@ namespace NativeRoutines
         return result;
     }
 
-    Utility::CheckConnectionResult ConnectionRoutines::GetConnectionState(HRASCONN h_ras_conn) {
+    Utility::CheckConnectionResult ConnectionRoutines::GetConnectionState(HRASCONN h_ras_conn, LPRASCONNSTATUSW& lp_ras_status)
+    {
         DWORD dw_ret = 0;
-
         RASCONNSTATUS ras_conn_status;
         ZeroMemory(&ras_conn_status, sizeof(RASCONNSTATUS));
         ras_conn_status.dwSize = sizeof(RASCONNSTATUS);
 
         // Utility::Checking connection status using RasGetConnectStatus
         dw_ret = RasGetConnectStatus(h_ras_conn, &ras_conn_status);
+        lp_ras_status = &ras_conn_status;
         if (ERROR_SUCCESS != dw_ret) {
             PrintRoutines::Output(System::String::Format("RasGetConnectStatus failed: Error = ", dw_ret));
             return Utility::CheckConnectionResult::DISCONNECTED;
@@ -247,6 +249,30 @@ namespace NativeRoutines
 
         return Utility::CheckConnectionResult::DISCONNECTED;
     }
+    // from copilot
+    Utility::CheckConnectionResult ConnectionRoutines::GetConnectionState(IntPtr hRasConn, RasConnStatusInfo^% statusInfo)
+    {
+        HRASCONN nativeHandle = static_cast<HRASCONN>(hRasConn.ToPointer());
+        LPRASCONNSTATUSW lpStatus = nullptr;
+        auto result = ConnectionRoutines::GetConnectionState(nativeHandle, lpStatus);
+
+        if (lpStatus != nullptr)
+        {
+            statusInfo = gcnew RasConnStatusInfo();
+            statusInfo->RasConnState = lpStatus->rasconnstate;
+            statusInfo->ErrorCode = lpStatus->dwError;
+            statusInfo->DeviceType = gcnew System::String(lpStatus->szDeviceType);
+            statusInfo->DeviceName = gcnew System::String(lpStatus->szDeviceName);
+            statusInfo->RasConnSubState = lpStatus->rasconnsubstate;
+        }
+        else
+        {
+            statusInfo = nullptr;
+        }
+
+        return result;
+    }
+    //
 
     String^ ConnectionRoutines::GetEntryNameOfActiveConnection()
     {
@@ -307,8 +333,9 @@ namespace NativeRoutines
 
         // If successful, find connection with |entry_name|.
         Utility::CheckConnectionResult result = Utility::CheckConnectionResult::DISCONNECTED;
+        LPRASCONNSTATUSW lp_ras_status = NULL;
         for (DWORD i = 0; i < dw_connections; i++) {
-            result = GetConnectionState(lp_ras_conn[i].hrasconn);
+            result = GetConnectionState(lp_ras_conn[i].hrasconn, lp_ras_status);
             if (result == Utility::CheckConnectionResult::CONNECTED) {
                 wprintf(L"FAAC: szEntryName = '%s'\n", lp_ras_conn[i].szEntryName);
                 size_t len = wcslen(lp_ras_conn[i].szEntryName);
@@ -318,7 +345,8 @@ namespace NativeRoutines
                 ConnectedEntry = gcnew String(activeName);
 
 
-                PrintRoutines::Output(Grd::FormatAString("FindAnyActiveConnection: Entry '{0}' is in a CONNECTED or CONNECTING state.",
+                PrintRoutines::Output(
+                    Grd::FormatAString("FindAnyActiveConnection: Entry '{0}' is in a CONNECTED or CONNECTING state.",
                     ConnectedEntry ));
                 wprintf(L"FAAC: ActiveConnectionEntryName = '%s'\n", ActiveConnectionEntryName);
                 
@@ -343,7 +371,7 @@ namespace NativeRoutines
         bool disconnectResult = false;
         HRASCONN entryHandle = NULL;
 
-        HRASCONN activeConnectionHandle = FindAnyActiveConnection();
+        ActiveConnectionHandle = FindAnyActiveConnection();
         
         String^ entryName = ConnectedEntry;
         PrintRoutines::Output("FindAnyActiveConnection found entry:");

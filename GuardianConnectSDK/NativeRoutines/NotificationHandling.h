@@ -12,11 +12,9 @@ namespace NativeRoutines
         static String^ LastKnownConnectedEntry;
         static void StartRasConnectStateWatcher();
         static Utility::CheckConnectionResult GetConnectionState();
-        static DWORD CreateClientNotificationEvent();
-        static void NotificationHandling::ResetClientNotificationEvent();
-        static void NotificationHandling::SetClientNotificationEvent();
+        static DWORD CreateListenerNotifyEvents();
         static HANDLE NotificationHandling::VPNClientNotifierHandle;
-//        static void NotificationHandling::RasConnChangeWaiterThread(HANDLE event);
+        static HANDLE NotificationHandling::VPNServiceNotifierHandle;
         static String^ lNameOfEventForVPNStateListeners = L"GRDRASCONNLISTENEREVENT";
 
 //        static DEVICE_NOTIFY_CALLBACK_ROUTINE DeviceNotifyCallbackRoutine;
@@ -24,7 +22,6 @@ namespace NativeRoutines
 //        static void UnregisterFromPowerNotifications();
         
     internal:
-        static HRASCONN RasConnectionHandle;
         static void RasConnChangeWaiterThread();
     };
 }

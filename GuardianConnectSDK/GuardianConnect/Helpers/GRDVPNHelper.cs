@@ -59,7 +59,6 @@ namespace GuardianConnect.Helpers
          /// a read only reference to the global NEVPNManager which handles
          /// IKEv2 connections. This should be used as a read-only reference to convenient access
          /// <param name="port"></param>
-         //protected internal static VPNTransportIKEV2 IKEV2Instance;
 
          public static GRDVPNHelper Instance
          {
