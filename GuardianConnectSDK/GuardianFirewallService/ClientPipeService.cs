@@ -13,9 +13,10 @@ public class ClientPipeService : BackgroundService
     private static int numThreads = 4;
     private static Thread?[] servers = new Thread[numThreads];
     private static CancellationToken _cancellationToken;
-    private static int numberOfClientsConnected;
     private static bool AdministrativeShutdownRequested = false;
 
+    internal static int NumberOfClientsConnected;
+    
     protected override async Task ExecuteAsync(CancellationToken stoppingToken)
     {
         _cancellationToken = stoppingToken;
@@ -27,18 +28,17 @@ public class ClientPipeService : BackgroundService
         
         StartServerListeners();
 
-
         try
         {
             var heartbeatCounter = 0;
             var priorMessage =
-                $"ClientPipeService is running... Clients connected: {numberOfClientsConnected}. Cancellation Request is {stoppingToken.IsCancellationRequested}";
+                $"ClientPipeService is running... Clients connected: {NumberOfClientsConnected}. Cancellation Request is {stoppingToken.IsCancellationRequested}";
             Log.Information(
                 $"Going into while() loop. stoppingToken.IsCancllationRequestioned = {stoppingToken.IsCancellationRequested}");
             while (!stoppingToken.IsCancellationRequested)
             {
                 var currentMessage =
-                    $"ClientPipeService is running... Clients connected: {numberOfClientsConnected}. Cancellation Request is {stoppingToken.IsCancellationRequested}";
+                    $"ClientPipeService is running... Clients connected: {NumberOfClientsConnected}. Cancellation Request is {stoppingToken.IsCancellationRequested}";
 
                 if (!currentMessage.Equals(priorMessage))
                 {
@@ -159,7 +159,7 @@ public class ClientPipeService : BackgroundService
             Log.Information($"Pipe Service Thread #{threadId} going to wait for Client Connection...");
             pipeServer.WaitForConnection();
 
-            Interlocked.Increment(ref numberOfClientsConnected);
+            Interlocked.Increment(ref NumberOfClientsConnected);
             Log.Information("Client connected on thread[{0}].", threadId);
             StreamString ss = new StreamString(pipeServer);
             // Verify our identity to the connected client using a
@@ -271,7 +271,7 @@ public class ClientPipeService : BackgroundService
                 }
             }
 
-            Interlocked.Decrement(ref numberOfClientsConnected);
+            Interlocked.Decrement(ref NumberOfClientsConnected);
             pipeServer.Close();
         }
     }

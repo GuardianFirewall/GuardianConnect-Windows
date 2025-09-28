@@ -11,7 +11,6 @@ namespace GuardianFirewallService;
 
 public class VpnManagerService : BackgroundService
 {
-
     protected override async Task ExecuteAsync(CancellationToken stoppingToken)
     {
         Log.Information("VPNMGR: TESTING LOG");
@@ -24,17 +23,21 @@ public class VpnManagerService : BackgroundService
         Log.Information("VpnManagerService: In task...");
         VPNTransportIKEV2 vpnikeInstance = new VPNTransportIKEV2();
 
-        Log.Information("Creating Change Event");
+        Log.Information("Creating Change Event for listeners - SERVICE-SIDE and CLIENT_SIDE...");
         Log.Information($"stoppingToken.IsCancllationRequestioned = {stoppingToken.IsCancellationRequested}");
         // Create VPNChange Event so Service and UI can wait for notification - OURS - not Ras'
+#if DOTHISHERE
         EventWaitHandleSecurity mSec = new EventWaitHandleSecurity();
         var Everyone = new SecurityIdentifier(WellKnownSidType.WorldSid, null);
         EventWaitHandleAccessRule rule = new EventWaitHandleAccessRule(Everyone,
             EventWaitHandleRights.Synchronize | EventWaitHandleRights.Modify, AccessControlType.Allow);
         mSec.AddAccessRule(rule);
 
-        EventWaitHandle VPNStateChangeEventHandle = new EventWaitHandle(false, EventResetMode.ManualReset, Common.VPNEVENT_CLIENTNOTIFIER);
-        VPNStateChangeEventHandle.SetAccessControl(mSec);
+        EventWaitHandle H_VPNStateChangeServiceEvent = new EventWaitHandle(false, EventResetMode.ManualReset, Common.VPNEVT_NAME_SVRSIDE);
+        H_VPNStateChangeServiceEvent.SetAccessControl(mSec);
+#else
+        NotificationHandling.CreateListenerNotifyEvents();
+#endif
 
         Log.Information("Checking for active connection...");
         Log.Information($"stoppingToken.IsCancllationRequestioned = {stoppingToken.IsCancellationRequested}");

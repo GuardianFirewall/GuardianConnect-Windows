@@ -193,31 +193,51 @@ public class VPNTransportIKEV2 :ITransportProvider
 
     private void PollConnectionState()
     {
+        var succeeded = EventWaitHandle.TryOpenExisting(Common.VPNEVT_NAME_SVRSIDE, out EventWaitHandle? H_VPNStateChangeServiceEvent);
+        if (!succeeded)
+        {
+            Log.Error( $"ERROR opening H_VPNStateChangeServiceEvent");
+            throw new Exception("VPNConnectionEvent WaitHandle Open Exception");
+        }
+        
         while (!shuttingDown)
         {
             Log.Information("PollConnectionState(): Waiting on state change...");
-            var succeeded = EventWaitHandle.TryOpenExisting(Common.VPNEVENT_CLIENTNOTIFIER, out EventWaitHandle? VPNStateChangeEventHandle);
-            if (!succeeded)
-            {
-                Log.Error( $"ERROR opening VPNStateChangeEventHandle");
-                throw new Exception("VPNConnectionEvent WaitHandle Open Exception");
-            }
 
-            VPNStateChangeEventHandle?.WaitOne(-1);
-            NotificationHandling.ResetClientNotificationEvent();
+            H_VPNStateChangeServiceEvent?.WaitOne(-1);
+            H_VPNStateChangeServiceEvent?.Reset();
+            
             Log.Information($"PollConnectionState(): woke from ConnStateChange.");
-            var cs = NotificationHandling.GetConnectionState();
-            var cs2 = GetCurrentVPNState();
-            // TJE 080125: TODO: FIND AND FIX THIS DISCREPANCY!!!!!! DON'T USE TWO - SHED THE WRONG ONE!!!
-            Log.Information($"PollConnectionState: [NoficationHandling.GetConnectionState] = {cs}. [GetCurrentVPNState] = {cs2}");
-            switch (cs)
+            // TJE TODO: change # of clients connected to be available here so we can set signal only if clients connected
+            //Log.Information($"PollConnectionState(): Clients connected - signalling them.");
+            
+           // Log.Information($"PollConnectionState(): Signaling clients ...");
+            
+            Utility.CheckConnectionResult connectionResult;
+            ConnectionRoutines.RasConnStatusInfo rasConnStatusInfo;
+            Log.Information("PollConnectionState(): Calling ConnectionRoutines.GetConnectionState to get current status...");
+            unsafe
+            {
+                nint hRasConn = (nint)ConnectionRoutines.ActiveConnectionHandle;
+                connectionResult = ConnectionRoutines.GetConnectionState(hRasConn, out rasConnStatusInfo);
+            }
+            
+            Log.Information("PollConnectionState(): Calling GetCurrentVPNState() to get current status...");
+            var cs = GetCurrentVPNState();
+            Log.Information($"PollConnectionState: [NoficationHandling.GetConnectionState] = {cs}.");
+            Log.Information($"PollConnectionState: [RasConnStatusInfo.RasConState] = {rasConnStatusInfo.RasConnState}.");
+            Log.Information($"PollConnectionState: [RasConnStatusInfo.RasConSubState] = {rasConnStatusInfo.RasConnSubState}.");
+            Log.Information($"PollConnectionState: [RasConnStatusInfo] = {rasConnStatusInfo}.");
+            switch (connectionResult)
             {
                 case Utility.CheckConnectionResult.CONNECTED:
                     _vpnStatus = ITransportProvider.VPNProviderStatus.VPNStatusConnected;
                     break;
+                /*
                 case Utility.CheckConnectionResult.CONNECTING:
                     _vpnStatus = ITransportProvider.VPNProviderStatus.VPNStatusConnecting;
                     break;
+                */
                 case Utility.CheckConnectionResult.DISCONNECTED:
                     // TEST THIS - check flag if intended disconnect or not (i.e., after sleep)
                     _vpnStatus = ITransportProvider.VPNProviderStatus.VPNStatusDisconnected;
@@ -229,13 +249,17 @@ public class VPNTransportIKEV2 :ITransportProvider
                         SetVPNStateAtSuspend();
                     }
                     break;
+                /*
                 case Utility.CheckConnectionResult.DISCONNECTING:
                     _vpnStatus = ITransportProvider.VPNProviderStatus.VPNStatusDisconnecting;
                     break;
+                    */
+                default:
+                    Log.Warning($"PollConnectionState: !!!!!!!!!!!!!!! UNHANDLED CS VALUE: {cs}");
+                    break;
             }
-            Debug.WriteLine($" VPN status is {0}...", cs);
 
-            Thread.Sleep(1000);
+            //Thread.Sleep(1000);
         }
     }
 }
