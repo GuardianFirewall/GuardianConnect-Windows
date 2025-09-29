@@ -65,7 +65,7 @@ namespace NativeRoutines
         SetEvent(VPNServiceNotifierHandle);
         SetEvent(VPNClientNotifierHandle);
         
-        PrintRoutines::Output(Grd::FormatAString("Thread {0} waiting for RASConnectionNotification event...",
+        PrintRoutines::Output(Grd::FormatAString("RasConnChangeWaiterThread: Thread {0} waiting for RASConnectionNotification event...",
                 gcnew array<Object^> { GetCurrentThreadId() }));
     
         DWORD dwWaitResult = WaitForSingleObject( HRasConnState, INFINITE);
@@ -89,7 +89,7 @@ namespace NativeRoutines
         if (eventSet == 0)
         {
             DWORD dwLastError = GetLastError();
-            PrintRoutines::Output("SetEvent of Server-Side VPN Listeners Event failed!");
+            PrintRoutines::Output("RasConnChangeWaiterThread: SetEvent of Server-Side VPN Listeners Event failed!");
             PrintRoutines::Output(Grd::FormatAString("Error:  {0:X} ...\n",
                 gcnew array<Object^> {dwLastError}));
         }
@@ -97,26 +97,12 @@ namespace NativeRoutines
         if (eventSet == 0)
         {
             DWORD dwLastError = GetLastError();
-            PrintRoutines::Output("SetEvent of Client-Side VPN Listeners Event failed!");
+            PrintRoutines::Output("RasConnChangeWaiterThread: SetEvent of Client-Side VPN Listeners Event failed!");
             PrintRoutines::Output(Grd::FormatAString("Error:  {0:X} ...\n",
                 gcnew array<Object^> {dwLastError}));
         }
-#if ISTHISNEEDED // put this in IVPNTransportIKEV2.cs PollConnectionState() with hook into ConnectionRoutions to do the call into VpnDnsHandler
-        if (!WasDisconnectPlanned)
-        {
-            PrintRoutines::Output("RasConnChangedWaiterThread: Post-wait fallthrough for RasConnState, DISCONNECT WAS NOT PLANNED!!");
-            // Put Filter reset here?
-            VpnDnsHandler* vdh = new VpnDnsHandler();
-            PrintRoutines::Output("RasConnChangedWaiterThread: Post-wait fallthrough for RasConnState: REMOVING WFP FILTERS!!");
-            vdh->RemoveFilters(ConnectionRoutines::ConnectedEntry);
-            PrintRoutines::Output("RasConnChangedWaiterThread: Post-wait fallthrough for RasConnState: SETTING VPNConnectionChangeEvent !!");
-            SetClientNotificationEvent(); // Is this correct??
-        }
-        PrintRoutines::Output("RasConnChangedWaiterThread: Post-wait fallthrough for RasConnState, calling ResetVPNConnnectionChangeEvent() to prime event...");
-//        ResetClientNotificationEvent();
-#endif
         
-        PrintRoutines::Output("Connection Event Waiter thread now exiting...");
+        PrintRoutines::Output("RasConnChangeWaiterThread now exiting...");
     }
     
     // --------------- Section for Notifying client of a change of the state of a VPN connection
