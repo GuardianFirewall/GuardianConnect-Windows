@@ -201,7 +201,7 @@ namespace NativeRoutines
 //                result = GetConnectionState(IntPtr(lp_ras_conn[i].hrasconn), lpras_conn_status);
                 //
                 RasConnStatusInfo^ managedStatusInfo = nullptr; // Create a managed RasConnStatusInfo object
-                result = GetConnectionState(IntPtr(lp_ras_conn[i].hrasconn), managedStatusInfo);
+                result = GetConnectionState(lp_ras_conn[i].hrasconn, managedStatusInfo);
 
                 // If needed, convert managedStatusInfo to native lpras_conn_status
                 if (managedStatusInfo != nullptr)
@@ -242,10 +242,12 @@ namespace NativeRoutines
         dw_ret = RasGetConnectStatus(h_ras_conn, &ras_conn_status);
         lp_ras_status = &ras_conn_status;
         if (ERROR_SUCCESS != dw_ret) {
-            PrintRoutines::Output(System::String::Format("GetRasConnectStatus: RasGetConnectStatus failed: Error = ", dw_ret));
+            PrintRoutines::Output(System::String::Format("GetRasConnectStatus: RasGetConnectStatus failed: Error = {0}", dw_ret));
             return Utility::CheckConnectionResult::DISCONNECTED;
         }
 
+        PrintRoutines::Output(String::Format("GetRasConnectStatus: RasConnState/RasConnSubState = {0}/{1}",
+            (int)ras_conn_status.rasconnstate, (int)ras_conn_status.rasconnsubstate));
         switch (ras_conn_status.rasconnstate) {
         case RASCS_ConnectDevice:
             PrintRoutines::Output("GetRasConnectStatus: Connecting device...");
@@ -263,11 +265,10 @@ namespace NativeRoutines
         return Utility::CheckConnectionResult::DISCONNECTED;
     }
     // from copilot
-    Utility::CheckConnectionResult ConnectionRoutines::GetConnectionState(IntPtr hRasConn, RasConnStatusInfo^% statusInfo)
+    Utility::CheckConnectionResult ConnectionRoutines::GetConnectionState(HRASCONN hRasConn, RasConnStatusInfo^% statusInfo)
     {
-        HRASCONN nativeHandle = static_cast<HRASCONN>(hRasConn.ToPointer());
         LPRASCONNSTATUSW lpStatus = nullptr;
-        auto result = GetRasConnectStatus(nativeHandle, lpStatus);
+        auto result = GetRasConnectStatus(hRasConn, lpStatus);
 
         if (lpStatus != nullptr)
         {
@@ -288,6 +289,12 @@ namespace NativeRoutines
 
         return result;
     }
+
+    Utility::CheckConnectionResult ConnectionRoutines::GetConnectionState(RasConnStatusInfo^% statusInfo)
+    {
+        return GetConnectionState(ActiveConnectionHandle, statusInfo);
+    }
+    
     //
 
     String^ ConnectionRoutines::GetEntryNameOfActiveConnection()
@@ -354,7 +361,7 @@ namespace NativeRoutines
             //result = GetConnectionState(IntPtr(lp_ras_conn[i].hrasconn), lp_ras_status);
             //
             RasConnStatusInfo^ managedStatusInfo = nullptr; // Create a managed RasConnStatusInfo object
-            result = GetConnectionState(IntPtr(lp_ras_conn[i].hrasconn), managedStatusInfo);
+            result = GetConnectionState(lp_ras_conn[i].hrasconn, managedStatusInfo);
 
             // If needed, convert managedStatusInfo to native lp_ras_status
             if (managedStatusInfo != nullptr)

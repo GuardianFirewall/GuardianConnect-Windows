@@ -74,6 +74,7 @@ namespace NativeRoutines
 
         static bool DisconnectEntry(System::String^ entryName);
 
-		static Utility::CheckConnectionResult GetConnectionState(IntPtr hRasConn, [System::Runtime::InteropServices::Out] RasConnStatusInfo^% statusInfo);
+		static Utility::CheckConnectionResult GetConnectionState(HRASCONN hRasConn, [System::Runtime::InteropServices::Out] RasConnStatusInfo^% statusInfo);
+        static Utility::CheckConnectionResult GetConnectionState(RasConnStatusInfo^% statusInfo);
     };
 }
