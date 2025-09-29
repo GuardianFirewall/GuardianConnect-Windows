@@ -198,7 +198,20 @@ namespace NativeRoutines
             wchar_t* rasConnEntryName = (lp_ras_conn[i].szEntryName);
             if (!wcscmp(entry_name, rasConnEntryName)) {
                 LPRASCONNSTATUS lpras_conn_status;
-                result = GetConnectionState(lp_ras_conn[i].hrasconn, lpras_conn_status);
+//                result = GetConnectionState(IntPtr(lp_ras_conn[i].hrasconn), lpras_conn_status);
+                //
+                RasConnStatusInfo^ managedStatusInfo = nullptr; // Create a managed RasConnStatusInfo object
+                result = GetConnectionState(IntPtr(lp_ras_conn[i].hrasconn), managedStatusInfo);
+
+                // If needed, convert managedStatusInfo to native lpras_conn_status
+                if (managedStatusInfo != nullptr)
+                {
+                    lpras_conn_status = new RASCONNSTATUSW();
+                    lpras_conn_status->dwSize = sizeof(RASCONNSTATUSW);
+                    lpras_conn_status->rasconnstate = static_cast<RASCONNSTATE>(managedStatusInfo->RasConnStateValue);
+                    lpras_conn_status->dwError = managedStatusInfo->ErrorCode;
+                }
+                //
                 handleOut = lp_ras_conn[i].hrasconn;
                 break;
             }
@@ -218,7 +231,7 @@ namespace NativeRoutines
         return result;
     }
 
-    Utility::CheckConnectionResult ConnectionRoutines::GetConnectionState(HRASCONN h_ras_conn, LPRASCONNSTATUSW& lp_ras_status)
+    Utility::CheckConnectionResult ConnectionRoutines::GetRasConnectStatus(HRASCONN h_ras_conn, LPRASCONNSTATUSW& lp_ras_status)
     {
         DWORD dw_ret = 0;
         RASCONNSTATUS ras_conn_status;
@@ -229,19 +242,19 @@ namespace NativeRoutines
         dw_ret = RasGetConnectStatus(h_ras_conn, &ras_conn_status);
         lp_ras_status = &ras_conn_status;
         if (ERROR_SUCCESS != dw_ret) {
-            PrintRoutines::Output(System::String::Format("RasGetConnectStatus failed: Error = ", dw_ret));
+            PrintRoutines::Output(System::String::Format("GetRasConnectStatus: RasGetConnectStatus failed: Error = ", dw_ret));
             return Utility::CheckConnectionResult::DISCONNECTED;
         }
 
         switch (ras_conn_status.rasconnstate) {
         case RASCS_ConnectDevice:
-            PrintRoutines::Output("GetConnectionState: Connecting device...");
+            PrintRoutines::Output("GetRasConnectStatus: Connecting device...");
             return Utility::CheckConnectionResult::CONNECTING;
         case RASCS_Connected:
-            PrintRoutines::Output("GetConnectionState: Connected");
+            PrintRoutines::Output("GetRasConnectStatus: Connected");
             return Utility::CheckConnectionResult::CONNECTED;
         case RASCS_Disconnected:
-            PrintRoutines::Output("GetConnectionState: Disconnected");
+            PrintRoutines::Output("GetRasConnectStatus: Disconnected");
             return Utility::CheckConnectionResult::DISCONNECTED;
         default:
             break;
@@ -254,16 +267,19 @@ namespace NativeRoutines
     {
         HRASCONN nativeHandle = static_cast<HRASCONN>(hRasConn.ToPointer());
         LPRASCONNSTATUSW lpStatus = nullptr;
-        auto result = ConnectionRoutines::GetConnectionState(nativeHandle, lpStatus);
+        auto result = GetRasConnectStatus(nativeHandle, lpStatus);
 
         if (lpStatus != nullptr)
         {
             statusInfo = gcnew RasConnStatusInfo();
-            statusInfo->RasConnState = lpStatus->rasconnstate;
+            //statusInfo->RasConnStateValue = static_cast<RasConnState>(lpStatus->rasconnstate);
+            //statusInfo->RasConnStateValue = lpStatus->rasconnstate;
+            RasConnState managedType = static_cast<RasConnState>(lpStatus->rasconnstate);
+            statusInfo->RasConnStateValue = managedType;
             statusInfo->ErrorCode = lpStatus->dwError;
-            statusInfo->DeviceType = gcnew System::String(lpStatus->szDeviceType);
-            statusInfo->DeviceName = gcnew System::String(lpStatus->szDeviceName);
-            statusInfo->RasConnSubState = lpStatus->rasconnsubstate;
+            //statusInfo->RasConnSubStateValue = static_cast<RasConnSubState>(lpStatus->rasconnsubstate);
+            RasConnSubState rcss = static_cast<RasConnSubState>(lpStatus->rasconnsubstate);
+            statusInfo->RasConnSubStateValue = rcss;
         }
         else
         {
@@ -335,7 +351,20 @@ namespace NativeRoutines
         Utility::CheckConnectionResult result = Utility::CheckConnectionResult::DISCONNECTED;
         LPRASCONNSTATUSW lp_ras_status = NULL;
         for (DWORD i = 0; i < dw_connections; i++) {
-            result = GetConnectionState(lp_ras_conn[i].hrasconn, lp_ras_status);
+            //result = GetConnectionState(IntPtr(lp_ras_conn[i].hrasconn), lp_ras_status);
+            //
+            RasConnStatusInfo^ managedStatusInfo = nullptr; // Create a managed RasConnStatusInfo object
+            result = GetConnectionState(IntPtr(lp_ras_conn[i].hrasconn), managedStatusInfo);
+
+            // If needed, convert managedStatusInfo to native lp_ras_status
+            if (managedStatusInfo != nullptr)
+            {
+                lp_ras_status = new RASCONNSTATUSW();
+                lp_ras_status->dwSize = sizeof(RASCONNSTATUSW);
+                lp_ras_status->rasconnstate = static_cast<RASCONNSTATE>(managedStatusInfo->RasConnStateValue);
+                lp_ras_status->dwError = managedStatusInfo->ErrorCode;
+            }
+            //
             if (result == Utility::CheckConnectionResult::CONNECTED) {
                 wprintf(L"FAAC: szEntryName = '%s'\n", lp_ras_conn[i].szEntryName);
                 size_t len = wcslen(lp_ras_conn[i].szEntryName);

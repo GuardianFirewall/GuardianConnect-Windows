@@ -41,5 +41,22 @@ Log.Information($"{filler} Program: Return from ConfigureServices... {filler}");
 
 var host = hb.Build();
 Log.Information($"{filler} Program: Calling host.RunAsync... {filler}");
-await host.RunAsync();
-Log.Information($"{filler} Fall-thru after host.RunAsync... {filler}");
+try
+{
+    await host.RunAsync();
+}
+catch (Exception e)
+{
+    if (e is OperationCanceledException)
+    {
+        Log.Information("{filler} GuardianFirewall Service operation was administratively cancelled.", filler);
+    }
+    else
+    {
+        Log.Error(e, $"{filler} Exception thrown in Fall-thru after host.RunAsync... {e}{filler}");
+    }
+}
+finally
+{
+    Log.Information($"{filler} GuardianFirewall Service exiting... {filler}");
+}

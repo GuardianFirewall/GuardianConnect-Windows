@@ -9,6 +9,7 @@ namespace NativeRoutines {
     public:
         enum class CheckConnectionResult
         {
+            Uninitialized,
             CONNECTED,
             CONNECTING,
             CONNECT_FAILED,

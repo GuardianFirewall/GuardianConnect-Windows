@@ -133,7 +133,9 @@ public class VPNTransportIKEV2 :ITransportProvider
             if (connectionCallResult.IsError) return connectionCallResult;
             
             NotificationHandling.WasDisconnectPlanned = false;
+            Log.Information($"StartVPNTunnelWithOptions: WasDisconnectPlanned now equals {NotificationHandling.WasDisconnectPlanned}");
             SetVPNStateAtSuspend(); // CHECK THIS - moving to here - makes sense after non-error Connect command return
+            Log.Information($"StartVPNTunnelWithOptions: (CHECK#2) WasDisconnectPlanned now equals {NotificationHandling.WasDisconnectPlanned}");
             
             // Save off the calling parameters in case we reboot while connected
             var vpnResumeParameters = JsonConvert.SerializeObject(VpnResumeParameters);
@@ -152,6 +154,7 @@ public class VPNTransportIKEV2 :ITransportProvider
     {
         Log.Information($"VPNTransportIKEV2.StopVPNTunnel(): Disconnecting entry '{entryName}' ...");
         NotificationHandling.WasDisconnectPlanned = true;
+        Log.Information($"StopVPNTunnel: WasDisconnectPlanned now equals {NotificationHandling.WasDisconnectPlanned}");
         ResetVPNStateAtSuspend(); // CHECK THIS - moving to here - makes sense after non-error Disconnect command return
         ConnectionRoutines.DisconnectEntry(entryName);
     }
@@ -212,23 +215,36 @@ public class VPNTransportIKEV2 :ITransportProvider
             //Log.Information($"PollConnectionState(): Clients connected - signalling them.");
             
            // Log.Information($"PollConnectionState(): Signaling clients ...");
-            
-            Utility.CheckConnectionResult connectionResult;
-            ConnectionRoutines.RasConnStatusInfo rasConnStatusInfo;
-            Log.Information("PollConnectionState(): Calling ConnectionRoutines.GetConnectionState to get current status...");
-            unsafe
-            {
-                nint hRasConn = (nint)ConnectionRoutines.ActiveConnectionHandle;
-                connectionResult = ConnectionRoutines.GetConnectionState(hRasConn, out rasConnStatusInfo);
-            }
-            
-            Log.Information("PollConnectionState(): Calling GetCurrentVPNState() to get current status...");
-            var cs = GetCurrentVPNState();
-            Log.Information($"PollConnectionState: [NoficationHandling.GetConnectionState] = {cs}.");
-            Log.Information($"PollConnectionState: [RasConnStatusInfo.RasConState] = {rasConnStatusInfo.RasConnState}.");
-            Log.Information($"PollConnectionState: [RasConnStatusInfo.RasConSubState] = {rasConnStatusInfo.RasConnSubState}.");
-            Log.Information($"PollConnectionState: [RasConnStatusInfo] = {rasConnStatusInfo}.");
-            switch (connectionResult)
+
+           Utility.CheckConnectionResult connectionResult = Utility.CheckConnectionResult.Uninitialized;
+           ConnectionRoutines.RasConnStatusInfo rasConnStatusInfo;
+           var cs = ITransportProvider.VPNProviderStatus.VPNStatusInvalid;
+           try
+           {
+
+               Log.Information(
+                   "PollConnectionState(): Calling ConnectionRoutines.GetConnectionState to get current status...");
+               unsafe
+               {
+                   nint hRasConn = (nint)ConnectionRoutines.ActiveConnectionHandle;
+                   connectionResult = ConnectionRoutines.GetConnectionState(hRasConn, out rasConnStatusInfo);
+               }
+
+               Log.Information("PollConnectionState(): Calling GetCurrentVPNState() to get current status...");
+               cs = GetCurrentVPNState();
+               Log.Information($"PollConnectionState: [NoficationHandling.GetConnectionState] = {cs}.");
+               Log.Information(
+                   $"PollConnectionState: [RasConnStatusInfo.RasConState] = {rasConnStatusInfo.RasConnStateValue}.");
+               Log.Information(
+                   $"PollConnectionState: [RasConnStatusInfo.RasConSubState] = {rasConnStatusInfo.RasConnSubStateValue}.");
+               Log.Information($"PollConnectionState: [RasConnStatusInfo] = {rasConnStatusInfo}.");
+           }
+           catch (Exception e)
+           {
+               Log.Error(e, $"PollConnectionState: Exception thrown for some reason: {e.Message}");
+           }
+
+           switch (connectionResult)
             {
                 case Utility.CheckConnectionResult.CONNECTED:
                     _vpnStatus = ITransportProvider.VPNProviderStatus.VPNStatusConnected;
