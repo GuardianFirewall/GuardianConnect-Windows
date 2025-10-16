@@ -1,7 +1,7 @@
 using GuardianConnect.Shared;
 using GuardianConnect.VPNTransports;
-using NativeRoutines;
 using Serilog;
+using Win32Calls;
 
 namespace GuardianFirewallService;
 
@@ -37,10 +37,11 @@ public class GuardianNPCommandDispatcher :IGuardianNPContract
         return result;
     }
 
-    public void DisconnectVPNConnection(string entryName)
+    public void DisconnectVPNConnection()
     {
         _vpnTransportIkev2 = new VPNTransportIKEV2();
-        _vpnTransportIkev2.StopVPNTunnel(entryName);
+        Log.Information($"GuardianNPCommandDispatcher.DisconnectVPNConnection: stopping VPN entry '{ConnectionRoutines.ActiveConnectionEntryName}'");
+        _vpnTransportIkev2.StopVPNTunnel();
     }
 
     public IGuardianNPContract.CurrentVPNStatus GetCurrentVpnConnectionStatus()
@@ -50,18 +51,15 @@ public class GuardianNPCommandDispatcher :IGuardianNPContract
             ConnectionState = IGuardianNPContract.ConnectionStateEnum.Disconnected,
             EntryName = "None"
         };
-            
-        unsafe
-        {
-            char* entryOut = null;
-            bool anyConnectionActive = ConnectionRoutines.IsAnyConnectionActive(entryOut);
-            status.ConnectionState = anyConnectionActive
-                ? IGuardianNPContract.ConnectionStateEnum.Connected
-                : IGuardianNPContract.ConnectionStateEnum.Disconnected;
-            status.EntryName = status.ConnectionState == IGuardianNPContract.ConnectionStateEnum.Connected
-                ? ConnectionRoutines.ConnectedEntry
-                : "None";
-        }
+
+        bool anyConnectionActive = ConnectionRoutines.IsAnyConnectionActive(out string entryOut);
+        Log.Information($"GuardianNPCommandDispatcher.GetVpnConnectionStatus: IsAnyConnectionActive returned {anyConnectionActive}, Entry: '{entryOut}'");
+        status.ConnectionState = anyConnectionActive
+            ? IGuardianNPContract.ConnectionStateEnum.Connected
+            : IGuardianNPContract.ConnectionStateEnum.Disconnected;
+        status.EntryName = status.ConnectionState == IGuardianNPContract.ConnectionStateEnum.Connected
+            ? ConnectionRoutines.ActiveConnectionEntryName
+            : "None";
 
         return status;
     }

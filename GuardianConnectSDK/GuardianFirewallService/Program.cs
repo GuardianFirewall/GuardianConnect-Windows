@@ -2,10 +2,13 @@
 using GuardianFirewallService;
 using Microsoft.Extensions.Hosting;
 using Serilog;
+using Win32Calls;
 
 // setup  logging first
 var paths = new[] { @"C:\temp", "GuardianFirewallService", "Diagnostics.log" };
 const string filler = "##############";
+
+Win32Calls.Class1.foo();
 
 Common.LogFilePath = Path.Combine(paths);
 Common.SetUpLogging();

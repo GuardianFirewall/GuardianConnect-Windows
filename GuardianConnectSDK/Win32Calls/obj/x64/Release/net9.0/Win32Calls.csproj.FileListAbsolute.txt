@@ -1,0 +1,13 @@
+C:\Users\Tim\Documents\GitHub\GuardianConnect-Windows\GuardianConnectSDK\BuildOutput\Win32Calls\runtimes\win10-x64\lib\net9.0-windows\Win32Calls.deps.json
+C:\Users\Tim\Documents\GitHub\GuardianConnect-Windows\GuardianConnectSDK\BuildOutput\Win32Calls\runtimes\win10-x64\lib\net9.0-windows\Win32Calls.dll
+C:\Users\Tim\Documents\GitHub\GuardianConnect-Windows\GuardianConnectSDK\BuildOutput\Win32Calls\runtimes\win10-x64\lib\net9.0-windows\Win32Calls.pdb
+C:\Users\Tim\Documents\GitHub\GuardianConnect-Windows\GuardianConnectSDK\Win32Calls\obj\x64\Release\net9.0\Win32Calls.csproj.AssemblyReference.cache
+C:\Users\Tim\Documents\GitHub\GuardianConnect-Windows\GuardianConnectSDK\Win32Calls\obj\x64\Release\net9.0\Win32Calls.GeneratedMSBuildEditorConfig.editorconfig
+C:\Users\Tim\Documents\GitHub\GuardianConnect-Windows\GuardianConnectSDK\Win32Calls\obj\x64\Release\net9.0\Win32Calls.AssemblyInfoInputs.cache
+C:\Users\Tim\Documents\GitHub\GuardianConnect-Windows\GuardianConnectSDK\Win32Calls\obj\x64\Release\net9.0\Win32Calls.AssemblyInfo.cs
+C:\Users\Tim\Documents\GitHub\GuardianConnect-Windows\GuardianConnectSDK\Win32Calls\obj\x64\Release\net9.0\Win32Calls.csproj.CoreCompileInputs.cache
+C:\Users\Tim\Documents\GitHub\GuardianConnect-Windows\GuardianConnectSDK\Win32Calls\obj\x64\Release\net9.0\Win32Calls.sourcelink.json
+C:\Users\Tim\Documents\GitHub\GuardianConnect-Windows\GuardianConnectSDK\Win32Calls\obj\x64\Release\net9.0\Win32Calls.dll
+C:\Users\Tim\Documents\GitHub\GuardianConnect-Windows\GuardianConnectSDK\Win32Calls\obj\x64\Release\net9.0\refint\Win32Calls.dll
+C:\Users\Tim\Documents\GitHub\GuardianConnect-Windows\GuardianConnectSDK\Win32Calls\obj\x64\Release\net9.0\Win32Calls.pdb
+C:\Users\Tim\Documents\GitHub\GuardianConnect-Windows\GuardianConnectSDK\Win32Calls\obj\x64\Release\net9.0\ref\Win32Calls.dll

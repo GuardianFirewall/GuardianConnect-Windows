@@ -55,7 +55,7 @@ public interface IGuardianNPContract
     
     ErrorResponse StartVPNConnection(Dictionary<string, object> protocolRequest);
 
-    void DisconnectVPNConnection(string entryName);
+    void DisconnectVPNConnection();
 
     CurrentVPNStatus GetCurrentVpnConnectionStatus();
 

@@ -24,7 +24,13 @@ if "%~1" == "gfs" (
 		echo "Building must include CPU platform as second argument"
 		goto :exit
 	)
-	 msbuild /t:restore /t:Build /p:Platform=%2 /p:Configuration=Release /p:RuntimeIdentifier=win-%2 GuardianFirewallService\GuardianFirewallService.csproj
+	if "%~3" == "aot" {
+		echo "Building Publish-AOT-Trimmed-Self-Contained GuardianFirewallService.exe"
+		msbuild /t:restore /t:Publish /p:Platform=%2 /p:Configuration=Release /p:RuntimeIdentifier=win-%2 GuardianFirewallService\GuardianFirewallService.csproj /p:PublishSingleFile=true /p:SelfContained=true /p:PublishTrimmed=true
+		goto :exit
+	}
+
+	msbuild /t:restore /t:Build /p:Platform=%2 /p:Configuration=Release /p:RuntimeIdentifier=win-%2 GuardianFirewallService\GuardianFirewallService.csproj
 	goto :exit
 )
 
