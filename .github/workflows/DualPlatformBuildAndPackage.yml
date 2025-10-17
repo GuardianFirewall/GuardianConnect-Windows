@@ -65,11 +65,11 @@ jobs:
 
     - name: Build GuardianConnect for x64 CPU
       #run: msbuild /t:restore /t:Build /p:Platform=x64 /p:Configuration=Release /p:RuntimeIdentifier=win-x64 GuardianConnect\GuardianConnect.csproj
-      run: msbuild /t:restore /t:Publish /p:Platform=x64 /p:Configuration=Release /p:RuntimeIdentifier=win-x64 GuardianFirewallService\GuardianConnect.csproj /p:PublishSingleFile=true /p:SelfContained=true /p:PublishTrimmed=true
+      run: msbuild /t:restore /t:Publish /p:Platform=x64 /p:Configuration=Release /p:RuntimeIdentifier=win-x64 GuardianConnect\GuardianConnect.csproj /p:PublishSingleFile=true /p:SelfContained=true /p:PublishTrimmed=true
       
     - name: Build GuardianConnect for ARM64 CPU
       #run: msbuild /t:restore /t:Build /p:Platform=arm64 /p:Configuration=Release /p:RuntimeIdentifier=win-arm64 GuardianConnect\GuardianConnect.csproj
-      run: msbuild /t:restore /t:Publish /p:Platform=arm64 /p:Configuration=Release /p:RuntimeIdentifier=win-arm64 GuardianFirewallService\GuardianConnect.csproj /p:PublishSingleFile=true /p:SelfContained=true /p:PublishTrimmed=true
+      run: msbuild /t:restore /t:Publish /p:Platform=arm64 /p:Configuration=Release /p:RuntimeIdentifier=win-arm64 GuardianConnect\GuardianConnect.csproj /p:PublishSingleFile=true /p:SelfContained=true /p:PublishTrimmed=true
       
     - name: Build GuardianFirewall Service for x64 CPU
       #run: msbuild /t:restore /t:Build /p:Platform=x64 /p:Configuration=Release /p:RuntimeIdentifier=win-x64 GuardianFirewallService\GuardianFirewallService.csproj
