@@ -1,0 +1,349 @@
+using GuardianConnect.Shared;
+using Serilog;
+using System.Reflection;
+using System.Runtime.InteropServices;
+using Windows.Win32;
+using Windows.Win32;
+using Windows.Win32.NetworkManagement.Rras;
+
+namespace Win32Calls;
+
+public static class ConnectionRoutines
+{
+    internal const string defaultPhonebookPath = @"C:\ProgramData\Microsoft\Network\Connections\Pbk\rasphone.pbk";
+
+    internal static HRASCONN ActiveConnectionHandle;
+    internal static RASCREDENTIALSW ActiveConnectionCredentials;
+
+    public static string ActiveConnectionEntryName { get; private set; }
+
+    internal static unsafe RASCONNW[] GetRasConnections(out uint cConnections)
+    {
+        uint cb = 0;
+        cConnections = 0;
+
+        // First call to RasEnumConnections to get count of connections and required buffer size
+        var retVal = PInvoke.RasEnumConnections(null, ref cb, out cConnections);
+        Log.Information($"GetRasConnections: First call for size returned {retVal}, cb={cb}, # of Connections = {cConnections}");
+        if (cConnections == 0)
+        {
+            Log.Information($"GetRasConnections: There are no active RAS connections. Setting empty values for name and handle and returning empty array to caller.");
+            ActiveConnectionHandle = HRASCONN.Null;
+            ActiveConnectionEntryName = "";
+            return Array.Empty<RASCONNW>();
+        }
+
+        RASCONNW[] connections = new RASCONNW[cConnections];
+        var ConnectionsZero= connections[0];
+        var pConnectionsZero = &ConnectionsZero;
+        pConnectionsZero->dwSize = cb;
+
+        retVal = PInvoke.RasEnumConnections(pConnectionsZero, ref cb, out cConnections);
+        if (retVal != 0)
+        {
+            Log.Error($"GetRasConnections: Call to RasEnumConnections returned NON-SUCCESS value of {retVal}");
+            return new RASCONNW[0];
+        }
+
+        IntPtr arrayPtr = new IntPtr(pConnectionsZero);
+        
+        for (int i = 0; i < cConnections; i++)
+        {
+            connections[i] = (RASCONNW)Marshal.PtrToStructure(arrayPtr, typeof(RASCONNW));
+            arrayPtr = new IntPtr(arrayPtr.ToInt64() + cb);
+        }
+
+        return connections;
+    }
+
+    // TJE - this is similar to CheckConnection below except entry name is not known. This is
+    // used when we have been started and don't known if or what entry has an
+    // active connection. So we iterate through and find ANY active connection
+    // and return the handle to be used for notification setup.
+    // We'll save entryName elsewhere for UI propagation
+    internal static unsafe HRASCONN FindAnyActiveConnection()
+    {
+        var connections = GetRasConnections(out uint cConnections);
+        if (connections.Length == 0)
+        {
+            Log.Error("FindAnyActiveConnection: GetRasConnections returned empty collection");
+            return HRASCONN.Null;
+        }
+
+        for (int i = 0; i < cConnections; i++)
+        {
+            var conn = connections[i];
+            // We only care about connections that start with "Guardian Firewall -"
+            if (!conn.szEntryName.ToString().StartsWith("Guardian Firewall -")) continue;
+
+            var status = new RASCONNSTATUSW
+            {
+                dwSize = (uint)sizeof(RASCONNSTATUSW)
+            };
+            var checkResult = GetRasConnectStatus(connections[i].hrasconn, ref status);
+            if (checkResult == Utility.CheckConnectionResult.CONNECTED)
+            {
+                ActiveConnectionEntryName = connections[i].szEntryName.ToString();
+                ActiveConnectionHandle = connections[i].hrasconn;
+                Log.Information($"FindAnyActiveConnection: Found active connection for entry {ActiveConnectionEntryName}");
+                return connections[i].hrasconn;
+            }
+        }
+
+        Log.Information("FindAnyActiveConnection: No active Guardian Firewall IKEv2 connections found under Ras networking");
+
+        return HRASCONN.Null;
+    }
+
+    public static string GetEntryNameOfActiveConnection()
+    {
+        var activehandle = FindAnyActiveConnection();
+        return ActiveConnectionEntryName;
+    }
+
+    public static bool IsAnyConnectionActive(out string entryNameOut)
+    {
+        entryNameOut = "";
+        var whetherWeAreConnected = FindAnyActiveConnection() != HRASCONN.Null;
+        entryNameOut = ActiveConnectionEntryName;
+        return whetherWeAreConnected;
+    }
+
+    public static unsafe ErrorResponse CreateOrUpdateEntry(string entryName, string hostName, string userName, string password, string phonebookPath = defaultPhonebookPath)
+    {
+        RASENTRYW entry = new RASENTRYW
+        {
+            dwSize = (uint)sizeof(RASENTRYW),
+            dwfOptions = PInvoke.RASEO_RemoteDefaultGateway | PInvoke.RASEO_RequireEAP | PInvoke.RASEO_PreviewDomain | PInvoke.RASEO_ShowDialingProgress,
+            szLocalPhoneNumber = hostName,
+            dwfNetProtocols = PInvoke.RASNP_Ip | PInvoke.RASNP_Ipv6,
+            dwFramingProtocol = PInvoke.RASFP_Ppp,
+            szDeviceType = PInvoke.RASDT_Vpn,
+            szDeviceName = "WAN Miniport (IKEv2)",
+            dwType = PInvoke.RASET_Vpn,
+            dwEncryptionType = PInvoke.ET_Optional,
+            dwVpnStrategy = PInvoke.VS_Ikev2Only,
+            dwfOptions2 = PInvoke.RASEO2_DontNegotiateMultilink | PInvoke.RASEO2_ReconnectIfDropped |
+                          PInvoke.RASEO2_IPv6RemoteDefaultGateway | PInvoke.RASEO2_CacheCredentials,
+            dwRedialCount = 3,
+            dwRedialPause = 60,
+            // this maps to "Type of sign-in info" => "User name and password"
+            dwCustomAuthKey = 26
+        };
+
+        Log.Information($"CreateOrUpdateEntry: Entry values are '{entryName}', '{entry.szLocalPhoneNumber}'");
+
+        uint dwRet = PInvoke.RasSetEntryProperties(null, entryName, entry, entry.dwSize, null, 0);
+        if (dwRet != 0)
+        {
+            Log.Error($"CreateOrUpdateEntry: Call to RasSetEntryProperties returned NON-SUCCESS value of {dwRet}");
+            return new ErrorResponse("NON-SUCCESS return from call to RasSetEntryProperties", null, true, null, dwRet);
+        }
+
+        RASCREDENTIALSW credentials = new RASCREDENTIALSW
+        {
+            dwMask = PInvoke.RASCM_UserName | PInvoke.RASCM_Password,
+            szUserName = userName,
+            szPassword = password,
+            dwSize = (uint)sizeof(RASCREDENTIALSW)
+        };
+
+        dwRet = PInvoke.RasSetCredentials(null, entryName, credentials, false);
+        if (dwRet != 0)
+        {
+            Log.Error($"CreateOrUpdateEntry: Call to RasSetCredentials returned NON-SUCCESS value of {dwRet:X8}");
+            return new ErrorResponse("NON-SUCCESS return from call to RasSetCredentials", null, true, null, dwRet);
+        }
+
+#if DEBUG
+        Log.Debug($"CreateOrUpdateEntry: Credentials values set are '{credentials.szUserName}', '{credentials.szPassword}'");
+#endif
+
+        bool entryWasWritten = PInvoke.WritePrivateProfileString(entryName, "NumCustomPolicy", "1", phonebookPath);
+        if (!entryWasWritten)
+        {
+            var error = Marshal.GetLastWin32Error();
+            Log.Error($"CreateOrUpdateEntry: Call to WritePrivateProfileString for NumCustomPolicy returned false. LastWin32Error = {error}");
+            return new ErrorResponse("Call to WritePrivateProfileString for NumCustomPolicy returned false", null, true, null, error);
+        }
+
+        entryWasWritten = PInvoke.WritePrivateProfileString(entryName, "CustomIPSecPolicies",
+            "030000000400000002000000050000000200000000000000", phonebookPath);
+        if (!entryWasWritten)
+        {
+            var error = Marshal.GetLastWin32Error();
+            Log.Error($"CreateOrUpdateEntry: Call to WritePrivateProfileString for CustomIPSecPolicies returned false. LastWin32Error = {error}");
+            return new ErrorResponse("Call to WritePrivateProfileString returned false", null, true, null, error);
+        }
+
+        ActiveConnectionEntryName = entryName;
+        ActiveConnectionCredentials = credentials;
+        return new ErrorResponse("Success", null, false, null, 0);
+    }
+
+    public static unsafe ErrorResponse ConnectEntry()
+    {
+        Log.Information($"In ConnectEntry - Entry name = {ActiveConnectionEntryName}");
+
+        // First - check to see if our connection is already active
+        // We now only use our previously stored handle if it is valid, instead of calling FindAnyActiveConnection which uses RasEnumConnections
+        // We don't need to do that extra work
+        RASCONNSTATUSW status = new RASCONNSTATUSW
+        {
+            dwSize = (uint)sizeof(RASCONNSTATUSW)
+        };
+
+        if (ActiveConnectionHandle!= IntPtr.Zero)
+        {
+            Utility.CheckConnectionResult checkResult = GetRasConnectStatus(ActiveConnectionHandle, ref status);
+            if (checkResult == Utility.CheckConnectionResult.CONNECTED)
+            {
+                Log.Information("In ConnectEntry - connection already active");
+                return new ErrorResponse("Connection already active", null, false, null, 0);
+            }
+        }
+
+        // Need to get credentials and stuff in the username and password
+        var retVal = PInvoke.RasGetCredentials(null, ActiveConnectionEntryName, ref ActiveConnectionCredentials);
+        if (retVal != 0)
+        {
+            Log.Error($"ConnectEntry: Call to RasGetCredentials returned NON-SUCCESS value of {retVal}");
+            return new ErrorResponse("NON-SUCCESS return from call to RasGetCredentials", null, true, null, retVal);
+        }
+
+        RASDIALPARAMSW rasdialparamsw = new RASDIALPARAMSW
+        {
+            szEntryName = ActiveConnectionEntryName,
+            szDomain = "*",
+            szUserName = ActiveConnectionCredentials.szUserName,
+            szPassword = ActiveConnectionCredentials.szPassword
+        };
+        rasdialparamsw.dwSize = (uint)sizeof(RASDIALPARAMSW);
+
+        ActiveConnectionHandle = HRASCONN.Null; // Reset our handle to zero before dialing
+        fixed (HRASCONN* pAcH = &ActiveConnectionHandle)
+        {
+            retVal = PInvoke.RasDial(null, null, &rasdialparamsw, 0, null, pAcH);
+
+            if (retVal != 0)
+            {
+                Log.Error($"ConnectEntry: Call to RasDial returned NON-SUCCESS value of {retVal}");
+                return new ErrorResponse("NON-SUCCESS return from call to RasDial", null, true, null, retVal);
+            }
+        }
+
+        // Update Filters to shape traffic as needed
+        Log.Information("ConnectEntry: Calling VpnDnsFilteringHandler.UpdateFiltersState to turn on traffic filtering...");
+        VpnDnsFilteringHandler.UpdateFiltersState(ActiveConnectionEntryName);
+
+        Log.Information("ConnectEntry: exiting...");
+        return new ErrorResponse();
+    }
+
+    public static bool DisconnectEntry()
+    {
+        Log.Information($"ConnectionRoutines.DisconnectEntry: ActiveConnectionHandle null? {(ActiveConnectionHandle == HRASCONN.Null)}, ActiveConnectionEntryName = '{ActiveConnectionEntryName}'");
+        bool disconnectResult = false;
+        var connectionResult = CheckConnection(ActiveConnectionEntryName, ref ActiveConnectionHandle);
+        Log.Information($"ConnectionRoutines.DisconnectEntry: checking connection returned {connectionResult}");
+        if (connectionResult == Utility.CheckConnectionResult.CONNECTED && ActiveConnectionHandle != HRASCONN.Null)
+        {
+            var retVal = PInvoke.RasHangUp(ActiveConnectionHandle);
+            if (retVal != 0)
+            {
+                Log.Error($"DisconnectEntry: Call to RasHangUp returned NON-SUCCESS value of {retVal:X8}");
+                disconnectResult = false;
+            }
+            else
+            {
+                Log.Information("DisconnectEntry: Successful return from call to RasHangup. Calling UpdateFiltersState to remove all traffic filters...");
+
+                // Update Filters to shape traffic as needed
+                VpnDnsFilteringHandler.UpdateFiltersState(ActiveConnectionEntryName);
+                ActiveConnectionHandle = HRASCONN.Null;
+                ActiveConnectionEntryName = "";
+                disconnectResult = true;
+            }
+        }
+        else
+        {
+            // Not connected, so nothing to do
+            Log.Information($"Entry '{ActiveConnectionEntryName} is not in a CONNECTED state. Its state is {connectionResult}");
+            disconnectResult = true;
+        }
+
+        return disconnectResult;
+    }
+
+    public static Utility.CheckConnectionResult CheckConnection(string entry_name)
+    {
+        HRASCONN waste = HRASCONN.Null;
+        return CheckConnection(entry_name, ref waste);
+    }
+
+    internal static unsafe Utility.CheckConnectionResult CheckConnection(string entryName, ref HRASCONN handleOut)
+    {
+        Utility.CheckConnectionResult result = Utility.CheckConnectionResult.DISCONNECTED;
+        RASCONNSTATUSW status = new RASCONNSTATUSW
+        {
+            dwSize = (uint)sizeof(RASCONNSTATUSW)
+        };
+
+        var connections = GetRasConnections(out uint cConnections);
+        if (connections.Length == 0)
+        {
+            Log.Error("CheckConnection: GetRasConnections returned empty collection");
+            return result;
+        }
+
+        for (int i = 0; i < cConnections; i++)
+        {
+            if (connections[i].szEntryName.ToString() != entryName) continue;
+            result = GetRasConnectStatus(connections[i].hrasconn, ref status);
+            switch (result)
+            {
+                case Utility.CheckConnectionResult.CONNECTED:
+                    handleOut = connections[i].hrasconn;
+                    ActiveConnectionEntryName = entryName;
+                    ActiveConnectionHandle = handleOut;
+                    break;
+                case Utility.CheckConnectionResult.CONNECTING:
+                case Utility.CheckConnectionResult.DISCONNECTING:
+                    handleOut = HRASCONN.Null;
+                    break;
+                case Utility.CheckConnectionResult.DISCONNECTED:
+                case Utility.CheckConnectionResult.CONNECT_FAILED:
+                    handleOut = HRASCONN.Null;
+                    // TODO: Do we want to clear out the saved entry name and handle here?
+                    break;
+                case Utility.CheckConnectionResult.Uninitialized:
+                    handleOut = HRASCONN.Null;
+                    break;
+            }
+        }
+
+        return result;
+    }
+
+    internal static Utility.CheckConnectionResult GetRasConnectStatus(HRASCONN h_ras_conn, ref RASCONNSTATUSW lp_ras_status)
+    {
+        var retVal = PInvoke.RasGetConnectStatus(h_ras_conn, ref lp_ras_status);
+        if (retVal != 0)
+        {
+            Log.Error($"GetRasConnectStatus: Call to RasGetConnectStatus returned NON-SUCCESS value of {retVal}");
+            return Utility.CheckConnectionResult.DISCONNECTED;
+        }
+
+        return lp_ras_status.rasconnstate switch
+        {
+            RASCONNSTATE.RASCS_Connected => Utility.CheckConnectionResult.CONNECTED,
+            //RASCONNSTATE. => Utility.CheckConnectionResult.CONNECTING,
+            //PInvoke.RASCS_Disconnecting => Utility.CheckConnectionResult.DISCONNECTING,
+            RASCONNSTATE.RASCS_Disconnected => Utility.CheckConnectionResult.DISCONNECTED,
+            //PInvoke.RASCS_ConnectFailed => Utility.CheckConnectionResult.CONNECT_FAILED,
+            _ => Utility.CheckConnectionResult.Uninitialized
+        };
+    }
+
+}
+    

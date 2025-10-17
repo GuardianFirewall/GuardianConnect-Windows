@@ -1,0 +1,17 @@
+C:\Users\Tim\Documents\GitHub\GuardianConnect-Windows\GuardianConnectSDK\BuildOutput\Win32CallsTestApp\runtimes\win10-x64\lib\net9.0-windows\Win32CallsTestApp.exe
+C:\Users\Tim\Documents\GitHub\GuardianConnect-Windows\GuardianConnectSDK\BuildOutput\Win32CallsTestApp\runtimes\win10-x64\lib\net9.0-windows\Win32CallsTestApp.deps.json
+C:\Users\Tim\Documents\GitHub\GuardianConnect-Windows\GuardianConnectSDK\BuildOutput\Win32CallsTestApp\runtimes\win10-x64\lib\net9.0-windows\Win32CallsTestApp.runtimeconfig.json
+C:\Users\Tim\Documents\GitHub\GuardianConnect-Windows\GuardianConnectSDK\BuildOutput\Win32CallsTestApp\runtimes\win10-x64\lib\net9.0-windows\Win32CallsTestApp.dll
+C:\Users\Tim\Documents\GitHub\GuardianConnect-Windows\GuardianConnectSDK\BuildOutput\Win32CallsTestApp\runtimes\win10-x64\lib\net9.0-windows\Win32CallsTestApp.pdb
+C:\Users\Tim\Documents\GitHub\GuardianConnect-Windows\GuardianConnectSDK\Win32CallsTestApp\obj\x64\Debug\net9.0-windows\Win32CallsTestApp.csproj.AssemblyReference.cache
+C:\Users\Tim\Documents\GitHub\GuardianConnect-Windows\GuardianConnectSDK\Win32CallsTestApp\obj\x64\Debug\net9.0-windows\Win32CallsTestApp.GeneratedMSBuildEditorConfig.editorconfig
+C:\Users\Tim\Documents\GitHub\GuardianConnect-Windows\GuardianConnectSDK\Win32CallsTestApp\obj\x64\Debug\net9.0-windows\Win32CallsTestApp.AssemblyInfoInputs.cache
+C:\Users\Tim\Documents\GitHub\GuardianConnect-Windows\GuardianConnectSDK\Win32CallsTestApp\obj\x64\Debug\net9.0-windows\Win32CallsTestApp.AssemblyInfo.cs
+C:\Users\Tim\Documents\GitHub\GuardianConnect-Windows\GuardianConnectSDK\Win32CallsTestApp\obj\x64\Debug\net9.0-windows\Win32CallsTestApp.csproj.CoreCompileInputs.cache
+C:\Users\Tim\Documents\GitHub\GuardianConnect-Windows\GuardianConnectSDK\Win32CallsTestApp\obj\x64\Debug\net9.0-windows\Win32CallsTestApp.sourcelink.json
+C:\Users\Tim\Documents\GitHub\GuardianConnect-Windows\GuardianConnectSDK\Win32CallsTestApp\obj\x64\Debug\net9.0-windows\Win32Cal.BB597D1F.Up2Date
+C:\Users\Tim\Documents\GitHub\GuardianConnect-Windows\GuardianConnectSDK\Win32CallsTestApp\obj\x64\Debug\net9.0-windows\Win32CallsTestApp.dll
+C:\Users\Tim\Documents\GitHub\GuardianConnect-Windows\GuardianConnectSDK\Win32CallsTestApp\obj\x64\Debug\net9.0-windows\refint\Win32CallsTestApp.dll
+C:\Users\Tim\Documents\GitHub\GuardianConnect-Windows\GuardianConnectSDK\Win32CallsTestApp\obj\x64\Debug\net9.0-windows\Win32CallsTestApp.pdb
+C:\Users\Tim\Documents\GitHub\GuardianConnect-Windows\GuardianConnectSDK\Win32CallsTestApp\obj\x64\Debug\net9.0-windows\Win32CallsTestApp.genruntimeconfig.cache
+C:\Users\Tim\Documents\GitHub\GuardianConnect-Windows\GuardianConnectSDK\Win32CallsTestApp\obj\x64\Debug\net9.0-windows\ref\Win32CallsTestApp.dll

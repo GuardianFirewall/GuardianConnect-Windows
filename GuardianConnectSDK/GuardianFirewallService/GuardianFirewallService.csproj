@@ -7,6 +7,7 @@
         <AllowUnsafeBlocks>true</AllowUnsafeBlocks>
         <Configurations>Debug;Release</Configurations>
         <Platforms>x64;ARM64</Platforms>
+	    <PublishAot>true</PublishAot>
 		<!--
 		<OutDir>..\BuildOutput\$(MSBuildProjectName)\runtimes\$(Platform)\</OutDir>
         -->
@@ -65,8 +66,8 @@
     </ItemGroup>
     <ItemGroup>
       <ProjectReference Include="..\GuardianConnect\GuardianConnect.csproj" />
-      <ProjectReference Include="..\NativeRoutines\NativeRoutines.vcxproj" />
       <ProjectReference Include="..\Shared\GuardianConnect.Shared.csproj" />
+      <ProjectReference Include="..\Win32Calls\Win32Calls.csproj" />
     </ItemGroup>
     <!--
     <Target Name="PreBuild" BeforeTargets="PreBuildEvent">

@@ -287,8 +287,9 @@ namespace GuardianConnect.Helpers
         /// <returns>String of Connection Name</returns>
         public bool GetCurrentVPNState(out string connectionName)
         {
-            Log.Information("In GetNameOfActiveConnection()");
+            Log.Information("In GetCurrentVPNState()");
             var state = ClientPipe.GetCurrentVpnConnectionStatus();
+            Log.Information($"GetCurrentVPNState: returned values for state are state: {state.ConnectionState}, entry: '{state.EntryName}'");
             var isConnected  = state.ConnectionState == IGuardianNPContract.ConnectionStateEnum.Connected;
             connectionName = state.EntryName;
             return isConnected;

@@ -29,7 +29,7 @@ public static class ClientPipe
     public static void DisconnectVPNConnection(string entryName)
     {
         if (!Instance.IsConnected) Instance.OpenNamedPipe();
-        Instance.DisconnectVPNConnection(entryName);
+        Instance.DisconnectVPNConnection();
     }
 
     public static IGuardianNPContract.CurrentVPNStatus GetCurrentVpnConnectionStatus()
@@ -161,9 +161,9 @@ public class ClientPipeImpl : IGuardianNPContract
         return startedErrorResponse;
     }
 
-    public void DisconnectVPNConnection(string entryName)
+    public void DisconnectVPNConnection()
     {
-        var cmdPayload = JsonConvert.SerializeObject(entryName);
+        var cmdPayload = "";
         var cmdString = $"{(int)IGuardianNPContract.NPCommands.DisconnectVPNConnection}.{cmdPayload}";
         ss.WriteString(cmdString);
     }

@@ -5,6 +5,7 @@ using Microsoft.Extensions.Hosting;
 using Serilog;
 using GuardianConnect.Shared;
 using Newtonsoft.Json;
+using Win32Calls;
 
 namespace GuardianFirewallService;
 
@@ -199,9 +200,9 @@ public class ClientPipeService : BackgroundService
                             ss.WriteString(startResponseJson);
                             break;
                         case IGuardianNPContract.NPCommands.DisconnectVPNConnection:
-                            Log.Information($"ClientPipeService[{threadId}]: Performing DisconnectVPNConnection");
-                            string entryName = cmdPayload;
-                            cmdDispatcher.DisconnectVPNConnection(entryName);
+                            string entryName = ConnectionRoutines.ActiveConnectionEntryName;
+                            Log.Information($"ClientPipeService[{threadId}]: Performing DisconnectVPNConnection. Entry is '{entryName}'");
+                            cmdDispatcher.DisconnectVPNConnection();
                             break;
                         case IGuardianNPContract.NPCommands.GetCurrentVpnConnectionStatus:
                             Log.Information($"ClientPipeService[{threadId}]: Performing GetCurrentVpnConnectionStatus");
@@ -224,7 +225,7 @@ public class ClientPipeService : BackgroundService
                             var status = cmdDispatcher.GetCurrentVpnConnectionStatus();
                             if (status.ConnectionState == IGuardianNPContract.ConnectionStateEnum.Connected)
                             {
-                                cmdDispatcher.DisconnectVPNConnection(status.EntryName);
+                                cmdDispatcher.DisconnectVPNConnection();
                             }
                             break;
                         case IGuardianNPContract.NPCommands.ToggleLogging:
