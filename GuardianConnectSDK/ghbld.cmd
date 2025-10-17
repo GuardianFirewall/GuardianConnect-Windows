@@ -30,6 +30,10 @@ if "%~1" == "gfs" (
 		goto :exit
 	}
 
+	if "%~3" == "dbg" {
+		msbuild /t:restore /t:Build /p:Platform=%2 /p:Configuration=Debug /p:RuntimeIdentifier=win-%2 GuardianFirewallService\GuardianFirewallService.csproj
+		goto :exit
+	}
 	msbuild /t:restore /t:Build /p:Platform=%2 /p:Configuration=Release /p:RuntimeIdentifier=win-%2 GuardianFirewallService\GuardianFirewallService.csproj
 	goto :exit
 )

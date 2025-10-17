@@ -88,9 +88,9 @@ ACL
 // Libraries
 //rasapi32.*
 Ws2_32.*
-Fwpuclnt.*
+//Fwpuclnt.*
 Iphlpapi.*
-advapi32.*
+//advapi32.*
 powrprof.*
 Synchapi.*
 

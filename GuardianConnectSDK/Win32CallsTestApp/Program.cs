@@ -3,6 +3,7 @@ using Serilog;
 using System;
 using Win32Calls;
 using Windows.Win32.Foundation;
+using Win32Calls.WFP;
 
 // See https://aka.ms/new-console-template for more information
 Serilog.Log.Logger = new Serilog.LoggerConfiguration()

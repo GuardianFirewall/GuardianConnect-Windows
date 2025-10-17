@@ -1,12 +1,15 @@
-﻿using System;
+﻿using GuardianConnect.Shared;
+using Microsoft.Win32.SafeHandles;
+using Serilog;
+using System;
 using System.Collections.Generic;
 using System.Configuration;
 using System.Linq;
 using System.Security.AccessControl;
+using System.Security.Principal;
 using System.Text;
 using System.Threading.Tasks;
 using Windows.Wdk;
-using Serilog;
 using Windows.Win32;
 using Windows.Win32.Foundation;
 using Windows.Win32.NetworkManagement.IpHelper;
@@ -14,8 +17,6 @@ using Windows.Win32.NetworkManagement.Ndis;
 using Windows.Win32.NetworkManagement.Rras;
 using Windows.Win32.NetworkManagement.WindowsFilteringPlatform;
 using Windows.Win32.Security;
-using GuardianConnect.Shared;
-using Microsoft.Win32.SafeHandles;
 using PInvoke = Windows.Win32.PInvoke;
 
 namespace Win32Calls
@@ -32,7 +33,7 @@ namespace Win32Calls
         static void RasConnChangeWaiterThread();
     };
 #endif
-    public static unsafe class NotificationHandler
+    public static class NotificationHandler
     {
         public static bool WasDisconnectPlanned = false;
         public static string LastKnownConnectedEntry;
@@ -47,7 +48,7 @@ namespace Win32Calls
         internal static HANDLE hVPNSvrSideEvtHandle;
         internal static HANDLE hVPNCliSideEvtHandle;
 
-        internal static void StartRasConnectStateWatcher()
+        internal static unsafe void StartRasConnectStateWatcher()
         {
             HRASCONN handleToActiveConnection = ConnectionRoutines.FindAnyActiveConnection();
             if (handleToActiveConnection == HRASCONN.Null)
@@ -120,6 +121,7 @@ namespace Win32Calls
 
         internal static unsafe void CreateListenerNotifyEvents()
         {
+#if WIN32
             SECURITY_DESCRIPTOR sd = new SECURITY_DESCRIPTOR();
             PSECURITY_DESCRIPTOR pSecDesc = new PSECURITY_DESCRIPTOR(new IntPtr(&sd));
             var initOk = PInvoke.InitializeSecurityDescriptor(pSecDesc, PInvoke.SECURITY_DESCRIPTOR_REVISION);
@@ -152,6 +154,16 @@ namespace Win32Calls
             }
             //var svcHandle = PInvoke.CreateEvent(lpSecAttr, false, false, Common.VPNEVT_NAME_SVRSIDE);
             //VPNServiceNotifierHandle = svcHandle.SafeWaitHandle;
+#else
+            var users = new SecurityIdentifier(WellKnownSidType.WorldSid, null);
+            var rule = new EventWaitHandleAccessRule(users, EventWaitHandleRights.Synchronize | EventWaitHandleRights.Modify, AccessControlType.Allow);
+            var security = new EventWaitHandleSecurity();
+            security.AddAccessRule(rule);
+            VPNServiceNotifierHandle = new EventWaitHandle(false, EventResetMode.ManualReset, Common.VPNEVT_NAME_SVRSIDE);
+            VPNServiceNotifierHandle.SetAccessControl(security);
+            VPNServiceNotifierHandle = new EventWaitHandle(false, EventResetMode.ManualReset, Common.VPNEVT_NAME_CLIENTSIDE);
+            VPNServiceNotifierHandle.SetAccessControl(security);
+#endif
         }
 
     }

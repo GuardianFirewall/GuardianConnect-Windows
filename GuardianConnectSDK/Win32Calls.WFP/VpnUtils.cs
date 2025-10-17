@@ -1,48 +1,24 @@
-﻿using Windows.Win32;
+﻿using Serilog;
+using System.Diagnostics.Tracing;
+using System.Runtime.CompilerServices;
+using System.Runtime.InteropServices;
+using Windows.Win32;
 using Windows.Win32.Foundation;
 using Windows.Win32.NetworkManagement.IpHelper;
 using Windows.Win32.NetworkManagement.Ndis;
 using Windows.Win32.NetworkManagement.WindowsFilteringPlatform;
 using Windows.Win32.Security;
-using Serilog;
 
 namespace Win32Calls.WFP
 {
-    internal class VpnUtils
+    public class VpnUtils
     {
-        /* items from VpnUtils.h */
-#if CPP
-        static UINT64 TAP_IPv4_Id;
-        static UINT64 TAP_IPv6_Id;
-        static UINT64 QBlock_IPv6_Id;
-        static UINT64 QBlock_IPv4_Id;
-
-        // Sets helper's flag to indicate filters successfully installed.
-        static void SetFiltersInstalledFlag();
-        // Resets helper's filters installed flag.
-        static void ResetFiltersInstalledFlag();
-        // Register and setup DNS filters layer to the system, if the layer is already
-        // registered reuses existing.
-        static bool AddWpmFilters(HANDLE engine_handle, System::String^ name);
-        static bool RemoveWpmFilters(HANDLE engine_handle, System::String^ name);
-        // Opens a session to a filter engine.
-        static HANDLE OpenWpmSession();
-        // Closes a session to a filter engine.
-        static bool CloseWpmSession(HANDLE engine);
-        // Subscribes for RAS connection notification of any os vpn entry.
-        static bool SubscribeRasConnectionNotification(HANDLE event_handle);
-        // Configure VPN Service autorestart.
-        static bool ConfigureServiceAutoRestart(const std::wstring& service_name,
-        const std::wstring& brave_vpn_entry);
-        static SC_HANDLE SCM;
-#endif
-
         static UInt64 TAP_IPv4_Id = 0;
         static UInt64 TAP_IPv6_Id = 0;
         static UInt64 QBlock_IPv6_Id = 0;
         static UInt64 QBlock_IPv4_Id = 0;
 
-        internal static char[] adapterNameToMatch;
+        public static char[] adapterNameToMatch;
         static IP_ADAPTER_INFO adapterInfo = new IP_ADAPTER_INFO();
 
         // Microsoft-Windows-NetworkProfile
@@ -51,25 +27,34 @@ namespace Win32Calls.WFP
 
         // 754b7cbd-cad3-474e-8d2c-054413fd4509
         internal static readonly Guid kVpnDnsSublayerGUID = new Guid("754b7cbd-cad3-474e-8d2c-054413fd4509");
+        private const string GRD_NETWORK_PROFILE_GUID = "fbcfac3f-8459-419f-8e48-1f0b49cdb85e";
+        private const string GRD_VPN_DNSSUBLAYER_GUID = "754b7cbd-cad3-474e-8d2c-054413fd4509";
 
-        static string kGuardianVPNServiceFilterName = "Guardian Firewall VPN Service Filter";
-        static string kGuardianVPNServiceFilterDesc = "Session for Guardian Firewall VPN Service";
-        static private PWSTR pSessionName;
-        static private PWSTR pSessionDesc;
+
+        private static char[] GuardianVPNServiceFilterName = "Guardian Firewall VPN Service Filter".ToCharArray();
+        private static char[] GuardianVPNServiceFilterDesc = "Session for Guardian Firewall VPN Service".ToCharArray();
+        private static char[] GuardianVpnFilterSubLayerName = "Guardian Firewall VPN Service Sublayer".ToCharArray();
+        private static char[] GuardianVpnFilterSubLayerDesc = "Sublayer for Guardian Firewall VPN Service".ToCharArray();
+
+        private static PWSTR pSessionName;
+        private static PWSTR pSessionDesc;
+
+        private static FWPM_FILTER_CONDITION0[] conditions = new FWPM_FILTER_CONDITION0[2];
+
         const string kGuardianVpnHelperRegistryStoragePath = "Software\\GuardianSoftware\\Vpn\\HelperService";
 
-        internal static unsafe HANDLE OpenWpmSession()
+        public static unsafe HANDLE OpenWpmSession()
         {
             HANDLE engine = HANDLE.Null;
             FWPM_SESSION0 session = new FWPM_SESSION0();
             session.flags = PInvoke.FWPM_SESSION_FLAG_DYNAMIC;
             session.displayData = new FWPM_DISPLAY_DATA0();
-            fixed (char* p = kGuardianVPNServiceFilterName)
+            fixed (char* p = GuardianVPNServiceFilterName)
             {
                 pSessionName = new PWSTR(p);
                 session.displayData.name = pSessionName;
             }
-            fixed (char* p = kGuardianVPNServiceFilterDesc)
+            fixed (char* p = GuardianVPNServiceFilterDesc)
             {
                 pSessionDesc = new PWSTR(p);
                 session.displayData.description = pSessionDesc;
@@ -93,7 +78,7 @@ namespace Win32Calls.WFP
             return engine;
         }
 
-        internal static bool CloseWpmSession(HANDLE engine)
+        public static bool CloseWpmSession(HANDLE engine)
         {
             if (engine == HANDLE.Null)
             {
@@ -117,13 +102,13 @@ namespace Win32Calls.WFP
             FWPM_SUBLAYER0* ptr = &subLayer;
             subLayer.subLayerKey = uuid;
             subLayer.displayData = new FWPM_DISPLAY_DATA0();
-            fixed (char* p = "Guardian Firewall VPN Service Sublayer")
+            fixed (char* p = GuardianVpnFilterSubLayerName)
             {
                 PWSTR pSubLayerName = new PWSTR(p);
                 subLayer.displayData.name = pSubLayerName;
             }
 
-            fixed (char* p = "Sublayer for Guardian Firewall VPN Service")
+            fixed (char* p = GuardianVpnFilterSubLayerDesc)
             {
                 PWSTR pSublayerDesc = new PWSTR(p);
                 subLayer.displayData.description = pSublayerDesc;
@@ -183,7 +168,7 @@ namespace Win32Calls.WFP
             return 0;
         }
 
-        internal static unsafe int GetAdapterIndexByName()
+        public static unsafe int GetAdapterIndexByName()
         {
             int indexOfMatch = -1;
             uint adapterInfoSize = 0;
@@ -240,7 +225,7 @@ namespace Win32Calls.WFP
 
             FWPM_FILTER0 filter = new FWPM_FILTER0();
             filter.subLayerKey = kVpnDnsSublayerGUID;
-            fixed (char* p = kGuardianVPNServiceFilterName)
+            fixed (char* p = GuardianVPNServiceFilterName)
             {
                 PWSTR pSubLayerName = new PWSTR(p);
                 filter.displayData.name = pSubLayerName;
@@ -275,7 +260,7 @@ namespace Win32Calls.WFP
         {
             FWPM_FILTER0 filter = new FWPM_FILTER0();
             filter.subLayerKey = kVpnDnsSublayerGUID;
-            fixed (char* p = kGuardianVPNServiceFilterName)
+            fixed (char* p = GuardianVPNServiceFilterName)
             {
                 PWSTR pSubLayerName = new PWSTR(p);
                 filter.displayData.name = pSubLayerName;
@@ -306,6 +291,27 @@ namespace Win32Calls.WFP
 	    // over the block filter added with automatic weighting */
         internal static unsafe uint PermitQueriesFromTAP(HANDLE engineHandle, string connectionName)
         {
+            // Filter
+            FWPM_FILTER0 filter = new FWPM_FILTER0();
+            Log.Information($"PermitQueriesFromTAP: Setting filter.subLayerKey to kVpnDnsSublayerGUID {kVpnDnsSublayerGUID}");
+            filter.subLayerKey = kVpnDnsSublayerGUID;
+            fixed (char* p = GuardianVPNServiceFilterName)
+            {
+                PWSTR pSubLayerName = new PWSTR(p);
+                filter.displayData.name = pSubLayerName;
+            }
+
+            filter.weight.type = FWP_DATA_TYPE.FWP_UINT8;
+            filter.weight.Anonymous.uint8 = 0xE; // Higher priority than block filter
+
+            /* Permit all IPv4 DNS queries from TAP adapter */
+            filter.layerKey = PInvoke.FWPM_LAYER_ALE_AUTH_CONNECT_V4;
+            filter.action.type = FWP_ACTION_TYPE.FWP_ACTION_PERMIT;
+            // Filter created - continue with conditions...
+
+#if WORKING // Original code from Brian at Brave - seems to have issues finding TAP adapter by name
+// TJE TODO - FIX THIS!! - compare with C++ code to see if both return same adapter index and ComboIndex. Also compare LUID values.
+            // Get TAP adapter index
             adapterNameToMatch = connectionName.ToCharArray();
             int adapterIndex = GetAdapterIndexByName();
             if (adapterIndex == -1)
@@ -314,54 +320,54 @@ namespace Win32Calls.WFP
                 return 1;
             }
 
-            NET_LUID_LH luid = new NET_LUID_LH();
-            fixed (char* p = connectionName)
+            NET_LUID_LH tapluid = new NET_LUID_LH();
+            var result = PInvoke.ConvertInterfaceIndexToLuid((uint)adapterIndex, &tapluid);
+            if (result != WIN32_ERROR.ERROR_SUCCESS) return 1;
+
+            //FWPM_FILTER_CONDITION0* pCondition = (FWPM_FILTER_CONDITION0*)Unsafe.AsPointer(ref VpnUtils.conditions[0]);
+            fixed (FWPM_FILTER_CONDITION0* pCondition = VpnUtils.conditions)
             {
-                PWSTR pSubLayerName = new PWSTR(p);
-                var result = PInvoke.ConvertInterfaceAliasToLuid(p, &luid);
+                // Condition 1
+                FWP_CONDITION_VALUE0 cv1 = new FWP_CONDITION_VALUE0();
+                cv1.type = FWP_DATA_TYPE.FWP_UINT16;
+                cv1.Anonymous.uint16 = 53; // DNS port
+
+                FWPM_FILTER_CONDITION0 tCondition = new FWPM_FILTER_CONDITION0();
+                pCondition[0].fieldKey = PInvoke.FWPM_CONDITION_IP_REMOTE_PORT;
+                pCondition[0].matchType = FWP_MATCH_TYPE.FWP_MATCH_EQUAL;
+                pCondition[0].conditionValue = cv1;
+
+                // Condition 2
+                FWP_CONDITION_VALUE0 cv2 = new FWP_CONDITION_VALUE0();
+                cv2.type = FWP_DATA_TYPE.FWP_UINT64;
+                cv2.Anonymous.uint64 = (ulong*)(&tapluid.Value);
+
+                pCondition[1].fieldKey = PInvoke.FWPM_CONDITION_IP_LOCAL_INTERFACE;
+                pCondition[1].matchType = FWP_MATCH_TYPE.FWP_MATCH_EQUAL;
+                pCondition[1].conditionValue = cv2;
+
+                // Add conditions to filter
+                filter.filterCondition = pCondition;
+                filter.numFilterConditions = 2;
             }
-            FWP_CONDITION_VALUE0 cv = new FWP_CONDITION_VALUE0();
-            // Condition 1
-            cv.type = FWP_DATA_TYPE.FWP_UINT16;
-            cv.Anonymous.uint16 = 53; // DNS port
-            FWPM_FILTER_CONDITION0 condition1 = new FWPM_FILTER_CONDITION0();
-            condition1.fieldKey = PInvoke.FWPM_CONDITION_IP_REMOTE_PORT;
-            condition1.matchType = FWP_MATCH_TYPE.FWP_MATCH_EQUAL;
-            condition1.conditionValue = cv;
+#else
+            filter.numFilterConditions = 0;
+#endif
 
-            FWP_CONDITION_VALUE0 cv2 = new FWP_CONDITION_VALUE0();
-            cv2.type = FWP_DATA_TYPE.FWP_UINT64;
-            cv2.Anonymous.uint64 = (ulong*)(&luid.Value);
-            FWPM_FILTER_CONDITION0 condition2 = new FWPM_FILTER_CONDITION0();
-            condition2.fieldKey = PInvoke.FWPM_CONDITION_IP_LOCAL_INTERFACE;
-            condition2.matchType = FWP_MATCH_TYPE.FWP_MATCH_EQUAL;
-            condition2.conditionValue = cv2;
-            FWPM_FILTER_CONDITION0* conditions = stackalloc FWPM_FILTER_CONDITION0[2];
-            conditions[0] = condition1;
-            conditions[1] = condition2;
-
-            FWPM_FILTER0 filter = new FWPM_FILTER0();
-            filter.subLayerKey = kVpnDnsSublayerGUID;
-            fixed (char* p = kGuardianVPNServiceFilterName)
-            {
-                PWSTR pSubLayerName = new PWSTR(p);
-                filter.displayData.name = pSubLayerName;
-            }
-
-            filter.weight.type = FWP_DATA_TYPE.FWP_UINT8;
-            filter.weight.Anonymous.uint8 = 0xE; // Higher priority than block filter
-            filter.filterCondition = conditions;
-            filter.numFilterConditions = 2;
-
-            /* Permit all IPv4 DNS queries from TAP adapter */
-            filter.layerKey = PInvoke.FWPM_LAYER_ALE_AUTH_CONNECT_V4;
-            filter.action.type = FWP_ACTION_TYPE.FWP_ACTION_PERMIT;
             UInt64 filterId = 0;
             Log.Information("PermitQueriesFromTAP: [CONNECT#9.2] Calling FwpmFilterAdd0() to Permit IPv4 DNS queries from TAP...");
             var retVal = PInvoke.FwpmFilterAdd0(engineHandle, &filter, PSECURITY_DESCRIPTOR.Null, &filterId);
             if (retVal != 0)
             {
-                Log.Error($"PermitQueriesFromTAP: Failed to add IPv4 DNS permit filter. Error: {retVal}");
+                if (retVal == 0x80320007)
+                {
+                    Log.Error($"PermitQueriesFromTAP: Failed to add IPv4 DNS permit filter. Error: {retVal:X8} [FWP_E_SUBLAYER_NOT_FOUND]");
+                }
+                else
+                {
+                    Log.Error($"PermitQueriesFromTAP: Failed to add IPv4 DNS permit filter. Error: {retVal:X8}");
+                    
+                }
                 return retVal;
             }
 
@@ -383,7 +389,7 @@ namespace Win32Calls.WFP
             return retVal;
         }
 
-        internal static unsafe bool AddWpmFilters(HANDLE engine_handle, string name)
+        public static unsafe bool AddWpmFilters(HANDLE engine_handle, string name)
         {
             if (engine_handle == HANDLE.Null)
             {
@@ -431,7 +437,7 @@ namespace Win32Calls.WFP
             return true;
         }
 
-        internal static unsafe bool RemoveWpmFilters(HANDLE engine_handle, string name)
+        public static unsafe bool RemoveWpmFilters(HANDLE engine_handle, string name)
         {
             // We need to fall through and try to remove all filters even if one fails.
             bool whetherSuccessful = true;
@@ -444,6 +450,7 @@ namespace Win32Calls.WFP
                 }
 
                 uint result = 0;
+
                 // Remove TAP IPv4 filter
                 if (TAP_IPv4_Id != 0)
                 {
@@ -497,6 +504,7 @@ namespace Win32Calls.WFP
                     whetherSuccessful = false;
                 }
 
+
                 Log.Information("RemoveWpmFilters: Successfully removed WPM filters.");
             }
             catch (Exception e)
@@ -508,7 +516,7 @@ namespace Win32Calls.WFP
             return whetherSuccessful;
         }
 
-        internal static void SetFiltersInstalledFlag()
+        public static void SetFiltersInstalledFlag()
         {
             try
             {
@@ -526,7 +534,7 @@ namespace Win32Calls.WFP
             }
         }
 
-        internal static void ResetFiltersInstalledFlag()
+        public static void ResetFiltersInstalledFlag()
         {
             try
             {

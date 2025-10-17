@@ -14,10 +14,12 @@
         <PrivateAssets>all</PrivateAssets>
         <IncludeAssets>runtime; build; native; contentfiles; analyzers; buildtransitive</IncludeAssets>
       </PackageReference>
+      <PackageReference Include="System.Threading.AccessControl" Version="9.0.3" />
     </ItemGroup>
 
     <ItemGroup>
       <ProjectReference Include="..\Shared\GuardianConnect.Shared.csproj" />
+      <ProjectReference Include="..\Win32Calls.WFP\Win32Calls.WFP.csproj" />
     </ItemGroup>
 
 </Project>

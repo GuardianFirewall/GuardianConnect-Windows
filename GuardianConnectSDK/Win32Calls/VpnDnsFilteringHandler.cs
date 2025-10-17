@@ -5,6 +5,7 @@ using System.Text;
 using System.Threading.Tasks;
 using Windows.Win32.Foundation;
 using Serilog;
+using Win32Calls.WFP;
 
 namespace Win32Calls
 {
@@ -25,7 +26,7 @@ namespace Win32Calls
                 return true;
             }
             Log.Information($"SetFilters: Setting DNS filters for '{EntryName}'...");
-            engine_ = Win32Calls.VpnUtils.OpenWpmSession();
+            engine_ = Win32Calls.WFP.VpnUtils.OpenWpmSession();
             if (engine_ == HANDLE.Null)
             {
                 Log.Information("SetFilters: Failed to create engine.");
@@ -57,11 +58,22 @@ namespace Win32Calls
 
         internal static bool RemoveFilters(string EntryName)
         {
+            bool success = true;
             if (!IsActive())
             {
                 Log.Information("RemoveFilters: DNS Filtering not active, skipping...");
                 return true;
             }
+            Log.Information($"RemoveFilters: Removing DNS filters for '{EntryName}'...");
+            if (!Win32Calls.WFP.VpnUtils.CloseWpmSession(engine_))
+            {
+                Log.Information("RemoveFilters: Failed to close engine.");
+                return false;
+            }
+            engine_ = HANDLE.Null;
+            Log.Information("RemoveFilters: DNS Filtering removed successfully.");
+
+#if NEEDED
             Log.Information($"RemoveFilters: Removing DNS filters for '{EntryName}'...");
             bool success = RemovePlatformFilters(EntryName);
             if (!success)
@@ -69,13 +81,14 @@ namespace Win32Calls
                 Log.Information("RemoveFilters: Failed to remove platform filters. Continuing to close WpmSession...");
             }
 
-            if (!Win32Calls.VpnUtils.CloseWpmSession(engine_))
+            if (!Win32Calls.WFP.VpnUtils.CloseWpmSession(engine_))
             {
                 Log.Information("RemoveFilters: Failed to close engine.");
                 return false;
             }
             engine_ = HANDLE.Null;
             Log.Information("RemoveFilters: DNS Filtering removed successfully.");
+#endif
             return success;
         }
 
