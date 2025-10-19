@@ -60,7 +60,6 @@ namespace GuardianConnect.Helpers
                         }
                         else
                         {
-                            //Log.Information($"GetLatestRegionsList: Content returned = '{content}'");
                             regionsList = JsonSerializer.Deserialize<List<GRDRegion>>(content, GRDRegionJsonContext.Default.ListGRDRegion) ?? new List<GRDRegion>();
                             Log.Information($"GetLatestRegionsList: Regions Collection loaded with (ACTUAL) {regionsList.Count} items");
                         }
@@ -106,21 +105,14 @@ namespace GuardianConnect.Helpers
                 if (response != null && response.IsSuccessStatusCode)
                 {
                     string content = await response.Content.ReadAsStringAsync(); // Task short-circuit jump
-                    //Log.Information($"GetLatestTimeZonesForRegions: Content returned = '{content}'");
-                    Log.Information(
-                        $"GetLatestTimeZonesForRegions: Content returned contains 'us-east' region? {content.Contains("us-east")}.");
-                    Log.Information($"GetLatestTimeZonesForRegions: Content contains 'America/New_York' timezone? {content.Contains("America/New_York")}");
-                    //geoDataCollection = JsonSerializer.Deserialize<List<GeoData>>(content) ?? new List<GeoData>();
                     geoDataCollection = JsonSerializer.Deserialize<List<GeoData>>(content, GeoDataJsonContext.Default.ListGeoData);
-
                     Log.Information($"GetLatestTimeZonesForRegions: Regions Refresh: Regions GeoData Collection loaded with (ACTUAL) {geoDataCollection.Count} items");
                 }
                 else
                 {
                     if (response != null)
                     {
-                        errorMessage =
-                            $"GetLatestTimeZonesForRegions: ResponseCode for getting latest regions collection: {response.StatusCode}";
+                        errorMessage = $"GetLatestTimeZonesForRegions: ResponseCode for getting latest regions collection: {response.StatusCode}";
                         Log.Error(errorMessage);
                     }
                     else
@@ -136,7 +128,7 @@ namespace GuardianConnect.Helpers
                 Log.Information($"GetLatestTimeZonesForRegions: Regions Refresh: Regions GeoData Collection loaded with (STATIC) {geoDataCollection.Count} items");
             }
 
-            Log.Information($"GetLatestTimeZonesForRegions: Regions Refresh: ow populating timezonesLookup dictionary with {geoDataCollection.Count} entries...");
+            Log.Information($"GetLatestTimeZonesForRegions: now populating timezonesLookup dictionary with {geoDataCollection.Count} entries...");
             foreach (var geoRec in geoDataCollection)
             {
                 Log.Information($"GetLatestTimeZonesForRegions: Adding '{geoRec.KeyName}' with {geoRec.Timezones.Count} timezones");
@@ -144,13 +136,8 @@ namespace GuardianConnect.Helpers
                 {
                     Log.Warning($"GetLatestTimeZonesForRegions: Could not add timezones for region key '{geoRec.KeyName}");
                 }
-                Log.Information("GetLatestTimeZonesForRegions: Testing lookup for default region key 'us-east'");
-
-                var tgv = timezonesLookup.TryGetValue("us-east", out var listGotten);
-                Log.Information($"GetLatestTimeZonesForRegions: timezonesLookup.TryGetValue for 'us-east' returned {tgv}. List gotten is null? {listGotten == null}");
             }
 
-            Log.Information($"GetLatestTimeZonesForRegions: timezonesLookup contains {timezonesLookup.Count} entries.");
             return geoDataCollection;
         }
 
@@ -158,76 +145,36 @@ namespace GuardianConnect.Helpers
         public static bool LookUpRegionIndexForMyTimeZone(string ourTimeZoneId, out string myRegionKey)
         {
             string containingKey = string.Empty;
+            myRegionKey = "us-east"; // default
+
             Log.Information($"LookUpRegionIndexForMyTimeZone [0.22.19.1234] Our time zone ID = '{ourTimeZoneId}'");
-            Log.Information($"timezonesLookup not null? = {timezonesLookup != null}");
-            myRegionKey = "FOO";
-            if (timezonesLookup != null)
+            var ourKey = "us-east";
+            Log.Information($"timezonesLookup.Keys.Count = {timezonesLookup.Keys.Count}.");
+
+            try
             {
-                var ourKey = "us-east";
-                Log.Information(
-                    $"timezonesLookup.Keys.Count = {timezonesLookup.Keys.Count}. timezonesLookup is {timezonesLookup.ToString()}");
-                Log.Information($"timezonesLookup contains key 'us-east'? {timezonesLookup.ContainsKey(ourKey)}.");
-                try
-                {
-                    Log.Information($"timezonesLookup[{ourKey}] null? {timezonesLookup[ourKey] is List<string>}");
-                }
-                catch (NullReferenceException nre)
-                {
-                    Log.Information("timezonesLookup[ourkey] reference threw {e}");
-                }
+                containingKey = timezonesLookup.Keys
+                    .Where(key => timezonesLookup[key].Contains(ourTimeZoneId))
+                    .FirstOrDefault() ?? throw new InvalidOperationException();
+                myRegionKey = containingKey;
 
-                var tgv = timezonesLookup.TryGetValue(ourKey, out var listGotten);
-                Log.Information($"timezonesLookup.TryGetValue for 'us-east' returned {tgv}. List gotten is null? {listGotten == null}");
-                if (timezonesLookup.ContainsKey(ourKey))
+            }
+            catch (Exception e)
+            {
+                if (e is InvalidOperationException ioe)
                 {
-                    Log.Information($"timezonesLookup['us-east'] has {timezonesLookup[ourKey].Count} timezones");
-                    myRegionKey = ourKey;
-                    containingKey = myRegionKey;
+                    myRegionKey = string.IsNullOrEmpty(containingKey) ? "us-east" : containingKey;
+                    Log.Warning(ioe,
+                        $"LookUPRegionIndexForMyTimeZone: Defaulting to 'us-east' as timezone not found in timezonesLookup collection!");
+                    Log.Warning("LookUpReginoIndexForMyTimeZone: Dumping timezonesLookup collection...");
                 }
-
-//#if false
-                foreach (string k in timezonesLookup.Keys)
+                else
                 {
-                    Log.Information($"timezonesLookup key = {k}");
-                    Log.Information($"Key: '{k}' has {timezonesLookup[k].Count} timezones");
-                    if (timezonesLookup[k].Contains(ourTimeZoneId))
-                    {
-                        Log.Information($"Key: '{k}' CONTAINS our timezone ID '{ourTimeZoneId}'");
-                        myRegionKey = k;
-                        return true;
-                    }
-                }
-
-                try
-                {
-                    containingKey = timezonesLookup.Keys
-                        .Where(key => timezonesLookup[key].Contains(ourTimeZoneId))
-                        .FirstOrDefault() ?? throw new InvalidOperationException();
+                    Log.Error(e,
+                        $"LookUpRegionIndexForMyTimeZone: Exception thrown when looking up region for timezone '{ourTimeZoneId}': {e.Message}");
+                    containingKey = "us-east";
                     myRegionKey = containingKey;
-
                 }
-                catch (Exception e)
-                {
-                    if (e is InvalidOperationException ioe)
-                    {
-                        myRegionKey = string.IsNullOrEmpty(containingKey) ? "us-east" : containingKey;
-                        Log.Warning(ioe,
-                            $"LookUPRegionIndexForMyTimeZone: Defaulting to 'us-east' as timezone not found in timezonesLookup collection!");
-                        Log.Warning("LookUpReginoIndexForMyTimeZone: Dumping timezonesLookup collection...");
-                        //foreach (string k in timezonesLookup.Keys)
-                        //{
-                        //    Log.Information($"Key: '{k}'");
-                        //}
-                    }
-                    else
-                    {
-                        Log.Error(e,
-                            $"LookUpRegionIndexForMyTimeZone: Exception thrown when looking up region for timezone '{ourTimeZoneId}': {e.Message}");
-                        containingKey = "us-east";
-                        myRegionKey = containingKey;
-                    }
-                }
-//#endif
             }
 
             return string.IsNullOrEmpty(containingKey);

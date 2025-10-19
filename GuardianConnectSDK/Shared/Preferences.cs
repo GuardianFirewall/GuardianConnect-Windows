@@ -14,12 +14,13 @@ namespace GuardianConnect.Shared;
  */
 public static class Preferences
 {
+
     private const string GRDKeyPath = @"Software\GuardianVPN";
 
     private static string SettingsPath = "UserPreferences";
     private static bool notLoadedYet = true;
 
-    private static Dictionary<string, string> Store = new();
+    private static PreferencesStore Store = new();
 
     public static string Get(string key, string valueIfMissing)
     {
@@ -57,8 +58,8 @@ public static class Preferences
         var jsonData = (string)rk.GetValue(SettingsPath)!;
         if (!string.IsNullOrEmpty(jsonData))
         {
-            Store = JsonSerializer.Deserialize<Dictionary<string, string>>(jsonData) ??
-                    new Dictionary<string, string>();
+            Store = JsonSerializer.Deserialize<PreferencesStore>(jsonData, PreferencesStoreJsonContext.Default.PreferencesStore) ??
+                    new PreferencesStore();
         }
 
         notLoadedYet = false;
@@ -68,7 +69,7 @@ public static class Preferences
     {
         try
         {
-            var jsonData = JsonSerializer.Serialize(Store);
+            var jsonData = JsonSerializer.Serialize(Store, PreferencesStoreJsonContext.Default.PreferencesStore);
             var rk = Registry.CurrentUser.CreateSubKey(GRDKeyPath, true);
 
             rk.SetValue(SettingsPath, jsonData);
@@ -115,7 +116,7 @@ public static class Preferences
             var jsonData = (string)rk.GetValue(DefaultSettingsPath)!;
             if (!string.IsNullOrEmpty(jsonData))
             {
-                Store = JsonSerializer.Deserialize<Dictionary<string, string>>(jsonData) ??
+                Store = JsonSerializer.Deserialize<PreferencesStore>(jsonData, PreferencesStoreJsonContext.Default.PreferencesStore) ??
                     new Dictionary<string, string>();
             }
 
@@ -126,7 +127,7 @@ public static class Preferences
         {
             try
             {
-                var jsonData = JsonSerializer.Serialize(Store);
+                var jsonData = JsonSerializer.Serialize(Store, PreferencesStoreJsonContext.Default.PreferencesStore);
                 var rk = Registry.CurrentUser.CreateSubKey(GRDKeyPath, true);
 
                 rk.SetValue(DefaultSettingsPath, jsonData);
