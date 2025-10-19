@@ -1,5 +1,4 @@
-﻿using Newtonsoft.Json.Linq;
-using Serilog;
+﻿using Serilog;
 using System;
 using Win32Calls;
 using Windows.Win32.Foundation;

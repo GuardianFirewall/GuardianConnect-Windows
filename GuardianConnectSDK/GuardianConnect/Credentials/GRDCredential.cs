@@ -1,5 +1,7 @@
 ﻿using GuardianConnect.Shared;
-using Newtonsoft.Json;
+//using Newtonsoft.Json;
+using System.Text.Json;
+using System.Text.Json.Serialization;
 
 namespace GuardianConnect.Credentials
 {
@@ -20,11 +22,13 @@ namespace GuardianConnect.Credentials
         public string HostName { get; set; } = string.Empty;
         public string ClientId { get; set; } = string.Empty;
 
-        [JsonProperty("api-auth-token")] public string ApiAuthToken { get; set; } = string.Empty;
+		[JsonPropertyName("api-auth-token")]
+        public string ApiAuthToken { get; set; } = string.Empty;
 
-        [JsonProperty("eap-username")] public string UserName { get; set; } = string.Empty;
+        [JsonPropertyName("eap-username")]
+        public string UserName { get; set; } = string.Empty;
         
-        [JsonProperty("eap-password")]
+        [JsonPropertyName("eap-password")]
         public string Password  {get; set; } = string.Empty;
 
         public byte[] PasswordRef { get; set; } = Array.Empty<byte>();

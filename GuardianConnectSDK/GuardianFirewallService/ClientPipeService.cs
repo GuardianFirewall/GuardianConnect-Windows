@@ -1,10 +1,11 @@
 using System.IO.Pipes;
 using System.Security.AccessControl;
 using System.Security.Principal;
+using System.Text.Json;
 using Microsoft.Extensions.Hosting;
 using Serilog;
 using GuardianConnect.Shared;
-using Newtonsoft.Json;
+using System.Text.Json.Serialization;
 using Win32Calls;
 
 namespace GuardianFirewallService;
@@ -192,10 +193,10 @@ public class ClientPipeService : BackgroundService
                         case IGuardianNPContract.NPCommands.StartVPNConnection:
                             Log.Information($"ClientPipeService[{threadId}]: Performing StartVPNConnection");
                             var dictSerial = cmdPayload;
-                            var dictObject = JsonConvert.DeserializeObject<Dictionary<string, object>>(dictSerial);
+                            var dictObject = JsonSerializer.Deserialize<Dictionary<string, object>>(dictSerial);
                             var didItStart = cmdDispatcher.StartVPNConnection(dictObject);
                             Log.Information($"ClientPipeService[{threadId}]: Exiting StartVPNConnection");
-                            var startResponseJson = JsonConvert.SerializeObject(didItStart);
+                            var startResponseJson = JsonSerializer.Serialize(didItStart);
                             Log.Information($"ClientPipeService.StartVPNConnection - string is '{startResponseJson}'");
                             ss.WriteString(startResponseJson);
                             break;
@@ -207,7 +208,7 @@ public class ClientPipeService : BackgroundService
                         case IGuardianNPContract.NPCommands.GetCurrentVpnConnectionStatus:
                             Log.Information($"ClientPipeService[{threadId}]: Performing GetCurrentVpnConnectionStatus");
                             var statusCheck = cmdDispatcher.GetCurrentVpnConnectionStatus();
-                            var statusString = JsonConvert.SerializeObject(statusCheck);
+                            var statusString = JsonSerializer.Serialize(statusCheck);
                             Log.Information($"ClientPipeService[{threadId}]: GetCurrentVpnConnectionStatus - writing statusString '{statusString}' to client");
                             ss.WriteString(statusString);
                             break;
@@ -251,7 +252,7 @@ public class ClientPipeService : BackgroundService
                             Log.Information($"ClientPipeService[{threadId}]: Performing RequestLogLines");
                             int maxLogLines = int.Parse(cmdPayload);
                             var lastLogLines = Common.GetLastLogLines(maxLogLines);
-                            string serializedLogs = JsonConvert.SerializeObject(lastLogLines);
+                            string serializedLogs = JsonSerializer.Serialize(lastLogLines);
                             Log.Information($"ClientPipeService[{threadId}]: Writing log lines to client");
                             ss.WriteString(serializedLogs);
                             break;

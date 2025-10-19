@@ -1,5 +1,6 @@
 ﻿using System.Text;
-using Newtonsoft.Json;
+using System.Text.Json;
+using System.Text.Json.Serialization;
 using Serilog;
 
 namespace GuardianConnect.Credentials
@@ -26,7 +27,7 @@ namespace GuardianConnect.Credentials
 
         private static byte[] CredentialsToToData()
         {
-            var serializedData = JsonConvert.SerializeObject(_credentialsList);
+            var serializedData = JsonSerializer.Serialize(_credentialsList, GRDCredentialJsonContext.Default.GRDCredential);
             var binData = Encoding.UTF8.GetBytes(serializedData);
 
             return binData;
@@ -34,7 +35,8 @@ namespace GuardianConnect.Credentials
 
         private static void DataToCredentials(string dataFromKeychain)
         {
-            CredentialsList = JsonConvert.DeserializeObject<List<GRDCredential>>(dataFromKeychain) ?? new List<GRDCredential>();
+            CredentialsList = JsonSerializer.Deserialize<List<GRDCredential>>(dataFromKeychain, GRDCredentialJsonContext.Default.ListGRDCredential) ?? new List<GRDCredential>();
+            
             Log.Information($"GRDCredentialsManager.DataToCredentials(): CredentialsList has {CredentialsList.Count}");
         }
 

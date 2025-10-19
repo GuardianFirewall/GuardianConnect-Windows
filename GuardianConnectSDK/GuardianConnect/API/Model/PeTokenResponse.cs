@@ -1,4 +1,5 @@
-using Newtonsoft.Json;
+//using Newtonsoft.Json;
+using System.Text.Json.Serialization;
 
 namespace GuardianConnect.API.Model;
 
@@ -8,9 +9,9 @@ public class PeTokenResponse
     
     public string? Dpat { get; set; }
 
-    [JsonProperty("pet-expires")] public int Petexpires { get; set; }
+    [JsonPropertyName("pet-expires")] public int Petexpires { get; set; }
     
     public string? type { get; set; }
 
-    [JsonProperty("type-pretty")] public string? Typepretty { get; set; }
+    [JsonPropertyName("type-pretty")] public string? Typepretty { get; set; }
 }

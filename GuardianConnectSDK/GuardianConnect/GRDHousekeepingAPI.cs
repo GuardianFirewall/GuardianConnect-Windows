@@ -1,10 +1,11 @@
 using System.Diagnostics;
+using System.Text.Json;
 using GuardianConnect.API.Model;
 using GuardianConnect.Credentials;
 using GuardianConnect.Helpers;
 using GuardianConnect.Shared;
 using GuardianConnect.Shared.Extensions;
-using Newtonsoft.Json;
+using System.Text.Json.Serialization;
 using Serilog;
 
 namespace GuardianConnect;
@@ -19,9 +20,9 @@ public class GRDHousekeepingAPI
 
     public class Credentials
     {
-        [JsonProperty("email")]
+        [JsonPropertyName("email")]
         public string Email = string.Empty;
-        [JsonProperty("password")]
+        [JsonPropertyName("password")]
         public string Password = string.Empty;
 
         public Credentials(string userEmail, string userPassword)
@@ -56,14 +57,14 @@ public class GRDHousekeepingAPI
         try
         {
             var pet = new PeTokenRequest("pe-token", peToken);
-            HttpContent content = new StringContent(JsonConvert.SerializeObject(pet));
+            HttpContent content = new StringContent(JsonSerializer.Serialize(pet, GRDPETokenJsonContext.Default.GRDPEToken));
             content.Headers.Remove("Content-Type");
             content.Headers.Add("Content-Type", "application/json; charset=utf-8");
             HttpResponseMessage response = await HttpUtils.Client.PostAsync(uri, content);
             if (response.IsSuccessStatusCode)
             {
                 string result = await response.Content.ReadAsStringAsync();
-                PeTokenResponse peTokenResponse = JsonConvert.DeserializeObject<PeTokenResponse>(result) ?? new PeTokenResponse();
+                PeTokenResponse peTokenResponse = JsonSerializer.Deserialize<PeTokenResponse>(result, PeTokenResponseJsonContext.Default.PeTokenResponse) ?? new PeTokenResponse();
                 errorResponse.SetData(peTokenResponse).SetResponse(response);
             }
             else
@@ -154,14 +155,14 @@ public class GRDHousekeepingAPI
             //HttpContent content = new StringContent(JsonSerializer.Serialize(lc));
             */
             
-            HttpContent content = new StringContent(JsonConvert.SerializeObject(pet));
+            HttpContent content = new StringContent(JsonSerializer.Serialize(pet));
             content.Headers.Remove("Content-Type");
             content.Headers.Add("Content-Type", "application/json; charset=utf-8");
             HttpResponseMessage response = await HttpUtils.Client.PostAsync(uri, content);
             if (response.IsSuccessStatusCode)
             {
                 string result = await response.Content.ReadAsStringAsync();
-                var jwt = JsonConvert.DeserializeObject<GrdSubscriberCredentialJwt>(result ?? "[]");
+                var jwt = JsonSerializer.Deserialize<GrdSubscriberCredentialJwt>(result, GRDSubScriberCredentialJwtJsonContext.Default.GrdSubscriberCredentialJwt);
                 LiveGrdCredential = new GRDSubscriberCredential(jwt!.SubscriberCredential!);
                 LiveGrdCredential.Store();
                 Log.Information("CreateSubscriberCredentialForBundleId(): JWT obtained.");

@@ -1,13 +1,14 @@
 ﻿using System.Diagnostics;
 using System.Diagnostics.CodeAnalysis;
 using System.Net;
+using System.Text.Json;
 using Windows.Win32.NetworkManagement.Rras;
 using GuardianConnect.Credentials;
 using GuardianConnect.Helpers;
 using GuardianConnect.Shared;
 using GuardianConnect.Shared.Extensions;
 using Win32Calls;
-using Newtonsoft.Json;
+using System.Text.Json.Serialization;
 using Serilog;
 
 namespace GuardianConnect.VPNTransports;
@@ -130,7 +131,7 @@ public class VPNTransportIKEV2 :ITransportProvider
             Log.Information($"StartVPNTunnelWithOptions: (CHECK#2) WasDisconnectPlanned now equals {NotificationHandler.WasDisconnectPlanned}");
             
             // Save off the calling parameters in case we reboot while connected
-            var vpnResumeParameters = JsonConvert.SerializeObject(VpnResumeParameters);
+            var vpnResumeParameters = JsonSerializer.Serialize(VpnResumeParameters);
             RegistrySettings.UpdateGuardianUserSettings(Common.kVpnCallParametersForReboot, vpnResumeParameters);
 
             ActiveEntryName = entryName;

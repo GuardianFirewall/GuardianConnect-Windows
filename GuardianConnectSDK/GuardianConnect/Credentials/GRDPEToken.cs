@@ -1,6 +1,7 @@
 ﻿using System.Text;
+using System.Text.Json;
 using GuardianConnect.Shared;
-using Newtonsoft.Json;
+using System.Text.Json.Serialization;
 
 namespace GuardianConnect.Credentials
 {
@@ -33,7 +34,8 @@ namespace GuardianConnect.Credentials
                 return peToken;
             }
 
-            peToken = JsonConvert.DeserializeObject<GRDPEToken>(petObjectAsText) ?? new GRDPEToken();
+            peToken = JsonSerializer.Deserialize<GRDPEToken>(petObjectAsText, GRDPETokenJsonContext.Default.GRDPEToken);
+
 
             return peToken;
         }
@@ -73,7 +75,7 @@ namespace GuardianConnect.Credentials
 
         public void Store()
         {
-            var jsonOut = JsonConvert.SerializeObject(this);
+            var jsonOut = JsonSerializer.Serialize(this);
             var plainTextData = Encoding.UTF8.GetBytes(jsonOut);
             var tempFileNamePath = Path.GetTempFileName();
             // temp for test cases

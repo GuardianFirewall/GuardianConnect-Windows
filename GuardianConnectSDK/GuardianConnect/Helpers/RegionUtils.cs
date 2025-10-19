@@ -1,8 +1,9 @@
 ﻿using GuardianConnect.API;
 using GuardianConnect.API.Model;
 using GuardianConnect.Shared;
-using Newtonsoft.Json;
 using Serilog;
+using System.Text.Json;
+using System.Text.Json.Serialization;
 
 namespace GuardianConnect.Helpers
 {
@@ -11,7 +12,7 @@ namespace GuardianConnect.Helpers
         private static Dictionary<string, List<string>> timezonesLookup = new();
         private static Dictionary<string, GRDRegion> regionLookup = new();
         private static Dictionary<string, List<RegionalHostRecord>> _hostLookup = new();
-        
+
         const string GetTimeZonesForRegionsUrl = $"https://{Common.kConnectAPIHostname}/api/v1.1/servers/timezones-for-regions";
         const string GetAllRegionsUrl = $"https://{Common.kConnectAPIHostname}/api/v1/servers/all-server-regions";
 
@@ -20,26 +21,18 @@ namespace GuardianConnect.Helpers
         public static string? RegionForOurActualLocation { get; set; } = null;
         public static string? KeyForCurrentlySelectedRegion { get; set; }
 
-        public static string GetRegionKeyByDisplayName(string pn)
-        {
-            if (pn == "Automatic") return RegionForOurActualLocation ?? string.Empty;
-            return regionLookup.Values.First(v => v.DisplayName == pn).RegionName;
-        }
 
-        public static string GetRegionPrettyName(string regionKey)
+        public static async Task RefreshDataAsync()
         {
-            return regionLookup[regionKey].DisplayName;
-        }
+            Log.Information("RefreshDataAsync [0.22.19.1234]: 1. calling GetLatestRegionsList()...");
+            var regions = await GetLatestRegionsList();
+            Log.Information("RefreshDataAsync: 2. calling GetLatestTimeZonesForRegions()...");
+            var geoDataCollection = GetLatestTimeZonesForRegions().GetAwaiter().GetResult();
 
-        public static bool LookUpRegionIndexForMyTimeZone(string ourTimeZoneId, out string myRegionKey)
-        {
-            Log.Information($"LookUpRegionIndexForMyTimeZone: Our time zone ID = '{ourTimeZoneId}'");
-            string containingKey = timezonesLookup.Keys
-                .Where(key => timezonesLookup[key].Contains(ourTimeZoneId))
-                .FirstOrDefault() ?? throw new InvalidOperationException();
-            myRegionKey = string.IsNullOrEmpty(containingKey) ? "us-east" : containingKey;
+            Log.Information($"Regions Collection has {regionLookup.Count} region records");
+            Log.Information($"Timezone Collection has {timezonesLookup.Count} timezone records");
 
-            return string.IsNullOrEmpty(containingKey);
+            Log.Information("Region Collection refreshed.");
         }
 
         private static async Task<List<GRDRegion>> GetLatestRegionsList()
@@ -53,24 +46,37 @@ namespace GuardianConnect.Helpers
             Uri uri = new Uri(GetAllRegionsUrl);
             try
             {
-                Log.Information("GET'ing latest Regions collection from backend...");
+                Log.Information("Getting latest Regions collection from backend...[0.22.19.1234]");
                 {
                     HttpResponseMessage
                         response = HttpUtils.Client.GetAsync(uri).GetAwaiter().GetResult(); // Task short-circuit jump
                     if (response.IsSuccessStatusCode)
                     {
+                        Log.Information($"GetLatestRegionsList(): Return from getting regions: Response statusCode = {response.StatusCode}");
                         string content = await response.Content.ReadAsStringAsync(); // Task short-circuit jump
-                        regionsList = JsonConvert.DeserializeObject<List<GRDRegion>>(content) ?? new List<GRDRegion>();
-                        Log.Information($"Regions Refresh: Regions Collection loaded with {regionsList.Count} items");
+                        if (string.IsNullOrEmpty(content))
+                        {
+                            Log.Information("GetLatestRegionsList: content returned for regions is empty");
+                        }
+                        else
+                        {
+                            //Log.Information($"GetLatestRegionsList: Content returned = '{content}'");
+                            regionsList = JsonSerializer.Deserialize<List<GRDRegion>>(content, GRDRegionJsonContext.Default.ListGRDRegion) ?? new List<GRDRegion>();
+                            Log.Information($"GetLatestRegionsList: Regions Collection loaded with (ACTUAL) {regionsList.Count} items");
+                        }
+
                         responseCode = (int)response.StatusCode;
+                    }
+                    else
+                    {
+                        Log.Information($"GetLatestRegionsList: Response from attempting to get latest regions is {response.StatusCode}");
                     }
                 }
             }
             catch (Exception ex)
             {
-                Log.Information(
-                    $"GetLatestRegionsList(): Exception thrown when calling all-server-regions...: {ex.Message}");
-                regionsList = new List<GRDRegion>();
+                Log.Error(ex, $"GetLatestRegionsList(): Exception thrown when calling all-server-regions...: {ex.Message}. (STATIC) Using GRDRegion.StaticRegions list data");
+                regionsList = GRDRegion.StaticRegions;
             }
 
             RegionKeysByDisplay.TryAdd("Automatic", "Automatic");
@@ -86,7 +92,7 @@ namespace GuardianConnect.Helpers
 
         private static async Task<List<GeoData>> GetLatestTimeZonesForRegions()
         {
-            Log.Information("RefreshDataAsync() executing...");
+            Log.Information("GetLatestTimeZonesForRegions[0.22.19.1234]() executing...");
             string errorMessage = string.Empty;
 
             var geoDataCollection = new List<GeoData>();
@@ -94,42 +100,148 @@ namespace GuardianConnect.Helpers
             Uri uri = new Uri(GetTimeZonesForRegionsUrl);
             try
             {
-                Log.Information("GET'ing latest Regions collection from backend...");
+                Log.Information("GetLatestTimeZonesForRegions: Getting time zones for regions from backend...[0.22.19.1234]");
                 HttpResponseMessage?
                     response = HttpUtils.Client?.GetAsync(uri).GetAwaiter().GetResult(); // Task short-circuit jump
                 if (response != null && response.IsSuccessStatusCode)
                 {
                     string content = await response.Content.ReadAsStringAsync(); // Task short-circuit jump
-                    geoDataCollection = JsonConvert.DeserializeObject<List<GeoData>>(content) ?? new List<GeoData>();
+                    //Log.Information($"GetLatestTimeZonesForRegions: Content returned = '{content}'");
                     Log.Information(
-                        $"Regions Refresh: Regions GeoData Collection loaded with {geoDataCollection.Count} items");
+                        $"GetLatestTimeZonesForRegions: Content returned contains 'us-east' region? {content.Contains("us-east")}.");
+                    Log.Information($"GetLatestTimeZonesForRegions: Content contains 'America/New_York' timezone? {content.Contains("America/New_York")}");
+                    //geoDataCollection = JsonSerializer.Deserialize<List<GeoData>>(content) ?? new List<GeoData>();
+                    geoDataCollection = JsonSerializer.Deserialize<List<GeoData>>(content, GeoDataJsonContext.Default.ListGeoData);
+
+                    Log.Information($"GetLatestTimeZonesForRegions: Regions Refresh: Regions GeoData Collection loaded with (ACTUAL) {geoDataCollection.Count} items");
+                }
+                else
+                {
+                    if (response != null)
+                    {
+                        errorMessage =
+                            $"GetLatestTimeZonesForRegions: ResponseCode for getting latest regions collection: {response.StatusCode}";
+                        Log.Error(errorMessage);
+                    }
+                    else
+                    {
+                        Log.Error($"Response from server at uri '{uri}' to get latest regions returned NULL");
+                    }
                 }
             }
             catch (Exception ex)
             {
-                Log.Information(
-                    $"RefreshDataAsync(): Exception thrown when calling GetTimeZonesForRegions...: {ex.Message}");
-                geoDataCollection = new List<GeoData>();
+                Log.Error(ex, $"GetLatestTimeZonesForRegions(): Exception thrown when calling GetTimeZonesForRegions...: {ex.Message}");
+                geoDataCollection = GeoData.StaticGeoDataCollection;
+                Log.Information($"GetLatestTimeZonesForRegions: Regions Refresh: Regions GeoData Collection loaded with (STATIC) {geoDataCollection.Count} items");
             }
 
+            Log.Information($"GetLatestTimeZonesForRegions: Regions Refresh: ow populating timezonesLookup dictionary with {geoDataCollection.Count} entries...");
             foreach (var geoRec in geoDataCollection)
             {
-                Log.Verbose( $"GetLatestGeoData: Adding '{geoRec.KeyName}' with {geoRec.Timezones.Count} timezones");
-                timezonesLookup.TryAdd(geoRec.KeyName, geoRec.Timezones);
+                Log.Information($"GetLatestTimeZonesForRegions: Adding '{geoRec.KeyName}' with {geoRec.Timezones.Count} timezones");
+                if (timezonesLookup.TryAdd(geoRec.KeyName, geoRec.Timezones) == false)
+                {
+                    Log.Warning($"GetLatestTimeZonesForRegions: Could not add timezones for region key '{geoRec.KeyName}");
+                }
+                Log.Information("GetLatestTimeZonesForRegions: Testing lookup for default region key 'us-east'");
+
+                var tgv = timezonesLookup.TryGetValue("us-east", out var listGotten);
+                Log.Information($"GetLatestTimeZonesForRegions: timezonesLookup.TryGetValue for 'us-east' returned {tgv}. List gotten is null? {listGotten == null}");
             }
 
+            Log.Information($"GetLatestTimeZonesForRegions: timezonesLookup contains {timezonesLookup.Count} entries.");
             return geoDataCollection;
         }
 
-        public static async Task RefreshDataAsync()
-        {
-            var regions = await GetLatestRegionsList();
-            var geoDataCollection = GetLatestTimeZonesForRegions().GetAwaiter().GetResult();
 
-            Log.Information($"Regions Collection has {regionLookup.Count} region records"); 
-            Log.Information($"Timezone Collection has {timezonesLookup.Count} timezone records"); 
-            
-            Log.Information("Region Collection refreshed.");
+        public static bool LookUpRegionIndexForMyTimeZone(string ourTimeZoneId, out string myRegionKey)
+        {
+            string containingKey = string.Empty;
+            Log.Information($"LookUpRegionIndexForMyTimeZone [0.22.19.1234] Our time zone ID = '{ourTimeZoneId}'");
+            Log.Information($"timezonesLookup not null? = {timezonesLookup != null}");
+            myRegionKey = "FOO";
+            if (timezonesLookup != null)
+            {
+                var ourKey = "us-east";
+                Log.Information(
+                    $"timezonesLookup.Keys.Count = {timezonesLookup.Keys.Count}. timezonesLookup is {timezonesLookup.ToString()}");
+                Log.Information($"timezonesLookup contains key 'us-east'? {timezonesLookup.ContainsKey(ourKey)}.");
+                try
+                {
+                    Log.Information($"timezonesLookup[{ourKey}] null? {timezonesLookup[ourKey] is List<string>}");
+                }
+                catch (NullReferenceException nre)
+                {
+                    Log.Information("timezonesLookup[ourkey] reference threw {e}");
+                }
+
+                var tgv = timezonesLookup.TryGetValue(ourKey, out var listGotten);
+                Log.Information($"timezonesLookup.TryGetValue for 'us-east' returned {tgv}. List gotten is null? {listGotten == null}");
+                if (timezonesLookup.ContainsKey(ourKey))
+                {
+                    Log.Information($"timezonesLookup['us-east'] has {timezonesLookup[ourKey].Count} timezones");
+                    myRegionKey = ourKey;
+                    containingKey = myRegionKey;
+                }
+
+//#if false
+                foreach (string k in timezonesLookup.Keys)
+                {
+                    Log.Information($"timezonesLookup key = {k}");
+                    Log.Information($"Key: '{k}' has {timezonesLookup[k].Count} timezones");
+                    if (timezonesLookup[k].Contains(ourTimeZoneId))
+                    {
+                        Log.Information($"Key: '{k}' CONTAINS our timezone ID '{ourTimeZoneId}'");
+                        myRegionKey = k;
+                        return true;
+                    }
+                }
+
+                try
+                {
+                    containingKey = timezonesLookup.Keys
+                        .Where(key => timezonesLookup[key].Contains(ourTimeZoneId))
+                        .FirstOrDefault() ?? throw new InvalidOperationException();
+                    myRegionKey = containingKey;
+
+                }
+                catch (Exception e)
+                {
+                    if (e is InvalidOperationException ioe)
+                    {
+                        myRegionKey = string.IsNullOrEmpty(containingKey) ? "us-east" : containingKey;
+                        Log.Warning(ioe,
+                            $"LookUPRegionIndexForMyTimeZone: Defaulting to 'us-east' as timezone not found in timezonesLookup collection!");
+                        Log.Warning("LookUpReginoIndexForMyTimeZone: Dumping timezonesLookup collection...");
+                        //foreach (string k in timezonesLookup.Keys)
+                        //{
+                        //    Log.Information($"Key: '{k}'");
+                        //}
+                    }
+                    else
+                    {
+                        Log.Error(e,
+                            $"LookUpRegionIndexForMyTimeZone: Exception thrown when looking up region for timezone '{ourTimeZoneId}': {e.Message}");
+                        containingKey = "us-east";
+                        myRegionKey = containingKey;
+                    }
+                }
+//#endif
+            }
+
+            return string.IsNullOrEmpty(containingKey);
+        }
+
+        public static string GetRegionKeyByDisplayName(string pn)
+        {
+            if (pn == "Automatic") return RegionForOurActualLocation ?? string.Empty;
+            return regionLookup.Values.First(v => v.DisplayName == pn).RegionName;
+        }
+
+        public static string GetRegionPrettyName(string regionKey)
+        {
+            return regionLookup[regionKey].DisplayName;
         }
 
         public static async Task GetHostsForRegion(string keyName)
@@ -156,7 +268,8 @@ namespace GuardianConnect.Helpers
 
                 rip.Region = regionLookup[regionKey].RegionName;
                 Log.Information("About to do GET for Region Hosts collection retrieval");
-                HttpContent content = new StringContent(Newtonsoft.Json.JsonConvert.SerializeObject(rip));
+                //HttpContent content = new StringContent(Newtonsoft.Json.JsonConvert.SerializeObject(rip));
+                HttpContent content = new StringContent(JsonSerializer.Serialize(rip));
                 content.Headers.Remove("Content-Type");
                 content.Headers.Add("Content-Type", "application/json; charset=utf-8");
 
@@ -178,10 +291,10 @@ namespace GuardianConnect.Helpers
                 if (response.IsSuccessStatusCode)
                 {
                     string respContent = await response.Content.ReadAsStringAsync();
-                    List<RegionalHostRecord> regionHosts = JsonConvert.DeserializeObject<List<RegionalHostRecord>>(respContent);
+                    List<RegionalHostRecord> regionHosts = JsonSerializer.Deserialize<List<RegionalHostRecord>>(respContent, RegionalHostRecordJsonContext.Default.ListRegionalHostRecord);
                     if (!_hostLookup.ContainsKey(regionKey)) _hostLookup.Add(regionKey, null);
                     _hostLookup[regionKey] = regionHosts;
-                    var message = $"RegionUtils.GetHostForRegion: Added {regionHosts.Count} hosts for region '{regionKey}'";
+                    var message = $"RegionUtils.GetHostForRegion [0.22.19.1234]: Added {regionHosts.Count} hosts for region '{regionKey}'";
                     Log.Information(message);
                 }
                 else
@@ -235,12 +348,12 @@ namespace GuardianConnect.Helpers
             Log.Information($"SelectBestHostInRegion: For region '{regionKey}' we have {lightest.Count()} lightest hosts, {lighter.Count()} midrange hosts out of {regionHosts.Count()} total hosts");
 
             if (lightest != null && lightest.Count() > 0)
-                return lightest.ElementAt(Random.Shared.Next(lightest.Count()-1));
+                return lightest.ElementAt(Random.Shared.Next(lightest.Count() - 1));
 
             if (lighter != null && lighter.Count() > 0)
-                return lighter.ElementAt(Random.Shared.Next(lighter.Count()-1));
+                return lighter.ElementAt(Random.Shared.Next(lighter.Count() - 1));
 
-            return regionHosts.ElementAt(Random.Shared.Next(regionHosts.Count-1));
+            return regionHosts.ElementAt(Random.Shared.Next(regionHosts.Count - 1));
         }
     }
 }

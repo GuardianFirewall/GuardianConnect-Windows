@@ -1,0 +1,12 @@
+bin/
+obj/
+Debug/
+Release/
+*.user
+*.suo
+*.cache
+*.log
+
+# Visual Studio output folders
+**/bin/
+**/obj/

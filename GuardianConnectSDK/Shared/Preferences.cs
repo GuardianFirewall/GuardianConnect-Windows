@@ -1,5 +1,6 @@
-﻿using Microsoft.Win32;
-using Newtonsoft.Json;
+﻿using System.Text.Json;
+using Microsoft.Win32;
+using System.Text.Json.Serialization;
 using Serilog;
 
 namespace GuardianConnect.Shared;
@@ -56,7 +57,7 @@ public static class Preferences
         var jsonData = (string)rk.GetValue(SettingsPath)!;
         if (!string.IsNullOrEmpty(jsonData))
         {
-            Store = JsonConvert.DeserializeObject<Dictionary<string, string>>(jsonData) ??
+            Store = JsonSerializer.Deserialize<Dictionary<string, string>>(jsonData) ??
                     new Dictionary<string, string>();
         }
 
@@ -67,7 +68,7 @@ public static class Preferences
     {
         try
         {
-            var jsonData = JsonConvert.SerializeObject(Store);
+            var jsonData = JsonSerializer.Serialize(Store);
             var rk = Registry.CurrentUser.CreateSubKey(GRDKeyPath, true);
 
             rk.SetValue(SettingsPath, jsonData);
@@ -114,7 +115,7 @@ public static class Preferences
             var jsonData = (string)rk.GetValue(DefaultSettingsPath)!;
             if (!string.IsNullOrEmpty(jsonData))
             {
-                Store = JsonConvert.DeserializeObject<Dictionary<string, string>>(jsonData) ??
+                Store = JsonSerializer.Deserialize<Dictionary<string, string>>(jsonData) ??
                     new Dictionary<string, string>();
             }
 
@@ -125,7 +126,7 @@ public static class Preferences
         {
             try
             {
-                var jsonData = JsonConvert.SerializeObject(Store);
+                var jsonData = JsonSerializer.Serialize(Store);
                 var rk = Registry.CurrentUser.CreateSubKey(GRDKeyPath, true);
 
                 rk.SetValue(DefaultSettingsPath, jsonData);

@@ -3,7 +3,9 @@ using GuardianConnect.Credentials;
 using GuardianConnect.Helpers;
 using GuardianConnect.Shared;
 using GuardianConnect.Shared.Extensions;
-using Newtonsoft.Json;
+//using Newtonsoft.Json;
+using System.Text.Json;
+using System.Text.Json.Serialization;
 using Serilog;
 
 namespace GuardianConnect.API;
@@ -17,18 +19,18 @@ public class GRDGateway
 
     public class RegisterDevicePayload
     {
-        [JsonProperty("subscriber-credential")]
+        [JsonPropertyName("subscriber-credential")]
         public string subscriberCredential { get; set; } = string.Empty;
 
-        [JsonProperty("transport-protocol")] public string transportProtocol { get; set; } = string.Empty;
+        [JsonPropertyName("transport-protocol")] public string transportProtocol { get; set; } = string.Empty;
     }
 
     public class InvalidateCredsPayload
     {
-        [JsonProperty("apitoken")]
+        [JsonPropertyName("apitoken")]
         public string ApiToken { get; set; } = string.Empty;
         
-        [JsonProperty("subscribercredential")]
+        [JsonPropertyName("subscribercredential")]
         public string SubscriberCredential { get; set; } = string.Empty;
     }
 
@@ -153,14 +155,14 @@ public class GRDGateway
 
         Uri reqUri = new Uri($"https://{hostname}/api/v1.3/device");
         HttpRequestMessage request = new HttpRequestMessage(HttpMethod.Post, reqUri);
-        request.Content = new StringContent(JsonConvert.SerializeObject(payload));
+        request.Content = new StringContent(JsonSerializer.Serialize(payload, RegisterDevicePayloadJsonContext.Default.RegisterDevicePayload));
 
         try
         {
             response = await HttpUtils.Client.SendAsync(request);
             errorResponse.SetResponse(response).SetData(new List<GRDCredential>());
             string respContent = await response.Content.ReadAsStringAsync();
-            var cred = JsonConvert.DeserializeObject<GRDCredential>(respContent);
+            var cred = JsonSerializer.Deserialize<GRDCredential>(respContent, GRDCredentialJsonContext.Default.GRDCredential);
             if (cred != null) credsList.Add(cred);
         }
         catch (Exception e)
@@ -227,7 +229,7 @@ public class GRDGateway
         
         // Get DeviceFilterConfig object
         var dfcCurrent = GRDVPNHelper.Instance.CurrentDeviceBlocklistConfig;
-        var dfcJson = JsonConvert.SerializeObject(dfcCurrent);
+        var dfcJson = JsonSerializer.Serialize(dfcCurrent);
         //var clientId = GRDCredentialManager.MainCredentials.ClientId;
         var clientId = DeviceIdentifier;
 

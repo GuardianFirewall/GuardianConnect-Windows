@@ -1,9 +1,9 @@
-﻿using Newtonsoft.Json;
+﻿using System.Text.Json.Serialization;
 
 namespace GuardianConnect.API.Model
 {
     public class RegionInputParameter
     {
-        [JsonProperty("region")] public string? Region;
+        [JsonPropertyName("region")] public string? Region;
     }
 }

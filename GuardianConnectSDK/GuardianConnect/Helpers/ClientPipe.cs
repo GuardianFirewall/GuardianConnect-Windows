@@ -1,6 +1,7 @@
 using System.IO.Pipes;
+using System.Text.Json;
 using GuardianConnect.Shared;
-using Newtonsoft.Json;
+using System.Text.Json.Serialization;
 using Serilog;
 
 namespace GuardianConnect.Helpers;
@@ -126,11 +127,11 @@ public class ClientPipeImpl : IGuardianNPContract
 
     public IGuardianNPContract.CompositeType GetDataUsingDataContract(IGuardianNPContract.CompositeType composite)
     {
-        var cmdPayload = JsonConvert.SerializeObject(composite);
+        var cmdPayload = JsonSerializer.Serialize(composite);
         var cmdString = $"{(int)IGuardianNPContract.NPCommands.GetDataUsingDataContract}.{cmdPayload}";
         ss.WriteString(cmdString);
         var response = ss.ReadStringAsync().Result;
-        var value = JsonConvert.DeserializeObject<IGuardianNPContract.CompositeType>(response);
+        var value = JsonSerializer.Deserialize<IGuardianNPContract.CompositeType>(response);
 
         if (value == null)
         {
@@ -142,7 +143,7 @@ public class ClientPipeImpl : IGuardianNPContract
 
     public ErrorResponse StartVPNConnection(Dictionary<string, object> protocolRequest)
     {
-        var cmdPayload = JsonConvert.SerializeObject(protocolRequest);
+        var cmdPayload = JsonSerializer.Serialize(protocolRequest);
         var cmdString = $"{(int)IGuardianNPContract.NPCommands.StartVPNConnection}.{cmdPayload}";
         ss.WriteString(cmdString);
         var startedJson = ss.ReadStringAsync().Result;
@@ -151,7 +152,7 @@ public class ClientPipeImpl : IGuardianNPContract
         ErrorResponse startedErrorResponse = new ErrorResponse();
         try
         {
-            startedErrorResponse = JsonConvert.DeserializeObject<ErrorResponse>(startedJson);
+            startedErrorResponse = JsonSerializer.Deserialize<ErrorResponse>(startedJson);
         }
         catch (Exception e)
         {
@@ -176,7 +177,7 @@ public class ClientPipeImpl : IGuardianNPContract
         Log.Information("Reading status...");
         //var statusString = ss.ReadStringAsync().Result;
         var statusString = ss.ReadString();
-        var status = JsonConvert.DeserializeObject<IGuardianNPContract.CurrentVPNStatus>(statusString);
+        var status = JsonSerializer.Deserialize<IGuardianNPContract.CurrentVPNStatus>(statusString);
         Log.Information($"status is {status.EntryName}, {status.ConnectionState}...");
 
         return status;
@@ -213,7 +214,7 @@ public class ClientPipeImpl : IGuardianNPContract
         ss.WriteString(cmdString);
         Log.Information("Reading response...");
         var serializedServiceLogLines = await ss.ReadStringAsync();
-        var jsonLines = JsonConvert.DeserializeObject<List<string>>(serializedServiceLogLines);
+        var jsonLines = JsonSerializer.Deserialize<List<string>>(serializedServiceLogLines);
         var serviceLogLines = jsonLines ?? new List<string>();
         Log.Information($"Number of log lines returned from the service = {serviceLogLines.Count}");
 
