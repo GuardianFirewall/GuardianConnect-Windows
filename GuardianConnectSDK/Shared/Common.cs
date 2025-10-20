@@ -1,10 +1,12 @@
-﻿using System.Diagnostics;
-using Microsoft.Extensions.Configuration;
+﻿using Microsoft.Extensions.Configuration;
 using Serilog;
 using Serilog.Configuration;
-using Serilog.Events;
 using Serilog.Enrichers.WithCaller;
+using Serilog.Events;
 using Serilog.Formatting.Json;
+using System.Diagnostics;
+using System.Text.Json;
+using System.Text.Json.Serialization;
 
 namespace GuardianConnect.Shared;
 
@@ -23,6 +25,17 @@ public class Common
 
     // Define below to 0 to make guardian specific code inactive
     //#define GUARDIAN_INTERNAL 1
+
+    public static JsonSerializerOptions DefaultJsonSerializerOptions = new JsonSerializerOptions
+    {
+        WriteIndented = true,
+        IgnoreReadOnlyFields = false,
+        IgnoreReadOnlyProperties = false,
+        IncludeFields = true,
+        AllowOutOfOrderMetadataProperties = true,
+        AllowTrailingCommas = true,
+        DefaultIgnoreCondition = JsonIgnoreCondition.Never,
+    };
 
     public enum PowerTransitionStates { Suspend, Resume, Running }
 

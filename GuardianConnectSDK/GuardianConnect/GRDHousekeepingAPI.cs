@@ -155,7 +155,7 @@ public class GRDHousekeepingAPI
             //HttpContent content = new StringContent(JsonSerializer.Serialize(lc));
             */
             
-            HttpContent content = new StringContent(JsonSerializer.Serialize(pet));
+            HttpContent content = new StringContent(JsonSerializer.Serialize(pet, GRDPETokenJsonContext.Default.GRDPEToken));
             content.Headers.Remove("Content-Type");
             content.Headers.Add("Content-Type", "application/json; charset=utf-8");
             HttpResponseMessage response = await HttpUtils.Client.PostAsync(uri, content);
@@ -221,8 +221,10 @@ public class GRDHousekeepingAPI
             return errorResponse;
         }
         //
-        errorResponse = new ErrorResponse(string.Empty, null, false, string.Empty);
-        errorResponse.Data = LiveGrdCredential.Jwt;
+        errorResponse = new ErrorResponse(string.Empty, null, false, string.Empty)
+        {
+            Data = LiveGrdCredential.Jwt
+        };
         return errorResponse;
     }
 }

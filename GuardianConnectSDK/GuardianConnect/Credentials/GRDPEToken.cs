@@ -75,7 +75,7 @@ namespace GuardianConnect.Credentials
 
         public void Store()
         {
-            var jsonOut = JsonSerializer.Serialize(this);
+            var jsonOut = JsonSerializer.Serialize(this, GRDPETokenJsonContext.Default.GRDPEToken);
             var plainTextData = Encoding.UTF8.GetBytes(jsonOut);
             var tempFileNamePath = Path.GetTempFileName();
             // temp for test cases

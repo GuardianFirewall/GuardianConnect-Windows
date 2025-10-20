@@ -192,9 +192,9 @@ public class ClientPipeService : BackgroundService
                     {
                         case IGuardianNPContract.NPCommands.StartVPNConnection:
                             Log.Information($"ClientPipeService[{threadId}]: Performing StartVPNConnection");
-                            var dictSerial = cmdPayload;
-                            var dictObject = JsonSerializer.Deserialize<Dictionary<string, object>>(dictSerial);
-                            var didItStart = cmdDispatcher.StartVPNConnection(dictObject);
+                            var serializedVpnParameters = cmdPayload;
+                            var vpnCallParameters = JsonSerializer.Deserialize<VPNCallParameters>(serializedVpnParameters, VPNCallParametersJsonContext.Default.VPNCallParameters);
+                            var didItStart = cmdDispatcher.StartVPNConnection(vpnCallParameters);
                             Log.Information($"ClientPipeService[{threadId}]: Exiting StartVPNConnection");
                             var startResponseJson = JsonSerializer.Serialize(didItStart);
                             Log.Information($"ClientPipeService.StartVPNConnection - string is '{startResponseJson}'");
@@ -208,7 +208,7 @@ public class ClientPipeService : BackgroundService
                         case IGuardianNPContract.NPCommands.GetCurrentVpnConnectionStatus:
                             Log.Information($"ClientPipeService[{threadId}]: Performing GetCurrentVpnConnectionStatus");
                             var statusCheck = cmdDispatcher.GetCurrentVpnConnectionStatus();
-                            var statusString = JsonSerializer.Serialize(statusCheck);
+                            var statusString = JsonSerializer.Serialize(statusCheck, CurrentVPNStatusJsonConect.Default.CurrentVPNStatus);
                             Log.Information($"ClientPipeService[{threadId}]: GetCurrentVpnConnectionStatus - writing statusString '{statusString}' to client");
                             ss.WriteString(statusString);
                             break;
@@ -224,7 +224,7 @@ public class ClientPipeService : BackgroundService
                             Log.Information($"ClientPipeService[{threadId}]: Performing UninstallerShutdownOccurring");
                             AdministrativeShutdownRequested = true;
                             var status = cmdDispatcher.GetCurrentVpnConnectionStatus();
-                            if (status.ConnectionState == IGuardianNPContract.ConnectionStateEnum.Connected)
+                            if (status.ConnectionState == ConnectionStateEnum.Connected)
                             {
                                 cmdDispatcher.DisconnectVPNConnection();
                             }

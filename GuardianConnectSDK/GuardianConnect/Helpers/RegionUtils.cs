@@ -16,7 +16,7 @@ namespace GuardianConnect.Helpers
         const string GetTimeZonesForRegionsUrl = $"https://{Common.kConnectAPIHostname}/api/v1.1/servers/timezones-for-regions";
         const string GetAllRegionsUrl = $"https://{Common.kConnectAPIHostname}/api/v1/servers/all-server-regions";
 
-        public static List<string> RegionKeys { get; } = new();
+        public static List<string> RegionKeys { get; private set; } = new();
         public static Dictionary<string, string> RegionKeysByDisplay = new();
         public static string? RegionForOurActualLocation { get; set; } = null;
         public static string? KeyForCurrentlySelectedRegion { get; set; }
@@ -60,8 +60,29 @@ namespace GuardianConnect.Helpers
                         }
                         else
                         {
-                            regionsList = JsonSerializer.Deserialize<List<GRDRegion>>(content, GRDRegionJsonContext.Default.ListGRDRegion) ?? new List<GRDRegion>();
+                            var jsonOptions = new JsonSerializerOptions
+                            {
+                                AllowOutOfOrderMetadataProperties = true,
+                                AllowTrailingCommas = true,
+                                DefaultIgnoreCondition = JsonIgnoreCondition.Never,
+                            };
+                            regionsList = JsonSerializer.Deserialize<List<GRDRegion>>(content, GRDRegionJsonContext.Default.ListGRDRegion);
                             Log.Information($"GetLatestRegionsList: Regions Collection loaded with (ACTUAL) {regionsList.Count} items");
+                            if (string.IsNullOrEmpty(regionsList[0].RegionName))
+                            {
+                                Log.Fatal( "!!!!!!!!!!!!!!!!!!! AOT/JSON BUG - INDIVIDUAL GRDRegion objects parsed empty !!!!!!!!!!!!!!!!");
+                                Poof();
+                            }
+                            else
+                            {
+#if DEBUG
+                                Log.Debug($"GetLatestRegionsList: (ACTUAL) Region[0] '{regionsList[0].RegionName}' has display name '{regionsList[0].DisplayName}'");
+                                foreach (var region in regionsList)
+                                {
+                                    Log.Information( $"GetLatestRegionsList: (ACTUAL) Region '{region.RegionName}' has display name '{region.DisplayName}'");
+                                }
+#endif
+                            }
                         }
 
                         responseCode = (int)response.StatusCode;
@@ -78,15 +99,43 @@ namespace GuardianConnect.Helpers
                 regionsList = GRDRegion.StaticRegions;
             }
 
+            // First - clear out existing lookup collections
+            RegionKeys = new List<string>();
+            RegionKeysByDisplay = new Dictionary<string, string>();
+            regionLookup = new Dictionary<string, GRDRegion>();
+
+            // Now populate region lookup collections
             RegionKeysByDisplay.TryAdd("Automatic", "Automatic");
+            Log.Information($"regionLookup pre-load has {regionLookup.Count} items.");
+            var rluKeys = String.Join(',', regionLookup.Keys);
+            Log.Debug($"regionLookup dictionary keys are: '{rluKeys}");
             foreach (var regionRec in regionsList.OrderBy(region => region.DisplayName))
             {
-                regionLookup.TryAdd(regionRec.RegionName, regionRec);
+                if (!regionLookup.TryAdd(regionRec.RegionName, regionRec))
+                {
+                    Log.Error($"GetLatestRegionsList: Failed to add region name/pretty-name to regionlookup dictionary for '{regionRec.RegionName}' using TryAdd");
+                    try
+                    {
+                        regionLookup.Add(regionRec.RegionName, regionRec);
+                        Log.Information($"GetLatestRegionsList: SUCCESS in adding region '{regionRec.RegionName}' to regionLookup collection.");
+                    }
+                    catch (Exception e)
+                    {
+                        Log.Error(e, $"GetLatestRegionsList: FATAL - Could not add region '{regionRec.RegionName}' object to regionLookup collection!");
+                        Poof();
+                    }
+                }
                 RegionKeys.Add(regionRec.RegionName);
                 RegionKeysByDisplay.TryAdd(regionRec.DisplayName, regionRec.RegionName);
             }
 
             return regionsList;
+        }
+
+        private static void Poof()
+        {
+            Log.CloseAndFlush();
+            Environment.Exit(-1);
         }
 
         private static async Task<List<GeoData>> GetLatestTimeZonesForRegions()
@@ -129,9 +178,10 @@ namespace GuardianConnect.Helpers
             }
 
             Log.Information($"GetLatestTimeZonesForRegions: now populating timezonesLookup dictionary with {geoDataCollection.Count} entries...");
+            timezonesLookup = new Dictionary<string, List<string>>();
             foreach (var geoRec in geoDataCollection)
             {
-                Log.Information($"GetLatestTimeZonesForRegions: Adding '{geoRec.KeyName}' with {geoRec.Timezones.Count} timezones");
+                Log.Debug($"GetLatestTimeZonesForRegions: Adding '{geoRec.KeyName}' with {geoRec.Timezones.Count} timezones");
                 if (timezonesLookup.TryAdd(geoRec.KeyName, geoRec.Timezones) == false)
                 {
                     Log.Warning($"GetLatestTimeZonesForRegions: Could not add timezones for region key '{geoRec.KeyName}");

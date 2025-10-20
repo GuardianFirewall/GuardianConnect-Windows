@@ -28,19 +28,32 @@ public class DeviceFilterConfig
 
     [JsonPropertyName("block-phishing")]
     //[Newtonsoft.Json.JsonConverter(typeof(YesNoConverter))]
-    public bool Block_Phishing => (DeviceFilterConfigBlockList & DeviceFilterConfigFlags.BlocklistBlockPhishing) != 0;
+    public bool Block_Phishing
+    {
+        get => (DeviceFilterConfigBlockList & DeviceFilterConfigFlags.BlocklistBlockPhishing) != 0;
+        set => throw new NotImplementedException();
+    }
 
     [JsonPropertyName("block-ads")]
     //[Newtonsoft.Json.JsonConverter(typeof(YesNoConverter))]
-    public bool Block_Ads => (DeviceFilterConfigBlockList & DeviceFilterConfigFlags.BlocklistBlockAds) != 0;
+    public bool Block_Ads
+    {
+        get => (DeviceFilterConfigBlockList & DeviceFilterConfigFlags.BlocklistBlockAds) != 0;
+        set => throw new NotImplementedException();
+    }
 
     [JsonPropertyName("block-none")]
     //[Newtonsoft.Json.JsonConverter(typeof(YesNoConverter))]
-    public bool Disable_Firewall => (DeviceFilterConfigBlockList & DeviceFilterConfigFlags.BlocklistDisableFirewall) != 0;
-    
+    public bool Disable_Firewall
+    {
+        get => (DeviceFilterConfigBlockList & DeviceFilterConfigFlags.BlocklistDisableFirewall) != 0;
+        set => throw new NotImplementedException();
+    }
+
     #endregion
 
     #region methods
+    [JsonConstructor]
     public DeviceFilterConfig()
     {
         DeviceFilterConfigBlockList = DeviceFilterConfigFlags.BlocklistCleared;

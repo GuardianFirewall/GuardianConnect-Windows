@@ -6,6 +6,7 @@ using GuardianConnect.Shared.Extensions;
 //using Newtonsoft.Json;
 using System.Text.Json;
 using System.Text.Json.Serialization;
+using GuardianConnect.API.Model;
 using Serilog;
 
 namespace GuardianConnect.API;
@@ -229,7 +230,7 @@ public class GRDGateway
         
         // Get DeviceFilterConfig object
         var dfcCurrent = GRDVPNHelper.Instance.CurrentDeviceBlocklistConfig;
-        var dfcJson = JsonSerializer.Serialize(dfcCurrent);
+        var dfcJson = JsonSerializer.Serialize(dfcCurrent, DeviceFilterConfigJsonContext.Default.DeviceFilterConfig);
         //var clientId = GRDCredentialManager.MainCredentials.ClientId;
         var clientId = DeviceIdentifier;
 

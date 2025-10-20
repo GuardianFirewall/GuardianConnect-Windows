@@ -1,22 +1,12 @@
+using System.Text.Json.Serialization;
+
 namespace GuardianConnect.Shared;
 
 public interface IGuardianNPContract
 {
-    public enum ConnectionStateEnum
-    {
-        Connected,
-        Connecting,
-        Disconnected,
-        Disconnecting
-    }
 
-    public struct CurrentVPNStatus
-    {
-        public string EntryName;
-        public ConnectionStateEnum ConnectionState;
-    }
-    
-    class CompositeType
+
+class CompositeType
     {
         bool boolValue = true;
         string stringValue = "Hello ";
@@ -53,7 +43,7 @@ public interface IGuardianNPContract
 
     CompositeType GetDataUsingDataContract(CompositeType composite);
     
-    ErrorResponse StartVPNConnection(Dictionary<string, object> protocolRequest);
+    ErrorResponse StartVPNConnection(VPNCallParameters? protocolRequest);
 
     void DisconnectVPNConnection();
 

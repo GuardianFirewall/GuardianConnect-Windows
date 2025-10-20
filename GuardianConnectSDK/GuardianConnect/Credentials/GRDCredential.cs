@@ -53,7 +53,7 @@ namespace GuardianConnect.Credentials
             throw new NotImplementedException();
         }
 
-        private GRDCredential()
+        public GRDCredential()
         {
         }
 

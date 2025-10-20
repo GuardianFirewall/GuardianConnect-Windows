@@ -2,7 +2,8 @@
 
 namespace GuardianConnect.API
 {
-    [JsonSourceGenerationOptions(WriteIndented = true)]
+    [JsonSourceGenerationOptions(GenerationMode = JsonSourceGenerationMode.Metadata, WriteIndented = true, PropertyNameCaseInsensitive = true, IncludeFields = true)]
+    [JsonSerializable(typeof(string))]
     [JsonSerializable(typeof(GRDRegion))]
     [JsonSerializable(typeof(List<GRDRegion>))]
     public partial class GRDRegionJsonContext: JsonSerializerContext

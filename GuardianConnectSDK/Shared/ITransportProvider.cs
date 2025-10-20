@@ -126,7 +126,7 @@ public interface ITransportProvider
 	 *    2. NEVPNErrorConfigurationDisabled
 	 * @return YES if the VPN tunnel was started successfully, NO if an error occurred.
 	 */
-    Task<ErrorResponse> StartVPNTunnelWithOptions(Dictionary<string, object> options);
+    Task<ErrorResponse> StartVPNTunnelWithOptions(VPNCallParameters options);
 
     /*!
 	 * @method stopVPNTunnel:

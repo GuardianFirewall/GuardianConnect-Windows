@@ -6,6 +6,11 @@ namespace GuardianConnect.API;
 
 public class GRDRegion
 {
+    [JsonConstructor]
+    public GRDRegion()
+    {
+    }
+
     public string Continent = string.Empty; 			//continent
     
     [JsonPropertyName("country-iso-code")]

@@ -23,8 +23,8 @@ public class VPNTransportIKEV2 :ITransportProvider
     private ITransportProvider.VPNConnectionError _lastVpnError = 0;
     private DateTime _connectedDate = DateTime.MinValue;
     private Task? PollingTask;
-    
-   public static Dictionary<string, object> VpnResumeParameters = new Dictionary<string, object>();
+
+   public static VPNCallParameters VpnResumeParameters = new VPNCallParameters();
    public delegate void PowerEventHandlerCallback();
    public static PowerEventHandlerCallback PowerResumeActions = () => { };
    public static PowerEventHandlerCallback SetVPNStateAtSuspend = () => { };
@@ -72,7 +72,7 @@ public class VPNTransportIKEV2 :ITransportProvider
 
     public static void PowerSuspendVPNConnection()
     {
-        string entryName = (string)VpnResumeParameters["PhonebookEntryName"];
+        string entryName = VpnResumeParameters.EntryName;
         var vpnTransportIkev2 = new VPNTransportIKEV2();
         vpnTransportIkev2.StopVPNTunnel();
     }
@@ -83,37 +83,37 @@ public class VPNTransportIKEV2 :ITransportProvider
         var vpnTransportIkev2 = new VPNTransportIKEV2();
 // TJE - don't do this - we already have phonebook entry created. Just MakeTheCall
 //        var result = vpnTransportIkev2.StartVPNTunnelWithOptions(VpnResumeParameters).Result;
-        var userName = (string)VpnResumeParameters["eapUser"];
-        var password = (string)VpnResumeParameters["eapPassword"];
+        var userName = VpnResumeParameters.EapuserName;
+        var password = VpnResumeParameters.Eappassword;
 
-        var entryName = (string)VpnResumeParameters["PhonebookEntryName"];
+        var entryName = VpnResumeParameters.EntryName;
         Log.Information("*************** PowerResumeVPNConnection **************** - Calling ConnectToVPNLongRunning to re-establish connection...");
         var result = vpnTransportIkev2.ConnectToVpnLongRunning(entryName, userName, password);
 
         return result;
     }
     
-    public virtual Task<ErrorResponse> StartVPNTunnelWithOptions(Dictionary<string, object> options)
+    public virtual Task<ErrorResponse> StartVPNTunnelWithOptions(VPNCallParameters options)
     {
         VpnResumeParameters = options;
         
         Task<ErrorResponse> t = new Task<ErrorResponse>(() =>
         {
             Log.Information("StartVPNTunnelWithOptions: Evaluating vpn connection parameters...");
-            foreach (string key in options.Keys)
-            {
-                Log.Information($"Key: '{key}': Value='{(string)options[key]}'");
-            }
+            Log.Information($"EapuserName: {options.EapuserName}");
+            Log.Information($"Eappassword: {options.Eappassword}");
+            Log.Information($"EntryNam: {options.EntryName}");
+            Log.Information($"VpnHostName: {options.VpnHostName}");
+            Log.Information($"VpnHostDisplay: {options.VpnHostDisplay}");
 
-            //_dialer.StateChanged += DialerOnStateChanged;
             NetworkCredential creds = new NetworkCredential();
 
-            creds.UserName = (string)options["eapUser"];
-            creds.Password = (string)options["eapPassword"];
+            creds.UserName = options.EapuserName;
+            creds.Password = options.Eappassword;
 
-            string entryName = (string)options["PhonebookEntryName"];
-            string hostName = (string)options["hostName"];
-            string hostDisplayName = (string)options["hostDisplay"];
+            string entryName = options.EntryName;
+            string hostName = options.VpnHostName;
+            string hostDisplayName = options.VpnHostDisplay;
 
             // :CALL POINT:
             var result = ConnectionRoutines.CreateOrUpdateEntry(entryName, hostName, creds.UserName, creds.Password);
@@ -131,7 +131,7 @@ public class VPNTransportIKEV2 :ITransportProvider
             Log.Information($"StartVPNTunnelWithOptions: (CHECK#2) WasDisconnectPlanned now equals {NotificationHandler.WasDisconnectPlanned}");
             
             // Save off the calling parameters in case we reboot while connected
-            var vpnResumeParameters = JsonSerializer.Serialize(VpnResumeParameters);
+            var vpnResumeParameters = JsonSerializer.Serialize(VpnResumeParameters, VPNCallParametersJsonContext.Default.VPNCallParameters);
             RegistrySettings.UpdateGuardianUserSettings(Common.kVpnCallParametersForReboot, vpnResumeParameters);
 
             ActiveEntryName = entryName;
@@ -161,21 +161,24 @@ public class VPNTransportIKEV2 :ITransportProvider
     {
         var t = new Task<ErrorResponse>(() =>
         {
-            var errorResult = new ErrorResponse();
             Log.Information("VPNTransportIKEV2.ConnectoToVpnLongRunning(): Connecting...");
             var rasDialRetVal = ConnectionRoutines.ConnectEntry();
             if (!rasDialRetVal.IsError ) // no premature errors from bad calling data/conventions or state of network/RRAS subsystem
             {
                 NotificationHandler.StartRasConnectStateWatcher();
-                errorResult.Message = "VPN Connection Successful!";
+                return new ErrorResponse() { Message = "VPN Connection Successful!" };
             }
             else
             {
-                errorResult.SetData(rasDialRetVal.ToString());
-                errorResult.IsError = true;
-                errorResult.Message = $"An error occurred when making RASDial VPN Connection call. Return value is  {rasDialRetVal}";
+                return new ErrorResponse
+                {
+                    Data = rasDialRetVal.ToString(),
+                    IsError = true,
+                    Message =
+                        $"An error occurred when making RASDial VPN Connection call. Return value is  {rasDialRetVal}"
+                };
             }
-            return errorResult;
+            return new ErrorResponse();
         });
         t.Start();
 

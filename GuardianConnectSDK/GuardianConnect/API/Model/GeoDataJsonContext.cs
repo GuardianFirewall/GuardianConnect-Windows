@@ -2,7 +2,7 @@
 
 namespace GuardianConnect.API.Model
 {
-    [JsonSourceGenerationOptions(WriteIndented = true)]
+    [JsonSourceGenerationOptions(GenerationMode = JsonSourceGenerationMode.Metadata, WriteIndented = true)]
     [JsonSerializable(typeof(GeoData))]
     [JsonSerializable(typeof(List<GeoData>))]
     [JsonSerializable(typeof(List<string>))]

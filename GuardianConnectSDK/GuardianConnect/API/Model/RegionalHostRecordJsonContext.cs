@@ -2,7 +2,7 @@
 
 namespace GuardianConnect.API.Model
 {
-    [JsonSourceGenerationOptions(WriteIndented = true)]
+    [JsonSourceGenerationOptions(GenerationMode = JsonSourceGenerationMode.Metadata, WriteIndented = true)]
     [JsonSerializable(typeof(RegionalHostRecord))]
     [JsonSerializable(typeof(List<RegionalHostRecord>))]
     public partial  class RegionalHostRecordJsonContext : JsonSerializerContext

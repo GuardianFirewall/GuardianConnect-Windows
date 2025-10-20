@@ -2,6 +2,7 @@ using System.IO.Pipes;
 using System.Text.Json;
 using GuardianConnect.Shared;
 using System.Text.Json.Serialization;
+using System.Text.Json.Serialization.Metadata;
 using Serilog;
 
 namespace GuardianConnect.Helpers;
@@ -21,7 +22,7 @@ public static class ClientPipe
         return Instance.GetDataUsingDataContract(composite);
     }
 
-    public static ErrorResponse StartVPNConnection(Dictionary<string, object> protocolRequest)
+    public static ErrorResponse StartVPNConnection(VPNCallParameters protocolRequest)
     {
         if (!Instance.IsConnected) Instance.OpenNamedPipe();
         return Instance.StartVPNConnection(protocolRequest);
@@ -33,7 +34,7 @@ public static class ClientPipe
         Instance.DisconnectVPNConnection();
     }
 
-    public static IGuardianNPContract.CurrentVPNStatus GetCurrentVpnConnectionStatus()
+    public static CurrentVPNStatus GetCurrentVpnConnectionStatus()
     {
         if (!Instance.IsConnected) Instance.OpenNamedPipe();
         return Instance.GetCurrentVpnConnectionStatus();
@@ -141,9 +142,9 @@ public class ClientPipeImpl : IGuardianNPContract
         return value;
     }
 
-    public ErrorResponse StartVPNConnection(Dictionary<string, object> protocolRequest)
+    public ErrorResponse StartVPNConnection(VPNCallParameters protocolRequest)
     {
-        var cmdPayload = JsonSerializer.Serialize(protocolRequest);
+        var cmdPayload = JsonSerializer.Serialize(protocolRequest, VPNCallParametersJsonContext.Default.VPNCallParameters);
         var cmdString = $"{(int)IGuardianNPContract.NPCommands.StartVPNConnection}.{cmdPayload}";
         ss.WriteString(cmdString);
         var startedJson = ss.ReadStringAsync().Result;
@@ -152,7 +153,7 @@ public class ClientPipeImpl : IGuardianNPContract
         ErrorResponse startedErrorResponse = new ErrorResponse();
         try
         {
-            startedErrorResponse = JsonSerializer.Deserialize<ErrorResponse>(startedJson);
+            startedErrorResponse = JsonSerializer.Deserialize<ErrorResponse>(startedJson, ErrorResponseJsonContext.Default.ErrorResponse);
         }
         catch (Exception e)
         {
@@ -169,7 +170,7 @@ public class ClientPipeImpl : IGuardianNPContract
         ss.WriteString(cmdString);
     }
 
-    public IGuardianNPContract.CurrentVPNStatus GetCurrentVpnConnectionStatus()
+    public CurrentVPNStatus GetCurrentVpnConnectionStatus()
     {
         Log.Information("Calling service to GetCurrentVpnConnectionStatus...");
         var cmdString = $"{(int)IGuardianNPContract.NPCommands.GetCurrentVpnConnectionStatus}.";
@@ -177,7 +178,7 @@ public class ClientPipeImpl : IGuardianNPContract
         Log.Information("Reading status...");
         //var statusString = ss.ReadStringAsync().Result;
         var statusString = ss.ReadString();
-        var status = JsonSerializer.Deserialize<IGuardianNPContract.CurrentVPNStatus>(statusString);
+        var status = JsonSerializer.Deserialize<CurrentVPNStatus>(statusString, CurrentVPNStatusJsonConect.Default.CurrentVPNStatus);
         Log.Information($"status is {status.EntryName}, {status.ConnectionState}...");
 
         return status;
@@ -214,7 +215,7 @@ public class ClientPipeImpl : IGuardianNPContract
         ss.WriteString(cmdString);
         Log.Information("Reading response...");
         var serializedServiceLogLines = await ss.ReadStringAsync();
-        var jsonLines = JsonSerializer.Deserialize<List<string>>(serializedServiceLogLines);
+        var jsonLines = JsonSerializer.Deserialize<List<string>>(serializedServiceLogLines, Common.DefaultJsonSerializerOptions);
         var serviceLogLines = jsonLines ?? new List<string>();
         Log.Information($"Number of log lines returned from the service = {serviceLogLines.Count}");
 
