@@ -5,7 +5,7 @@
   },
   "projects": {
     "C:\\Users\\Tim\\Documents\\GitHub\\GuardianConnect-Windows\\GuardianConnectSDK\\Win32Calls.WFP\\Win32Calls.WFP.csproj": {
-      "version": "0.20.3",
+      "version": "0.23.9",
       "restore": {
         "projectUniqueName": "C:\\Users\\Tim\\Documents\\GitHub\\GuardianConnect-Windows\\GuardianConnectSDK\\Win32Calls.WFP\\Win32Calls.WFP.csproj",
         "projectName": "Win32Calls.WFP",
@@ -59,12 +59,10 @@
               "version": "[9.0.7, )"
             },
             "Microsoft.Windows.CsWin32": {
+              "include": "Runtime, Build, Native, ContentFiles, Analyzers, BuildTransitive",
+              "suppressParent": "All",
               "target": "Package",
               "version": "[0.3.213, )"
-            },
-            "Newtonsoft.Json": {
-              "target": "Package",
-              "version": "[13.0.3, )"
             },
             "Serilog": {
               "target": "Package",

@@ -1,16 +1,18 @@
 using System.Diagnostics;
+using System.Text.Json;
 using GuardianConnect.API.Model;
 using GuardianConnect.Credentials;
 using GuardianConnect.Helpers;
 using GuardianConnect.Shared;
 using GuardianConnect.Shared.Extensions;
-using Newtonsoft.Json;
+using System.Text.Json.Serialization;
 using Serilog;
 
 namespace GuardianConnect;
 
 public class GRDHousekeepingAPI
 {
+#if false
     public class PETRequest
     {
         public string validationMethod = "pe-token";
@@ -19,9 +21,9 @@ public class GRDHousekeepingAPI
 
     public class Credentials
     {
-        [JsonProperty("email")]
+        [JsonPropertyName("email")]
         public string Email = string.Empty;
-        [JsonProperty("password")]
+        [JsonPropertyName("password")]
         public string Password = string.Empty;
 
         public Credentials(string userEmail, string userPassword)
@@ -30,6 +32,7 @@ public class GRDHousekeepingAPI
             Password = userPassword;
         }
     }
+#endif
 
     public static GrdUserLoginResponse LoginResponse { get; set; } = new GrdUserLoginResponse();
     public static GRDSubscriberCredential? LiveGrdCredential { get; set; }
@@ -56,14 +59,14 @@ public class GRDHousekeepingAPI
         try
         {
             var pet = new PeTokenRequest("pe-token", peToken);
-            HttpContent content = new StringContent(JsonConvert.SerializeObject(pet));
+            HttpContent content = new StringContent(JsonSerializer.Serialize(pet, GRDPETokenJsonContext.Default.GRDPEToken));
             content.Headers.Remove("Content-Type");
             content.Headers.Add("Content-Type", "application/json; charset=utf-8");
             HttpResponseMessage response = await HttpUtils.Client.PostAsync(uri, content);
             if (response.IsSuccessStatusCode)
             {
                 string result = await response.Content.ReadAsStringAsync();
-                PeTokenResponse peTokenResponse = JsonConvert.DeserializeObject<PeTokenResponse>(result) ?? new PeTokenResponse();
+                PeTokenResponse peTokenResponse = JsonSerializer.Deserialize<PeTokenResponse>(result, PeTokenResponseJsonContext.Default.PeTokenResponse) ?? new PeTokenResponse();
                 errorResponse.SetData(peTokenResponse).SetResponse(response);
             }
             else
@@ -141,27 +144,24 @@ public class GRDHousekeepingAPI
             }
         }
 
-        PETRequest petRequest = new PETRequest();
-        petRequest.peToken = peToken;
+        PeTokenRequest petRequest = new PeTokenRequest(peToken);
 
         // TJE - remove comment - taken from AuthenticateUser.cs in UI
         Uri uri = new Uri($"https://{connectHost}/api/v1.2/subscriber-credential/create");
         try
         {
-            var pet = new PeTokenRequest("pe-token", petRequest.peToken);
-            /*
-            // TODO: Check this bug with System.JSON why it doesn't work!
-            //HttpContent content = new StringContent(JsonSerializer.Serialize(lc));
-            */
+            var pet = new PeTokenRequest("pe-token", petRequest.PeToken);
             
-            HttpContent content = new StringContent(JsonConvert.SerializeObject(pet));
+            string serializedPetReq = JsonSerializer.Serialize(pet, PeTokenRequestJsonContext.Default.PeTokenRequest);
+            Log.Information($"CreateSubscriberCredentialForBundleId: serializedPetReq = '{serializedPetReq}'");
+            HttpContent content = new StringContent(serializedPetReq);
             content.Headers.Remove("Content-Type");
             content.Headers.Add("Content-Type", "application/json; charset=utf-8");
             HttpResponseMessage response = await HttpUtils.Client.PostAsync(uri, content);
             if (response.IsSuccessStatusCode)
             {
                 string result = await response.Content.ReadAsStringAsync();
-                var jwt = JsonConvert.DeserializeObject<GrdSubscriberCredentialJwt>(result ?? "[]");
+                var jwt = JsonSerializer.Deserialize<GrdSubscriberCredentialJwt>(result, GRDSubScriberCredentialJwtJsonContext.Default.GrdSubscriberCredentialJwt);
                 LiveGrdCredential = new GRDSubscriberCredential(jwt!.SubscriberCredential!);
                 LiveGrdCredential.Store();
                 Log.Information("CreateSubscriberCredentialForBundleId(): JWT obtained.");
@@ -220,8 +220,10 @@ public class GRDHousekeepingAPI
             return errorResponse;
         }
         //
-        errorResponse = new ErrorResponse(string.Empty, null, false, string.Empty);
-        errorResponse.Data = LiveGrdCredential.Jwt;
+        errorResponse = new ErrorResponse(string.Empty, null, false, string.Empty)
+        {
+            Data = LiveGrdCredential.Jwt
+        };
         return errorResponse;
     }
 }

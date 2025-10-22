@@ -28,7 +28,7 @@ public class GuardianNPCommandDispatcher :IGuardianNPContract
         return composite;
     }
 
-    public ErrorResponse StartVPNConnection(Dictionary<string, object> protocolRequest)
+    public ErrorResponse StartVPNConnection(VPNCallParameters? protocolRequest)
     {
         //return true;
         _vpnTransportIkev2 = new VPNTransportIKEV2();
@@ -44,20 +44,20 @@ public class GuardianNPCommandDispatcher :IGuardianNPContract
         _vpnTransportIkev2.StopVPNTunnel();
     }
 
-    public IGuardianNPContract.CurrentVPNStatus GetCurrentVpnConnectionStatus()
+    public CurrentVPNStatus GetCurrentVpnConnectionStatus()
     {
-        IGuardianNPContract.CurrentVPNStatus status = new IGuardianNPContract.CurrentVPNStatus
+        CurrentVPNStatus status = new CurrentVPNStatus
         {
-            ConnectionState = IGuardianNPContract.ConnectionStateEnum.Disconnected,
+            ConnectionState = ConnectionStateEnum.Disconnected,
             EntryName = "None"
         };
 
         bool anyConnectionActive = ConnectionRoutines.IsAnyConnectionActive(out string entryOut);
         Log.Information($"GuardianNPCommandDispatcher.GetVpnConnectionStatus: IsAnyConnectionActive returned {anyConnectionActive}, Entry: '{entryOut}'");
         status.ConnectionState = anyConnectionActive
-            ? IGuardianNPContract.ConnectionStateEnum.Connected
-            : IGuardianNPContract.ConnectionStateEnum.Disconnected;
-        status.EntryName = status.ConnectionState == IGuardianNPContract.ConnectionStateEnum.Connected
+            ? ConnectionStateEnum.Connected
+            : ConnectionStateEnum.Disconnected;
+        status.EntryName = status.ConnectionState == ConnectionStateEnum.Connected
             ? ConnectionRoutines.ActiveConnectionEntryName
             : "None";
 

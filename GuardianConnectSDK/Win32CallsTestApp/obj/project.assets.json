@@ -300,7 +300,7 @@
           "buildTransitive/net8.0/_._": {}
         }
       },
-      "Newtonsoft.Json/13.0.3": {
+      "Newtonsoft.Json/13.0.4": {
         "type": "package",
         "compile": {
           "lib/net6.0/Newtonsoft.Json.dll": {
@@ -526,12 +526,59 @@
           }
         }
       },
-      "GuardianConnect.Shared/0.20.3": {
+      "System.Threading.AccessControl/9.0.3": {
+        "type": "package",
+        "compile": {
+          "lib/net9.0/System.Threading.AccessControl.dll": {
+            "related": ".xml"
+          }
+        },
+        "runtime": {
+          "lib/net9.0/System.Threading.AccessControl.dll": {
+            "related": ".xml"
+          }
+        },
+        "build": {
+          "buildTransitive/net8.0/_._": {}
+        },
+        "runtimeTargets": {
+          "runtimes/win/lib/net9.0/System.Threading.AccessControl.dll": {
+            "assetType": "runtime",
+            "rid": "win"
+          }
+        }
+      },
+      "GuardianConnect/0.23.9": {
+        "type": "project",
+        "framework": ".NETCoreApp,Version=v9.0",
+        "dependencies": {
+          "GuardianConnect.Shared": "0.23.9",
+          "Microsoft.Extensions.Configuration.Json": "9.0.7",
+          "Serilog": "4.3.0",
+          "Serilog.Enrichers.Environment": "3.0.1",
+          "Serilog.Enrichers.Process": "3.0.0",
+          "Serilog.Enrichers.Thread": "4.0.0",
+          "Serilog.Enrichers.WithCaller": "1.3.0",
+          "Serilog.Extensions.Logging": "9.0.0",
+          "Serilog.Settings.AppSettings": "3.0.0",
+          "Serilog.Settings.Configuration": "9.0.0",
+          "Serilog.Sinks.Console": "6.0.0",
+          "Serilog.Sinks.Debug": "3.0.0",
+          "Serilog.Sinks.File": "7.0.0",
+          "Win32Calls": "0.23.9"
+        },
+        "compile": {
+          "bin/placeholder/GuardianConnect.dll": {}
+        },
+        "runtime": {
+          "bin/placeholder/GuardianConnect.dll": {}
+        }
+      },
+      "GuardianConnect.Shared/0.23.9": {
         "type": "project",
         "framework": ".NETCoreApp,Version=v9.0",
         "dependencies": {
           "Microsoft.Extensions.Configuration.Json": "9.0.7",
-          "Newtonsoft.Json": "13.0.3",
           "Serilog": "4.3.0",
           "Serilog.Enrichers.Environment": "3.0.1",
           "Serilog.Enrichers.Process": "3.0.0",
@@ -551,13 +598,38 @@
           "bin/placeholder/GuardianConnect.Shared.dll": {}
         }
       },
-      "Win32Calls/0.20.3": {
+      "Win32Calls/0.23.9": {
         "type": "project",
         "framework": ".NETCoreApp,Version=v9.0",
         "dependencies": {
-          "GuardianConnect.Shared": "0.20.3",
+          "GuardianConnect.Shared": "0.23.9",
           "Microsoft.Extensions.Configuration.Json": "9.0.7",
-          "Newtonsoft.Json": "13.0.3",
+          "Serilog": "4.3.0",
+          "Serilog.Enrichers.Environment": "3.0.1",
+          "Serilog.Enrichers.Process": "3.0.0",
+          "Serilog.Enrichers.Thread": "4.0.0",
+          "Serilog.Enrichers.WithCaller": "1.3.0",
+          "Serilog.Extensions.Logging": "9.0.0",
+          "Serilog.Settings.AppSettings": "3.0.0",
+          "Serilog.Settings.Configuration": "9.0.0",
+          "Serilog.Sinks.Console": "6.0.0",
+          "Serilog.Sinks.Debug": "3.0.0",
+          "Serilog.Sinks.File": "7.0.0",
+          "System.Threading.AccessControl": "9.0.3",
+          "Win32Calls.WFP": "0.23.9"
+        },
+        "compile": {
+          "bin/placeholder/Win32Calls.dll": {}
+        },
+        "runtime": {
+          "bin/placeholder/Win32Calls.dll": {}
+        }
+      },
+      "Win32Calls.WFP/0.23.9": {
+        "type": "project",
+        "framework": ".NETCoreApp,Version=v9.0",
+        "dependencies": {
+          "Microsoft.Extensions.Configuration.Json": "9.0.7",
           "Serilog": "4.3.0",
           "Serilog.Enrichers.Environment": "3.0.1",
           "Serilog.Enrichers.Process": "3.0.0",
@@ -571,10 +643,10 @@
           "Serilog.Sinks.File": "7.0.0"
         },
         "compile": {
-          "bin/placeholder/Win32Calls.dll": {}
+          "bin/placeholder/Win32Calls.WFP.dll": {}
         },
         "runtime": {
-          "bin/placeholder/Win32Calls.dll": {}
+          "bin/placeholder/Win32Calls.WFP.dll": {}
         }
       }
     }
@@ -1095,10 +1167,10 @@
         "useSharedDesignerContext.txt"
       ]
     },
-    "Newtonsoft.Json/13.0.3": {
-      "sha512": "HrC5BXdl00IP9zeV+0Z848QWPAoCr9P3bDEZguI+gkLcBKAOxix/tLEAAHC+UvDNPv4a2d18lOReHMOagPa+zQ==",
+    "Newtonsoft.Json/13.0.4": {
+      "sha512": "pdgNNMai3zv51W5aq268sujXUyx7SNdE2bj1wZcWjAQrKMFZV260lbqYop1d2GM67JI1huLRwxo9ZqnfF/lC6A==",
       "type": "package",
-      "path": "newtonsoft.json/13.0.3",
+      "path": "newtonsoft.json/13.0.4",
       "files": [
         ".nupkg.metadata",
         ".signature.p7s",
@@ -1120,7 +1192,7 @@
         "lib/netstandard1.3/Newtonsoft.Json.xml",
         "lib/netstandard2.0/Newtonsoft.Json.dll",
         "lib/netstandard2.0/Newtonsoft.Json.xml",
-        "newtonsoft.json.13.0.3.nupkg.sha512",
+        "newtonsoft.json.13.0.4.nupkg.sha512",
         "newtonsoft.json.nuspec",
         "packageIcon.png"
       ]
@@ -1450,21 +1522,64 @@
         "version.txt"
       ]
     },
-    "GuardianConnect.Shared/0.20.3": {
+    "System.Threading.AccessControl/9.0.3": {
+      "sha512": "NzQXU2z7Os+reR8gqTSosUwt6Q2kDYucp2tZkpD02YeXWdI7vuEmSZcI6wB5/edsn4pJavGoCY85RaxAdF2wPA==",
+      "type": "package",
+      "path": "system.threading.accesscontrol/9.0.3",
+      "files": [
+        ".nupkg.metadata",
+        ".signature.p7s",
+        "Icon.png",
+        "LICENSE.TXT",
+        "PACKAGE.md",
+        "THIRD-PARTY-NOTICES.TXT",
+        "buildTransitive/net461/System.Threading.AccessControl.targets",
+        "buildTransitive/net462/_._",
+        "buildTransitive/net8.0/_._",
+        "buildTransitive/netcoreapp2.0/System.Threading.AccessControl.targets",
+        "lib/net462/System.Threading.AccessControl.dll",
+        "lib/net462/System.Threading.AccessControl.xml",
+        "lib/net8.0/System.Threading.AccessControl.dll",
+        "lib/net8.0/System.Threading.AccessControl.xml",
+        "lib/net9.0/System.Threading.AccessControl.dll",
+        "lib/net9.0/System.Threading.AccessControl.xml",
+        "lib/netstandard2.0/System.Threading.AccessControl.dll",
+        "lib/netstandard2.0/System.Threading.AccessControl.xml",
+        "runtimes/win/lib/net8.0/System.Threading.AccessControl.dll",
+        "runtimes/win/lib/net8.0/System.Threading.AccessControl.xml",
+        "runtimes/win/lib/net9.0/System.Threading.AccessControl.dll",
+        "runtimes/win/lib/net9.0/System.Threading.AccessControl.xml",
+        "system.threading.accesscontrol.9.0.3.nupkg.sha512",
+        "system.threading.accesscontrol.nuspec",
+        "useSharedDesignerContext.txt"
+      ]
+    },
+    "GuardianConnect/0.23.9": {
+      "type": "project",
+      "path": "../GuardianConnect/GuardianConnect.csproj",
+      "msbuildProject": "../GuardianConnect/GuardianConnect.csproj"
+    },
+    "GuardianConnect.Shared/0.23.9": {
       "type": "project",
       "path": "../Shared/GuardianConnect.Shared.csproj",
       "msbuildProject": "../Shared/GuardianConnect.Shared.csproj"
     },
-    "Win32Calls/0.20.3": {
+    "Win32Calls/0.23.9": {
       "type": "project",
       "path": "../Win32Calls/Win32Calls.csproj",
       "msbuildProject": "../Win32Calls/Win32Calls.csproj"
+    },
+    "Win32Calls.WFP/0.23.9": {
+      "type": "project",
+      "path": "../Win32Calls.WFP/Win32Calls.WFP.csproj",
+      "msbuildProject": "../Win32Calls.WFP/Win32Calls.WFP.csproj"
     }
   },
   "projectFileDependencyGroups": {
     "net9.0-windows7.0": [
+      "GuardianConnect >= 0.23.9",
       "Microsoft.Extensions.Configuration.Json >= 9.0.7",
-      "Newtonsoft.Json >= 13.0.3",
+      "Newtonsoft.Json >= 13.0.4",
       "Serilog >= 4.3.0",
       "Serilog.Enrichers.Environment >= 3.0.1",
       "Serilog.Enrichers.Process >= 3.0.0",
@@ -1476,7 +1591,7 @@
       "Serilog.Sinks.Console >= 6.0.0",
       "Serilog.Sinks.Debug >= 3.0.0",
       "Serilog.Sinks.File >= 7.0.0",
-      "Win32Calls >= 0.20.3"
+      "Win32Calls >= 0.23.9"
     ]
   },
   "packageFolders": {
@@ -1484,7 +1599,7 @@
     "C:\\Program Files (x86)\\Microsoft Visual Studio\\Shared\\NuGetPackages": {}
   },
   "project": {
-    "version": "0.20.3",
+    "version": "0.23.9",
     "restore": {
       "projectUniqueName": "C:\\Users\\Tim\\Documents\\GitHub\\GuardianConnect-Windows\\GuardianConnectSDK\\Win32CallsTestApp\\Win32CallsTestApp.csproj",
       "projectName": "Win32CallsTestApp",
@@ -1515,6 +1630,9 @@
         "net9.0-windows7.0": {
           "targetAlias": "net9.0-windows",
           "projectReferences": {
+            "C:\\Users\\Tim\\Documents\\GitHub\\GuardianConnect-Windows\\GuardianConnectSDK\\GuardianConnect\\GuardianConnect.csproj": {
+              "projectPath": "C:\\Users\\Tim\\Documents\\GitHub\\GuardianConnect-Windows\\GuardianConnectSDK\\GuardianConnect\\GuardianConnect.csproj"
+            },
             "C:\\Users\\Tim\\Documents\\GitHub\\GuardianConnect-Windows\\GuardianConnectSDK\\Win32Calls\\Win32Calls.csproj": {
               "projectPath": "C:\\Users\\Tim\\Documents\\GitHub\\GuardianConnect-Windows\\GuardianConnectSDK\\Win32Calls\\Win32Calls.csproj"
             }
@@ -1543,7 +1661,7 @@
           },
           "Newtonsoft.Json": {
             "target": "Package",
-            "version": "[13.0.3, )"
+            "version": "[13.0.4, )"
           },
           "Serilog": {
             "target": "Package",

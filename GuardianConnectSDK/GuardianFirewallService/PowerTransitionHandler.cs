@@ -6,9 +6,10 @@ using GuardianConnect.Shared.Extensions;
 using GuardianConnect.VPNTransports;
 using Serilog;
 using Microsoft.Win32;
-using Newtonsoft.Json;
+using System.Text.Json.Serialization;
 //using System.Management;
 using System.Net.NetworkInformation;
+using System.Text.Json;
 using Win32Calls;
 
 namespace GuardianFirewallService;
@@ -181,7 +182,7 @@ public static class PowerTransitionHandler
             var SavedResumeParemeters =
                 RegistrySettings.RetrieveGuardianUserSettings(Common.kVpnCallParametersForReboot);
             var VpnResumeParameters =
-                JsonConvert.DeserializeObject(SavedResumeParemeters, typeof(Dictionary<string, object>)) as
+                JsonSerializer.Deserialize(SavedResumeParemeters, typeof(Dictionary<string, object>)) as
                     Dictionary<string, object>;
 
             var host = (string)VpnResumeParameters["hostName"];

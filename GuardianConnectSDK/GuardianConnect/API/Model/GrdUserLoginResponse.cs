@@ -1,30 +1,37 @@
-﻿using Newtonsoft.Json;
+﻿//using Newtonsoft.Json;
+using System.Net.Http.Json;
+using System.Text.Json;
+using System.Text.Json.Serialization;
+using System.Xml;
 
 namespace GuardianConnect.API.Model
 {
     public class GrdUserLoginResponse
     {
-        [JsonProperty("cancelled-subscription")]
+        [JsonPropertyName("cancelled-subscription")]
         public bool CancelledSubscription { get; set; }
         
-        [JsonProperty("is-sub-user-account")]
+        [JsonPropertyName("is-sub-user-account")]
         public bool IsSubUserAccount { get; set; }
 
-        [JsonProperty("pe-token")]
+        [JsonPropertyName("pe-token")]
         public string? PeToken { get; set; }
 
-        [JsonProperty("pet-expires")]
+        [JsonPropertyName("pet-expires")]
         public int PetExpires { get; set; }
         
-        [JsonProperty("type")]
+        [JsonPropertyName("type")]
         public string? SubscriptionType { get; set; }
 
-        [JsonProperty("type-pretty")]
+        [JsonPropertyName("type-pretty")]
         public string? SubscriptionTypePretty { get; set; }
 
         public override string ToString()
         {
-            var pretty = JsonConvert.SerializeObject(this, Formatting.Indented);
+            //var pretty = JsonSerializer.Serialize(this, Formatting.Indented);
+
+            // New (System.Text.Json)
+            var pretty = JsonSerializer.Serialize(this, new System.Text.Json.JsonSerializerOptions { WriteIndented = true });
             return pretty;
         }
     }

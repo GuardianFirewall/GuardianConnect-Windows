@@ -64,12 +64,10 @@ jobs:
       uses: microsoft/setup-msbuild@v2
 
     - name: Build GuardianConnect for x64 CPU
-      #run: msbuild /t:restore /t:Build /p:Platform=x64 /p:Configuration=Release /p:RuntimeIdentifier=win-x64 GuardianConnect\GuardianConnect.csproj
-      run: msbuild /t:restore /t:Publish /p:Platform=x64 /p:Configuration=Release /p:RuntimeIdentifier=win-x64 GuardianConnect\GuardianConnect.csproj /p:PublishSingleFile=true /p:SelfContained=true /p:PublishTrimmed=true
+      run: msbuild /t:restore /t:Build /p:Platform=x64 /p:Configuration=Release /p:RuntimeIdentifier=win-x64 GuardianConnect\GuardianConnect.csproj
       
     - name: Build GuardianConnect for ARM64 CPU
-      #run: msbuild /t:restore /t:Build /p:Platform=arm64 /p:Configuration=Release /p:RuntimeIdentifier=win-arm64 GuardianConnect\GuardianConnect.csproj
-      run: msbuild /t:restore /t:Publish /p:Platform=arm64 /p:Configuration=Release /p:RuntimeIdentifier=win-arm64 GuardianConnect\GuardianConnect.csproj /p:PublishSingleFile=true /p:SelfContained=true /p:PublishTrimmed=true
+      run: msbuild /t:restore /t:Build /p:Platform=arm64 /p:Configuration=Release /p:RuntimeIdentifier=win-arm64 GuardianConnect\GuardianConnect.csproj
       
     - name: Build GuardianFirewall Service for x64 CPU
       #run: msbuild /t:restore /t:Build /p:Platform=x64 /p:Configuration=Release /p:RuntimeIdentifier=win-x64 GuardianFirewallService\GuardianFirewallService.csproj
@@ -91,10 +89,19 @@ jobs:
 
      # Zip up our binaries for specific zip signing in SignPath
     - name: Zip Guardian binaries for SignPath deep-signing
-      #run: PackagingHelpers\bin\7-zip\7z a -bb3 "${{ env.unsignedzipfile }}" @PackagingHelpers\Input\ListOfGuardianFilesToSign.fls
-      run: 7z a -bb3 .\UnsignedGuardianBinaries.zip @ListOfGuardianConnectSDKFilesToSign.fls
+      run: 7z a -bb3 .\UnsignedGuardianBinaries_${{env.PKGVERSION}}.zip @ListOfGuardianConnectSDKFilesToSign.fls
       shell: cmd
 
+    - name: Upload build artifacts - both SDKs AND AOT-version of GuardianFirewallService.exe - UNSIGNED SO WE CAN GIVE AS SAMPLE TO SIGNPATH
+      uses: actions/upload-artifact@v4
+      with:
+        name: "Upload UnsignedGuardianBinaries_${{env.PKGVERSION}}.zip"
+        path: D:\a\GuardianConnect-Windows\GuardianConnect-Windows\GuardianConnectSDK\UnsignedGuardianBinaries_${{env.PKGVERSSION}}.zip
+      
+      # STOP HERE
+    - name: STOP HERE
+      run: BARF
+      
       # Sign Guardian binaries only  Executable with certificate
     - name: Sign Guardian Binaries with certificate
       run: Install-Module -Name SignPath -Force

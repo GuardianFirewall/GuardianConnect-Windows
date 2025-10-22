@@ -8,6 +8,11 @@
   </PropertyGroup>
 
   <ItemGroup>
+    <PackageReference Include="Newtonsoft.Json" Version="13.0.4" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\GuardianConnect\GuardianConnect.csproj" />
     <ProjectReference Include="..\Win32Calls\Win32Calls.csproj" />
   </ItemGroup>
 

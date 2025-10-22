@@ -1,6 +1,6 @@
 {
   "version": 2,
-  "dgSpecHash": "pmf8eQ5KpbE=",
+  "dgSpecHash": "PaMbYZUc9BU=",
   "success": true,
   "projectFilePath": "C:\\Users\\Tim\\Documents\\GitHub\\GuardianConnect-Windows\\GuardianConnectSDK\\Win32Calls.WFP\\Win32Calls.WFP.csproj",
   "expectedPackageFiles": [
@@ -24,7 +24,6 @@
     "C:\\Users\\Tim\\.nuget\\packages\\microsoft.windows.sdk.win32docs\\0.1.42-alpha\\microsoft.windows.sdk.win32docs.0.1.42-alpha.nupkg.sha512",
     "C:\\Users\\Tim\\.nuget\\packages\\microsoft.windows.sdk.win32metadata\\65.0.8-preview\\microsoft.windows.sdk.win32metadata.65.0.8-preview.nupkg.sha512",
     "C:\\Users\\Tim\\.nuget\\packages\\microsoft.windows.wdk.win32metadata\\0.13.25-experimental\\microsoft.windows.wdk.win32metadata.0.13.25-experimental.nupkg.sha512",
-    "C:\\Users\\Tim\\.nuget\\packages\\newtonsoft.json\\13.0.3\\newtonsoft.json.13.0.3.nupkg.sha512",
     "C:\\Users\\Tim\\.nuget\\packages\\serilog\\4.3.0\\serilog.4.3.0.nupkg.sha512",
     "C:\\Users\\Tim\\.nuget\\packages\\serilog.enrichers.environment\\3.0.1\\serilog.enrichers.environment.3.0.1.nupkg.sha512",
     "C:\\Users\\Tim\\.nuget\\packages\\serilog.enrichers.process\\3.0.0\\serilog.enrichers.process.3.0.0.nupkg.sha512",

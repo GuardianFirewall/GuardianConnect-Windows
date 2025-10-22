@@ -1,12 +1,13 @@
 using GuardianConnect.Helpers;
 using GuardianConnect.Shared;
-using Newtonsoft.Json;
+//using Newtonsoft.Json;
+using System.Text.Json.Serialization;
 
 namespace GuardianConnect.API.Model;
 
 public class DeviceFilterConfig
 {
-    [Newtonsoft.Json.JsonIgnore]
+    [JsonIgnore]
     public DeviceFilterConfigFlags DeviceFilterConfigBlockList;
 
     #region Definitions
@@ -22,24 +23,37 @@ public class DeviceFilterConfig
     #endregion
 
     #region fields
-    [JsonProperty("api-auth-token")]
-    public string Api_auth_token = string.Empty;
+    [JsonPropertyName("api-auth-token")]
+    public string Api_auth_token { get; set; } = string.Empty;
 
-    [JsonProperty("block-phishing")]
+    [JsonPropertyName("block-phishing")]
     //[Newtonsoft.Json.JsonConverter(typeof(YesNoConverter))]
-    public bool Block_Phishing => (DeviceFilterConfigBlockList & DeviceFilterConfigFlags.BlocklistBlockPhishing) != 0;
+    public bool Block_Phishing
+    {
+        get => (DeviceFilterConfigBlockList & DeviceFilterConfigFlags.BlocklistBlockPhishing) != 0;
+        set => throw new NotImplementedException();
+    }
 
-    [JsonProperty("block-ads")]
+    [JsonPropertyName("block-ads")]
     //[Newtonsoft.Json.JsonConverter(typeof(YesNoConverter))]
-    public bool Block_Ads => (DeviceFilterConfigBlockList & DeviceFilterConfigFlags.BlocklistBlockAds) != 0;
+    public bool Block_Ads
+    {
+        get => (DeviceFilterConfigBlockList & DeviceFilterConfigFlags.BlocklistBlockAds) != 0;
+        set => throw new NotImplementedException();
+    }
 
-    [JsonProperty("block-none")]
+    [JsonPropertyName("block-none")]
     //[Newtonsoft.Json.JsonConverter(typeof(YesNoConverter))]
-    public bool Disable_Firewall => (DeviceFilterConfigBlockList & DeviceFilterConfigFlags.BlocklistDisableFirewall) != 0;
-    
+    public bool Disable_Firewall
+    {
+        get => (DeviceFilterConfigBlockList & DeviceFilterConfigFlags.BlocklistDisableFirewall) != 0;
+        set => throw new NotImplementedException();
+    }
+
     #endregion
 
     #region methods
+    [JsonConstructor]
     public DeviceFilterConfig()
     {
         DeviceFilterConfigBlockList = DeviceFilterConfigFlags.BlocklistCleared;
