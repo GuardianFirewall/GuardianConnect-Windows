@@ -2,5 +2,5 @@ BuildOutput\GuardianConnect\runtimes\win10-arm64\lib\net9.0-windows\GuardianConn
 BuildOutput\GuardianConnect\runtimes\win10-arm64\lib\net9.0-windows\GuardianConnect.Shared.dll
 BuildOutput\GuardianConnect\runtimes\win10-x64\lib\net9.0-windows\GuardianConnect.dll
 BuildOutput\GuardianConnect\runtimes\win10-x64\lib\net9.0-windows\GuardianConnect.Shared.dll
-GuardianFirewallService\bin\x64\Release\net9.0-windows\win-x64\publish
-GuardianFirewallService\bin\arm64\Release\net9.0-windows\win-arm64\publish
+GuardianFirewallService\bin\x64\Release\net9.0-windows\win-x64\publish\GuardianFirewallService.exe
+GuardianFirewallService\bin\arm64\Release\net9.0-windows\win-arm64\publish\GuardianFirewallService.exe
