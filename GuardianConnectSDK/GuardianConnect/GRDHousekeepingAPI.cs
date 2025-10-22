@@ -12,6 +12,7 @@ namespace GuardianConnect;
 
 public class GRDHousekeepingAPI
 {
+#if false
     public class PETRequest
     {
         public string validationMethod = "pe-token";
@@ -31,6 +32,7 @@ public class GRDHousekeepingAPI
             Password = userPassword;
         }
     }
+#endif
 
     public static GrdUserLoginResponse LoginResponse { get; set; } = new GrdUserLoginResponse();
     public static GRDSubscriberCredential? LiveGrdCredential { get; set; }
@@ -142,20 +144,17 @@ public class GRDHousekeepingAPI
             }
         }
 
-        PETRequest petRequest = new PETRequest();
-        petRequest.peToken = peToken;
+        PeTokenRequest petRequest = new PeTokenRequest(peToken);
 
         // TJE - remove comment - taken from AuthenticateUser.cs in UI
         Uri uri = new Uri($"https://{connectHost}/api/v1.2/subscriber-credential/create");
         try
         {
-            var pet = new PeTokenRequest("pe-token", petRequest.peToken);
-            /*
-            // TODO: Check this bug with System.JSON why it doesn't work!
-            //HttpContent content = new StringContent(JsonSerializer.Serialize(lc));
-            */
+            var pet = new PeTokenRequest("pe-token", petRequest.PeToken);
             
-            HttpContent content = new StringContent(JsonSerializer.Serialize(pet, GRDPETokenJsonContext.Default.GRDPEToken));
+            string serializedPetReq = JsonSerializer.Serialize(pet, PeTokenRequestJsonContext.Default.PeTokenRequest);
+            Log.Information($"CreateSubscriberCredentialForBundleId: serializedPetReq = '{serializedPetReq}'");
+            HttpContent content = new StringContent(serializedPetReq);
             content.Headers.Remove("Content-Type");
             content.Headers.Add("Content-Type", "application/json; charset=utf-8");
             HttpResponseMessage response = await HttpUtils.Client.PostAsync(uri, content);

@@ -265,8 +265,9 @@ namespace GuardianConnect.Helpers
 
                 rip.Region = regionLookup[regionKey].RegionName;
                 Log.Information("About to do GET for Region Hosts collection retrieval");
-                //HttpContent content = new StringContent(Newtonsoft.Json.JsonConvert.SerializeObject(rip));
-                HttpContent content = new StringContent(JsonSerializer.Serialize(rip));
+                string ripSerialized = JsonSerializer.Serialize(rip, RegionInputParameterJsonContext.Default.RegionInputParameter);
+                Log.Information($"GetHostsForRegionKey: Json string for RegionInputParameter '{ripSerialized}'");
+                HttpContent content = new StringContent(ripSerialized);
                 content.Headers.Remove("Content-Type");
                 content.Headers.Add("Content-Type", "application/json; charset=utf-8");
 

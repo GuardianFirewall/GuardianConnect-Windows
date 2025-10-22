@@ -19,16 +19,16 @@ using System.Text.Json;
 using GuardianConnect.Credentials;
 
 // Serialize a single object
-string json = JsonSerializer.Serialize(token, GRDCredentialsJsonContext.Default.GRDPEToken);
+string json = JsonSerializer.Serialize(token, GRDPETokenJsonContext.Default.GRDPEToken);
 
 // Serialize a list
-string jsonList = JsonSerializer.Serialize(tokenList, GRDCredentialsJsonContext.Default.ListGRDPEToken);
+string jsonList = JsonSerializer.Serialize(tokenList, GRDPETokenJsonContext.Default.ListGRDPEToken);
 
 // Deserialize a single object
-var token = JsonSerializer.Deserialize<GRDPEToken>(json, GRDCredentialsJsonContext.Default.GRDPEToken);
+var token = JsonSerializer.Deserialize<GRDPEToken>(json, GRDPETokenJsonContext.Default.GRDPEToken);
 
 // Deserialize a list
-var tokenList = JsonSerializer.Deserialize<List<GRDPEToken>>(jsonList, GRDCredentialsJsonContext.Default.ListGRDPEToken);
+var tokenList = JsonSerializer.Deserialize<List<GRDPEToken>>(jsonList, GRDPETokenJsonContext.Default.ListGRDPEToken);
 
 // Same for GRDSubscriberCredential and List<GRDSubscriberCredential>
 

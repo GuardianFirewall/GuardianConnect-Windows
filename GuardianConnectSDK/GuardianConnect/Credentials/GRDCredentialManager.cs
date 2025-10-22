@@ -1,6 +1,7 @@
 ﻿using System.Text;
 using System.Text.Json;
 using System.Text.Json.Serialization;
+using GuardianConnect.API;
 using Serilog;
 
 namespace GuardianConnect.Credentials
@@ -27,7 +28,7 @@ namespace GuardianConnect.Credentials
 
         private static byte[] CredentialsToToData()
         {
-            var serializedData = JsonSerializer.Serialize(_credentialsList, GRDCredentialJsonContext.Default.GRDCredential);
+            var serializedData = JsonSerializer.Serialize(_credentialsList, GRDCredentialJsonContext.Default.ListGRDCredential);
             var binData = Encoding.UTF8.GetBytes(serializedData);
 
             return binData;
@@ -65,6 +66,10 @@ namespace GuardianConnect.Credentials
         public static void LoadCredentialsList()
         {
             var data = GRDKeychain.GetDataForAccount(IGRDKeychain.kGuardianCredentialsList);
+            if (string.IsNullOrEmpty(data))
+            {
+                data = JsonSerializer.Serialize(new List<GRDCredential>(), GRDCredentialJsonContext.Default.ListGRDCredential);
+            }
             DataToCredentials(data);
             
             // first time store empty list

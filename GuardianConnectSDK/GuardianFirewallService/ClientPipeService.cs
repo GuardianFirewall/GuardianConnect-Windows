@@ -196,7 +196,7 @@ public class ClientPipeService : BackgroundService
                             var vpnCallParameters = JsonSerializer.Deserialize<VPNCallParameters>(serializedVpnParameters, VPNCallParametersJsonContext.Default.VPNCallParameters);
                             var didItStart = cmdDispatcher.StartVPNConnection(vpnCallParameters);
                             Log.Information($"ClientPipeService[{threadId}]: Exiting StartVPNConnection");
-                            var startResponseJson = JsonSerializer.Serialize(didItStart);
+                            var startResponseJson = JsonSerializer.Serialize(didItStart, ErrorResponseJsonContext.Default.ErrorResponse);
                             Log.Information($"ClientPipeService.StartVPNConnection - string is '{startResponseJson}'");
                             ss.WriteString(startResponseJson);
                             break;
@@ -252,7 +252,7 @@ public class ClientPipeService : BackgroundService
                             Log.Information($"ClientPipeService[{threadId}]: Performing RequestLogLines");
                             int maxLogLines = int.Parse(cmdPayload);
                             var lastLogLines = Common.GetLastLogLines(maxLogLines);
-                            string serializedLogs = JsonSerializer.Serialize(lastLogLines);
+                            string serializedLogs = JsonSerializer.Serialize(lastLogLines, JsonSerializerOptions.Default);
                             Log.Information($"ClientPipeService[{threadId}]: Writing log lines to client");
                             ss.WriteString(serializedLogs);
                             break;

@@ -2,7 +2,7 @@ using System.Text.Json.Serialization;
 
 namespace GuardianConnect.Credentials
 {
-    [JsonSourceGenerationOptions(WriteIndented = true)]
+    [JsonSourceGenerationOptions(WriteIndented = true, IncludeFields = true)]
     [JsonSerializable(typeof(GRDSubscriberCredential))]
     [JsonSerializable(typeof(List<GRDSubscriberCredential>))]
     [JsonSerializable(typeof(string))]

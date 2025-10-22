@@ -10,6 +10,7 @@ namespace GuardianConnect.Credentials
     [JsonSerializable(typeof(bool))]
     [JsonSerializable(typeof(string))]
     [JsonSerializable(typeof(DateTime))]
+    [JsonSerializable(typeof(byte[]))]
     [JsonSerializable(typeof(GRDCredential))]
     [JsonSerializable(typeof(List<GRDCredential>))]
     public partial class GRDCredentialJsonContext : JsonSerializerContext

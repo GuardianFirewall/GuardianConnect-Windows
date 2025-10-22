@@ -156,7 +156,9 @@ public class GRDGateway
 
         Uri reqUri = new Uri($"https://{hostname}/api/v1.3/device");
         HttpRequestMessage request = new HttpRequestMessage(HttpMethod.Post, reqUri);
-        request.Content = new StringContent(JsonSerializer.Serialize(payload, RegisterDevicePayloadJsonContext.Default.RegisterDevicePayload));
+        string payLoadString = JsonSerializer.Serialize(payload, RegisterDevicePayloadJsonContext.Default.RegisterDevicePayload);
+        Log.Information($"RegisterDeviceForTransportProtocol: payload for call is '{payLoadString}");
+        request.Content = new StringContent(payLoadString);
 
         try
         {
@@ -164,6 +166,7 @@ public class GRDGateway
             errorResponse.SetResponse(response).SetData(new List<GRDCredential>());
             string respContent = await response.Content.ReadAsStringAsync();
             var cred = JsonSerializer.Deserialize<GRDCredential>(respContent, GRDCredentialJsonContext.Default.GRDCredential);
+            Log.Information($"RegisterDeviceForTransportProtocol: resp Status={response.StatusCode}, cred values: ApiAuthToken: {cred.ApiAuthToken}, ClientId: {cred.ClientId}, DevicePrivateKey: {cred.DevicePrivateKey}, DevicePublicKey: {cred.DevicePublicKey}, Ipv4Address: {cred.IPv4Address}");
             if (cred != null) credsList.Add(cred);
         }
         catch (Exception e)
@@ -230,6 +233,11 @@ public class GRDGateway
         
         // Get DeviceFilterConfig object
         var dfcCurrent = GRDVPNHelper.Instance.CurrentDeviceBlocklistConfig;
+        dfcCurrent.Api_auth_token =  ApiAuthToken;
+        // TJE 102225: Check and set our CurrentDeviceBlockListConfig's Api-Auth-Token value from MainCredentials
+        Log.Information("SetDeviceFilterConfigsForDevice: Updating CurrentDeviceBlocklistConfig api_auth_token");
+        GRDVPNHelper.Instance.CurrentDeviceBlocklistConfig.Api_auth_token = ApiAuthToken;
+        //
         var dfcJson = JsonSerializer.Serialize(dfcCurrent, DeviceFilterConfigJsonContext.Default.DeviceFilterConfig);
         //var clientId = GRDCredentialManager.MainCredentials.ClientId;
         var clientId = DeviceIdentifier;

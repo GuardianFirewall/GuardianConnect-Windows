@@ -12,14 +12,19 @@ namespace GuardianConnect.API.Model;
 public class PeTokenRequest
 {
     [JsonPropertyName("validation-method")]
-    public string ValidationMethod = "pe-token";
+    public string ValidationMethod { get; }= "pe-token";
 
     [JsonPropertyName("pe-token")]
-    public string LivePeToken;
+    public string PeToken { get; set; }
 
     public PeTokenRequest(string method, string token)
     {
         ValidationMethod = method;
-        LivePeToken = token;
+        PeToken = token;
+    }
+
+    public PeTokenRequest(string token)
+    {
+        PeToken = token;
     }
 }

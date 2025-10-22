@@ -7,8 +7,10 @@ namespace GuardianConnect.Credentials
 {
     public class GRDCredential
     {
-	    #pragma warning disable CS0414
+#pragma warning disable CS0414
+		[JsonIgnore]
 	    private bool _checkedExpiration;
+		[JsonIgnore]
 	    private bool _expired;
 	    #pragma warning restore CS0414
 	    
@@ -16,6 +18,8 @@ namespace GuardianConnect.Credentials
         public string Name { get; set; } = string.Empty;
         public string Identifer { get; set; } = string.Empty;
         public bool MainCredential  {get; set; }
+
+		//[JsonIgnore]
         public ITransportProvider.TransportProtocol TransportProtocol  {get; set; }
         public string HostnameDisplayValue { get; set; } = string.Empty;
         public DateTime ExpirationDate  {get; set; }
@@ -31,6 +35,7 @@ namespace GuardianConnect.Credentials
         [JsonPropertyName("eap-password")]
         public string Password  {get; set; } = string.Empty;
 
+		[JsonIgnore]
         public byte[] PasswordRef { get; set; } = Array.Empty<byte>();
         public string DevicePublicKey { get; set; } = string.Empty;
         public string DevicePrivateKey { get; set; } = string.Empty;
@@ -53,6 +58,7 @@ namespace GuardianConnect.Credentials
             throw new NotImplementedException();
         }
 
+		[JsonConstructor]
         public GRDCredential()
         {
         }

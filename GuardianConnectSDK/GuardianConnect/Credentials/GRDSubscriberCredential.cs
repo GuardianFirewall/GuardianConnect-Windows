@@ -10,18 +10,34 @@ namespace GuardianConnect.Credentials
 {
     public class GRDSubscriberCredential
     {
+        public GRDSubscriberCredential()
+        {
+        }
+
+        #region json properties
         [JsonPropertyName("jwt")]
         public string Jwt { get; set; } = string.Empty;
 
-        [JsonPropertyName("sub-type")]
+        //[JsonPropertyName("sub-type")]
+        [JsonPropertyName("subscription-type")]
         public string SubscriptionType { get; set; } = string.Empty;
 
-        [JsonPropertyName("sub-type-pretty")] public string SubscriptionTypePretty { get; set; } = string.Empty;
+        [JsonPropertyName("subscription-type-pretty")]
+        //[JsonPropertyName("sub-type-pretty")]
+        public string SubscriptionTypePretty { get; set; } = string.Empty;
 
-        [JsonPropertyName("sub-expire-date")]
+        //[JsonPropertyName("sub-expire-date")]
+        [JsonPropertyName("subscription-expiration-date")]
+        public long SubscriptionExpirationDateUnixSeconds { get; set; }
+
+        [JsonIgnore]
         public DateTime SubscriptionExpirationDate { get; set; }
 
-        [JsonPropertyName("token-expire-date")]
+        //[JsonPropertyName("token-expire-date")]
+        [JsonPropertyName("exp")]
+        public long TokenExpirationDateUnixSeconds { get; set; }
+
+        [JsonIgnore]
         public DateTime TokenExpirationDate { get; set; }
 
         [JsonIgnore]
@@ -30,6 +46,30 @@ namespace GuardianConnect.Credentials
         [JsonIgnore]
         public bool IsEmpty => string.IsNullOrEmpty(Jwt);
 
+        #endregion json properties
+
+#if FROMJ2CS
+// Root myDeserializedClass = JsonConvert.DeserializeObject<Root>(myJsonResponse);
+    public class Root
+    {
+        [JsonProperty("subscription-type")]
+        public string subscriptiontype { get; set; }
+
+        [JsonProperty("subscription-type-pretty")]
+        public string subscriptiontypepretty { get; set; }
+
+        [JsonProperty("subscription-expiration-date")]
+        public int subscriptionexpirationdate { get; set; }
+
+        [JsonProperty("guardian-employee")]
+        public bool guardianemployee { get; set; }
+
+        [JsonProperty("guardian-employee-id")]
+        public string guardianemployeeid { get; set; }
+        public int exp { get; set; }
+        public int iat { get; set; }
+    }
+#endif
         public static GRDSubscriberCredential GetCurrentStoredSubscriberCredential()
         {
             // CONN#8
@@ -107,17 +147,22 @@ namespace GuardianConnect.Credentials
             string base64Payload = payloadString + (padSizeForB64 != 4 ? new string('=', padSizeForB64) : "");
 
             string payLoad = Common.DecodeFrom64(base64Payload);
-            var gscDict = JsonSerializer.Deserialize<Dictionary<string, object>>(payLoad);
+            Log.Information($"ParseSubscriberCredentials: jwt payload = '{payLoad}'");
+            var subCred = JsonSerializer.Deserialize<GRDSubscriberCredential>(payLoad, GRDSubscriberCredentialJsonContext.Default.GRDSubscriberCredential);
 
-            SubscriptionType = (string)gscDict!["subscription-type"] ?? string.Empty;
-            SubscriptionTypePretty = (string)gscDict!["subscription-type"] ?? string.Empty;
-            
-            //long expDateTimeSecondsSinceUnixEpoch = (long)gscDict["subscription-expiration-date"];
+            SubscriptionType = subCred.SubscriptionType ?? string.Empty;
+            SubscriptionTypePretty = subCred.SubscriptionTypePretty ?? string.Empty;
+
+            //long expDateTimeSecondsSinceUnixEpoch = long.Parse(SubscriptionExpirationDateUnixSeconds);
             //SubscriptionExpirationDate = Common.DateOnlyFromAppleDTI1970(expDateTimeSecondsSinceUnixEpoch);
-            SubscriptionExpirationDate = DateTimeOffset.FromUnixTimeSeconds((long)gscDict!["subscription-expiration-date"]).DateTime;
-            TokenExpirationDate = DateTimeOffset.FromUnixTimeSeconds((long)gscDict["exp"]).DateTime;
-            SubscriptionTypePretty = (string)gscDict["subscription-type"];
+            //SubscriptionExpirationDate = DateTimeOffset.FromUnixTimeSeconds((long)gscDict!["subscription-expiration-date"]).DateTime;
+            SubscriptionExpirationDate = DateTimeOffset.FromUnixTimeSeconds(subCred.SubscriptionExpirationDateUnixSeconds).DateTime;
+            TokenExpirationDate =        DateTimeOffset.FromUnixTimeSeconds(subCred.TokenExpirationDateUnixSeconds).DateTime;
+            //SubscriptionTypePretty = (string)gscDict["subscription-type"];
             IsTokenExpired = IsExpired();
+            //Jwt = subCred.Jwt;
+            SubscriptionExpirationDateUnixSeconds = subCred.SubscriptionExpirationDateUnixSeconds;
+            TokenExpirationDateUnixSeconds = subCred.TokenExpirationDateUnixSeconds;
         }
  
         private bool IsExpired()

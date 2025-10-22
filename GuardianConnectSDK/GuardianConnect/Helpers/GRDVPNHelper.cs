@@ -440,7 +440,6 @@ namespace GuardianConnect.Helpers
             }
 
             GRDHousekeepingAPI houseKeeping = new GRDHousekeepingAPI();
-            //(var subCredJWT, var success, errorResponse) = await houseKeeping.CreateSubscriberCredentialForBundleId(peToken);
             errorResponse = await houseKeeping.CreateSubscriberCredentialForBundleId(peToken);
             return (GRDHousekeepingAPI.LiveGrdCredential, errorResponse);
         }

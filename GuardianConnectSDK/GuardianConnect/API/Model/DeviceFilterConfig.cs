@@ -24,7 +24,7 @@ public class DeviceFilterConfig
 
     #region fields
     [JsonPropertyName("api-auth-token")]
-    public string Api_auth_token = string.Empty;
+    public string Api_auth_token { get; set; } = string.Empty;
 
     [JsonPropertyName("block-phishing")]
     //[Newtonsoft.Json.JsonConverter(typeof(YesNoConverter))]
