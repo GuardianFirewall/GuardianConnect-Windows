@@ -106,7 +106,8 @@ jobs:
         -InputArtifactPath "${{ env.unsignedzipfile }}" `
         -ApiToken "${{ secrets.CI_SIGNPATH_USER_TOKEN }}" `
         -OrganizationId "5c1e4170-8bf7-48b1-8542-78374ccc3471" `
-        -ProjectSlug "GuardianSDKandAOTCompiledServiceNoCPP" `
+        -ProjectSlug "NoCPP_and_AOT_SVC" `
+        
         -SigningPolicySlug "Guardian_DNSF_Branded" `
         -OutputArtifactPath "${{ env.signedzipfile }}" `
         -ArtifactConfigurationSlug  GuardianConnectWindowsBinariesZip `
