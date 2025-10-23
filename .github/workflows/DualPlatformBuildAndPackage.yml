@@ -72,36 +72,12 @@ jobs:
     - name: Build GuardianFirewall Service for x64 CPU
       #PRE-AOT-run: msbuild /t:restore /t:Build /p:Platform=x64 /p:Configuration=Release /p:RuntimeIdentifier=win-x64 GuardianFirewallService\GuardianFirewallService.csproj
       #run: msbuild /t:restore /t:Publish /p:Platform=x64 /p:Configuration=Release /p:RuntimeIdentifier=win-x64 GuardianFirewallService\GuardianFirewallService.csproj /p:PublishSingleFile=true /p:SelfContained=true /p:PublishTrimmed=true
-      run: >
-            msbuild /t:restore
-                    /t:Publish
-                    /p:SelfContained=true
-                    /p:_IsPortable=false
-                    /p:PublishSingleFile=true
-                    /p:PublishReadyToRun=false
-                    /p:PublishTrimmed=true
-                    /p:IncludeNativeLibrariesForSelfExtract=false
-                    /p:IncludeAllContentForSelfExtract=false
-                    /p:Configuration=Release
-                    /p:Platform=x64
-                    /p:RuntimeIdentifier=win-x64 GuardianFirewallService\GuardianFirewallService.csproj
+      run: msbuild /t:restore /t:Publish /p:SelfContained=true /p:_IsPortable=false /p:PublishSingleFile=true /p:PublishReadyToRun=false /p:PublishTrimmed=true /p:IncludeNativeLibrariesForSelfExtract=false /p:IncludeAllContentForSelfExtract=false /p:Configuration=Release /p:Platform=x64 /p:RuntimeIdentifier=win-x64 GuardianFirewallService\GuardianFirewallService.csproj
 
     - name: Build GuardianFirewall Service for arm64 CPU
       #PRE_AOT-run: msbuild /t:restore /t:Build /p:Platform=arm64 /p:Configuration=Release /p:RuntimeIdentifier=win-arm64 GuardianFirewallService\GuardianFirewallService.csproj
       #run: msbuild /t:restore /t:Publish /p:Platform=arm64 /p:Configuration=Release /p:RuntimeIdentifier=win-arm64 GuardianFirewallService\GuardianFirewallService.csproj /p:PublishSingleFile=true /p:SelfContained=true /p:PublishTrimmed=true
-      run: >
-        msbuild /t:restore
-                /t:Publish
-                /p:SelfContained=true
-                /p:_IsPortable=false
-                /p:PublishSingleFile=true
-                /p:PublishReadyToRun=false
-                /p:PublishTrimmed=true
-                /p:IncludeNativeLibrariesForSelfExtract=false
-                /p:IncludeAllContentForSelfExtract=false
-                /p:Configuration=Release
-                /p:Platform=arm64
-                /p:RuntimeIdentifier=win-arm64 GuardianFirewallService\GuardianFirewallService.csproj
+      run: msbuild /t:restore /t:Publish /p:SelfContained=true /p:_IsPortable=false /p:PublishSingleFile=true /p:PublishReadyToRun=false /p:PublishTrimmed=true /p:IncludeNativeLibrariesForSelfExtract=false /p:IncludeAllContentForSelfExtract=false /p:Configuration=Release /p:Platform=arm64 /p:RuntimeIdentifier=win-arm64 GuardianFirewallService\GuardianFirewallService.csproj
 
     ## PAUSE HERE - Going to ONLY gather and upload the Guardian assets to SignPath in a zip. Both x64 and arm64.
     ## GuardianConnect.Shared.dll, GuardianConnect.dll, NativeRoutines.dll, GuardianFirewallService.exe and GuardianFirewallService.dll
