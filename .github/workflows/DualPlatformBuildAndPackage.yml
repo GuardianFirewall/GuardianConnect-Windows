@@ -98,10 +98,6 @@ jobs:
         name: "Upload UnsignedGuardianBinaries_${{env.PKGVERSION}}.zip"
         path: D:\a\GuardianConnect-Windows\GuardianConnect-Windows\GuardianConnectSDK\UnsignedGuardianBinaries_${{env.PKGVERSION}}.zip
       
-      # STOP HERE
-    - name: STOP HERE
-      run: BARF
-      
       # Sign Guardian binaries only  Executable with certificate
     - name: Sign Guardian Binaries with certificate
       run: Install-Module -Name SignPath -Force
@@ -110,7 +106,7 @@ jobs:
         -InputArtifactPath "${{ env.unsignedzipfile }}" `
         -ApiToken "${{ secrets.CI_SIGNPATH_USER_TOKEN }}" `
         -OrganizationId "5c1e4170-8bf7-48b1-8542-78374ccc3471" `
-        -ProjectSlug "Guardian" `
+        -ProjectSlug "GuardianSDKandAOTCompiledServiceNoCPP" `
         -SigningPolicySlug "Guardian_DNSF_Branded" `
         -OutputArtifactPath "${{ env.signedzipfile }}" `
         -ArtifactConfigurationSlug  GuardianConnectWindowsBinariesZip `
@@ -120,17 +116,6 @@ jobs:
     - name: Unzip the newly-created file to list Guardian binaries for SignPath deep-signing
       run: 7z x -aoa -bb3 "${{ env.signedzipfile }}"
 
-        # BARF
-#    - name: BARF
-#      run: FOOBAR
-        
-    ###
-###    - name: Upload build artifacts - GuardianFirewall Service Executable for ARM64 itself - single file so we can verify if it works
-###      uses: actions/upload-artifact@v4
-###      with:
-###        name: GuardianFirewallService.exe
-###        path: D:\a\GuardianConnect-Windows\GuardianConnect-Windows\GuardianConnectSDK\BuildOutput\GuardianFirewallService\runtimes\win10-arm64\lib\net9.0-windows\GuardianFirewallService.exe
-###        
     - name: Create GuardianConnectSDK_x64.nupkg package bundle for EACH CPU build - x64 first
       run: nuget pack GuardianConnectSDK_x64.nuspec -Version ${{env.PKGVERSION}}
       shell: cmd
