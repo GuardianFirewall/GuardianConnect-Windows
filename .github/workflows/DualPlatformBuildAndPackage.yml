@@ -89,14 +89,14 @@ jobs:
 
      # Zip up our binaries for specific zip signing in SignPath
     - name: Zip Guardian binaries for SignPath deep-signing
-      run: 7z a -bb3 .\UnsignedGuardianBinaries_${{env.PKGVERSION}}.zip @ListOfGuardianConnectSDKFilesToSign.fls
+      run: 7z a -bb3 .\UnsignedGuardianBinaries.zip @ListOfGuardianConnectSDKFilesToSign.fls
       shell: cmd
 
-    - name: Upload build artifacts - both SDKs AND AOT-version of GuardianFirewallService.exe - UNSIGNED SO WE CAN GIVE AS SAMPLE TO SIGNPATH
-      uses: actions/upload-artifact@v4
-      with:
-        name: "Upload UnsignedGuardianBinaries_${{env.PKGVERSION}}.zip"
-        path: D:\a\GuardianConnect-Windows\GuardianConnect-Windows\GuardianConnectSDK\UnsignedGuardianBinaries_${{env.PKGVERSION}}.zip
+##    - name: Upload build artifacts - both SDKs AND AOT-version of GuardianFirewallService.exe - UNSIGNED SO WE CAN GIVE AS SAMPLE TO SIGNPATH
+##      uses: actions/upload-artifact@v4
+##      with:
+##        name: "Upload UnsignedGuardianBinaries_${{env.PKGVERSION}}.zip"
+##        path: D:\a\GuardianConnect-Windows\GuardianConnect-Windows\GuardianConnectSDK\UnsignedGuardianBinaries_${{env.PKGVERSION}}.zip
       
       # Sign Guardian binaries only  Executable with certificate
     - name: Sign Guardian Binaries with certificate
