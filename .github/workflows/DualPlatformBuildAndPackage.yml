@@ -95,7 +95,7 @@ jobs:
 
      # Zip up our binaries for specific zip signing in SignPath
     - name: Zip Guardian binaries for SignPath deep-signing
-      run: 7z a -bb3 "${{ env.unsignedzipfile }} @ListOfGuardianConnectSDKFilesToSign.fls
+      run: 7z a -bb3 "${{ env.unsignedzipfile }}" @ListOfGuardianConnectSDKFilesToSign.fls
       shell: cmd
 
 ##    - name: Upload build artifacts - both SDKs AND AOT-version of GuardianFirewallService.exe - UNSIGNED SO WE CAN GIVE AS SAMPLE TO SIGNPATH
