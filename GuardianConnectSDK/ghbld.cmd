@@ -26,7 +26,18 @@ if "%~1" == "gfs" (
 	)
 	if "%~3" == "aot" {
 		echo "Building Publish-AOT-Trimmed-Self-Contained GuardianFirewallService.exe"
-		msbuild /t:restore /t:Publish /p:Platform=%2 /p:Configuration=Release /p:RuntimeIdentifier=win-%2 GuardianFirewallService\GuardianFirewallService.csproj /p:PublishSingleFile=true /p:SelfContained=true /p:PublishTrimmed=true
+		msbuild /t:restore ^
+			/t:Publish ^
+			/p:SelfContained=true ^
+			/p:_IsPortable=false ^
+			/p:PublishSingleFile=true ^
+			/p:PublishReadyToRun=false ^
+			/p:PublishTrimmed=true ^
+			/p:IncludeNativeLibrariesForSelfExtract=false ^
+			/p:IncludeAllContentForSelfExtract=false ^
+			/p:Configuration=Release ^
+			/p:Platform=%2 ^
+			/p:RuntimeIdentifier=win-%2 GuardianFirewallService\GuardianFirewallService.csproj
 		goto :exit
 	}
 
