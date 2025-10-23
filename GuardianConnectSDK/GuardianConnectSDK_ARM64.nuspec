@@ -2,7 +2,7 @@
 <package >
   <metadata>
     <id>GuardianConnectSDK_ARM64</id>
-    <version>0.18.18.7</version>
+    <version>0.23.9</version>
     <title>GuardianConnect SDK Nuget Bundle Package for arm64</title>
     <authors>DNSFilter, Inc.</authors>
     <license type="expression">MIT</license>
@@ -25,8 +25,8 @@
 
     <file src="BuildOutput\GuardianConnect\runtimes\win10-arm64\lib\net9.0-windows\GuardianConnect.dll" target="lib\net9.0\GuardianConnect.dll"  />
     <file src="BuildOutput\GuardianConnect\runtimes\win10-arm64\lib\net9.0-windows\GuardianConnect.Shared.dll" target="lib\net9.0\GuardianConnect.Shared.dll"  />
-    <file src="BuildOutput\GuardianConnect\runtimes\win10-arm64\lib\net9.0-windows\NativeRoutines.dll" target="lib\net9.0\NativeRoutines.dll"  />
-    <file src="BuildOutput\GuardianConnect\runtimes\win10-arm64\lib\net9.0-windows\Ijwhost.dll" target="lib\net9.0\Ijwhost.dll"  />
+    <file src="BuildOutput\GuardianConnect\runtimes\win10-x64\lib\net9.0-windows\Win32Calls.dll" target="lib\net9.0\Win32Calls.dll"  />
+    <file src="BuildOutput\GuardianConnect\runtimes\win10-x64\lib\net9.0-windows\Win32Calls.WFP.dll" target="lib\net9.0\Win32Calls.WFP.dll"  />
     <!-- Placeholder for the GuardianConnect SDK for lib so that nuget resolution works - go figure. -->
     <!--
       <file src="BuildOutput\GuardianConnect\runtimes\win10-arm64\lib\net9.0-windows\GuardianConnect.dll" target="lib\net9.0\GuardianConnect.dll"  />
