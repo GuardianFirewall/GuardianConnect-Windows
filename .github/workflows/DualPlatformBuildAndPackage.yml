@@ -105,9 +105,9 @@ jobs:
         Submit-SigningRequest `
         -OrganizationId "5c1e4170-8bf7-48b1-8542-78374ccc3471" `
         -ApiToken "${{ secrets.CI_SIGNPATH_USER_TOKEN }}" `
-        -SigningPolicySlug "Guardian_DNSF_Branded" `
         -ProjectSlug "Guardian" `
-        -ArtifactConfigurationSlug  "NoCPP_and_AOT_SVC" `
+        -SigningPolicySlug "Guardian_DNSF_Branded" `
+        -ArtifactConfigurationSlug  "NoCPP_SDK_and_AOT_SVC" `
         -InputArtifactPath "${{ env.unsignedzipfile }}" `
         -OutputArtifactPath "${{ env.signedzipfile }}" `
         -WaitForCompletion
@@ -153,13 +153,13 @@ jobs:
       run: Install-Module -Name SignPath -Force
 
         Submit-SigningRequest `
-        -InputArtifactPath "GuardianConnectSDK_x64.${{env.PKGVERSION}}.nupkg" `
-        -ApiToken "${{ secrets.CI_SIGNPATH_USER_TOKEN }}" `
         -OrganizationId "5c1e4170-8bf7-48b1-8542-78374ccc3471" `
+        -ApiToken "${{ secrets.CI_SIGNPATH_USER_TOKEN }}" `
         -ProjectSlug "Guardian" `
         -SigningPolicySlug "Guardian_DNSF_Branded" `
-        -OutputArtifactPath "SIGNED_GuardianConnectSDK_x64.${{env.PKGVERSION}}.nupkg"  `
         -ArtifactConfigurationSlug GuardianConnectSDK_x64_Nuget_Package `
+        -InputArtifactPath "GuardianConnectSDK_x64.${{env.PKGVERSION}}.nupkg" `
+        -OutputArtifactPath "SIGNED_GuardianConnectSDK_x64.${{env.PKGVERSION}}.nupkg"  `
         -WaitForCompletion
       
     # Sign GuardianConnectSDK ARM64 package with certificate
