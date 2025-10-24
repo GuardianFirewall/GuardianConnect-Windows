@@ -73,16 +73,9 @@ jobs:
       #PRE-AOT-run: msbuild /t:restore /t:Build /p:Platform=x64 /p:Configuration=Release /p:RuntimeIdentifier=win-x64 GuardianFirewallService\GuardianFirewallService.csproj
       #run: msbuild /t:restore /t:Publish /p:Platform=x64 /p:Configuration=Release /p:RuntimeIdentifier=win-x64 GuardianFirewallService\GuardianFirewallService.csproj /p:PublishSingleFile=true /p:SelfContained=true /p:PublishTrimmed=true
       #run:  msbuild /t:restore /t:Publish /p:SelfContained=true /p:_IsPortable=false /p:PublishSingleFile=true /p:PublishReadyToRun=false /p:PublishTrimmed=true /p:IncludeNativeLibrariesForSelfExtract=false /p:IncludeAllContentForSelfExtract=false /p:Configuration=Release /p:Platform=x64 /p:RuntimeIdentifier=win-x64 GuardianFirewallService\GuardianFirewallService.csproj
-      run: ghbld.cmd gfs x64 aot
+      run: gfsBuildToPublishOnly.cmd x64
       shell: cmd
 
-    - name: Build GuardianFirewall Service for arm64 CPU
-      #PRE_AOT-run: msbuild /t:restore /t:Build /p:Platform=arm64 /p:Configuration=Release /p:RuntimeIdentifier=win-arm64 GuardianFirewallService\GuardianFirewallService.csproj
-      #run: msbuild /t:restore /t:Publish /p:Platform=arm64 /p:Configuration=Release /p:RuntimeIdentifier=win-arm64 GuardianFirewallService\GuardianFirewallService.csproj /p:PublishSingleFile=true /p:SelfContained=true /p:PublishTrimmed=true
-      #run:  msbuild /t:restore /t:Publish /p:SelfContained=true /p:_IsPortable=false /p:PublishSingleFile=true /p:PublishReadyToRun=false /p:PublishTrimmed=true /p:IncludeNativeLibrariesForSelfExtract=false /p:IncludeAllContentForSelfExtract=false /p:Configuration=Release /p:Platform=arm64 /p:RuntimeIdentifier=win-arm64 GuardianFirewallService\GuardianFirewallService.csproj
-      run: ghbld.cmd gfs arm64 aot
-      shell: cmd
-      
       # Zip up our binaries for specific zip signing in SignPath
     - name: TEST TEST TEST TEST Zip JUST Guardian Firewall Service AOT Output folder - NEED TO TEST THIS FOR EXECUTABILITY
       run: 7z a -bb3 GFSAOTONLYFILES.zip GuardianFirewallService\bin\x64\Release\net9.0-windows\win-x64\publish\
@@ -92,9 +85,16 @@ jobs:
       with:
         name: "Upload GFSAOTONLYFILES.zip"
         path: D:\a\GuardianConnect-Windows\GuardianConnect-Windows\GuardianConnectSDK\GFSAOTONLYFILES.zip
-      
+
     - name: STOP HERE
       run: POOF
+    
+    - name: Build GuardianFirewall Service for arm64 CPU
+      #PRE_AOT-run: msbuild /t:restore /t:Build /p:Platform=arm64 /p:Configuration=Release /p:RuntimeIdentifier=win-arm64 GuardianFirewallService\GuardianFirewallService.csproj
+      #run: msbuild /t:restore /t:Publish /p:Platform=arm64 /p:Configuration=Release /p:RuntimeIdentifier=win-arm64 GuardianFirewallService\GuardianFirewallService.csproj /p:PublishSingleFile=true /p:SelfContained=true /p:PublishTrimmed=true
+      #run:  msbuild /t:restore /t:Publish /p:SelfContained=true /p:_IsPortable=false /p:PublishSingleFile=true /p:PublishReadyToRun=false /p:PublishTrimmed=true /p:IncludeNativeLibrariesForSelfExtract=false /p:IncludeAllContentForSelfExtract=false /p:Configuration=Release /p:Platform=arm64 /p:RuntimeIdentifier=win-arm64 GuardianFirewallService\GuardianFirewallService.csproj
+      run: gfsBuildToPublishOnly.cmd arm64
+      shell: cmd
       
     ## PAUSE HERE - Going to ONLY gather and upload the Guardian assets to SignPath in a zip. Both x64 and arm64.
     ## GuardianConnect.Shared.dll, GuardianConnect.dll, NativeRoutines.dll, GuardianFirewallService.exe and GuardianFirewallService.dll
