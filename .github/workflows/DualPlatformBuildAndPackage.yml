@@ -70,53 +70,20 @@ jobs:
       run: msbuild /t:restore /t:Build /p:Platform=arm64 /p:Configuration=Release /p:RuntimeIdentifier=win-arm64 GuardianConnect\GuardianConnect.csproj
       
     - name: Build GuardianFirewall Service for x64 CPU
-      #PRE-AOT-run: msbuild /t:restore /t:Build /p:Platform=x64 /p:Configuration=Release /p:RuntimeIdentifier=win-x64 GuardianFirewallService\GuardianFirewallService.csproj
-      #run: msbuild /t:restore /t:Publish /p:Platform=x64 /p:Configuration=Release /p:RuntimeIdentifier=win-x64 GuardianFirewallService\GuardianFirewallService.csproj /p:PublishSingleFile=true /p:SelfContained=true /p:PublishTrimmed=true
-      #run:  msbuild /t:restore /t:Publish /p:SelfContained=true /p:_IsPortable=false /p:PublishSingleFile=true /p:PublishReadyToRun=false /p:PublishTrimmed=true /p:IncludeNativeLibrariesForSelfExtract=false /p:IncludeAllContentForSelfExtract=false /p:Configuration=Release /p:Platform=x64 /p:RuntimeIdentifier=win-x64 GuardianFirewallService\GuardianFirewallService.csproj
-      run: gfsBuildToPublishOnly.cmd x64
-      shell: cmd
+      run: |
+            msbuild /t:restore /t:Build /p:Configuration=Release /p:Platform=x64 /p:WarningLevel=0 /p:RuntimeIdentifier=win-x64 GuardianFirewallService\GuardianFirewallService.csproj
+            msbuild /t:Publish /p:PublishReadyToRun=false /p:IncludeNativeLibrariesForSelfExtract=false /p:IncludeAllContentForSelfExtract=false /p:Configuration=Release /p:Platform=x64 /p:WarningLevel=0 /p:RuntimeIdentifier=win-x64 GuardianFirewallService\GuardianFirewallService.csproj
 
-      # Zip up our binaries for specific zip signing in SignPath
-    - name: TEST TEST TEST TEST Zip JUST Guardian Firewall Service AOT Output folder - NEED TO TEST THIS FOR EXECUTABILITY
-      run: 7z a -bb3 GFSAOTONLYFILES.zip GuardianFirewallService\bin\x64\Release\net9.0-windows\win-x64\publish\
-
-    - name: Upload build artifacts - both SDKs AND AOT-version of GuardianFirewallService.exe - UNSIGNED SO WE CAN GIVE AS SAMPLE TO SIGNPATH
-      uses: actions/upload-artifact@v4
-      with:
-        name: "Upload GFSAOTONLYFILES.zip"
-        path: D:\a\GuardianConnect-Windows\GuardianConnect-Windows\GuardianConnectSDK\GFSAOTONLYFILES.zip
-
-    - name: STOP HERE
-      run: POOF
-    
     - name: Build GuardianFirewall Service for arm64 CPU
-      #PRE_AOT-run: msbuild /t:restore /t:Build /p:Platform=arm64 /p:Configuration=Release /p:RuntimeIdentifier=win-arm64 GuardianFirewallService\GuardianFirewallService.csproj
-      #run: msbuild /t:restore /t:Publish /p:Platform=arm64 /p:Configuration=Release /p:RuntimeIdentifier=win-arm64 GuardianFirewallService\GuardianFirewallService.csproj /p:PublishSingleFile=true /p:SelfContained=true /p:PublishTrimmed=true
-      #run:  msbuild /t:restore /t:Publish /p:SelfContained=true /p:_IsPortable=false /p:PublishSingleFile=true /p:PublishReadyToRun=false /p:PublishTrimmed=true /p:IncludeNativeLibrariesForSelfExtract=false /p:IncludeAllContentForSelfExtract=false /p:Configuration=Release /p:Platform=arm64 /p:RuntimeIdentifier=win-arm64 GuardianFirewallService\GuardianFirewallService.csproj
-      run: gfsBuildToPublishOnly.cmd arm64
-      shell: cmd
+      run: |
+        msbuild /t:restore /t:Build /p:Configuration=Release /p:Platform=arm64 /p:WarningLevel=0 /p:RuntimeIdentifier=win-arm64 GuardianFirewallService\GuardianFirewallService.csproj
+        msbuild /t:Publish /p:PublishReadyToRun=false /p:IncludeNativeLibrariesForSelfExtract=false /p:IncludeAllContentForSelfExtract=false /p:Configuration=Release /p:Platform=arm64 /p:WarningLevel=0 /p:RuntimeIdentifier=win-arm64 GuardianFirewallService\GuardianFirewallService.csproj
       
-    ## PAUSE HERE - Going to ONLY gather and upload the Guardian assets to SignPath in a zip. Both x64 and arm64.
-    ## GuardianConnect.Shared.dll, GuardianConnect.dll, NativeRoutines.dll, GuardianFirewallService.exe and GuardianFirewallService.dll
-    ## Second thought - we will just do that for both the GuardianConnect build output AND the GuardianFirewallService build output - so a little redundant on the GC binaries
-    ## as it is much easier to add the binaries in-place to the zip, sign the binaries in that zip file, then extract with overlay in-place
-    ## so that the nuget package builds flow easier (we have limited pathing and variables in the nuspecs). And then we can also sign the Nuget packages later on.
-
-##    - name: Run sigcheck64 utility to verify binaries
-##      run: bin\sigcheck64 -nobanner -accepteula  -s -a BuildOutput\GuardianConnect\runtimes\win10-x64\lib\net9.0-windows\Guardian*.dll
-##      shell: cmd
-
      # Zip up our binaries for specific zip signing in SignPath
     - name: Zip Guardian binaries for SignPath deep-signing
       run: 7z a -bb3 "${{ env.unsignedzipfile }}" @ListOfGuardianConnectSDKFilesToSign.fls
       shell: cmd
 
-##    - name: Upload build artifacts - both SDKs AND AOT-version of GuardianFirewallService.exe - UNSIGNED SO WE CAN GIVE AS SAMPLE TO SIGNPATH
-##      uses: actions/upload-artifact@v4
-##      with:
-##        name: "Upload UnsignedGuardianBinaries_${{env.PKGVERSION}}.zip"
-##        path: D:\a\GuardianConnect-Windows\GuardianConnect-Windows\GuardianConnectSDK\UnsignedGuardianBinaries_${{env.PKGVERSION}}.zip
-      
       # Sign Guardian binaries only  Executable with certificate
     - name: Sign Guardian Binaries with certificate
       run: Install-Module -Name SignPath -Force
