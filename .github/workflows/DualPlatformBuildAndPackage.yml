@@ -84,7 +84,7 @@ jobs:
       shell: cmd
       
       # Zip up our binaries for specific zip signing in SignPath
-    - name: [TEST TEST TEST TEST] Zip JUST Guardian Firewall Service AOT Output folder - NEED TO TEST THIS FOR EXECUTABILITY
+    - name: TEST TEST TEST TEST Zip JUST Guardian Firewall Service AOT Output folder - NEED TO TEST THIS FOR EXECUTABILITY
       run: 7z a -bb3 GFSAOTONLYFILES.zip GuardianFirewallService\bin\x64\Release\net9.0-windows\win-x64\publish\
 
     - name: Upload build artifacts - both SDKs AND AOT-version of GuardianFirewallService.exe - UNSIGNED SO WE CAN GIVE AS SAMPLE TO SIGNPATH
