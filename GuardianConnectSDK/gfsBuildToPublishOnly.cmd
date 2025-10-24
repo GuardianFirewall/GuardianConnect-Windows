@@ -10,6 +10,7 @@ msbuild /t:restore ^
 	/p:SelfContained=true ^
 	/p:_IsPortable=false ^
 	/p:PublishSingleFile=true ^
+	/p:PublishAot=true ^
 	/p:PublishReadyToRun=false ^
 	/p:PublishTrimmed=true ^
 	/p:IncludeNativeLibrariesForSelfExtract=false ^
