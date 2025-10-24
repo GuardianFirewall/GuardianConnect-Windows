@@ -8,6 +8,9 @@
         <Configurations>Debug;Release</Configurations>
         <Platforms>x64;ARM64</Platforms>
 	    <PublishAot>true</PublishAot>
+        <PublishSingleFile>true</PublishSingleFile>
+        <SelfContained>true</SelfContained>
+        <PublishTrimmed>true</PublishTrimmed>
 		<!--
 		<OutDir>..\BuildOutput\$(MSBuildProjectName)\runtimes\$(Platform)\</OutDir>
         -->
