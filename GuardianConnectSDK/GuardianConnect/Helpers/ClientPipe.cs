@@ -1,3 +1,5 @@
+using System.Collections;
+using System.Diagnostics;
 using System.IO.Pipes;
 using System.Text.Json;
 using GuardianConnect.Shared;
@@ -71,28 +73,35 @@ public class ClientPipeImpl : IGuardianNPContract
 {
     private static NamedPipeClientStream _clientStream = new NamedPipeClientStream("NULL");
     private static StreamString ss;
+    private static int usingResource = 0;
 
     internal bool IsConnected => _clientStream.IsConnected;
 
     internal void OpenNamedPipe(string servicePipeName = Common.kGRDServicePipeName)
     {
-        Log.Information("ClientPipeImpl.OpenNamedPipe: Opening Pipe Stream...");
-        _clientStream = new NamedPipeClientStream(".", servicePipeName, PipeDirection.InOut);
-        Log.Information("ClientPipeImpl.OpenNamedPipe: Going into Opening loop until success or retries exhausted...");
-        int retries = 10;
-        while (retries-- > 0 && !_clientStream.IsConnected)
+        if (0 == Interlocked.Exchange(ref usingResource, 1))
         {
-            try
+            Log.Information("ClientPipeImpl.OpenNamedPipe: Opening Pipe Stream...");
+            _clientStream = new NamedPipeClientStream(".", servicePipeName, PipeDirection.InOut);
+            Log.Information(
+                "ClientPipeImpl.OpenNamedPipe: Going into Opening loop until success or retries exhausted...");
+            int retries = 10;
+            while (retries-- > 0 && !_clientStream.IsConnected)
             {
-                _clientStream.Connect(10 * 1000);
-                Log.Information($"ClientPipeImpl.OpenNamedPipe: {retries} left to attempt opening of Client Pipe Stream...");
-            }
-            catch (Exception e)
-            {
-                if (!IsConnected)
+                try
                 {
-                    Log.Error("!!!!!!!!!!!!!!!!!!!! ClientPipeImpl.OpenNamedPipe could NOT connect to Pipe Stream...");
-                    throw;
+                    _clientStream.Connect(30 * 1000);
+                    Log.Information(
+                        $"ClientPipeImpl.OpenNamedPipe: {retries} left to attempt opening of Client Pipe Stream...");
+                }
+                catch (Exception e)
+                {
+                    if (!IsConnected)
+                    {
+                        Log.Error(
+                            "!!!!!!!!!!!!!!!!!!!! ClientPipeImpl.OpenNamedPipe could NOT connect to Pipe Stream...");
+                        throw;
+                    }
                 }
             }
         }
@@ -103,7 +112,7 @@ public class ClientPipeImpl : IGuardianNPContract
         bool whetherPreviouslyConnectedAtSuspend = false;
         try
         {
-            Log.Information("ClientPipeImpl.Connect: Calling OpenNamedPipe...");
+            Log.Information($"ClientPipeImpl.Connect: Calling OpenNamedPipe...");
             OpenNamedPipe(servicePipeName);
             ss = new StreamString(_clientStream);
             //var testAck = ss.ReadStringAsync();
