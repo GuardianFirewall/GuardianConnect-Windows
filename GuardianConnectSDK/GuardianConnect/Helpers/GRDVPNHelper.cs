@@ -179,18 +179,34 @@ namespace GuardianConnect.Helpers
 
         /// Helper function to quickly determine if a VPN tunnel of any kind
         /// with any transport protocol is established
-        public bool isConnected()
+        public bool IsConnected(out string activeConnectionName)
         {
+            activeConnectionName = string.Empty;
+#if OLD_VIA_PIPES
             Log.Information("Calling ClientPipe.GetCurrentVpnConnectionStatus()...");
             var state = ClientPipe.GetCurrentVpnConnectionStatus();
             return state.ConnectionState == ConnectionStateEnum.Connected;
+#else
+            Log.Information( "GRDVPNHelper.IsConnected: Calling Win32Calls.ConnectionRoutines.IsAnyConnectionActive()...");
+            bool ifConnected;
+            ifConnected = Win32Calls.ConnectionRoutines.IsAnyConnectionActive(out string entryName);
+            activeConnectionName = Win32Calls.ConnectionRoutines.GetEntryNameOfActiveConnection();
+            Log.Information($"CheckConnectionState: IsConnected returned {ifConnected}. ACN='{activeConnectionName}',  Name='{entryName}'");
+
+            return ifConnected;
+#endif
         }
 
         public String GetNameOfConnectionEntry()
         {
-            Log.Information("Calling ClientPipe.GetCurrentVpnConnectionStatus()...");
+#if OLD_VIA_PIPES
+            Log.Information("GetNameOfCOnnectionEntry: Calling ClientPipe.GetCurrentVpnConnectionStatus to get any entry name if connected...");
             var state = ClientPipe.GetCurrentVpnConnectionStatus();
             return state.EntryName;
+#else
+            var isConnected = IsConnected(out string activeConnectionName);
+            return isConnected ? activeConnectionName : string.Empty;
+#endif
         }
 
         public bool IsBusy;

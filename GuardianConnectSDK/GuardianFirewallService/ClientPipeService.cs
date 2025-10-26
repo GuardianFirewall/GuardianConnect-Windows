@@ -50,7 +50,7 @@ public class ClientPipeService : BackgroundService
                 }
                 else if (++heartbeatCounter % 5 == 0) Log.Information("ClientPipeService is running...");
 
-                await Task.Delay(60000);
+                await Task.Delay(60000, stoppingToken);
             }
 
             Log.Information(
@@ -118,7 +118,7 @@ public class ClientPipeService : BackgroundService
     public void StopServerListenerThreads()
     {
         int i = numThreads;
-        Thread.Sleep(250);
+        Thread.Sleep(50);
         while (i > 0)
         {
             for (int j = 0; j < numThreads; j++)
@@ -272,9 +272,11 @@ public class ClientPipeService : BackgroundService
                     Log.Error(e, "ERROR: {0}", e.Message);
                 }
             }
+            Log.Information("ClientPipeService.End -- inner While()...");
 
             Interlocked.Decrement(ref NumberOfClientsConnected);
             pipeServer.Close();
         }
+        Log.Information("ClientPipeService.End -- outer While()...");
     }
 }

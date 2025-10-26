@@ -19,6 +19,12 @@ Serilog.Log.Logger = new Serilog.LoggerConfiguration()
     .CreateLogger();
 
 Log.Information("Hello, World!");
+bool f = ClientPipe.Connect();
+
+Log.Information($"Connected to service? {f}");
+
+
+#if false
 TestRegionStuff();
 
 string connectHost = "connect-api.guardianapp.com";
@@ -155,6 +161,7 @@ if (hrcArray.Length == 0)
     return;
 }
 Console.WriteLine($"Connection Name = '{hrcArray[0].szEntryName}', Device={hrcArray[0].szDeviceName}, Type='{hrcArray[0].szDeviceType}'");
+#endif
 #endif
 Console.Write("Press ENTER...");
 Console.ReadLine();

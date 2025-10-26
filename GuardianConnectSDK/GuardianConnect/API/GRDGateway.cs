@@ -224,7 +224,7 @@ public class GRDGateway
 
     public async void SetDeviceFilterConfigsForDeviceId()
     {
-        if (!GRDVPNHelper.Instance.isConnected()) return;
+        if (!GRDVPNHelper.Instance.IsConnected(out _)) return;
         if (string.IsNullOrEmpty(BaseHostName))
         {
             Log.Error("Cannot set DeviceFilterConfig since BaseHostName is not set!");
