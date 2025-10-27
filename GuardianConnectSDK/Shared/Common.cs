@@ -266,7 +266,7 @@ public class Common
         Logger.Information(logMessage);
     }
 
-    public static string GetLastLogLines(int maxToReturn = 500)
+    public static List<string> GetLastLogLines(int maxToReturn = 20)
     {
         List<string> logLines = new List<string>();
 
@@ -284,11 +284,7 @@ public class Common
             Debug.WriteLine($"Unable to open logfile {LogFilePath} for Tech Support Email: {e.Message}");
         }
 
-        string serializedLogs = JsonSerializer.Serialize(logLines, LogLinesJsonContext.Default.ListString);
-        var compressedLogLines = CompressString(serializedLogs);
-        Log.Information($"GetLastLogLines: serialized log lines size = {serializedLogs.Length}, compressedLogLines size = {compressedLogLines.Length}");
-
-        return serializedLogs;
+        return logLines;
     }
 
     public static string CompressString(string text)

@@ -230,8 +230,8 @@ public class ClientPipeImpl : IGuardianNPContract
         var cmdString = $"{(int)IGuardianNPContract.NPCommands.RequestLogLines}.{maxNumberOfLinesToGet}";
         ss.WriteString(cmdString);
         Log.Information("Reading response...");
-        var serializedServiceLogLines = await ss.ReadStringAsync();
-        var jsonLines = JsonSerializer.Deserialize<List<string>>(serializedServiceLogLines, Common.DefaultJsonSerializerOptions);
+        var serializedServiceLogs = await ss.ReadStringAsync();
+        var jsonLines = JsonSerializer.Deserialize<List<string>>(serializedServiceLogs, LogLinesJsonContext.Default.ListString);
         var serviceLogLines = jsonLines ?? new List<string>();
         Log.Information($"Number of log lines returned from the service = {serviceLogLines.Count}");
 

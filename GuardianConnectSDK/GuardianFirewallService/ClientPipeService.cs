@@ -253,7 +253,8 @@ public class ClientPipeService : BackgroundService
                             int maxLogLines = int.Parse(cmdPayload);
                             var lastLogLines = Common.GetLastLogLines(maxLogLines);
                             Log.Information($"ClientPipeService[{threadId}]: Writing log lines to client");
-                            ss.WriteString(lastLogLines);
+                            var serializedLogLines = JsonSerializer.Serialize<List<string>>(lastLogLines, GuardianConnect.Shared.LogLinesJsonContext.Default.ListString);
+                            ss.WriteString(serializedLogLines);
                             break;
                         default:
                             Log.Information("WHY ARE WE HERE?");

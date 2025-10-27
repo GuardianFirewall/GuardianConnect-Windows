@@ -22,6 +22,7 @@ Log.Information("Hello, World!");
 bool f = ClientPipe.Connect();
 
 Log.Information($"Connected to service? {f}");
+var serviceLogs = ClientPipe.GetServiceLogLinesAsync(500);
 
 
 #if false
