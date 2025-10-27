@@ -288,7 +288,7 @@ public class Common
         var compressedLogLines = CompressString(serializedLogs);
         Log.Information($"GetLastLogLines: serialized log lines size = {serializedLogs.Length}, compressedLogLines size = {compressedLogLines.Length}");
 
-        return compressedLogLines;
+        return serializedLogs;
     }
 
     public static string CompressString(string text)
