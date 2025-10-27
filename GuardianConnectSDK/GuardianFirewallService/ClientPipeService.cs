@@ -252,9 +252,8 @@ public class ClientPipeService : BackgroundService
                             Log.Information($"ClientPipeService[{threadId}]: Performing RequestLogLines");
                             int maxLogLines = int.Parse(cmdPayload);
                             var lastLogLines = Common.GetLastLogLines(maxLogLines);
-                            string serializedLogs = JsonSerializer.Serialize(lastLogLines, JsonSerializerOptions.Default);
                             Log.Information($"ClientPipeService[{threadId}]: Writing log lines to client");
-                            ss.WriteString(serializedLogs);
+                            ss.WriteString(lastLogLines);
                             break;
                         default:
                             Log.Information("WHY ARE WE HERE?");
