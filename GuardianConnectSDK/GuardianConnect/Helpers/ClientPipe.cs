@@ -20,50 +20,50 @@ public static class ClientPipe
 
     public static IGuardianNPContract.CompositeType GetDataUsingDataContract(IGuardianNPContract.CompositeType composite)
     {
-        if (!Instance.IsConnected) Instance.OpenNamedPipe();
+        if (!Instance.IsConnected) Instance.ReopenNamedPipe();
         return Instance.GetDataUsingDataContract(composite);
     }
 
     public static ErrorResponse StartVPNConnection(VPNCallParameters protocolRequest)
     {
-        if (!Instance.IsConnected) Instance.OpenNamedPipe();
+        if (!Instance.IsConnected) Instance.ReopenNamedPipe();
         return Instance.StartVPNConnection(protocolRequest);
     }
 
     public static void DisconnectVPNConnection(string entryName)
     {
-        if (!Instance.IsConnected) Instance.OpenNamedPipe();
+        if (!Instance.IsConnected) Instance.ReopenNamedPipe();
         Instance.DisconnectVPNConnection();
     }
 
     public static CurrentVPNStatus GetCurrentVpnConnectionStatus()
     {
-        if (!Instance.IsConnected) Instance.OpenNamedPipe();
+        if (!Instance.IsConnected) Instance.ReopenNamedPipe();
         return Instance.GetCurrentVpnConnectionStatus();
     }
 
     public static async Task<string> Ping()
     {
-        if (!Instance.IsConnected) Instance.OpenNamedPipe();
+        if (!Instance.IsConnected) Instance.ReopenNamedPipe();
         return await Instance.Ping();
     }
 
     public static void ToggleLogging(bool whetherToDeleteLogFiles)
     {
-        if (!Instance.IsConnected) Instance.OpenNamedPipe();
+        if (!Instance.IsConnected) Instance.ReopenNamedPipe();
         Instance.ToggleLogging(whetherToDeleteLogFiles);
 
     }
 
     public static async Task<List<string>> GetServiceLogLinesAsync(int maxNumberOfLinesToGet = 200)
     {
-        if (!Instance.IsConnected) Instance.OpenNamedPipe();
+        if (!Instance.IsConnected) Instance.ReopenNamedPipe();
         return await Instance.GetServiceLogLinesAsync(maxNumberOfLinesToGet);
     }
 
     public static void SwitchServiceLoggingLevel(Common.LoggingLevels loggingLevel)
     {
-        if (!Instance.IsConnected) Instance.OpenNamedPipe();
+        if (!Instance.IsConnected) Instance.ReopenNamedPipe();
         Instance.SwitchServiceLoggingLevel(loggingLevel);
     }
         
@@ -105,6 +105,13 @@ public class ClientPipeImpl : IGuardianNPContract
                 }
             }
         }
+    }
+
+    internal void ReopenNamedPipe()
+    {
+        Log.Warning("!!!!!!!!!!!!!! REOPENING CLIENTPIPE TO SERVICE...");
+        OpenNamedPipe();
+        ss = new StreamString(_clientStream);
     }
     
     internal bool Connect(string servicePipeName = Common.kGRDServicePipeName)
