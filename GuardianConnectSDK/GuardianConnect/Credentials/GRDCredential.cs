@@ -1,12 +1,16 @@
 ﻿using GuardianConnect.Shared;
-using Newtonsoft.Json;
+//using Newtonsoft.Json;
+using System.Text.Json;
+using System.Text.Json.Serialization;
 
 namespace GuardianConnect.Credentials
 {
     public class GRDCredential
     {
-	    #pragma warning disable CS0414
+#pragma warning disable CS0414
+		[JsonIgnore]
 	    private bool _checkedExpiration;
+		[JsonIgnore]
 	    private bool _expired;
 	    #pragma warning restore CS0414
 	    
@@ -14,19 +18,24 @@ namespace GuardianConnect.Credentials
         public string Name { get; set; } = string.Empty;
         public string Identifer { get; set; } = string.Empty;
         public bool MainCredential  {get; set; }
+
+		//[JsonIgnore]
         public ITransportProvider.TransportProtocol TransportProtocol  {get; set; }
         public string HostnameDisplayValue { get; set; } = string.Empty;
         public DateTime ExpirationDate  {get; set; }
         public string HostName { get; set; } = string.Empty;
         public string ClientId { get; set; } = string.Empty;
 
-        [JsonProperty("api-auth-token")] public string ApiAuthToken { get; set; } = string.Empty;
+		[JsonPropertyName("api-auth-token")]
+        public string ApiAuthToken { get; set; } = string.Empty;
 
-        [JsonProperty("eap-username")] public string UserName { get; set; } = string.Empty;
+        [JsonPropertyName("eap-username")]
+        public string UserName { get; set; } = string.Empty;
         
-        [JsonProperty("eap-password")]
+        [JsonPropertyName("eap-password")]
         public string Password  {get; set; } = string.Empty;
 
+		[JsonIgnore]
         public byte[] PasswordRef { get; set; } = Array.Empty<byte>();
         public string DevicePublicKey { get; set; } = string.Empty;
         public string DevicePrivateKey { get; set; } = string.Empty;
@@ -49,7 +58,8 @@ namespace GuardianConnect.Credentials
             throw new NotImplementedException();
         }
 
-        private GRDCredential()
+		[JsonConstructor]
+        public GRDCredential()
         {
         }
 

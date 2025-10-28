@@ -1,3 +1,4 @@
+using System.Text.Json.Serialization;
 using GuardianConnect.Shared.Extensions;
 
 namespace GuardianConnect.Shared;
@@ -10,12 +11,13 @@ public record ErrorResponse(
     object? DataArg = null,
     HttpResponseMessage? HttpResponse = null)
 {
-    public bool IsError = IsErrorArg;
-    public string Message = MessageArg;
-    public object? ThrownException = ThrownExceptionArg;
-    public object? Response = ResponseArg;
-    public object? Data = DataArg;
-    public HttpResponseMessage HttpResponse = HttpResponse;
+    public bool IsError { get; set; } = IsErrorArg;
+
+    public string Message { get; set; } = MessageArg;
+    public object? ThrownException { get; set; } = ThrownExceptionArg;
+    public object? Response { get; set; } = ResponseArg;
+    public object? Data { get; set; } = DataArg;
+    public HttpResponseMessage HttpResponse { get; set; } = HttpResponse;
 
     public static ErrorResponse FromException(Exception exception)
     {

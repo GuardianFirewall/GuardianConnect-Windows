@@ -179,18 +179,34 @@ namespace GuardianConnect.Helpers
 
         /// Helper function to quickly determine if a VPN tunnel of any kind
         /// with any transport protocol is established
-        public bool isConnected()
+        public bool IsConnected(out string activeConnectionName)
         {
+            activeConnectionName = string.Empty;
+#if OLD_VIA_PIPES
             Log.Information("Calling ClientPipe.GetCurrentVpnConnectionStatus()...");
             var state = ClientPipe.GetCurrentVpnConnectionStatus();
-            return state.ConnectionState == IGuardianNPContract.ConnectionStateEnum.Connected;
+            return state.ConnectionState == ConnectionStateEnum.Connected;
+#else
+            Log.Information( "GRDVPNHelper.IsConnected: Calling Win32Calls.ConnectionRoutines.IsAnyConnectionActive()...");
+            bool ifConnected;
+            ifConnected = Win32Calls.ConnectionRoutines.IsAnyConnectionActive(out string entryName);
+            activeConnectionName = Win32Calls.ConnectionRoutines.GetEntryNameOfActiveConnection();
+            Log.Information($"CheckConnectionState: IsConnected returned {ifConnected}. ACN='{activeConnectionName}',  Name='{entryName}'");
+
+            return ifConnected;
+#endif
         }
 
         public String GetNameOfConnectionEntry()
         {
-            Log.Information("Calling ClientPipe.GetCurrentVpnConnectionStatus()...");
+#if OLD_VIA_PIPES
+            Log.Information("GetNameOfCOnnectionEntry: Calling ClientPipe.GetCurrentVpnConnectionStatus to get any entry name if connected...");
             var state = ClientPipe.GetCurrentVpnConnectionStatus();
             return state.EntryName;
+#else
+            var isConnected = IsConnected(out string activeConnectionName);
+            return isConnected ? activeConnectionName : string.Empty;
+#endif
         }
 
         public bool IsBusy;
@@ -287,9 +303,10 @@ namespace GuardianConnect.Helpers
         /// <returns>String of Connection Name</returns>
         public bool GetCurrentVPNState(out string connectionName)
         {
-            Log.Information("In GetNameOfActiveConnection()");
+            Log.Information("In GetCurrentVPNState()");
             var state = ClientPipe.GetCurrentVpnConnectionStatus();
-            var isConnected  = state.ConnectionState == IGuardianNPContract.ConnectionStateEnum.Connected;
+            Log.Information($"GetCurrentVPNState: returned values for state are state: {state.ConnectionState}, entry: '{state.EntryName}'");
+            var isConnected  = state.ConnectionState == ConnectionStateEnum.Connected;
             connectionName = state.EntryName;
             return isConnected;
         }
@@ -439,7 +456,6 @@ namespace GuardianConnect.Helpers
             }
 
             GRDHousekeepingAPI houseKeeping = new GRDHousekeepingAPI();
-            //(var subCredJWT, var success, errorResponse) = await houseKeeping.CreateSubscriberCredentialForBundleId(peToken);
             errorResponse = await houseKeeping.CreateSubscriberCredentialForBundleId(peToken);
             return (GRDHousekeepingAPI.LiveGrdCredential, errorResponse);
         }
@@ -529,13 +545,14 @@ namespace GuardianConnect.Helpers
             // TJE: - called from configureAndConnectVPNWithCompletion after Server check
 
             // Make WCF call to GuardianWindowsService to start the connection
-            Dictionary<string, object> vpnValues = new Dictionary<string, object>();
-            vpnValues.Add("hostName", mainCredential!.HostName);
-            vpnValues.Add("hostDisplay", mainCredential.HostnameDisplayValue);
-            vpnValues.Add("eapUser", mainCredential.UserName);
-            vpnValues.Add("eapPassword", mainCredential.Password);
-            string entryName = $"Guardian Firewall - {mainCredential.HostnameDisplayValue}";
-            vpnValues.Add("PhonebookEntryName", entryName);
+            VPNCallParameters vpnValues = new VPNCallParameters
+            {
+                VpnHostName = mainCredential!.HostName,
+                VpnHostDisplay = mainCredential.HostnameDisplayValue,
+                EapuserName = mainCredential.UserName,
+                Eappassword = mainCredential.Password,
+                EntryName = $"Guardian Firewall - {mainCredential.HostnameDisplayValue}"
+            };
 
             Log.Information("Starting VPN connection...");
             

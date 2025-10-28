@@ -1,16 +1,32 @@
-using NativeRoutines;
 using System.Security.AccessControl;
 using System.Security.Principal;
 using GuardianConnect.Shared;
 using GuardianConnect.VPNTransports;
 using Microsoft.Extensions.Hosting;
 using Serilog;
+using Win32Calls;
+        using System.Security.AccessControl;
+        using System.Threading;
 
 
 namespace GuardianFirewallService;
 
 public class VpnManagerService : BackgroundService
 {
+    private static void ShowSecurity(EventWaitHandleSecurity security, string who)
+    {
+        Log.Information($"\r\nCurrent access rules for {who}:\r\n");
+
+        foreach (EventWaitHandleAccessRule ar in
+                 security.GetAccessRules(true, true, typeof(NTAccount)))
+        {
+            Log.Information("        User: {0}", ar.IdentityReference);
+            Log.Information("        Type: {0}", ar.AccessControlType);
+            Log.Information("      Rights: {0}", ar.EventWaitHandleRights);
+            Log.Information("");
+        }
+    }
+
     protected override async Task ExecuteAsync(CancellationToken stoppingToken)
     {
         Log.Information("VPNMGR: TESTING LOG");
@@ -18,25 +34,51 @@ public class VpnManagerService : BackgroundService
 
         stoppingToken.Register(() => Log.Information("VpnManagerService is stopping."));
 
-        Log.Information(
-            $"VpnManagerService: creating task...stoppingToken.IsCancllationRequestioned = {stoppingToken.IsCancellationRequested}");
+        Log.Information($"VpnManagerService: creating task...stoppingToken.IsCancllationRequestioned = {stoppingToken.IsCancellationRequested}");
         Log.Information("VpnManagerService: In task...");
         VPNTransportIKEV2 vpnikeInstance = new VPNTransportIKEV2();
 
-        Log.Information("Creating Change Event for listeners - SERVICE-SIDE and CLIENT_SIDE...");
+        Log.Information("Creating Change Event for listeners - SERVICE-SIDE and CLIENT-SIDE...");
         Log.Information($"stoppingToken.IsCancllationRequestioned = {stoppingToken.IsCancellationRequested}");
         // Create VPNChange Event so Service and UI can wait for notification - OURS - not Ras'
-#if DOTHISHERE
-        EventWaitHandleSecurity mSec = new EventWaitHandleSecurity();
+#if BRAVE
+        // From Brave AI
+
+        // ...
+
+        EventWaitHandleSecurity security = new EventWaitHandleSecurity();
+        // Add access rules for specific users or groups
+        security.AddAccessRule(new EventWaitHandleAccessRule("Everyone", EventWaitHandleRights.FullControl, AccessControlType.Allow));
+
+        EventWaitHandle globalEvent = new EventWaitHandle(false, EventResetMode.ManualReset, "MyGlobalEventName", out bool createdNew, security);
+        //
+#endif
+#if true
         var Everyone = new SecurityIdentifier(WellKnownSidType.WorldSid, null);
         EventWaitHandleAccessRule rule = new EventWaitHandleAccessRule(Everyone,
-            EventWaitHandleRights.Synchronize | EventWaitHandleRights.Modify, AccessControlType.Allow);
-        mSec.AddAccessRule(rule);
+//            EventWaitHandleRights.Synchronize | EventWaitHandleRights.Modify |
+            EventWaitHandleRights.FullControl, AccessControlType.Allow);
 
+        EventWaitHandleSecurity mSecSvc = new EventWaitHandleSecurity();
+        mSecSvc.AddAccessRule(rule);
         EventWaitHandle H_VPNStateChangeServiceEvent = new EventWaitHandle(false, EventResetMode.ManualReset, Common.VPNEVT_NAME_SVRSIDE);
-        H_VPNStateChangeServiceEvent.SetAccessControl(mSec);
+        var currentAC = H_VPNStateChangeServiceEvent.GetAccessControl();
+        H_VPNStateChangeServiceEvent.SetAccessControl(mSecSvc);
+        Win32Calls.NotificationHandler.VPNServiceNotifierHandle = H_VPNStateChangeServiceEvent;
+        var afterAC = H_VPNStateChangeServiceEvent.GetAccessControl();
+        ShowSecurity(afterAC, "Service");
+
+        EventWaitHandleSecurity mSecCli = new EventWaitHandleSecurity();
+        mSecCli.AddAccessRule(rule);
+        EventWaitHandle H_VPNStateChangeClientEvent = new EventWaitHandle(false, EventResetMode.ManualReset, Common.VPNEVT_NAME_CLIENTSIDE);
+        currentAC = H_VPNStateChangeClientEvent.GetAccessControl();
+        H_VPNStateChangeClientEvent.SetAccessControl(mSecCli);
+        afterAC = H_VPNStateChangeClientEvent.GetAccessControl();
+        ShowSecurity(afterAC, "Client");
+        Win32Calls.NotificationHandler.VPNClientNotifierHandle = H_VPNStateChangeClientEvent;
 #else
-        NotificationHandling.CreateListenerNotifyEvents();
+        //NotificationHandling.CreateListenerNotifyEvents();
+        NotificationHandler.CreateListenerNotifyEvents();
 #endif
 
         Log.Information("Checking for active connection...");
@@ -47,7 +89,7 @@ public class VpnManagerService : BackgroundService
             // Now spawn watcher at native level so we trap CONNECT/DISCONNECT notifications
             Log.Information("VpnManagerService: Calling StartConnectionStateWatcher...");
             Log.Information($"stoppingToken.IsCancllationRequestioned = {stoppingToken.IsCancellationRequested}");
-            NotificationHandling.StartRasConnectStateWatcher();
+            NotificationHandler.StartRasConnectStateWatcher();
         }
 
         vpnikeInstance.StartMonitoringTask();

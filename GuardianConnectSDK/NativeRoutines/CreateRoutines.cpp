@@ -78,7 +78,6 @@ namespace NativeRoutines
         // this maps to "Type of sign-in info" => "User name and password"
         entry.dwCustomAuthKey = 26;
 
-        std::string error_get_phone_book_path;
         DWORD dwRet = RasSetEntryProperties(givenPhonebookPath, entry_name, &entry, entry.dwSize, NULL, NULL);
         if (dwRet != ERROR_SUCCESS) {
             PrintRoutines::PrintRasError(dwRet);

@@ -34,7 +34,7 @@ public class VpnTunnelManager : ITransportProvider
         throw new NotImplementedException();
     }
 
-    public async Task<ErrorResponse> StartVPNTunnelWithOptions(Dictionary<string, object> options)
+    public async Task<ErrorResponse> StartVPNTunnelWithOptions(VPNCallParameters protocolRequest)
     {
         throw new NotImplementedException();
     }

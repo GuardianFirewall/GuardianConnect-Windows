@@ -1,10 +1,14 @@
-﻿using System.Diagnostics;
-using Microsoft.Extensions.Configuration;
+﻿using Microsoft.Extensions.Configuration;
 using Serilog;
 using Serilog.Configuration;
-using Serilog.Events;
 using Serilog.Enrichers.WithCaller;
+using Serilog.Events;
 using Serilog.Formatting.Json;
+using System.Diagnostics;
+using System.IO.Compression;
+using System.Text;
+using System.Text.Json;
+using System.Text.Json.Serialization;
 
 namespace GuardianConnect.Shared;
 
@@ -23,6 +27,17 @@ public class Common
 
     // Define below to 0 to make guardian specific code inactive
     //#define GUARDIAN_INTERNAL 1
+
+    public static JsonSerializerOptions DefaultJsonSerializerOptions = new JsonSerializerOptions
+    {
+        WriteIndented = true,
+        IgnoreReadOnlyFields = false,
+        IgnoreReadOnlyProperties = false,
+        IncludeFields = true,
+        AllowOutOfOrderMetadataProperties = true,
+        AllowTrailingCommas = true,
+        DefaultIgnoreCondition = JsonIgnoreCondition.Never,
+    };
 
     public enum PowerTransitionStates { Suspend, Resume, Running }
 
@@ -270,6 +285,27 @@ public class Common
         }
 
         return logLines;
+    }
+
+    public static string CompressString(string text)
+    {
+        byte[] inputBytes = Encoding.UTF8.GetBytes(text);
+        using var outputStream = new MemoryStream();
+        using (var gzip = new GZipStream(outputStream, CompressionLevel.Optimal))
+        {
+            gzip.Write(inputBytes, 0, inputBytes.Length);
+        }
+        return Convert.ToBase64String(outputStream.ToArray());
+    }
+
+    public static string DecompressString(string compressedBase64)
+    {
+        byte[] compressedBytes = Convert.FromBase64String(compressedBase64);
+        using var inputStream = new MemoryStream(compressedBytes);
+        using var gzip = new GZipStream(inputStream, CompressionMode.Decompress);
+        using var outputStream = new MemoryStream();
+        gzip.CopyTo(outputStream);
+        return Encoding.UTF8.GetString(outputStream.ToArray());
     }
 
     public static void SetUpLogging()

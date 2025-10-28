@@ -5,11 +5,15 @@
     <TargetFramework>net9.0-windows</TargetFramework>
     <ImplicitUsings>enable</ImplicitUsings>
     <Nullable>enable</Nullable>
-    <Platforms>ARM64;x64</Platforms>
   </PropertyGroup>
 
   <ItemGroup>
-    <ProjectReference Include="..\NativeRoutines\NativeRoutines.vcxproj" />
+    <PackageReference Include="Newtonsoft.Json" Version="13.0.4" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\GuardianConnect\GuardianConnect.csproj" />
+    <ProjectReference Include="..\Win32Calls\Win32Calls.csproj" />
   </ItemGroup>
 
 </Project>

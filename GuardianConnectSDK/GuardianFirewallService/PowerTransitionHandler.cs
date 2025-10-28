@@ -6,10 +6,11 @@ using GuardianConnect.Shared.Extensions;
 using GuardianConnect.VPNTransports;
 using Serilog;
 using Microsoft.Win32;
-using NativeRoutines;
-using Newtonsoft.Json;
-using System.Management;
+using System.Text.Json.Serialization;
+//using System.Management;
 using System.Net.NetworkInformation;
+using System.Text.Json;
+using Win32Calls;
 
 namespace GuardianFirewallService;
 
@@ -47,7 +48,7 @@ public static class PowerTransitionHandler
         VPNTransportIKEV2.PowerResumeActions = PerformResumeActions;
         VPNTransportIKEV2.SetVPNStateAtSuspend = SetConnectedAtSuspendTime;
         VPNTransportIKEV2.ResetVPNStateAtSuspend = ResetVpnStatusAtSuspendTime;
-        InitPowerEvents();
+        //InitPowerEvents();
 
     }
 
@@ -181,7 +182,7 @@ public static class PowerTransitionHandler
             var SavedResumeParemeters =
                 RegistrySettings.RetrieveGuardianUserSettings(Common.kVpnCallParametersForReboot);
             var VpnResumeParameters =
-                JsonConvert.DeserializeObject(SavedResumeParemeters, typeof(Dictionary<string, object>)) as
+                JsonSerializer.Deserialize(SavedResumeParemeters, typeof(Dictionary<string, object>)) as
                     Dictionary<string, object>;
 
             var host = (string)VpnResumeParameters["hostName"];
@@ -231,6 +232,7 @@ public static class PowerTransitionHandler
     }
 
     #region USEWMI
+#if USING_WMI_POWEREVENTMONITORING
     private static ManagementEventWatcher managementEventWatcher;
 
     private static readonly Dictionary<string, string> powerValues = new Dictionary<string, string>
@@ -269,5 +271,6 @@ public static class PowerTransitionHandler
     {
         managementEventWatcher.Stop();
     }
-    #endregion USEWMI
+#endif
+#endregion USEWMI
 }

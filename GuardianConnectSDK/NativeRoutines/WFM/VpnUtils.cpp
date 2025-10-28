@@ -165,12 +165,6 @@ namespace NativeRoutines
 	}
 
 	DWORD BlockIPv4Queries(HANDLE engine_handle) {
-#if BRAVE_CPP20
-		std::vector<FWPM_FILTER_CONDITION0> conditions = {
-			FWPM_FILTER_CONDITION0{FWPM_CONDITION_IP_REMOTE_PORT,
-								   FWP_MATCH_EQUAL,
-								   {FWP_UINT16, {.uint16 = 53}}}};	
-#else
 		std::vector<FWPM_FILTER_CONDITION0> conditions;
 		FWP_CONDITION_VALUE cv;
 		cv.type = FWP_UINT16;
@@ -180,7 +174,6 @@ namespace NativeRoutines
 		condition.matchType = FWP_MATCH_EQUAL;
 		condition.conditionValue = cv;
 		conditions.push_back(condition);
-#endif
 
 		FWPM_FILTER0 filter = {};
 		filter.subLayerKey = kVpnDnsSublayerGUID;
@@ -197,25 +190,6 @@ namespace NativeRoutines
 		filter.weight.type = FWP_EMPTY;
 		filter.numFilterConditions = 1;
 		UINT64 filterid = 0;
-		//
-#if NOT_IN_BRAVE
-		FWPM_SUBLAYER0* sublayer_ptr = nullptr;
-		/* Check sublayer exists and add one if it does not. */
-		if (FwpmSubLayerGetByKey0(engine_handle, &filter.subLayerKey, &sublayer_ptr) == ERROR_SUCCESS) {
-			PrintRoutines::Output("BlockIPv4Queries: Sublayer DOES ALREADY EXIST. Proceeding to Block IPV4");
-			if (sublayer_ptr) {
-				FwpmFreeMemory0(reinterpret_cast<void**>(&sublayer_ptr));
-			}
-			//return ERROR_SUCCESS;
-		}
-		else
-		{
-			PrintRoutines::Output("******************** BlockIPv4Queries: Sublayer DOES NOT EXIST. FIND OUT WHY NOT!!!!");
-			//return ERROR_SUCCESS;
-		}
-#endif
-
-		//
         PrintRoutines::Output(Grd::FormatAString("BlockIPv4Queries: [CONNECT#8.1] Calling FwpmFilterAdd0 with filter name: {0}",
 			gcnew array<Object^> { gcnew String(name.data()) }));
 
@@ -423,22 +397,6 @@ namespace NativeRoutines
 		return success;
 	}
 
-	bool VpnUtils::SubscribeRasConnectionNotification(HANDLE event_handle) {
-		// As we pass INVALID_HANDLE_VALUE, we can get connected or disconnected
-		// event from any os vpn entry. It's filtered by
-		// VpnDnsHandler::OnObjectSignaled().
-		auto result = RasConnectionNotificationW(
-			static_cast<HRASCONN>(INVALID_HANDLE_VALUE), event_handle,
-			RASCN_Connection | RASCN_Disconnection);
-		bool success = result == ERROR_SUCCESS;
-		if (!success) {
-			std::cout
-				<< "Failed to subscribe for RAS connection notifications, error code:"
-				<< std::hex << result;
-		}
-		return success;
-	}
-	
 	void VpnUtils::SetFiltersInstalledFlag() {
 		String^ regValuePath = L"\\Software\\GuardianVPN";
 		String^ regFiltersPath = L"filters";
@@ -463,39 +421,5 @@ namespace NativeRoutines
 		}
 		key->DeleteValue(regFiltersPath);
 	}
-
-#if CFGSVCINCODE
-	bool VpnUtils::ConfigureServiceAutoRestart(const std::wstring& service_name,
-		const std::wstring& brave_vpn_entry) {
-		//ScopedScHandle scm(::OpenSCManager(nullptr, nullptr, SC_MANAGER_CONNECT));
-		SCM(::OpenSCManager(nullptr, nullptr, SC_MANAGER_CONNECT));
-		if (SCM == nullptr) {
-			std::cerr << "::OpenSCManager failed. service_name: " << service_name.data()
-				<< ", error: " << std::hex << GetLastError();
-			return false;
-		}
-		HANDLE service(
-			::OpenService(SCM, service_name.c_str(), SERVICE_ALL_ACCESS));
-		if (SCM == nullptr) {
-			std::cerr << "::OpenService failed. service_name: " << service_name.data()
-				<< ", error: " << std::hex << GetLastError();
-			return false;
-		}
-
-#if false
-		if (!brave_vpn::SetServiceFailureActions(service.Get())) {
-			std::cerr << "SetServiceFailureActions failed:" << std::hex
-				<< HRESULTFromLastError();
-			return false;
-		}
-		if (!SetServiceTriggerForVPNConnection(service.Get(), brave_vpn_entry)) {
-			std::cerr << "SetServiceTriggerForVPNConnection failed:" << std::hex
-				<< HRESULTFromLastError();
-			return false;
-		}
-#endif
-		return true;
-	}
-#endif
 
 }

@@ -1,10 +1,12 @@
 using System.IO.Pipes;
 using System.Security.AccessControl;
 using System.Security.Principal;
+using System.Text.Json;
 using Microsoft.Extensions.Hosting;
 using Serilog;
 using GuardianConnect.Shared;
-using Newtonsoft.Json;
+using System.Text.Json.Serialization;
+using Win32Calls;
 
 namespace GuardianFirewallService;
 
@@ -48,7 +50,7 @@ public class ClientPipeService : BackgroundService
                 }
                 else if (++heartbeatCounter % 5 == 0) Log.Information("ClientPipeService is running...");
 
-                await Task.Delay(60000);
+                await Task.Delay(60000, stoppingToken);
             }
 
             Log.Information(
@@ -116,7 +118,7 @@ public class ClientPipeService : BackgroundService
     public void StopServerListenerThreads()
     {
         int i = numThreads;
-        Thread.Sleep(250);
+        Thread.Sleep(50);
         while (i > 0)
         {
             for (int j = 0; j < numThreads; j++)
@@ -190,23 +192,23 @@ public class ClientPipeService : BackgroundService
                     {
                         case IGuardianNPContract.NPCommands.StartVPNConnection:
                             Log.Information($"ClientPipeService[{threadId}]: Performing StartVPNConnection");
-                            var dictSerial = cmdPayload;
-                            var dictObject = JsonConvert.DeserializeObject<Dictionary<string, object>>(dictSerial);
-                            var didItStart = cmdDispatcher.StartVPNConnection(dictObject);
+                            var serializedVpnParameters = cmdPayload;
+                            var vpnCallParameters = JsonSerializer.Deserialize<VPNCallParameters>(serializedVpnParameters, VPNCallParametersJsonContext.Default.VPNCallParameters);
+                            var didItStart = cmdDispatcher.StartVPNConnection(vpnCallParameters);
                             Log.Information($"ClientPipeService[{threadId}]: Exiting StartVPNConnection");
-                            var startResponseJson = JsonConvert.SerializeObject(didItStart);
+                            var startResponseJson = JsonSerializer.Serialize(didItStart, ErrorResponseJsonContext.Default.ErrorResponse);
                             Log.Information($"ClientPipeService.StartVPNConnection - string is '{startResponseJson}'");
                             ss.WriteString(startResponseJson);
                             break;
                         case IGuardianNPContract.NPCommands.DisconnectVPNConnection:
-                            Log.Information($"ClientPipeService[{threadId}]: Performing DisconnectVPNConnection");
-                            string entryName = cmdPayload;
-                            cmdDispatcher.DisconnectVPNConnection(entryName);
+                            string entryName = ConnectionRoutines.ActiveConnectionEntryName;
+                            Log.Information($"ClientPipeService[{threadId}]: Performing DisconnectVPNConnection. Entry is '{entryName}'");
+                            cmdDispatcher.DisconnectVPNConnection();
                             break;
                         case IGuardianNPContract.NPCommands.GetCurrentVpnConnectionStatus:
                             Log.Information($"ClientPipeService[{threadId}]: Performing GetCurrentVpnConnectionStatus");
                             var statusCheck = cmdDispatcher.GetCurrentVpnConnectionStatus();
-                            var statusString = JsonConvert.SerializeObject(statusCheck);
+                            var statusString = JsonSerializer.Serialize(statusCheck, CurrentVPNStatusJsonConect.Default.CurrentVPNStatus);
                             Log.Information($"ClientPipeService[{threadId}]: GetCurrentVpnConnectionStatus - writing statusString '{statusString}' to client");
                             ss.WriteString(statusString);
                             break;
@@ -222,9 +224,9 @@ public class ClientPipeService : BackgroundService
                             Log.Information($"ClientPipeService[{threadId}]: Performing UninstallerShutdownOccurring");
                             AdministrativeShutdownRequested = true;
                             var status = cmdDispatcher.GetCurrentVpnConnectionStatus();
-                            if (status.ConnectionState == IGuardianNPContract.ConnectionStateEnum.Connected)
+                            if (status.ConnectionState == ConnectionStateEnum.Connected)
                             {
-                                cmdDispatcher.DisconnectVPNConnection(status.EntryName);
+                                cmdDispatcher.DisconnectVPNConnection();
                             }
                             break;
                         case IGuardianNPContract.NPCommands.ToggleLogging:
@@ -250,9 +252,9 @@ public class ClientPipeService : BackgroundService
                             Log.Information($"ClientPipeService[{threadId}]: Performing RequestLogLines");
                             int maxLogLines = int.Parse(cmdPayload);
                             var lastLogLines = Common.GetLastLogLines(maxLogLines);
-                            string serializedLogs = JsonConvert.SerializeObject(lastLogLines);
                             Log.Information($"ClientPipeService[{threadId}]: Writing log lines to client");
-                            ss.WriteString(serializedLogs);
+                            var serializedLogLines = JsonSerializer.Serialize<List<string>>(lastLogLines, GuardianConnect.Shared.LogLinesJsonContext.Default.ListString);
+                            ss.WriteString(serializedLogLines);
                             break;
                         default:
                             Log.Information("WHY ARE WE HERE?");
@@ -270,9 +272,11 @@ public class ClientPipeService : BackgroundService
                     Log.Error(e, "ERROR: {0}", e.Message);
                 }
             }
+            Log.Information("ClientPipeService.End -- inner While()...");
 
             Interlocked.Decrement(ref NumberOfClientsConnected);
             pipeServer.Close();
         }
+        Log.Information("ClientPipeService.End -- outer While()...");
     }
 }

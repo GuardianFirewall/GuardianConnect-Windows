@@ -36,7 +36,6 @@ namespace NativeRoutines
         void CloseWatchers();
         void DisconnectVPN();
         void Exit();
-        virtual void SubscribeForRasNotifications(HANDLE event_handle);
 
         static HANDLE engine_;
         HANDLE event_handle_for_vpn_ = nullptr;

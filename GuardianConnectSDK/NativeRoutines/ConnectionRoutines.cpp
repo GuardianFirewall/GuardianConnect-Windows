@@ -28,33 +28,6 @@ namespace NativeRoutines
         return retVal;
     }
 
-#if NOTNEEDED
-    // https://docs.microsoft.com/en-us/windows/win32/api/ras/nf-ras-rassetcredentialsa
-    DWORD ConnectionRoutines::SetCredentials(LPCTSTR entry_name, LPCTSTR username, LPCTSTR password)
-    {
-        RASCREDENTIALS credentials;
-
-        ZeroMemory(&credentials, sizeof(RASCREDENTIALS));
-        credentials.dwSize = sizeof(RASCREDENTIALS);
-        credentials.dwMask = RASCM_UserName | RASCM_Password;
-
-        wcscpy_s(credentials.szUserName, 256, username);
-        wcscpy_s(credentials.szPassword, 256, password);
-
-        std::string error_get_phone_book_path;
-        wchar_t phonebookPath[1025];
-        RasBaseRoutines::GetPhonebookPath(entry_name, phonebookPath, &error_get_phone_book_path);
-        DWORD dwRet = RasSetCredentials(phonebookPath, entry_name, &credentials, FALSE);
-        if (dwRet != ERROR_SUCCESS)
-        {
-            PrintRoutines::PrintRasError(dwRet);
-            return dwRet;
-        }
-
-        return ERROR_SUCCESS;
-    }
-#endif
-
     DWORD ConnectionRoutines::ConnectWithEntry(String^ givenPhonebookPath, String^ entryName)
     {
         PrintRoutines::SetLoggingPath();
@@ -273,12 +246,9 @@ namespace NativeRoutines
         if (lpStatus != nullptr)
         {
             statusInfo = gcnew RasConnStatusInfo();
-            //statusInfo->RasConnStateValue = static_cast<RasConnState>(lpStatus->rasconnstate);
-            //statusInfo->RasConnStateValue = lpStatus->rasconnstate;
             RasConnState managedType = static_cast<RasConnState>(lpStatus->rasconnstate);
             statusInfo->RasConnStateValue = managedType;
             statusInfo->ErrorCode = lpStatus->dwError;
-            //statusInfo->RasConnSubStateValue = static_cast<RasConnSubState>(lpStatus->rasconnsubstate);
             RasConnSubState rcss = static_cast<RasConnSubState>(lpStatus->rasconnsubstate);
             statusInfo->RasConnSubStateValue = rcss;
         }

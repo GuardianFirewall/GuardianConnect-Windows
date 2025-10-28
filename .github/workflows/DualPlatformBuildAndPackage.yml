@@ -70,25 +70,18 @@ jobs:
       run: msbuild /t:restore /t:Build /p:Platform=arm64 /p:Configuration=Release /p:RuntimeIdentifier=win-arm64 GuardianConnect\GuardianConnect.csproj
       
     - name: Build GuardianFirewall Service for x64 CPU
-      run: msbuild /t:restore /t:Build /p:Platform=x64 /p:Configuration=Release /p:RuntimeIdentifier=win-x64 GuardianFirewallService\GuardianFirewallService.csproj
+      run: |
+            msbuild /t:restore /t:Build /p:Configuration=Release /p:Platform=x64 /p:WarningLevel=0 /p:RuntimeIdentifier=win-x64 GuardianFirewallService\GuardianFirewallService.csproj
+            msbuild /t:Publish /p:PublishReadyToRun=false /p:IncludeNativeLibrariesForSelfExtract=false /p:IncludeAllContentForSelfExtract=false /p:Configuration=Release /p:Platform=x64 /p:WarningLevel=0 /p:RuntimeIdentifier=win-x64 GuardianFirewallService\GuardianFirewallService.csproj
 
     - name: Build GuardianFirewall Service for arm64 CPU
-      run: msbuild /t:restore /t:Build /p:Platform=arm64 /p:Configuration=Release /p:RuntimeIdentifier=win-arm64 GuardianFirewallService\GuardianFirewallService.csproj
-
-    ## PAUSE HERE - Going to ONLY gather and upload the Guardian assets to SignPath in a zip. Both x64 and arm64.
-    ## GuardianConnect.Shared.dll, GuardianConnect.dll, NativeRoutines.dll, GuardianFirewallService.exe and GuardianFirewallService.dll
-    ## Second thought - we will just do that for both the GuardianConnect build output AND the GuardianFirewallService build output - so a little redundant on the GC binaries
-    ## as it is much easier to add the binaries in-place to the zip, sign the binaries in that zip file, then extract with overlay in-place
-    ## so that the nuget package builds flow easier (we have limited pathing and variables in the nuspecs). And then we can also sign the Nuget packages later on.
-
-##    - name: Run sigcheck64 utility to verify binaries
-##      run: bin\sigcheck64 -nobanner -accepteula  -s -a BuildOutput\GuardianConnect\runtimes\win10-x64\lib\net9.0-windows\Guardian*.dll
-##      shell: cmd
-
+      run: |
+        msbuild /t:restore /t:Build /p:Configuration=Release /p:Platform=arm64 /p:WarningLevel=0 /p:RuntimeIdentifier=win-arm64 GuardianFirewallService\GuardianFirewallService.csproj
+        msbuild /t:Publish /p:PublishReadyToRun=false /p:IncludeNativeLibrariesForSelfExtract=false /p:IncludeAllContentForSelfExtract=false /p:Configuration=Release /p:Platform=arm64 /p:WarningLevel=0 /p:RuntimeIdentifier=win-arm64 GuardianFirewallService\GuardianFirewallService.csproj
+      
      # Zip up our binaries for specific zip signing in SignPath
     - name: Zip Guardian binaries for SignPath deep-signing
-      #run: PackagingHelpers\bin\7-zip\7z a -bb3 "${{ env.unsignedzipfile }}" @PackagingHelpers\Input\ListOfGuardianFilesToSign.fls
-      run: 7z a -bb3 .\UnsignedGuardianBinaries.zip @ListOfGuardianConnectSDKFilesToSign.fls
+      run: 7z a -bb3 "${{ env.unsignedzipfile }}" @ListOfGuardianConnectSDKFilesToSign.fls
       shell: cmd
 
       # Sign Guardian binaries only  Executable with certificate
@@ -96,30 +89,19 @@ jobs:
       run: Install-Module -Name SignPath -Force
         
         Submit-SigningRequest `
-        -InputArtifactPath "${{ env.unsignedzipfile }}" `
-        -ApiToken "${{ secrets.CI_SIGNPATH_USER_TOKEN }}" `
         -OrganizationId "5c1e4170-8bf7-48b1-8542-78374ccc3471" `
+        -ApiToken "${{ secrets.CI_SIGNPATH_USER_TOKEN }}" `
         -ProjectSlug "Guardian" `
         -SigningPolicySlug "Guardian_DNSF_Branded" `
+        -ArtifactConfigurationSlug  "NoCPP_SDK_and_AOT_SVC" `
+        -InputArtifactPath "${{ env.unsignedzipfile }}" `
         -OutputArtifactPath "${{ env.signedzipfile }}" `
-        -ArtifactConfigurationSlug  GuardianConnectWindowsBinariesZip `
         -WaitForCompletion
       
       # Unzip what has just been signed
     - name: Unzip the newly-created file to list Guardian binaries for SignPath deep-signing
       run: 7z x -aoa -bb3 "${{ env.signedzipfile }}"
 
-        # BARF
-#    - name: BARF
-#      run: FOOBAR
-        
-    ###
-###    - name: Upload build artifacts - GuardianFirewall Service Executable for ARM64 itself - single file so we can verify if it works
-###      uses: actions/upload-artifact@v4
-###      with:
-###        name: GuardianFirewallService.exe
-###        path: D:\a\GuardianConnect-Windows\GuardianConnect-Windows\GuardianConnectSDK\BuildOutput\GuardianFirewallService\runtimes\win10-arm64\lib\net9.0-windows\GuardianFirewallService.exe
-###        
     - name: Create GuardianConnectSDK_x64.nupkg package bundle for EACH CPU build - x64 first
       run: nuget pack GuardianConnectSDK_x64.nuspec -Version ${{env.PKGVERSION}}
       shell: cmd
@@ -157,13 +139,13 @@ jobs:
       run: Install-Module -Name SignPath -Force
 
         Submit-SigningRequest `
-        -InputArtifactPath "GuardianConnectSDK_x64.${{env.PKGVERSION}}.nupkg" `
-        -ApiToken "${{ secrets.CI_SIGNPATH_USER_TOKEN }}" `
         -OrganizationId "5c1e4170-8bf7-48b1-8542-78374ccc3471" `
+        -ApiToken "${{ secrets.CI_SIGNPATH_USER_TOKEN }}" `
         -ProjectSlug "Guardian" `
         -SigningPolicySlug "Guardian_DNSF_Branded" `
-        -OutputArtifactPath "SIGNED_GuardianConnectSDK_x64.${{env.PKGVERSION}}.nupkg"  `
         -ArtifactConfigurationSlug GuardianConnectSDK_x64_Nuget_Package `
+        -InputArtifactPath "GuardianConnectSDK_x64.${{env.PKGVERSION}}.nupkg" `
+        -OutputArtifactPath "SIGNED_GuardianConnectSDK_x64.${{env.PKGVERSION}}.nupkg"  `
         -WaitForCompletion
       
     # Sign GuardianConnectSDK ARM64 package with certificate

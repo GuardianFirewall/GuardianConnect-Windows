@@ -1,6 +1,10 @@
+using System.Collections;
+using System.Diagnostics;
 using System.IO.Pipes;
+using System.Text.Json;
 using GuardianConnect.Shared;
-using Newtonsoft.Json;
+using System.Text.Json.Serialization;
+using System.Text.Json.Serialization.Metadata;
 using Serilog;
 
 namespace GuardianConnect.Helpers;
@@ -16,50 +20,50 @@ public static class ClientPipe
 
     public static IGuardianNPContract.CompositeType GetDataUsingDataContract(IGuardianNPContract.CompositeType composite)
     {
-        if (!Instance.IsConnected) Instance.OpenNamedPipe();
+        if (!Instance.IsConnected) Instance.ReopenNamedPipe();
         return Instance.GetDataUsingDataContract(composite);
     }
 
-    public static ErrorResponse StartVPNConnection(Dictionary<string, object> protocolRequest)
+    public static ErrorResponse StartVPNConnection(VPNCallParameters protocolRequest)
     {
-        if (!Instance.IsConnected) Instance.OpenNamedPipe();
+        if (!Instance.IsConnected) Instance.ReopenNamedPipe();
         return Instance.StartVPNConnection(protocolRequest);
     }
 
     public static void DisconnectVPNConnection(string entryName)
     {
-        if (!Instance.IsConnected) Instance.OpenNamedPipe();
-        Instance.DisconnectVPNConnection(entryName);
+        if (!Instance.IsConnected) Instance.ReopenNamedPipe();
+        Instance.DisconnectVPNConnection();
     }
 
-    public static IGuardianNPContract.CurrentVPNStatus GetCurrentVpnConnectionStatus()
+    public static CurrentVPNStatus GetCurrentVpnConnectionStatus()
     {
-        if (!Instance.IsConnected) Instance.OpenNamedPipe();
+        if (!Instance.IsConnected) Instance.ReopenNamedPipe();
         return Instance.GetCurrentVpnConnectionStatus();
     }
 
     public static async Task<string> Ping()
     {
-        if (!Instance.IsConnected) Instance.OpenNamedPipe();
+        if (!Instance.IsConnected) Instance.ReopenNamedPipe();
         return await Instance.Ping();
     }
 
     public static void ToggleLogging(bool whetherToDeleteLogFiles)
     {
-        if (!Instance.IsConnected) Instance.OpenNamedPipe();
+        if (!Instance.IsConnected) Instance.ReopenNamedPipe();
         Instance.ToggleLogging(whetherToDeleteLogFiles);
 
     }
 
     public static async Task<List<string>> GetServiceLogLinesAsync(int maxNumberOfLinesToGet = 200)
     {
-        if (!Instance.IsConnected) Instance.OpenNamedPipe();
+        if (!Instance.IsConnected) Instance.ReopenNamedPipe();
         return await Instance.GetServiceLogLinesAsync(maxNumberOfLinesToGet);
     }
 
     public static void SwitchServiceLoggingLevel(Common.LoggingLevels loggingLevel)
     {
-        if (!Instance.IsConnected) Instance.OpenNamedPipe();
+        if (!Instance.IsConnected) Instance.ReopenNamedPipe();
         Instance.SwitchServiceLoggingLevel(loggingLevel);
     }
         
@@ -69,31 +73,45 @@ public class ClientPipeImpl : IGuardianNPContract
 {
     private static NamedPipeClientStream _clientStream = new NamedPipeClientStream("NULL");
     private static StreamString ss;
+    private static int usingResource = 0;
 
     internal bool IsConnected => _clientStream.IsConnected;
 
     internal void OpenNamedPipe(string servicePipeName = Common.kGRDServicePipeName)
     {
-        Log.Information("ClientPipeImpl.OpenNamedPipe: Opening Pipe Stream...");
-        _clientStream = new NamedPipeClientStream(".", servicePipeName, PipeDirection.InOut);
-        Log.Information("ClientPipeImpl.OpenNamedPipe: Going into Opening loop until success or retries exhausted...");
-        int retries = 10;
-        while (retries-- > 0 && !_clientStream.IsConnected)
+        if (0 == Interlocked.Exchange(ref usingResource, 1))
         {
-            try
+            Log.Information("ClientPipeImpl.OpenNamedPipe: Opening Pipe Stream...");
+            _clientStream = new NamedPipeClientStream(".", servicePipeName, PipeDirection.InOut);
+            Log.Information(
+                "ClientPipeImpl.OpenNamedPipe: Going into Opening loop until success or retries exhausted...");
+            int retries = 10;
+            while (retries-- > 0 && !_clientStream.IsConnected)
             {
-                _clientStream.Connect(10 * 1000);
-                Log.Information($"ClientPipeImpl.OpenNamedPipe: {retries} left to attempt opening of Client Pipe Stream...");
-            }
-            catch (Exception e)
-            {
-                if (!IsConnected)
+                try
                 {
-                    Log.Error("!!!!!!!!!!!!!!!!!!!! ClientPipeImpl.OpenNamedPipe could NOT connect to Pipe Stream...");
-                    throw;
+                    _clientStream.Connect(30 * 1000);
+                    Log.Information(
+                        $"ClientPipeImpl.OpenNamedPipe: {retries} left to attempt opening of Client Pipe Stream...");
+                }
+                catch (Exception e)
+                {
+                    if (!IsConnected)
+                    {
+                        Log.Error(
+                            "!!!!!!!!!!!!!!!!!!!! ClientPipeImpl.OpenNamedPipe could NOT connect to Pipe Stream...");
+                        throw;
+                    }
                 }
             }
         }
+    }
+
+    internal void ReopenNamedPipe()
+    {
+        Log.Warning("!!!!!!!!!!!!!! REOPENING CLIENTPIPE TO SERVICE...");
+        OpenNamedPipe();
+        ss = new StreamString(_clientStream);
     }
     
     internal bool Connect(string servicePipeName = Common.kGRDServicePipeName)
@@ -101,7 +119,7 @@ public class ClientPipeImpl : IGuardianNPContract
         bool whetherPreviouslyConnectedAtSuspend = false;
         try
         {
-            Log.Information("ClientPipeImpl.Connect: Calling OpenNamedPipe...");
+            Log.Information($"ClientPipeImpl.Connect: Calling OpenNamedPipe...");
             OpenNamedPipe(servicePipeName);
             ss = new StreamString(_clientStream);
             //var testAck = ss.ReadStringAsync();
@@ -126,11 +144,11 @@ public class ClientPipeImpl : IGuardianNPContract
 
     public IGuardianNPContract.CompositeType GetDataUsingDataContract(IGuardianNPContract.CompositeType composite)
     {
-        var cmdPayload = JsonConvert.SerializeObject(composite);
+        var cmdPayload = JsonSerializer.Serialize(composite);
         var cmdString = $"{(int)IGuardianNPContract.NPCommands.GetDataUsingDataContract}.{cmdPayload}";
         ss.WriteString(cmdString);
         var response = ss.ReadStringAsync().Result;
-        var value = JsonConvert.DeserializeObject<IGuardianNPContract.CompositeType>(response);
+        var value = JsonSerializer.Deserialize<IGuardianNPContract.CompositeType>(response);
 
         if (value == null)
         {
@@ -140,9 +158,9 @@ public class ClientPipeImpl : IGuardianNPContract
         return value;
     }
 
-    public ErrorResponse StartVPNConnection(Dictionary<string, object> protocolRequest)
+    public ErrorResponse StartVPNConnection(VPNCallParameters protocolRequest)
     {
-        var cmdPayload = JsonConvert.SerializeObject(protocolRequest);
+        var cmdPayload = JsonSerializer.Serialize(protocolRequest, VPNCallParametersJsonContext.Default.VPNCallParameters);
         var cmdString = $"{(int)IGuardianNPContract.NPCommands.StartVPNConnection}.{cmdPayload}";
         ss.WriteString(cmdString);
         var startedJson = ss.ReadStringAsync().Result;
@@ -151,7 +169,7 @@ public class ClientPipeImpl : IGuardianNPContract
         ErrorResponse startedErrorResponse = new ErrorResponse();
         try
         {
-            startedErrorResponse = JsonConvert.DeserializeObject<ErrorResponse>(startedJson);
+            startedErrorResponse = JsonSerializer.Deserialize<ErrorResponse>(startedJson, ErrorResponseJsonContext.Default.ErrorResponse);
         }
         catch (Exception e)
         {
@@ -161,14 +179,14 @@ public class ClientPipeImpl : IGuardianNPContract
         return startedErrorResponse;
     }
 
-    public void DisconnectVPNConnection(string entryName)
+    public void DisconnectVPNConnection()
     {
-        var cmdPayload = JsonConvert.SerializeObject(entryName);
+        var cmdPayload = "";
         var cmdString = $"{(int)IGuardianNPContract.NPCommands.DisconnectVPNConnection}.{cmdPayload}";
         ss.WriteString(cmdString);
     }
 
-    public IGuardianNPContract.CurrentVPNStatus GetCurrentVpnConnectionStatus()
+    public CurrentVPNStatus GetCurrentVpnConnectionStatus()
     {
         Log.Information("Calling service to GetCurrentVpnConnectionStatus...");
         var cmdString = $"{(int)IGuardianNPContract.NPCommands.GetCurrentVpnConnectionStatus}.";
@@ -176,7 +194,7 @@ public class ClientPipeImpl : IGuardianNPContract
         Log.Information("Reading status...");
         //var statusString = ss.ReadStringAsync().Result;
         var statusString = ss.ReadString();
-        var status = JsonConvert.DeserializeObject<IGuardianNPContract.CurrentVPNStatus>(statusString);
+        var status = JsonSerializer.Deserialize<CurrentVPNStatus>(statusString, CurrentVPNStatusJsonConect.Default.CurrentVPNStatus);
         Log.Information($"status is {status.EntryName}, {status.ConnectionState}...");
 
         return status;
@@ -212,8 +230,8 @@ public class ClientPipeImpl : IGuardianNPContract
         var cmdString = $"{(int)IGuardianNPContract.NPCommands.RequestLogLines}.{maxNumberOfLinesToGet}";
         ss.WriteString(cmdString);
         Log.Information("Reading response...");
-        var serializedServiceLogLines = await ss.ReadStringAsync();
-        var jsonLines = JsonConvert.DeserializeObject<List<string>>(serializedServiceLogLines);
+        var serializedServiceLogs = await ss.ReadStringAsync();
+        var jsonLines = JsonSerializer.Deserialize<List<string>>(serializedServiceLogs, LogLinesJsonContext.Default.ListString);
         var serviceLogLines = jsonLines ?? new List<string>();
         Log.Information($"Number of log lines returned from the service = {serviceLogLines.Count}");
 
