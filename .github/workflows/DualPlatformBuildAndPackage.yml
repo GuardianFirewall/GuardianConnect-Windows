@@ -72,18 +72,18 @@ jobs:
     - name: Build GuardianConnect.Services for x64 CPU
       run: msbuild /t:restore /t:Build /p:Platform=x64 /p:Configuration=Release /p:RuntimeIdentifier=win-x64 GuardianConnect.Services\GuardianConnect.Services.csproj
       
-    - name: Build GuardianConnect for ARM64 CPU
+    - name: Build GuardianConnect.Services for ARM64 CPU
       run: msbuild /t:restore /t:Build /p:Platform=arm64 /p:Configuration=Release /p:RuntimeIdentifier=win-arm64 GuardianConnect.Services\GuardianConnect.Services.csproj
       
-    - name: Build GuardianFirewall Service for x64 CPU
-      run: |
-            msbuild /t:restore /t:Build /p:Configuration=Release /p:Platform=x64 /p:WarningLevel=0 /p:RuntimeIdentifier=win-x64 GuardianFirewallService\GuardianFirewallService.csproj
-            msbuild /t:Publish /p:PublishReadyToRun=false /p:IncludeNativeLibrariesForSelfExtract=false /p:IncludeAllContentForSelfExtract=false /p:Configuration=Release /p:Platform=x64 /p:WarningLevel=0 /p:RuntimeIdentifier=win-x64 GuardianFirewallService\GuardianFirewallService.csproj
-
-    - name: Build GuardianFirewall Service for arm64 CPU
-      run: |
-        msbuild /t:restore /t:Build /p:Configuration=Release /p:Platform=arm64 /p:WarningLevel=0 /p:RuntimeIdentifier=win-arm64 GuardianFirewallService\GuardianFirewallService.csproj
-        msbuild /t:Publish /p:PublishReadyToRun=false /p:IncludeNativeLibrariesForSelfExtract=false /p:IncludeAllContentForSelfExtract=false /p:Configuration=Release /p:Platform=arm64 /p:WarningLevel=0 /p:RuntimeIdentifier=win-arm64 GuardianFirewallService\GuardianFirewallService.csproj
+####    - name: Build GuardianFirewall Service for x64 CPU
+####      run: |
+####            msbuild /t:restore /t:Build /p:Configuration=Release /p:Platform=x64 /p:WarningLevel=0 /p:RuntimeIdentifier=win-x64 GuardianFirewallService\GuardianFirewallService.csproj
+####            msbuild /t:Publish /p:PublishReadyToRun=false /p:IncludeNativeLibrariesForSelfExtract=false /p:IncludeAllContentForSelfExtract=false /p:Configuration=Release /p:Platform=x64 /p:WarningLevel=0 /p:RuntimeIdentifier=win-x64 GuardianFirewallService\GuardianFirewallService.csproj
+####
+####    - name: Build GuardianFirewall Service for arm64 CPU
+####      run: |
+####        msbuild /t:restore /t:Build /p:Configuration=Release /p:Platform=arm64 /p:WarningLevel=0 /p:RuntimeIdentifier=win-arm64 GuardianFirewallService\GuardianFirewallService.csproj
+####        msbuild /t:Publish /p:PublishReadyToRun=false /p:IncludeNativeLibrariesForSelfExtract=false /p:IncludeAllContentForSelfExtract=false /p:Configuration=Release /p:Platform=arm64 /p:WarningLevel=0 /p:RuntimeIdentifier=win-arm64 GuardianFirewallService\GuardianFirewallService.csproj
       
      # Zip up our binaries for specific zip signing in SignPath
     - name: Zip Guardian binaries for SignPath deep-signing
@@ -111,11 +111,28 @@ jobs:
     - name: Create GuardianConnectSDK_x64.nupkg package bundle for EACH CPU build - x64 first
       run: nuget pack GuardianConnectSDK_x64.nuspec -Version ${{env.PKGVERSION}}
       shell: cmd
-    
+
     - name: Create GuardianConnectSDK_ARM64.nupkg package bundle for EACH CPU build - then ARM64
       run: nuget pack GuardianConnectSDK_ARM64.nuspec -Version ${{env.PKGVERSION}}
       shell: cmd
-      
+
+    - name: Create GuardianConnect.Services.SDK_x64.nupkg package bundle for EACH CPU build - x64 first
+      run: nuget pack GuardianConnect.Services.SDK_x64.nuspec -Version ${{env.PKGVERSION}}
+      shell: cmd
+    
+    - name: Create GuardianConnect.Services.SDK_arm64.nupkg package bundle for EACH CPU build - arm64 first
+      run: nuget pack GuardianConnect.Services.SDK_arm64.nuspec -Version ${{env.PKGVERSION}}
+      shell: cmd
+
+    - name: Upload build artifacts - both Service SDKs - x64 first- UNSIGNED SO WE CAN GIVE AS SAMPLE TO SIGNPATH
+      uses: actions/upload-artifact@v4
+      with:
+        name: "GuardianConnect.Services.SDK_x64.${{env.PKGVERSION}}.nupkg"
+        path: D:\a\GuardianConnect-Windows\GuardianConnect-Windows\GuardianConnectSDK\GuardianConnect.Services.SDK_x64.${{env.PKGVERSION}}.nupkg
+        
+    - name: POOF
+      run: poof
+
     - name: Upload build artifacts - both SDKs - x64 first- UNSIGNED SO WE CAN GIVE AS SAMPLE TO SIGNPATH
       uses: actions/upload-artifact@v4
       with:
