@@ -88,7 +88,7 @@ jobs:
      # Zip up our binaries for specific zip signing in SignPath
     - name: Zip Guardian binaries for SignPath deep-signing
       shell: cmd
-      run: 7z a -bb3 "${{ env.unsignedzipfile }}" @ListOfGuardianConnectSDKFilesToSign.fls
+      run: 7z a -bb3 "${{env.unsignedzipfile}}" @ListOfGuardianConnectSDKFilesToSign.fls
 
     - name: Get a dir of zip
       run: dir
@@ -97,8 +97,8 @@ jobs:
     - name: Upload build artifacts - include Service SDKs - x64 first- UNSIGNED SO WE CAN GIVE AS SAMPLE TO SIGNPATH
       uses: actions/upload-artifact@v4
       with:
-        name: "GuardianSDKIncludingServices.zip"
-        path: "${{ env.unsignedzipfile }}"
+        name: UnsignedGuardianBinaries.zip
+        path: D:\a\GuardianConnect-Windows\GuardianConnect-Windows\GuardianConnectSDK\${{env.unsignedzipfile}}
 
     - name: POOF
       run: poof
