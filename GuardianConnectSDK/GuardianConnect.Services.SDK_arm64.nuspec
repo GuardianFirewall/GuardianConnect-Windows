@@ -1,0 +1,28 @@
+<?xml version="1.0" encoding="utf-8"?>
+<package>
+    <metadata>
+        <id>GuardianConnect.Services.SDK_arm64</id>
+        <version>0.24.1</version>
+        <title>GuardianConnect SDK Nuget Bundle Package for arm64</title>
+        <authors>DNSFilter, Inc.</authors>
+        <license type="expression">MIT</license>
+        <icon>Guardian.png</icon>
+        <projectUrl>https://github.com/GuardianFirewall/guardianconnect-windows</projectUrl>
+        <description>Use this Nuget package to incorporate into your service executable to provide Guardian Firewall Services</description>
+        <releaseNotes>$(Version): Beta Release as SDK package</releaseNotes>
+        <copyright>Copyright DNSFilter, Inc.</copyright>
+        <tags>GuardianConnectSDK Windows Beta</tags>
+        <dependencies>
+            <group targetFramework="net9.0">
+                <!-- Add your dependencies here -->
+            </group>
+        </dependencies>
+    </metadata>
+    <files>
+        <!--    <file src="GuardianConnectSDK.targets" target="buildTransitive\GuardianConnectSDK.targets" />-->
+        <file src=".\README.md" target="content"/>
+        <file src="Guardian.png"/>
+        <file src="BuildOutput\GuardianConnect.Services\runtimes\win10-arm64\lib\net9.0-windows\GuardianConnect.Services.dll"
+              target="lib\net9.0\GuardianConnect.Services.dll"/>
+    </files>
+</package>
