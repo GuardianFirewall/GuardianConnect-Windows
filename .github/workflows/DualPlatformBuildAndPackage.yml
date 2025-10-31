@@ -100,10 +100,7 @@ jobs:
         name: UnsignedGuardianBinaries.zip
         path: D:\a\GuardianConnect-Windows\GuardianConnect-Windows\GuardianConnectSDK\${{env.unsignedzipfile}}
 
-    - name: POOF
-      run: poof
-      
-      # Sign Guardian binaries only  Executable with certificate
+      # Sign Guardian binaries only  with certificate
     - name: Sign Guardian Binaries with certificate
       run: Install-Module -Name SignPath -Force
         
@@ -112,7 +109,7 @@ jobs:
         -ApiToken "${{ secrets.CI_SIGNPATH_USER_TOKEN }}" `
         -ProjectSlug "Guardian" `
         -SigningPolicySlug "Guardian_DNSF_Branded" `
-        -ArtifactConfigurationSlug  "NoCPP_SDK_and_AOT_SVC" `
+        -ArtifactConfigurationSlug  "NoCPP_SDK_and_SDK_SVC" `
         -InputArtifactPath "${{ env.unsignedzipfile }}" `
         -OutputArtifactPath "${{ env.signedzipfile }}" `
         -WaitForCompletion
