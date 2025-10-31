@@ -90,6 +90,15 @@ jobs:
       run: 7z a -bb3 "${{ env.unsignedzipfile }}" @ListOfGuardianConnectSDKFilesToSign.fls
       shell: cmd
 
+    - name: Upload build artifacts - include Service SDKs - x64 first- UNSIGNED SO WE CAN GIVE AS SAMPLE TO SIGNPATH
+      uses: actions/upload-artifact@v4
+      with:
+        name: "GuardianSDKIncludingServices.zip"
+        path: D:\a\GuardianConnect-Windows\GuardianConnect-Windows\GuardianConnectSDK\${{ env.unsignedzipfile }}"
+
+    - name: POOF
+      run: poof
+      
       # Sign Guardian binaries only  Executable with certificate
     - name: Sign Guardian Binaries with certificate
       run: Install-Module -Name SignPath -Force
