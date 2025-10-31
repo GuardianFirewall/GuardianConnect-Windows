@@ -140,9 +140,6 @@ jobs:
         name: "GuardianConnect.Services.SDK_x64.${{env.PKGVERSION}}.nupkg"
         path: D:\a\GuardianConnect-Windows\GuardianConnect-Windows\GuardianConnectSDK\GuardianConnect.Services.SDK_x64.${{env.PKGVERSION}}.nupkg
         
-    - name: POOF
-      run: poof
-
     - name: Upload build artifacts - both SDKs - x64 first- UNSIGNED SO WE CAN GIVE AS SAMPLE TO SIGNPATH
       uses: actions/upload-artifact@v4
       with:
@@ -154,8 +151,11 @@ jobs:
       with:
         name: "GuardianConnectSDK_ARM64.${{env.PKGVERSION}}.nupkg"
         path: D:\a\GuardianConnect-Windows\GuardianConnect-Windows\GuardianConnectSDK\GuardianConnectSDK_ARM64.${{env.PKGVERSION}}.nupkg
-    
-####    - name: Create GuardianFirewallService.nupkg package bundle
+
+    - name: POOF
+      run: poof
+        
+        ####    - name: Create GuardianFirewallService.nupkg package bundle
 ####      run: nuget pack GuardianFirewallService.nuspec -Version ${{env.PKGVERSION}}
 ####      shell: cmd
 ####      
