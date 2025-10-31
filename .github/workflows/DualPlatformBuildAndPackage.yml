@@ -139,6 +139,12 @@ jobs:
       with:
         name: "GuardianConnect.Services.SDK_x64.${{env.PKGVERSION}}.nupkg"
         path: D:\a\GuardianConnect-Windows\GuardianConnect-Windows\GuardianConnectSDK\GuardianConnect.Services.SDK_x64.${{env.PKGVERSION}}.nupkg
+    
+    - name: Upload build artifacts - both Service SDKs - arm64 - UNSIGNED SO WE CAN GIVE AS SAMPLE TO SIGNPATH
+      uses: actions/upload-artifact@v4
+      with:
+        name: "GuardianConnect.Services.SDK_arm64.${{env.PKGVERSION}}.nupkg"
+        path: D:\a\GuardianConnect-Windows\GuardianConnect-Windows\GuardianConnectSDK\GuardianConnect.Services.SDK_arm64.${{env.PKGVERSION}}.nupkg
         
     - name: Upload build artifacts - both SDKs - x64 first- UNSIGNED SO WE CAN GIVE AS SAMPLE TO SIGNPATH
       uses: actions/upload-artifact@v4
@@ -152,10 +158,7 @@ jobs:
         name: "GuardianConnectSDK_ARM64.${{env.PKGVERSION}}.nupkg"
         path: D:\a\GuardianConnect-Windows\GuardianConnect-Windows\GuardianConnectSDK\GuardianConnectSDK_ARM64.${{env.PKGVERSION}}.nupkg
 
-    - name: POOF
-      run: poof
-        
-        ####    - name: Create GuardianFirewallService.nupkg package bundle
+####    - name: Create GuardianFirewallService.nupkg package bundle
 ####      run: nuget pack GuardianFirewallService.nuspec -Version ${{env.PKGVERSION}}
 ####      shell: cmd
 ####      
@@ -196,8 +199,11 @@ jobs:
         -OutputArtifactPath "SIGNED_GuardianConnectSDK_ARM64.${{env.PKGVERSION}}.nupkg"  `
         -ArtifactConfigurationSlug GuardianConnectSDK_ARM64_Nuget_Package `
         -WaitForCompletion
-    
-    # Sign GuardianFirewallService package with certificate
+
+    - name: POOF
+      run: poof
+      
+      # Sign GuardianFirewallService package with certificate
     # Name GuardianFirewallService Windows Nuget Package
     # Slug GuardianConnectSDK_Windows_Nuget_Package
 ####    - name: Sign GuardianFirewallService package with certificate
