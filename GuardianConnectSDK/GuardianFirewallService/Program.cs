@@ -1,4 +1,5 @@
-﻿using GuardianConnect.Shared;
+﻿using GuardianConnect.Services;
+using GuardianConnect.Shared;
 using GuardianFirewallService;
 using Microsoft.Extensions.Hosting;
 using Serilog;

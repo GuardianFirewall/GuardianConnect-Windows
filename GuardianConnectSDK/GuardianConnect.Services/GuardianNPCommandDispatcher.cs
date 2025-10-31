@@ -1,7 +1,11 @@
+using GuardianConnect.Abstractions;
 using GuardianConnect.Shared;
 using GuardianConnect.VPNTransports;
+using Microsoft.Extensions.Logging;
 using Serilog;
+//using Serilog;
 using Win32Calls;
+using ILogger = Microsoft.Extensions.Logging.ILogger;
 
 namespace GuardianFirewallService;
 
@@ -10,12 +14,18 @@ public class GuardianNPCommandDispatcher :IGuardianNPContract
 {
     private VPNTransportIKEV2 _vpnTransportIkev2;
     
+    public  ILogger _logger { get; set; }
+
+    public GuardianNPCommandDispatcher()
+    {
+    }
+    
     public string GetData(int value)
     {
         return string.Format("You entered: {0}", value);
     }
 
-    public IGuardianNPContract.CompositeType GetDataUsingDataContract(IGuardianNPContract.CompositeType composite)
+    public CompositeType GetDataUsingDataContract(CompositeType composite)
     {
         if (composite == null)
         {
@@ -40,7 +50,7 @@ public class GuardianNPCommandDispatcher :IGuardianNPContract
     public void DisconnectVPNConnection()
     {
         _vpnTransportIkev2 = new VPNTransportIKEV2();
-        Log.Information($"GuardianNPCommandDispatcher.DisconnectVPNConnection: stopping VPN entry '{ConnectionRoutines.ActiveConnectionEntryName}'");
+        _logger.LogInformation($"GuardianNPCommandDispatcher.DisconnectVPNConnection: stopping VPN entry '{ConnectionRoutines.ActiveConnectionEntryName}'");
         _vpnTransportIkev2.StopVPNTunnel();
     }
 
@@ -53,7 +63,7 @@ public class GuardianNPCommandDispatcher :IGuardianNPContract
         };
 
         bool anyConnectionActive = ConnectionRoutines.IsAnyConnectionActive(out string entryOut);
-        Log.Information($"GuardianNPCommandDispatcher.GetVpnConnectionStatus: IsAnyConnectionActive returned {anyConnectionActive}, Entry: '{entryOut}'");
+        _logger.Log(LogLevel.Information,$"GuardianNPCommandDispatcher.GetVpnConnectionStatus: IsAnyConnectionActive returned {anyConnectionActive}, Entry: '{entryOut}'");
         status.ConnectionState = anyConnectionActive
             ? ConnectionStateEnum.Connected
             : ConnectionStateEnum.Disconnected;
@@ -78,7 +88,7 @@ public class GuardianNPCommandDispatcher :IGuardianNPContract
 
     public void SwitchServiceLoggingLevel(Common.LoggingLevels loggingLevel)
     {
-        Log.Warning($"Command sent to switch log level from {Common.CurrentMinimumLogLevel} to {loggingLevel}");
+        _logger.LogWarning($"Command sent to switch log level from {Common.CurrentMinimumLogLevel} to {loggingLevel}");
         Common.CurrentMinimumLogLevel = loggingLevel;
         Common.SetMinimumLogLevelToCurrentLevel();
     }

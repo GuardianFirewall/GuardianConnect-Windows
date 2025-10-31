@@ -1,5 +1,6 @@
 ﻿using System.Diagnostics;
 using System.Runtime.CompilerServices;
+using GuardianConnect.Abstractions;
 using GuardianConnect.API;
 using GuardianConnect.API.Model;
 using GuardianConnect.Credentials;

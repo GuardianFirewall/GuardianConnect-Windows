@@ -1,4 +1,6 @@
-﻿namespace GuardianConnect.Shared;
+﻿using GuardianConnect.Shared;
+
+namespace GuardianConnect.Abstractions;
 
 public interface ITransportProvider
 {

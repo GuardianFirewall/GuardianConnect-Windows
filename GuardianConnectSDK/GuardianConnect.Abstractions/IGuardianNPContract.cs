@@ -1,29 +1,11 @@
-using System.Text.Json.Serialization;
+using GuardianConnect.Shared;
 
-namespace GuardianConnect.Shared;
+namespace GuardianConnect.Abstractions;
 
 public interface IGuardianNPContract
 {
 
 
-class CompositeType
-    {
-        bool boolValue = true;
-        string stringValue = "Hello ";
-
-        public bool BoolValue
-        {
-            get { return boolValue; }
-            set { boolValue = value; }
-        }
-
-        public string StringValue
-        {
-            get { return stringValue; }
-            set { stringValue = value; }
-        }
-    }
-    
     public enum NPCommands
     {
         StartVPNConnection,
@@ -42,7 +24,7 @@ class CompositeType
     string GetData(int value);
 
     CompositeType GetDataUsingDataContract(CompositeType composite);
-    
+
     ErrorResponse StartVPNConnection(VPNCallParameters? protocolRequest);
 
     void DisconnectVPNConnection();
@@ -54,6 +36,6 @@ class CompositeType
     void ShutdownService();
 
     void ToggleLogging(bool whetherToDeleteLogFiles);
-    
-    void SwitchServiceLoggingLevel(Common.LoggingLevels loggingLevel );
+
+    void SwitchServiceLoggingLevel(Common.LoggingLevels loggingLevel);
 }

@@ -6,6 +6,7 @@ using GuardianConnect.Shared.Extensions;
 //using Newtonsoft.Json;
 using System.Text.Json;
 using System.Text.Json.Serialization;
+using GuardianConnect.Abstractions;
 using GuardianConnect.API.Model;
 using Serilog;
 
@@ -73,7 +74,7 @@ public class GRDGateway
 
     /// endpoint: /vpnsrv/api/server-status
     /// hits the endpoint for the current VPN host to check if a VPN connection can be established
-    internal async Task<ErrorResponse> GetServerStatus(string hostOverride, bool clientCall = false)
+    public async Task<ErrorResponse> GetServerStatus(string hostOverride, bool clientCall = false)
     {
         var vpnHost = hostOverride;
         ErrorResponse errorResponse = new ErrorResponse();
@@ -118,7 +119,7 @@ public class GRDGateway
     /// hits the endpoint for the current VPN host to check if a VPN connection can be established
     /// This signature of method uses host from main credentials in GRDVPNHelper
     /// and calls dual-use (service/client) version that takes host parameter
-    internal async Task<ErrorResponse> GetServerStatus()
+    public async Task<ErrorResponse> GetServerStatus()
     {
         var vpnHost = ApiHostname;
         var t = await GetServerStatus(vpnHost, true);
