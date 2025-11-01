@@ -18,10 +18,10 @@ Serilog.Log.Logger = new Serilog.LoggerConfiguration()
     .WriteTo.Console()
     .CreateLogger();
 
-Log.Information("Hello, World!");
+_logger.LogInformation("Hello, World!");
 bool f = ClientPipe.Connect();
 
-Log.Information($"Connected to service? {f}");
+_logger.LogInformation($"Connected to service? {f}");
 var serviceLogs = ClientPipe.GetServiceLogLinesAsync(500);
 
 
@@ -43,7 +43,7 @@ void TestSubCred()
         var pet = new PeTokenRequest("pe-token", petRequest.PeToken);
 
         string serializedPetReq = JsonSerializer.Serialize(pet, PeTokenRequestJsonContext.Default.PeTokenRequest);
-        Log.Information($"CreateSubscriberCredentialForBundleId: serializedPetReq = '{serializedPetReq}'");
+        _logger.LogInformation($"CreateSubscriberCredentialForBundleId: serializedPetReq = '{serializedPetReq}'");
         HttpContent content = new StringContent(serializedPetReq);
         content.Headers.Remove("Content-Type");
         content.Headers.Add("Content-Type", "application/json; charset=utf-8");
@@ -55,7 +55,7 @@ void TestSubCred()
                 GRDSubScriberCredentialJwtJsonContext.Default.GrdSubscriberCredentialJwt);
             var LiveGrdCredential = new GRDSubscriberCredential(jwt!.SubscriberCredential!);
             LiveGrdCredential.Store();
-            Log.Information("CreateSubscriberCredentialForBundleId(): JWT obtained.");
+            _logger.LogInformation("CreateSubscriberCredentialForBundleId(): JWT obtained.");
         }
     }
     catch (Exception e)
@@ -69,7 +69,7 @@ void subcredtest2()
     var base64Payload = "NOTSET";
 
     string payLoad = Common.DecodeFrom64(base64Payload);
-    Log.Information($"ParseSubscriberCredentials: jwt payload = '{payLoad}'");
+    _logger.LogInformation($"ParseSubscriberCredentials: jwt payload = '{payLoad}'");
     var subCred = JsonSerializer.Deserialize<GRDSubscriberCredential>(payLoad,
         GRDSubscriberCredentialJsonContext.Default.GRDSubscriberCredential);
 
@@ -93,7 +93,7 @@ void TestRegionStuff()
     GRDLoginCredentials lc = new GRDLoginCredentials();
     lc.Email = "terdies@dnsfilter.com";
     lc.Password = "P@ssw0rd!";
-    Log.Information($"lc.Email = '{lc.Email}', lc.Password = '{lc.Password}'");
+    _logger.LogInformation($"lc.Email = '{lc.Email}', lc.Password = '{lc.Password}'");
     string lcSerial =
         System.Text.Json.JsonSerializer.Serialize(lc, GRDLoginCredentialsJsonContext.Default.GRDLoginCredentials);
     Log.Information($"lcSerial = '{lcSerial}'");

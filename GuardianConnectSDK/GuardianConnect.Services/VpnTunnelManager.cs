@@ -1,5 +1,6 @@
 using System;
 using GuardianConnect;
+using GuardianConnect.Abstractions;
 using GuardianConnect.Shared;
 
 namespace GuardianFirewallService;

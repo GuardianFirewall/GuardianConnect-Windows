@@ -6,6 +6,7 @@ using Windows.Win32.NetworkManagement.Rras;
 using GuardianConnect.Credentials;
 using GuardianConnect.Helpers;
 using GuardianConnect.Shared;
+using GuardianConnect.Abstractions;
 using GuardianConnect.Shared.Extensions;
 using Win32Calls;
 using System.Text.Json.Serialization;

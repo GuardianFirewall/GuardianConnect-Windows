@@ -5,6 +5,7 @@ using System.Text.Json;
 using GuardianConnect.Shared;
 using System.Text.Json.Serialization;
 using System.Text.Json.Serialization.Metadata;
+using GuardianConnect.Abstractions;
 using Serilog;
 
 namespace GuardianConnect.Helpers;
@@ -18,7 +19,7 @@ public static class ClientPipe
         return Instance.Connect(servicePipeName);
     }
 
-    public static IGuardianNPContract.CompositeType GetDataUsingDataContract(IGuardianNPContract.CompositeType composite)
+    public static CompositeType GetDataUsingDataContract(CompositeType composite)
     {
         if (!Instance.IsConnected) Instance.ReopenNamedPipe();
         return Instance.GetDataUsingDataContract(composite);
@@ -142,13 +143,13 @@ public class ClientPipeImpl : IGuardianNPContract
         throw new NotImplementedException();
     }
 
-    public IGuardianNPContract.CompositeType GetDataUsingDataContract(IGuardianNPContract.CompositeType composite)
+    public CompositeType GetDataUsingDataContract(CompositeType composite)
     {
         var cmdPayload = JsonSerializer.Serialize(composite);
         var cmdString = $"{(int)IGuardianNPContract.NPCommands.GetDataUsingDataContract}.{cmdPayload}";
         ss.WriteString(cmdString);
         var response = ss.ReadStringAsync().Result;
-        var value = JsonSerializer.Deserialize<IGuardianNPContract.CompositeType>(response);
+        var value = JsonSerializer.Deserialize<CompositeType>(response);
 
         if (value == null)
         {

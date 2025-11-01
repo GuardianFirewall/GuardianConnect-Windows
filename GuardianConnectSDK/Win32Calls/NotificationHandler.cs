@@ -48,7 +48,7 @@ namespace Win32Calls
         internal static HANDLE hVPNSvrSideEvtHandle;
         internal static HANDLE hVPNCliSideEvtHandle;
 
-        internal static unsafe void StartRasConnectStateWatcher()
+        public static unsafe void StartRasConnectStateWatcher()
         {
             HRASCONN handleToActiveConnection = ConnectionRoutines.FindAnyActiveConnection();
             if (handleToActiveConnection == HRASCONN.Null)

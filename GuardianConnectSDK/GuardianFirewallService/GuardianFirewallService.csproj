@@ -68,9 +68,15 @@
       </AvaloniaResource>
     </ItemGroup>
     <ItemGroup>
+      <ProjectReference Include="..\GuardianConnect.Services\GuardianConnect.Services.csproj" />
       <ProjectReference Include="..\GuardianConnect\GuardianConnect.csproj" />
       <ProjectReference Include="..\Shared\GuardianConnect.Shared.csproj" />
       <ProjectReference Include="..\Win32Calls\Win32Calls.csproj" />
+    </ItemGroup>
+    <ItemGroup>
+      <Compile Update="PowerHandlerService.cs">
+        <SubType>Component</SubType>
+      </Compile>
     </ItemGroup>
     <!--
     <Target Name="PreBuild" BeforeTargets="PreBuildEvent">
