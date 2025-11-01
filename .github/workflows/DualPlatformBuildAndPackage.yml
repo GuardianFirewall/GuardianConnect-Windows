@@ -127,9 +127,9 @@ jobs:
       shell: cmd
 
     - name: Create GuardianConnect.Services.SDK_x64.nupkg package bundle for EACH CPU build - x64 first
+      if: github.ref_name == 'main'
       run: nuget pack GuardianConnect.Services.SDK_x64.nuspec -Version ${{env.PKGVERSION}}
-      shell: cmd
-    
+      
     - name: Create GuardianConnect.Services.SDK_arm64.nupkg package bundle for EACH CPU build - arm64 first
       run: nuget pack GuardianConnect.Services.SDK_arm64.nuspec -Version ${{env.PKGVERSION}}
       shell: cmd
@@ -281,14 +281,19 @@ jobs:
         
     # Update GitHub Packages with these nuget packages
     - name: Update GitHub with nuget packages - SDK x64
+      if: github.ref_name == 'main'
       run: nuget push SIGNED_GuardianConnectSDK_x64.${{env.PKGVERSION}}.nupkg `${{ secrets.GUARDIANFIREWALL_GH_PKG_TOKEN }} -Source GitHub -SkipDuplicate
     - name: Update GitHub with nuget packages - SDK ARM64
+      if: github.ref_name == 'main'
       run: nuget push SIGNED_GuardianConnectSDK_ARM64.${{env.PKGVERSION}}.nupkg `${{ secrets.GUARDIANFIREWALL_GH_PKG_TOKEN }} -Source GitHub -SkipDuplicate
       
     # Update GitHub Packages for Connect.Services with these nuget packages
     - name: Update GitHub with nuget packages - SDK Services x64
+      if: github.ref_name == 'main'
       run: nuget push SIGNED_GuardianConnect_Services_SDK_x64.${{env.PKGVERSION}}.nupkg `${{ secrets.GUARDIANFIREWALL_GH_PKG_TOKEN }} -Source GitHub
+      
     - name: Update GitHub with nuget packages - SDK Services ARM64
+      if: github.ref_name == 'main'
       run: nuget push SIGNED_GuardianConnect_Services_SDK_ARM64.${{env.PKGVERSION}}.nupkg `${{ secrets.GUARDIANFIREWALL_GH_PKG_TOKEN }} -Source GitHub
       
 ####    - name: Update GitHub with nuget packages - Service
