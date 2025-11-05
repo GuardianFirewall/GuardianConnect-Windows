@@ -2,6 +2,8 @@
 using GuardianConnect.Credentials;
 using GuardianConnect.Helpers;
 using GuardianConnect.Shared;
+using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.Logging;
 using Newtonsoft.Json.Linq;
 
 //using Newtonsoft.Json;
@@ -17,11 +19,22 @@ Serilog.Log.Logger = new Serilog.LoggerConfiguration()
     .MinimumLevel.Debug()
     .WriteTo.Console()
     .CreateLogger();
+var serviceCollection = new ServiceCollection();
+serviceCollection.AddLogging(builder =>
+{
+    builder.AddSerilog(); // Add your desired logging providers
+    builder.SetMinimumLevel(LogLevel.Information);
+});
 
-_logger.LogInformation("Hello, World!");
+var serviceProvider = serviceCollection.BuildServiceProvider();
+var loggerFactory = serviceProvider.GetRequiredService<ILoggerFactory>();
+StaticLoggerFactory.Initialize(loggerFactory);
+
+Log.Information("Hello, World!");
+Win32Calls.ConnectionRoutines.GetRasConnections(out uint cConnections);
 bool f = ClientPipe.Connect();
 
-_logger.LogInformation($"Connected to service? {f}");
+Log.Information($"Connected to service? {f}");
 var serviceLogs = ClientPipe.GetServiceLogLinesAsync(500);
 
 
