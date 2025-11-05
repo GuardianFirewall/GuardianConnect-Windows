@@ -551,7 +551,7 @@ public class DPAPI
                 var w32ex = new Win32Exception(errCode);
                 var ex = new Exception( "CryptUnprotectData failed.", w32ex);
                 var ctbText = Convert.ToHexString(cipherTextBytes);
-                Serilog.Log.Error(ex, $"CipherTextBlob: {ctbText}");
+                //Serilog.Log.Error(ex, $"CipherTextBlob: {ctbText}");
                 return Array.Empty<byte>();
                 //throw ex;
             }

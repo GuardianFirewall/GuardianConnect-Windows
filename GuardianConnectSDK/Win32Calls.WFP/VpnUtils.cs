@@ -1,13 +1,11 @@
-﻿using Serilog;
-using System.Diagnostics.Tracing;
-using System.Runtime.CompilerServices;
-using System.Runtime.InteropServices;
-using Windows.Win32;
+﻿using Windows.Win32;
 using Windows.Win32.Foundation;
 using Windows.Win32.NetworkManagement.IpHelper;
-using Windows.Win32.NetworkManagement.Ndis;
 using Windows.Win32.NetworkManagement.WindowsFilteringPlatform;
 using Windows.Win32.Security;
+using GuardianConnect.Shared;
+using Microsoft.Extensions.Logging;
+using Serilog;
 
 namespace Win32Calls.WFP
 {
@@ -43,6 +41,14 @@ namespace Win32Calls.WFP
 
         const string kGuardianVpnHelperRegistryStoragePath = "Software\\GuardianSoftware\\Vpn\\HelperService";
 
+        private static Microsoft.Extensions.Logging.ILogger _logger;
+        public static Microsoft.Extensions.Logging.ILogger Logger
+        {
+            get => _logger ?? StaticLoggerFactory.CreateLogger("VpnDnsFilteringHandler");
+            set => _logger = value;
+        }
+
+        
         public static unsafe HANDLE OpenWpmSession()
         {
             HANDLE engine = HANDLE.Null;

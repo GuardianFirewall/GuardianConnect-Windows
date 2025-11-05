@@ -7,6 +7,8 @@ namespace GuardianConnect.API.Model;
 
 public class DeviceFilterConfig
 {
+    private Microsoft.Extensions.Logging.ILogger<DeviceFilterConfig> _logger;
+
     [JsonIgnore]
     public DeviceFilterConfigFlags DeviceFilterConfigBlockList;
 
@@ -56,6 +58,7 @@ public class DeviceFilterConfig
     [JsonConstructor]
     public DeviceFilterConfig()
     {
+        _logger = StaticLoggerFactory.CreateLogger<DeviceFilterConfig>();
         DeviceFilterConfigBlockList = DeviceFilterConfigFlags.BlocklistCleared;
     }
 

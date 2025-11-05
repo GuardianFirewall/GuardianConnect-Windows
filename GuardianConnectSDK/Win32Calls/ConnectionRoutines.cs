@@ -23,8 +23,7 @@ public static class ConnectionRoutines
         cConnections = 0;
 
         // First call to RasEnumConnections to get count of connections and required buffer size
-        var retVal = PInvoke.RasEnumConnections(null, ref cb, out cConnections);
-        //Log.Information($"GetRasConnections: First call for size returned {retVal}, cb={cb}, # of Connections = {cConnections}");
+        var retVal = PInvoke.RasEnumConnections((RASCONNW*)null, (uint*) cb, (uint*)cConnections);
         if (cConnections == 0)
         {
             Log.Information($"GetRasConnections: There are no active RAS connections. Setting empty values for name and handle and returning empty array to caller.");
@@ -38,7 +37,7 @@ public static class ConnectionRoutines
         var pConnectionsZero = &ConnectionsZero;
         pConnectionsZero->dwSize = cb;
 
-        retVal = PInvoke.RasEnumConnections(pConnectionsZero, ref cb, out cConnections);
+        retVal = PInvoke.RasEnumConnections(ref ConnectionsZero, ref cb, out cConnections);
         if (retVal != 0)
         {
             Log.Error($"GetRasConnections: Call to RasEnumConnections returned NON-SUCCESS value of {retVal}");
