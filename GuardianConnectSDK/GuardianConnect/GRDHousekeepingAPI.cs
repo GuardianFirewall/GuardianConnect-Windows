@@ -6,33 +6,18 @@ using GuardianConnect.Helpers;
 using GuardianConnect.Shared;
 using GuardianConnect.Shared.Extensions;
 using System.Text.Json.Serialization;
-using Serilog;
+using Microsoft.Extensions.Logging;
 
 namespace GuardianConnect;
 
 public class GRDHousekeepingAPI
 {
-#if false
-    public class PETRequest
-    {
-        public string validationMethod = "pe-token";
-        public string peToken = string.Empty;
-    }
+    private Microsoft.Extensions.Logging.ILogger<GRDHousekeepingAPI> _logger;
 
-    public class Credentials
+    public GRDHousekeepingAPI()
     {
-        [JsonPropertyName("email")]
-        public string Email = string.Empty;
-        [JsonPropertyName("password")]
-        public string Password = string.Empty;
-
-        public Credentials(string userEmail, string userPassword)
-        {
-            Email = userEmail;
-            Password = userPassword;
-        }
+        _logger = StaticLoggerFactory.CreateLogger<GRDHousekeepingAPI>();
     }
-#endif
 
     public static GrdUserLoginResponse LoginResponse { get; set; } = new GrdUserLoginResponse();
     public static GRDSubscriberCredential? LiveGrdCredential { get; set; }
@@ -48,7 +33,7 @@ public class GRDHousekeepingAPI
         if (string.IsNullOrEmpty(peToken))
         {
             Debug.WriteLine("No pe token provided");
-            Log.Error("RequestPETokenInformationForToken: PEToken is null or empty");
+            _logger.LogError("RequestPETokenInformationForToken: PEToken is null or empty");
 
             return errorResponse
                 .SetException(new ArgumentNullException("NO PE Token Provided"))
@@ -104,7 +89,7 @@ public class GRDHousekeepingAPI
         catch (Exception ex)
         {
             Debug.WriteLine(@"\tERROR {0}", ex.Message);
-            Log.Error(ex, $"Exception thrown - RequestPETokenInformationForToken: {ex.Message}");
+            _logger.LogError(ex, $"Exception thrown - RequestPETokenInformationForToken: {ex.Message}");
             errorResponse.SetException(ex);
         }
         //
@@ -121,7 +106,7 @@ public class GRDHousekeepingAPI
     {
         ErrorResponse errorResponse;
         // CONN#9
-        Log.Information("CONN#9");
+        _logger.LogInformation("CONN#9");
         // TJE: Called by GRDVPNHelper.GetValidSubscriberCredentialWithCompletion()
         
         // set host to use
@@ -130,11 +115,11 @@ public class GRDHousekeepingAPI
         string peToken = GRDVPNHelper.Instance.PeToken?.Token;
         if (string.IsNullOrEmpty(peToken))
         {
-            Log.Error(@"PEToken Object has empty token. Trying string from keychain...");
+            _logger.LogError(@"PEToken Object has empty token. Trying string from keychain...");
             peToken = GRDKeychain.GetPasswordStringForAccount(IGRDKeychain.kKeychainStr_PEToken_Itself);
             if (string.IsNullOrEmpty(peToken))
             {
-                Log.Error(@"Failed to retrieve PEToken from keychain");
+                _logger.LogError(@"Failed to retrieve PEToken from keychain");
                 return new ErrorResponse
                 {
                     Data = null,
@@ -153,7 +138,7 @@ public class GRDHousekeepingAPI
             var pet = new PeTokenRequest("pe-token", petRequest.PeToken);
             
             string serializedPetReq = JsonSerializer.Serialize(pet, PeTokenRequestJsonContext.Default.PeTokenRequest);
-            Log.Information($"CreateSubscriberCredentialForBundleId: serializedPetReq = '{serializedPetReq}'");
+            _logger.LogInformation($"CreateSubscriberCredentialForBundleId: serializedPetReq = '{serializedPetReq}'");
             HttpContent content = new StringContent(serializedPetReq);
             content.Headers.Remove("Content-Type");
             content.Headers.Add("Content-Type", "application/json; charset=utf-8");
@@ -164,17 +149,17 @@ public class GRDHousekeepingAPI
                 var jwt = JsonSerializer.Deserialize<GrdSubscriberCredentialJwt>(result, GRDSubScriberCredentialJwtJsonContext.Default.GrdSubscriberCredentialJwt);
                 LiveGrdCredential = new GRDSubscriberCredential(jwt!.SubscriberCredential!);
                 LiveGrdCredential.Store();
-                Log.Information("CreateSubscriberCredentialForBundleId(): JWT obtained.");
+                _logger.LogInformation("CreateSubscriberCredentialForBundleId(): JWT obtained.");
             }
             else
             {
-                Log.Information("CreateSubscriberCredentialForBundleId(): Error occurred.");
+                _logger.LogInformation("CreateSubscriberCredentialForBundleId(): Error occurred.");
                 // ... check response values...
                 int statusCode = (int)response.StatusCode;
                 if (statusCode == 500)
                 {
                     var message = "Housekeeping failed to return subscriber credential";
-                    Log.Information(message);
+                    _logger.LogInformation(message);
                     errorResponse = new ErrorResponse(message, null, true, response);
                     return errorResponse;
 
@@ -182,14 +167,14 @@ public class GRDHousekeepingAPI
                 else if (statusCode == 400)
                 {
                     var message = "Failed to create subscriber credential. Faulty input values";
-                    Log.Information(message);
+                    _logger.LogInformation(message);
                     errorResponse = new ErrorResponse(message, null, true, response);
                     return errorResponse;
                 }
                 else if (statusCode == 401)
                 {
                     var message = "No subscription present";
-                    Log.Information(message);
+                    _logger.LogInformation(message);
                     errorResponse = new ErrorResponse(message, null, true, response);
                     return errorResponse;
 
@@ -199,7 +184,7 @@ public class GRDHousekeepingAPI
                     // Not sending an error message back so that we're not showing a useless error to the user
                     // The app should transition to free/unpaid if required
                     var message = "Subscription expired";
-                    Log.Information(message);
+                    _logger.LogInformation(message);
                     errorResponse = new ErrorResponse(message, null, true, response);
                     return errorResponse;
 
@@ -207,7 +192,7 @@ public class GRDHousekeepingAPI
                 else if (statusCode == 402) // Payment required
                 {
                     var message = "Payment required";
-                    Log.Information(message);
+                    _logger.LogInformation(message);
                     errorResponse = new ErrorResponse(message, null, true, response);
                     return errorResponse;
                 }
@@ -215,7 +200,7 @@ public class GRDHousekeepingAPI
         }
         catch (Exception ex)
         {
-            Log.Information($"\tERROR {ex.Message}");
+            _logger.LogInformation($"\tERROR {ex.Message}");
             errorResponse = new ErrorResponse(ex.Message, ex, true, null);
             return errorResponse;
         }

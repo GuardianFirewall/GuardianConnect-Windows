@@ -41,7 +41,7 @@ public class VpnManagerService : BackgroundService
 
         _logger.LogInformation($"VpnManagerService: creating task...stoppingToken.IsCancllationRequestioned = {stoppingToken.IsCancellationRequested}");
         _logger.LogInformation("VpnManagerService: In task...");
-        VPNTransportIKEV2 vpnikeInstance = new VPNTransportIKEV2();
+        VPNTransportIKEV2 vpnikeInstance = new VPNTransportIKEV2(_logger);
 
         _logger.LogInformation("Creating Change Event for listeners - SERVICE-SIDE and CLIENT-SIDE...");
         _logger.LogInformation($"stoppingToken.IsCancllationRequestioned = {stoppingToken.IsCancellationRequested}");

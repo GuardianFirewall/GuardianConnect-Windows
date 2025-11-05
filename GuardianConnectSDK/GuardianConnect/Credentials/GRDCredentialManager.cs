@@ -2,13 +2,13 @@
 using System.Text.Json;
 using System.Text.Json.Serialization;
 using GuardianConnect.API;
-using Serilog;
+using Microsoft.Extensions.Logging;
 
 namespace GuardianConnect.Credentials
 {
     public static class GRDCredentialManager
     {
-        public static Serilog.ILogger Logger { get; set; } = Serilog.Log.Logger;
+        public static Microsoft.Extensions.Logging.ILogger Logger { get; set; }
 
         private const string ZERO = "ZERO";
         private static List<GRDCredential> _credentialsList = new List<GRDCredential>();
@@ -38,7 +38,7 @@ namespace GuardianConnect.Credentials
         {
             CredentialsList = JsonSerializer.Deserialize<List<GRDCredential>>(dataFromKeychain, GRDCredentialJsonContext.Default.ListGRDCredential) ?? new List<GRDCredential>();
             
-            Log.Information($"GRDCredentialsManager.DataToCredentials(): CredentialsList has {CredentialsList.Count}");
+            Logger.LogInformation($"GRDCredentialsManager.DataToCredentials(): CredentialsList has {CredentialsList.Count}");
         }
 
         internal static GRDCredential? MainCredentials => CredentialsList.Find(c => c.MainCredential);
@@ -76,7 +76,7 @@ namespace GuardianConnect.Credentials
             if (data == "[]") GRDKeychain.StoreData(IGRDKeychain.kGuardianCredentialsList, CredentialsToToData());
             
             string count = CredentialsList.Count == 0 ? ZERO : CredentialsList.Count.ToString();
-            Logger.Information( $"LoadCredentialsList(): Number of Credentials loaded from KeyChain is {count}");
+            Logger.LogInformation( $"LoadCredentialsList(): Number of Credentials loaded from KeyChain is {count}");
         }
 
         public static void ClearMainCredentials()

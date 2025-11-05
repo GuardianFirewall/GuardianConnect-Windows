@@ -202,17 +202,21 @@ public class Common
     // Other useful definitions and constants
     public const string VPNEVT_NAME_CLIENTSIDE = "Global\\GRDRASCONNCLIENTSIGNAL";
     public const string VPNEVT_NAME_SVRSIDE = "Global\\GRDRASCONNSERVICESIGNAL";
+
+    #region Logging Setup
+    // Logging setup
     public static ILogger Logger { get; set; } = null!;
+    public static ILogger GetLogger() { return Logger; }
 
     private static Dictionary<LoggingLevels, Serilog.LoggerConfiguration> LevelBasedLoggerConfigurations = new Dictionary<LoggingLevels, Serilog.LoggerConfiguration>();
-
     public enum LoggingLevels { Debug, Verbose, Information, Warning, Error }
-    public static ILogger GetLogger() { return Logger; }
     public const LoggingLevels DefaultMinimumLogLevel = LoggingLevels.Information;
     public static LoggingLevels CurrentMinimumLogLevel { get; set; } = DefaultMinimumLogLevel;
 
     public static string LogFilePath { get; set; } = "INVALID:";
     public static bool LogFilterOn { get; set; }
+    // 
+    #endregion
 
     public static DateTime TimeFromUnixTimestamp(int unixTimestamp)
     {

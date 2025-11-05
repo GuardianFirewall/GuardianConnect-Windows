@@ -1,7 +1,7 @@
 ﻿using GuardianConnect.API;
 using GuardianConnect.API.Model;
 using GuardianConnect.Shared;
-using Serilog;
+using Microsoft.Extensions.Logging;
 using System.Text.Json;
 using System.Text.Json.Serialization;
 
@@ -9,6 +9,14 @@ namespace GuardianConnect.Helpers
 {
     public static class RegionUtils
     {
+        private static Microsoft.Extensions.Logging.ILogger _logger;
+
+        public static Microsoft.Extensions.Logging.ILogger Logger
+        {
+            get => _logger;
+            set => _logger = value;
+        }
+
         private static Dictionary<string, List<string>> timezonesLookup = new();
         private static Dictionary<string, GRDRegion> regionLookup = new();
         private static Dictionary<string, List<RegionalHostRecord>> _hostLookup = new();
@@ -24,20 +32,20 @@ namespace GuardianConnect.Helpers
 
         public static async Task RefreshDataAsync()
         {
-            Log.Information("RefreshDataAsync [0.22.19.1234]: 1. calling GetLatestRegionsList()...");
+            _logger.LogInformation("RefreshDataAsync [0.22.19.1234]: 1. calling GetLatestRegionsList()...");
             var regions = await GetLatestRegionsList();
-            Log.Information("RefreshDataAsync: 2. calling GetLatestTimeZonesForRegions()...");
+            _logger.LogInformation("RefreshDataAsync: 2. calling GetLatestTimeZonesForRegions()...");
             var geoDataCollection = GetLatestTimeZonesForRegions().GetAwaiter().GetResult();
 
-            Log.Information($"Regions Collection has {regionLookup.Count} region records");
-            Log.Information($"Timezone Collection has {timezonesLookup.Count} timezone records");
+            _logger.LogInformation($"Regions Collection has {regionLookup.Count} region records");
+            _logger.LogInformation($"Timezone Collection has {timezonesLookup.Count} timezone records");
 
-            Log.Information("Region Collection refreshed.");
+            _logger.LogInformation("Region Collection refreshed.");
         }
 
         private static async Task<List<GRDRegion>> GetLatestRegionsList()
         {
-            Log.Information("GetLatestRegionsList() executing...");
+            _logger.LogInformation("GetLatestRegionsList() executing...");
             string errorMessage = string.Empty;
             int responseCode = 0;
 
@@ -46,17 +54,17 @@ namespace GuardianConnect.Helpers
             Uri uri = new Uri(GetAllRegionsUrl);
             try
             {
-                Log.Information("Getting latest Regions collection from backend...[0.22.19.1234]");
+                _logger.LogInformation("Getting latest Regions collection from backend...[0.22.19.1234]");
                 {
                     HttpResponseMessage
                         response = HttpUtils.Client.GetAsync(uri).GetAwaiter().GetResult(); // Task short-circuit jump
                     if (response.IsSuccessStatusCode)
                     {
-                        Log.Information($"GetLatestRegionsList(): Return from getting regions: Response statusCode = {response.StatusCode}");
+                        _logger.LogInformation($"GetLatestRegionsList(): Return from getting regions: Response statusCode = {response.StatusCode}");
                         string content = await response.Content.ReadAsStringAsync(); // Task short-circuit jump
                         if (string.IsNullOrEmpty(content))
                         {
-                            Log.Information("GetLatestRegionsList: content returned for regions is empty");
+                            _logger.LogInformation("GetLatestRegionsList: content returned for regions is empty");
                         }
                         else
                         {
@@ -67,19 +75,19 @@ namespace GuardianConnect.Helpers
                                 DefaultIgnoreCondition = JsonIgnoreCondition.Never,
                             };
                             regionsList = JsonSerializer.Deserialize<List<GRDRegion>>(content, GRDRegionJsonContext.Default.ListGRDRegion);
-                            Log.Information($"GetLatestRegionsList: Regions Collection loaded with (ACTUAL) {regionsList.Count} items");
+                            _logger.LogInformation($"GetLatestRegionsList: Regions Collection loaded with (ACTUAL) {regionsList.Count} items");
                             if (string.IsNullOrEmpty(regionsList[0].RegionName))
                             {
-                                Log.Fatal( "!!!!!!!!!!!!!!!!!!! AOT/JSON BUG - INDIVIDUAL GRDRegion objects parsed empty !!!!!!!!!!!!!!!!");
+                                _logger.LogCritical( "!!!!!!!!!!!!!!!!!!! AOT/JSON BUG - INDIVIDUAL GRDRegion objects parsed empty !!!!!!!!!!!!!!!!");
                                 Poof();
                             }
                             else
                             {
 #if DEBUG
-                                Log.Debug($"GetLatestRegionsList: (ACTUAL) Region[0] '{regionsList[0].RegionName}' has display name '{regionsList[0].DisplayName}'");
+                                _logger.LogDebug($"GetLatestRegionsList: (ACTUAL) Region[0] '{regionsList[0].RegionName}' has display name '{regionsList[0].DisplayName}'");
                                 foreach (var region in regionsList)
                                 {
-                                    Log.Information( $"GetLatestRegionsList: (ACTUAL) Region '{region.RegionName}' has display name '{region.DisplayName}'");
+                                    _logger.LogInformation( $"GetLatestRegionsList: (ACTUAL) Region '{region.RegionName}' has display name '{region.DisplayName}'");
                                 }
 #endif
                             }
@@ -89,13 +97,13 @@ namespace GuardianConnect.Helpers
                     }
                     else
                     {
-                        Log.Information($"GetLatestRegionsList: Response from attempting to get latest regions is {response.StatusCode}");
+                        _logger.LogInformation($"GetLatestRegionsList: Response from attempting to get latest regions is {response.StatusCode}");
                     }
                 }
             }
             catch (Exception ex)
             {
-                Log.Error(ex, $"GetLatestRegionsList(): Exception thrown when calling all-server-regions...: {ex.Message}. (STATIC) Using GRDRegion.StaticRegions list data");
+                _logger.LogError(ex, $"GetLatestRegionsList(): Exception thrown when calling all-server-regions...: {ex.Message}. (STATIC) Using GRDRegion.StaticRegions list data");
                 regionsList = GRDRegion.StaticRegions;
             }
 
@@ -106,22 +114,22 @@ namespace GuardianConnect.Helpers
 
             // Now populate region lookup collections
             RegionKeysByDisplay.TryAdd("Automatic", "Automatic");
-            Log.Information($"regionLookup pre-load has {regionLookup.Count} items.");
+            _logger.LogInformation($"regionLookup pre-load has {regionLookup.Count} items.");
             var rluKeys = String.Join(',', regionLookup.Keys);
-            Log.Debug($"regionLookup dictionary keys are: '{rluKeys}");
+            _logger.LogDebug($"regionLookup dictionary keys are: '{rluKeys}");
             foreach (var regionRec in regionsList.OrderBy(region => region.DisplayName))
             {
                 if (!regionLookup.TryAdd(regionRec.RegionName, regionRec))
                 {
-                    Log.Error($"GetLatestRegionsList: Failed to add region name/pretty-name to regionlookup dictionary for '{regionRec.RegionName}' using TryAdd");
+                    _logger.LogError($"GetLatestRegionsList: Failed to add region name/pretty-name to regionlookup dictionary for '{regionRec.RegionName}' using TryAdd");
                     try
                     {
                         regionLookup.Add(regionRec.RegionName, regionRec);
-                        Log.Information($"GetLatestRegionsList: SUCCESS in adding region '{regionRec.RegionName}' to regionLookup collection.");
+                        _logger.LogInformation($"GetLatestRegionsList: SUCCESS in adding region '{regionRec.RegionName}' to regionLookup collection.");
                     }
                     catch (Exception e)
                     {
-                        Log.Error(e, $"GetLatestRegionsList: FATAL - Could not add region '{regionRec.RegionName}' object to regionLookup collection!");
+                        _logger.LogCritical(e, $"GetLatestRegionsList: FATAL - Could not add region '{regionRec.RegionName}' object to regionLookup collection!");
                         Poof();
                     }
                 }
@@ -134,13 +142,13 @@ namespace GuardianConnect.Helpers
 
         private static void Poof()
         {
-            Log.CloseAndFlush();
+            //Log.CloseAndFlush();
             Environment.Exit(-1);
         }
 
         private static async Task<List<GeoData>> GetLatestTimeZonesForRegions()
         {
-            Log.Information("GetLatestTimeZonesForRegions[0.22.19.1234]() executing...");
+            _logger.LogInformation("GetLatestTimeZonesForRegions[0.22.19.1234]() executing...");
             string errorMessage = string.Empty;
 
             var geoDataCollection = new List<GeoData>();
@@ -148,43 +156,43 @@ namespace GuardianConnect.Helpers
             Uri uri = new Uri(GetTimeZonesForRegionsUrl);
             try
             {
-                Log.Information("GetLatestTimeZonesForRegions: Getting time zones for regions from backend...[0.22.19.1234]");
+                _logger.LogInformation("GetLatestTimeZonesForRegions: Getting time zones for regions from backend...[0.22.19.1234]");
                 HttpResponseMessage?
                     response = HttpUtils.Client?.GetAsync(uri).GetAwaiter().GetResult(); // Task short-circuit jump
                 if (response != null && response.IsSuccessStatusCode)
                 {
                     string content = await response.Content.ReadAsStringAsync(); // Task short-circuit jump
                     geoDataCollection = JsonSerializer.Deserialize<List<GeoData>>(content, GeoDataJsonContext.Default.ListGeoData);
-                    Log.Information($"GetLatestTimeZonesForRegions: Regions Refresh: Regions GeoData Collection loaded with (ACTUAL) {geoDataCollection.Count} items");
+                    _logger.LogInformation($"GetLatestTimeZonesForRegions: Regions Refresh: Regions GeoData Collection loaded with (ACTUAL) {geoDataCollection.Count} items");
                 }
                 else
                 {
                     if (response != null)
                     {
                         errorMessage = $"GetLatestTimeZonesForRegions: ResponseCode for getting latest regions collection: {response.StatusCode}";
-                        Log.Error(errorMessage);
+                        _logger.LogError(errorMessage);
                     }
                     else
                     {
-                        Log.Error($"Response from server at uri '{uri}' to get latest regions returned NULL");
+                        _logger.LogError($"Response from server at uri '{uri}' to get latest regions returned NULL");
                     }
                 }
             }
             catch (Exception ex)
             {
-                Log.Error(ex, $"GetLatestTimeZonesForRegions(): Exception thrown when calling GetTimeZonesForRegions...: {ex.Message}");
+                _logger.LogError(ex, $"GetLatestTimeZonesForRegions(): Exception thrown when calling GetTimeZonesForRegions...: {ex.Message}");
                 geoDataCollection = GeoData.StaticGeoDataCollection;
-                Log.Information($"GetLatestTimeZonesForRegions: Regions Refresh: Regions GeoData Collection loaded with (STATIC) {geoDataCollection.Count} items");
+                _logger.LogInformation($"GetLatestTimeZonesForRegions: Regions Refresh: Regions GeoData Collection loaded with (STATIC) {geoDataCollection.Count} items");
             }
 
-            Log.Information($"GetLatestTimeZonesForRegions: now populating timezonesLookup dictionary with {geoDataCollection.Count} entries...");
+            _logger.LogInformation($"GetLatestTimeZonesForRegions: now populating timezonesLookup dictionary with {geoDataCollection.Count} entries...");
             timezonesLookup = new Dictionary<string, List<string>>();
             foreach (var geoRec in geoDataCollection)
             {
-                Log.Debug($"GetLatestTimeZonesForRegions: Adding '{geoRec.KeyName}' with {geoRec.Timezones.Count} timezones");
+                _logger.LogDebug($"GetLatestTimeZonesForRegions: Adding '{geoRec.KeyName}' with {geoRec.Timezones.Count} timezones");
                 if (timezonesLookup.TryAdd(geoRec.KeyName, geoRec.Timezones) == false)
                 {
-                    Log.Warning($"GetLatestTimeZonesForRegions: Could not add timezones for region key '{geoRec.KeyName}");
+                    _logger.LogWarning($"GetLatestTimeZonesForRegions: Could not add timezones for region key '{geoRec.KeyName}");
                 }
             }
 
@@ -197,9 +205,9 @@ namespace GuardianConnect.Helpers
             string containingKey = string.Empty;
             myRegionKey = "us-east"; // default
 
-            Log.Information($"LookUpRegionIndexForMyTimeZone [0.22.19.1234] Our time zone ID = '{ourTimeZoneId}'");
+            _logger.LogInformation($"LookUpRegionIndexForMyTimeZone [0.22.19.1234] Our time zone ID = '{ourTimeZoneId}'");
             var ourKey = "us-east";
-            Log.Information($"timezonesLookup.Keys.Count = {timezonesLookup.Keys.Count}.");
+            _logger.LogInformation($"timezonesLookup.Keys.Count = {timezonesLookup.Keys.Count}.");
 
             try
             {
@@ -214,13 +222,13 @@ namespace GuardianConnect.Helpers
                 if (e is InvalidOperationException ioe)
                 {
                     myRegionKey = string.IsNullOrEmpty(containingKey) ? "us-east" : containingKey;
-                    Log.Warning(ioe,
+                    _logger.LogWarning(ioe,
                         $"LookUPRegionIndexForMyTimeZone: Defaulting to 'us-east' as timezone not found in timezonesLookup collection!");
-                    Log.Warning("LookUpReginoIndexForMyTimeZone: Dumping timezonesLookup collection...");
+                    _logger.LogWarning("LookUpReginoIndexForMyTimeZone: Dumping timezonesLookup collection...");
                 }
                 else
                 {
-                    Log.Error(e,
+                    _logger.LogError(e,
                         $"LookUpRegionIndexForMyTimeZone: Exception thrown when looking up region for timezone '{ourTimeZoneId}': {e.Message}");
                     containingKey = "us-east";
                     myRegionKey = containingKey;
@@ -247,13 +255,13 @@ namespace GuardianConnect.Helpers
             await GetHostsForRegionKey(regionRec.RegionName);
             int hostCount = _hostLookup[regionRec.RegionName].Count;
             var message = $"GetHostsForRegion(): Getting latest collection of hosts for Region {regionRec.RegionName} - {regionRec.DisplayName}. Number of hosts = {hostCount}";
-            Log.Information(message);
+            _logger.LogInformation(message);
         }
 
         // Get hosts for a region
         public static async Task GetHostsForRegionKey(string regionKey)
         {
-            Log.Information($"GetHostsForRegionKey: Retrieving hosts for region {regionKey}.");
+            _logger.LogInformation($"GetHostsForRegionKey: Retrieving hosts for region {regionKey}.");
 
             HttpResponseMessage response = new HttpResponseMessage();
             string getHostsForRegionUrl = $"https://{Common.kConnectAPIHostname}/api/v1/servers/hostnames-for-region";
@@ -264,9 +272,9 @@ namespace GuardianConnect.Helpers
                 if (!regionLookup.ContainsKey(regionKey)) return;
 
                 rip.Region = regionLookup[regionKey].RegionName;
-                Log.Information("About to do GET for Region Hosts collection retrieval");
+                _logger.LogInformation("About to do GET for Region Hosts collection retrieval");
                 string ripSerialized = JsonSerializer.Serialize(rip, RegionInputParameterJsonContext.Default.RegionInputParameter);
-                Log.Information($"GetHostsForRegionKey: Json string for RegionInputParameter '{ripSerialized}'");
+                _logger.LogInformation($"GetHostsForRegionKey: Json string for RegionInputParameter '{ripSerialized}'");
                 HttpContent content = new StringContent(ripSerialized);
                 content.Headers.Remove("Content-Type");
                 content.Headers.Add("Content-Type", "application/json; charset=utf-8");
@@ -277,12 +285,12 @@ namespace GuardianConnect.Helpers
                 }
                 catch (HttpRequestException hrex)
                 {
-                    Log.Error(hrex, $"FAILURE: HTTP REQUEST EXCEPTION - Failed to get hosts for region {regionKey}. StatusCode={hrex.StatusCode}, Error={hrex.HttpRequestError}");
+                    _logger.LogError(hrex, $"FAILURE: HTTP REQUEST EXCEPTION - Failed to get hosts for region {regionKey}. StatusCode={hrex.StatusCode}, Error={hrex.HttpRequestError}");
                     throw;
                 }
                 catch (Exception e)
                 {
-                    Log.Error(e, $"Failed to get hosts for region {regionKey}");
+                    _logger.LogError(e, $"Failed to get hosts for region {regionKey}");
                     throw;
                 }
 
@@ -293,17 +301,17 @@ namespace GuardianConnect.Helpers
                     if (!_hostLookup.ContainsKey(regionKey)) _hostLookup.Add(regionKey, null);
                     _hostLookup[regionKey] = regionHosts;
                     var message = $"RegionUtils.GetHostForRegion [0.22.19.1234]: Added {regionHosts.Count} hosts for region '{regionKey}'";
-                    Log.Information(message);
+                    _logger.LogInformation(message);
                 }
                 else
                 {
                     var message = $"RegionUtils.GetHostForRegion: ResponseCode for getting region hosts for region '{regionKey}': {response.StatusCode}";
-                    Log.Information(message);
+                    _logger.LogInformation(message);
                 }
             }
             catch (Exception ex)
             {
-                Log.Error(ex, @"\tERROR {0}", ex.Message);
+                _logger.LogError(ex, @"\tERROR {0}", ex.Message);
             }
         }
 
@@ -343,7 +351,7 @@ namespace GuardianConnect.Helpers
             var lightest = regionHosts.Where(h => h.CapacityScore == 0);
             var lighter = regionHosts.Where(h => h.CapacityScore == 1);
 
-            Log.Information($"SelectBestHostInRegion: For region '{regionKey}' we have {lightest.Count()} lightest hosts, {lighter.Count()} midrange hosts out of {regionHosts.Count()} total hosts");
+            _logger.LogInformation($"SelectBestHostInRegion: For region '{regionKey}' we have {lightest.Count()} lightest hosts, {lighter.Count()} midrange hosts out of {regionHosts.Count()} total hosts");
 
             if (lightest != null && lightest.Count() > 0)
                 return lightest.ElementAt(Random.Shared.Next(lightest.Count() - 1));

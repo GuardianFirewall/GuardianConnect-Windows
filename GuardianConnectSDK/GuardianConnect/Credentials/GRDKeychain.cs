@@ -3,12 +3,14 @@ using System.Text;
 using GuardianConnect.Shared;
 using GuardianConnect.Win32;
 using Microsoft.Win32;
-using Serilog;
+using Microsoft.Extensions.Logging;
 
 namespace GuardianConnect.Credentials
 {
     public class GRDKeychain : IGRDKeychain
     {
+        private static Microsoft.Extensions.Logging.ILogger<GRDKeychain> _logger;
+
         private const string GRDKeyPath = @"Software\GuardianVPN";
         private static string _entropyData = @"Быстрая, коричневая лиса, перепрыгнула через ленивого пса";
 
@@ -24,7 +26,7 @@ namespace GuardianConnect.Credentials
             }
             catch (Exception e)
             {
-                Log.Error(e, "Exception thrown when writing to registry key: ", key);
+                _logger.LogError(e, "Exception thrown when writing to registry key: ", key);
                 throw;
             }
         }
@@ -38,7 +40,7 @@ namespace GuardianConnect.Credentials
             }
             catch (Exception e)
             {
-                Log.Error(e, "Exception thrown when writing to registry key: ", key);
+                _logger.LogError(e, "Exception thrown when writing to registry key: ", key);
                 throw;
             }
         } 
@@ -53,7 +55,7 @@ namespace GuardianConnect.Credentials
             }
             catch (Exception e)
             {
-                Log.Error(e, "Exception thrown when reading from registry key: ", key);
+                _logger.LogError(e, "Exception thrown when reading from registry key: ", key);
             }
             return encryptedDataString;
         }
@@ -73,7 +75,7 @@ namespace GuardianConnect.Credentials
                 if (o == null) return defaultValue;
                 
                 var t = rk.GetValueKind(key);
-                Log.Information($"Type of value for key {key} is {t}");
+                _logger.LogInformation($"Type of value for key {key} is {t}");
                 if (t == RegistryValueKind.String)
                 {
                     string s = (string)o;
@@ -89,12 +91,18 @@ namespace GuardianConnect.Credentials
             }
             catch (Exception e)
             {
-                Log.Error(e, "Exception thrown when reading from registry key: ", key);
+                _logger.LogError(e, "Exception thrown when reading from registry key: ", key);
             }            
             
             return encryptedDataBytes;
         }
         
+        public static Microsoft.Extensions.Logging.ILogger<GRDKeychain> Logger
+        {
+            get => _logger;
+            set => _logger = value;
+        }
+
         public static string GetDataForAccount(string accountKey)
         {
             string data = string.Empty;
@@ -109,7 +117,7 @@ namespace GuardianConnect.Credentials
                 }
                 catch (Exception e)
                 {
-                    Log.Error(e, $"Exception thrown while decrypting accocunt data retrieved from keychain. Setting to empty.");
+                    _logger.LogError(e, $"Exception thrown while decrypting accocunt data retrieved from keychain. Setting to empty.");
                 }
             }
 
@@ -169,7 +177,7 @@ namespace GuardianConnect.Credentials
             var rootGrdKey = Registry.CurrentUser.OpenSubKey(GRDKeyPath, true);
             if (rootGrdKey == null)
             {
-                Log.Error("RemoveGuardianKeychainItems(): Could not open Guardian Keychain root key.");
+                _logger.LogError("RemoveGuardianKeychainItems(): Could not open Guardian Keychain root key.");
                 return;
             }
 
@@ -181,7 +189,7 @@ namespace GuardianConnect.Credentials
                     if (o is null)
                     {
                         var errmsg = $"DELETING Registry Value with key '{key} found that value is not present.";
-                        Log.Error(errmsg);
+                        _logger.LogError(errmsg);
                         Debug.WriteLine(errmsg);
                         continue;
                     }
@@ -192,7 +200,7 @@ namespace GuardianConnect.Credentials
                     if (e is UnauthorizedAccessException)
                     {
                         var errmsg = $"Exception 'UnauthorizedAccessException' thrown when attemnpting deletion of key {key}";
-                        Log.Error(errmsg);
+                        _logger.LogError(errmsg);
                         Debug.WriteLine(errmsg);
                     }
                 }

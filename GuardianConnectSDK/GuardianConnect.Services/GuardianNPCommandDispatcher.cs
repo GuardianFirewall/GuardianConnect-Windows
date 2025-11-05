@@ -41,7 +41,7 @@ public class GuardianNPCommandDispatcher :IGuardianNPContract
     public ErrorResponse StartVPNConnection(VPNCallParameters? protocolRequest)
     {
         //return true;
-        _vpnTransportIkev2 = new VPNTransportIKEV2();
+        _vpnTransportIkev2 = new VPNTransportIKEV2(_logger);
         var result = _vpnTransportIkev2.StartVPNTunnelWithOptions(protocolRequest).Result;
 
         return result;
@@ -49,7 +49,7 @@ public class GuardianNPCommandDispatcher :IGuardianNPContract
 
     public void DisconnectVPNConnection()
     {
-        _vpnTransportIkev2 = new VPNTransportIKEV2();
+        _vpnTransportIkev2 = new VPNTransportIKEV2(_logger);
         _logger.LogInformation($"GuardianNPCommandDispatcher.DisconnectVPNConnection: stopping VPN entry '{ConnectionRoutines.ActiveConnectionEntryName}'");
         _vpnTransportIkev2.StopVPNTunnel();
     }

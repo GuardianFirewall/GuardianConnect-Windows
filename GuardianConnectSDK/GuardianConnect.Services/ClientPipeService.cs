@@ -24,13 +24,13 @@ public class ClientPipeService : BackgroundService
     public ClientPipeService(ILogger<ClientPipeService> logger)
     {
         _logger = logger;
+        _logger.Log(LogLevel.Information, "ClientPipeService: TESTING LOG");
     }
     
     protected override async Task ExecuteAsync(CancellationToken stoppingToken)
     {
         _cancellationToken = stoppingToken;
         _cancellationToken.ThrowIfCancellationRequested();
-        _logger.Log(LogLevel.Information, "ClientPipeService: TESTING LOG");
         _logger.Log(LogLevel.Information, "ClientPipeService running at: {time}", DateTimeOffset.Now);
 
         stoppingToken.Register(() => _logger.Log(LogLevel.Information, "ClientPipeService is stopping."));

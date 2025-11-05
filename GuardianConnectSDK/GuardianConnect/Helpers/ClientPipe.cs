@@ -1,18 +1,26 @@
+using GuardianConnect.Abstractions;
+using GuardianConnect.Shared;
+using Microsoft.Extensions.Logging;
+using Serilog;
 using System.Collections;
 using System.Diagnostics;
 using System.IO.Pipes;
 using System.Text.Json;
-using GuardianConnect.Shared;
 using System.Text.Json.Serialization;
 using System.Text.Json.Serialization.Metadata;
-using GuardianConnect.Abstractions;
-using Serilog;
 
 namespace GuardianConnect.Helpers;
 
 public static class ClientPipe
 {
     private static readonly ClientPipeImpl Instance = new ClientPipeImpl();
+    private static Microsoft.Extensions.Logging.ILogger<ClientPipeImpl> _logger;
+
+    public static Microsoft.Extensions.Logging.ILogger<ClientPipeImpl> Logger
+    {
+        get => _logger;
+        set => _logger = value;
+    }
 
     public static bool Connect(string servicePipeName = Common.kGRDServicePipeName)
     {
@@ -76,15 +84,19 @@ public class ClientPipeImpl : IGuardianNPContract
     private static StreamString ss;
     private static int usingResource = 0;
 
+    internal ClientPipeImpl()
+    {
+    }
+
     internal bool IsConnected => _clientStream.IsConnected;
 
     internal void OpenNamedPipe(string servicePipeName = Common.kGRDServicePipeName)
     {
         if (0 == Interlocked.Exchange(ref usingResource, 1))
         {
-            Log.Information("ClientPipeImpl.OpenNamedPipe: Opening Pipe Stream...");
+            ClientPipe.Logger.LogInformation("ClientPipeImpl.OpenNamedPipe: Opening Pipe Stream...");
             _clientStream = new NamedPipeClientStream(".", servicePipeName, PipeDirection.InOut);
-            Log.Information(
+            ClientPipe.Logger.LogInformation(
                 "ClientPipeImpl.OpenNamedPipe: Going into Opening loop until success or retries exhausted...");
             int retries = 10;
             while (retries-- > 0 && !_clientStream.IsConnected)
@@ -92,14 +104,14 @@ public class ClientPipeImpl : IGuardianNPContract
                 try
                 {
                     _clientStream.Connect(30 * 1000);
-                    Log.Information(
+                    ClientPipe.Logger.LogInformation(
                         $"ClientPipeImpl.OpenNamedPipe: {retries} left to attempt opening of Client Pipe Stream...");
                 }
                 catch (Exception e)
                 {
                     if (!IsConnected)
                     {
-                        Log.Error(
+                        ClientPipe.Logger.LogError(
                             "!!!!!!!!!!!!!!!!!!!! ClientPipeImpl.OpenNamedPipe could NOT connect to Pipe Stream...");
                         throw;
                     }
@@ -110,7 +122,7 @@ public class ClientPipeImpl : IGuardianNPContract
 
     internal void ReopenNamedPipe()
     {
-        Log.Warning("!!!!!!!!!!!!!! REOPENING CLIENTPIPE TO SERVICE...");
+        ClientPipe.Logger.LogWarning("!!!!!!!!!!!!!! REOPENING CLIENTPIPE TO SERVICE...");
         OpenNamedPipe();
         ss = new StreamString(_clientStream);
     }
@@ -120,18 +132,18 @@ public class ClientPipeImpl : IGuardianNPContract
         bool whetherPreviouslyConnectedAtSuspend = false;
         try
         {
-            Log.Information($"ClientPipeImpl.Connect: Calling OpenNamedPipe...");
+            ClientPipe.Logger.LogInformation($"ClientPipeImpl.Connect: Calling OpenNamedPipe...");
             OpenNamedPipe(servicePipeName);
             ss = new StreamString(_clientStream);
             //var testAck = ss.ReadStringAsync();
             var testAck = ss.ReadString();
-            Log.Information($"Client Pipe connected to Service. testAck returned '{testAck}'");
+            ClientPipe.Logger.LogInformation($"Client Pipe connected to Service. testAck returned '{testAck}'");
             var pieces = testAck.Split(new char[] { '#' } );
             whetherPreviouslyConnectedAtSuspend = pieces[2].Equals("true", StringComparison.InvariantCultureIgnoreCase);
         }
         catch (Exception e)
         {
-            Log.Error(e, $"Exception when Connecting on pipe: {e.Message}");
+            ClientPipe.Logger.LogError(e, $"Exception when Connecting on pipe: {e.Message}");
             throw;
         }
 
@@ -165,7 +177,7 @@ public class ClientPipeImpl : IGuardianNPContract
         var cmdString = $"{(int)IGuardianNPContract.NPCommands.StartVPNConnection}.{cmdPayload}";
         ss.WriteString(cmdString);
         var startedJson = ss.ReadStringAsync().Result;
-        Log.Information($"ClientPipe.StartVPNConnection - string is '{startedJson}'");
+        ClientPipe.Logger.LogInformation($"ClientPipe.StartVPNConnection - string is '{startedJson}'");
 
         ErrorResponse startedErrorResponse = new ErrorResponse();
         try
@@ -174,7 +186,7 @@ public class ClientPipeImpl : IGuardianNPContract
         }
         catch (Exception e)
         {
-            Log.Error(e, $"ClientPipe.StartVPNConnection: Exception when parsing response from pipe: {e.Message}");
+            ClientPipe.Logger.LogError(e, $"ClientPipe.StartVPNConnection: Exception when parsing response from pipe: {e.Message}");
         }
 
         return startedErrorResponse;
@@ -189,26 +201,26 @@ public class ClientPipeImpl : IGuardianNPContract
 
     public CurrentVPNStatus GetCurrentVpnConnectionStatus()
     {
-        Log.Information("Calling service to GetCurrentVpnConnectionStatus...");
+        ClientPipe.Logger.LogInformation("Calling service to GetCurrentVpnConnectionStatus...");
         var cmdString = $"{(int)IGuardianNPContract.NPCommands.GetCurrentVpnConnectionStatus}.";
         ss.WriteString(cmdString);
-        Log.Information("Reading status...");
+        ClientPipe.Logger.LogInformation("Reading status...");
         //var statusString = ss.ReadStringAsync().Result;
         var statusString = ss.ReadString();
         var status = JsonSerializer.Deserialize<CurrentVPNStatus>(statusString, CurrentVPNStatusJsonConect.Default.CurrentVPNStatus);
-        Log.Information($"status is {status.EntryName}, {status.ConnectionState}...");
+        ClientPipe.Logger.LogInformation($"status is {status.EntryName}, {status.ConnectionState}...");
 
         return status;
     }
 
     public async Task<string> Ping()
     {
-        Log.Information("Pinging service");
+        ClientPipe.Logger.LogInformation("Pinging service");
         var cmdString = $"{(int)IGuardianNPContract.NPCommands.Ping}.";
         ss.WriteString(cmdString);
-        Log.Information("Reading status...");
+        ClientPipe.Logger.LogInformation("Reading status...");
         var ping = await ss.ReadStringAsync();
-        Log.Information($"Service returned {ping}");
+        ClientPipe.Logger.LogInformation($"Service returned {ping}");
         return ping;
     }
 
@@ -220,28 +232,28 @@ public class ClientPipeImpl : IGuardianNPContract
     public void ToggleLogging(bool whetherToDeleteLogFiles)
     {
         var msg = Common.LogFilterOn ? "OFF" : "ON";
-        Log.Information($"Telling Service to turn Logging {msg}");
+        ClientPipe.Logger.LogInformation($"Telling Service to turn Logging {msg}");
         var cmdString = $"{(int)IGuardianNPContract.NPCommands.ToggleLogging}.{whetherToDeleteLogFiles.ToString()}";
         ss.WriteString(cmdString);
     }
 
     public async Task<List<string>> GetServiceLogLinesAsync(int maxNumberOfLinesToGet = 200)
     {
-        Log.Information($"Requesting GuardianFirewall Service's last {maxNumberOfLinesToGet} log lines...");
+        ClientPipe.Logger.LogInformation($"Requesting GuardianFirewall Service's last {maxNumberOfLinesToGet} log lines...");
         var cmdString = $"{(int)IGuardianNPContract.NPCommands.RequestLogLines}.{maxNumberOfLinesToGet}";
         ss.WriteString(cmdString);
-        Log.Information("Reading response...");
+        ClientPipe.Logger.LogInformation("Reading response...");
         var serializedServiceLogs = await ss.ReadStringAsync();
         var jsonLines = JsonSerializer.Deserialize<List<string>>(serializedServiceLogs, LogLinesJsonContext.Default.ListString);
         var serviceLogLines = jsonLines ?? new List<string>();
-        Log.Information($"Number of log lines returned from the service = {serviceLogLines.Count}");
+        ClientPipe.Logger.LogInformation($"Number of log lines returned from the service = {serviceLogLines.Count}");
 
         return serviceLogLines;
     }
 
     public void SwitchServiceLoggingLevel(Common.LoggingLevels loggingLevel)
     {
-        Log.Warning($"Sending command to service to switch logging level to {loggingLevel}");
+        ClientPipe.Logger.LogWarning($"Sending command to service to switch logging level to {loggingLevel}");
         var cmdString = $"{(int)IGuardianNPContract.NPCommands.SwitchLoggingLevel}.{loggingLevel}";
         ss.WriteString(cmdString);
         

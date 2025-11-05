@@ -6,7 +6,8 @@ using GuardianConnect.API.Model;
 using GuardianConnect.Credentials;
 using GuardianConnect.Shared;
 using GuardianConnect.Shared.Extensions;
-using Serilog;
+using GuardianConnect.VPNTransports;
+using Microsoft.Extensions.Logging;
 
 [assembly: InternalsVisibleTo("GuardianCore")]
 
@@ -15,6 +16,8 @@ namespace GuardianConnect.Helpers
      public class GRDVPNHelper
      {
          private static bool _instanceCreated = false;
+         private static Microsoft.Extensions.Logging.ILogger _logger;
+
          public enum GRDVPNHelperStatusCode {
              GRDVPNHelperSuccess,
              GRDVPNHelperFail,
@@ -32,8 +35,13 @@ namespace GuardianConnect.Helpers
          protected internal GRDServerFeatureEnvironment? _featureEnvironment;
          public GRDPEToken? PeToken;
          public static bool IsClientSet = false;
+        public static Microsoft.Extensions.Logging.ILogger Logger
+         {
+             get => _logger;
+             set => _logger = value;
+        }
 
-         public DeviceFilterConfig? CurrentDeviceBlocklistConfig;
+        public DeviceFilterConfig? CurrentDeviceBlocklistConfig;
          
          private GRDServerManager? _grdServerManager;
 
@@ -47,10 +55,10 @@ namespace GuardianConnect.Helpers
          {
              _preferBetaCapableServers = preferBetaCapableServers;
              _featureEnvironment = featureEnvironment;
-             if (!_instanceCreated)
-             {
-                 CreateInstance(preferBetaCapableServers, featureEnvironment);
-             }
+//             if (!_instanceCreated)
+//             {
+//                 CreateInstance(preferBetaCapableServers, featureEnvironment);
+//             }
          }
          
          // Set up a singleton
@@ -77,18 +85,19 @@ namespace GuardianConnect.Helpers
 
          public static void CreateInstance(bool prefBetaServers, GRDServerFeatureEnvironment featureEnv)
          {
-             Log.Verbose("GRDVPNHelper.CreateInstance() - Entry.");
+             _logger = StaticLoggerFactory.CreateLogger<GRDVPNHelper>();
+             _logger.LogInformation("GRDVPNHelper.CreateInstance() - Entry.");
              _instanceCreated = true;
              _instance = new GRDVPNHelper(prefBetaServers, featureEnv);
              _instance._grdServerManager = new GRDServerManager();
              _instance.mainCredential = GRDCredentialManager.MainCredentials;
              _instance.PeToken = GRDPEToken.GetCurrentPEToken();
 
-             _instance.CurrentDeviceBlocklistConfig = new DeviceFilterConfig
+             _instance.CurrentDeviceBlocklistConfig = new DeviceFilterConfig()
              {
                  Api_auth_token = GRDCredentialManager.MainCredentials == null ? "" :
                      GRDCredentialManager.MainCredentials.ApiAuthToken == null ? "" :
-                     GRDCredentialManager.MainCredentials.ApiAuthToken
+                     GRDCredentialManager.MainCredentials.ApiAuthToken,
              };
          }
 
@@ -134,9 +143,9 @@ namespace GuardianConnect.Helpers
                     $"{stackFrames[^2].GetMethod()}:{stackFrames[^2].GetFileLineNumber():dd}";
                 var sfm1 =
                     $"{stackFrames[^1].GetMethod()}:{stackFrames[^1].GetFileLineNumber():dd}";
-                Log.Information($"Callers to setting mainCredential...");
-                Log.Debug($"{sfm2}");
-                Log.Debug($"{sfm1}");
+                _logger.LogInformation($"Callers to setting mainCredential...");
+                _logger.LogDebug($"{sfm2}");
+                _logger.LogDebug($"{sfm1}");
                 _mainCredential = value ?? null;
             }
         }
@@ -184,15 +193,15 @@ namespace GuardianConnect.Helpers
         {
             activeConnectionName = string.Empty;
 #if OLD_VIA_PIPES
-            Log.Information("Calling ClientPipe.GetCurrentVpnConnectionStatus()...");
+            _logger.LogInformation("Calling ClientPipe.GetCurrentVpnConnectionStatus()...");
             var state = ClientPipe.GetCurrentVpnConnectionStatus();
             return state.ConnectionState == ConnectionStateEnum.Connected;
 #else
-            Log.Information( "GRDVPNHelper.IsConnected: Calling Win32Calls.ConnectionRoutines.IsAnyConnectionActive()...");
+            _logger.LogInformation( "GRDVPNHelper.IsConnected: Calling Win32Calls.ConnectionRoutines.IsAnyConnectionActive()...");
             bool ifConnected;
             ifConnected = Win32Calls.ConnectionRoutines.IsAnyConnectionActive(out string entryName);
             activeConnectionName = Win32Calls.ConnectionRoutines.GetEntryNameOfActiveConnection();
-            Log.Information($"CheckConnectionState: IsConnected returned {ifConnected}. ACN='{activeConnectionName}',  Name='{entryName}'");
+            _logger.LogInformation($"CheckConnectionState: IsConnected returned {ifConnected}. ACN='{activeConnectionName}',  Name='{entryName}'");
 
             return ifConnected;
 #endif
@@ -201,7 +210,7 @@ namespace GuardianConnect.Helpers
         public String GetNameOfConnectionEntry()
         {
 #if OLD_VIA_PIPES
-            Log.Information("GetNameOfCOnnectionEntry: Calling ClientPipe.GetCurrentVpnConnectionStatus to get any entry name if connected...");
+            _logger.LogInformation("GetNameOfCOnnectionEntry: Calling ClientPipe.GetCurrentVpnConnectionStatus to get any entry name if connected...");
             var state = ClientPipe.GetCurrentVpnConnectionStatus();
             return state.EntryName;
 #else
@@ -223,10 +232,10 @@ namespace GuardianConnect.Helpers
         /// Used to determine if an active connection is possible, do we have all the necessary credentials (EAPUsername, Password, Host, etc)
         public static bool ActiveConnectionPossible()
         {
-            Log.Information("In ActiveConnectionPossible()");
+            _logger.LogInformation("In ActiveConnectionPossible()");
             if (GRDCredentialManager.MainCredentials == null)
             {
-                Log.Information("ActiveConnectionPossible(): MainCredentials are not set");
+                _logger.LogInformation("ActiveConnectionPossible(): MainCredentials are not set");
                 return false;
             }
             
@@ -237,11 +246,11 @@ namespace GuardianConnect.Helpers
                 && !string.IsNullOrEmpty(mainCreds.UserName))
             {
 
-                Log.Information("ActiveConnectionPossible(): MainCredentials are valid");
+                _logger.LogInformation("ActiveConnectionPossible(): MainCredentials are valid");
                 return true;
             }
 
-            Log.Information("ActiveConnectionPossible(): MainCredentials are not valid");
+            _logger.LogInformation("ActiveConnectionPossible(): MainCredentials are not valid");
             return false;
         }
 
@@ -250,10 +259,10 @@ namespace GuardianConnect.Helpers
         /// </summary>
         public static void ResetMainCredentials()
         {
-            Log.Information("In ResetMainCredentialsForRegionChange()");
+            _logger.LogInformation("In ResetMainCredentialsForRegionChange()");
             if (GRDCredentialManager.MainCredentials == null)
             {
-                Log.Information("ResetMainCredentialsForRegionChange(): MainCredentials are already not set.");
+                _logger.LogInformation("ResetMainCredentialsForRegionChange(): MainCredentials are already not set.");
                 return;
             }
             
@@ -277,7 +286,7 @@ namespace GuardianConnect.Helpers
                 if (errorResponse.IsError)
                 {
                     var responseMessage = (HttpResponseMessage)errorResponse.Response;
-                    Log.Error( $"Failed to invalidate VPN credentials: {responseMessage.ReasonPhrase ?? errorResponse.Message})");
+                    _logger.LogError( $"Failed to invalidate VPN credentials: {responseMessage.ReasonPhrase ?? errorResponse.Message})");
                 }
             }
             
@@ -304,9 +313,9 @@ namespace GuardianConnect.Helpers
         /// <returns>String of Connection Name</returns>
         public bool GetCurrentVPNState(out string connectionName)
         {
-            Log.Information("In GetCurrentVPNState()");
+            _logger.LogInformation("In GetCurrentVPNState()");
             var state = ClientPipe.GetCurrentVpnConnectionStatus();
-            Log.Information($"GetCurrentVPNState: returned values for state are state: {state.ConnectionState}, entry: '{state.EntryName}'");
+            _logger.LogInformation($"GetCurrentVPNState: returned values for state are state: {state.ConnectionState}, entry: '{state.EntryName}'");
             var isConnected  = state.ConnectionState == ConnectionStateEnum.Connected;
             connectionName = state.EntryName;
             return isConnected;
@@ -338,7 +347,7 @@ namespace GuardianConnect.Helpers
             ErrorResponse? errorResponse = new ErrorResponse();
             
             // CONN#3
-            Log.Information("CONN#3");
+            _logger.LogInformation("CONN#3");
             
             // TJE - just go get Subscriber Credentials for IKEv2 for now
             // also - just use first server for my region for now
@@ -373,12 +382,12 @@ namespace GuardianConnect.Helpers
                 || string.IsNullOrEmpty(mainCredential.ApiAuthToken)
                 || mainCredential.LastUpdated < GRDCredentialManager.MainCredentials.LastUpdated)
             {
-                Log.Information("GRDVPNHelper: our main credentials not set or older than GRDCredentialsManager's. Syncing now.");
+                _logger.LogInformation("GRDVPNHelper: our main credentials not set or older than GRDCredentialsManager's. Syncing now.");
                 mainCredential = GRDCredentialManager.MainCredentials;
             }
             
             // CONN#11
-            Log.Information("CONN#11");
+            _logger.LogInformation("CONN#11");
             GRDGateway gw = new GRDGateway();
             errorResponse = await gw.GetServerStatus();
             if (errorResponse.IsError)
@@ -424,14 +433,14 @@ namespace GuardianConnect.Helpers
         /// could potentially include an error every time
         public async void DisconnectVPN()
         {
-            Log.Information("DISCONN#2");
-            Log.Information("In GRDVPNHelper.DisconnectVPN().");
+            _logger.LogInformation("DISCONN#2");
+            _logger.LogInformation("In GRDVPNHelper.DisconnectVPN().");
             var entryName = GetNameOfConnectionEntry();
-            Log.Information($"GRDVPNHelper.DisconnectVPN(): Name of entry to disconnect is '{entryName}'");
-            Log.Information($"GRDVPNHelper.DisconnectVPN(): Calling ClientPipe.DisconnectVPNConnectionAsync() to disconnect '{entryName}'");
+            _logger.LogInformation($"GRDVPNHelper.DisconnectVPN(): Name of entry to disconnect is '{entryName}'");
+            _logger.LogInformation($"GRDVPNHelper.DisconnectVPN(): Calling ClientPipe.DisconnectVPNConnectionAsync() to disconnect '{entryName}'");
             ClientPipe.DisconnectVPNConnection(entryName);
-            Log.Information($"GRDVPNHelper.DisconnectVPN(): Back from ClientPipe.DisconnectVPNConnectionAsync()");
-            Log.Information("DISCONN#3");
+            _logger.LogInformation($"GRDVPNHelper.DisconnectVPN(): Back from ClientPipe.DisconnectVPNConnectionAsync()");
+            _logger.LogInformation("DISCONN#3");
 
         }
 
@@ -439,7 +448,7 @@ namespace GuardianConnect.Helpers
         public async Task<(GRDSubscriberCredential?, ErrorResponse)> GetValidSubscriberCredentialWithCompletion()
         {
             // CONN#7
-            Log.Information("CONN#7");
+            _logger.LogInformation("CONN#7");
             
             ErrorResponse errorResponse;
             GRDSubscriberCredential subCred = GRDSubscriberCredential.GetCurrentStoredSubscriberCredential();
@@ -471,7 +480,7 @@ namespace GuardianConnect.Helpers
         {
             ErrorResponse errorResponse = new ErrorResponse();
             // CONN#4
-            Log.Information("CONN#4");
+            _logger.LogInformation("CONN#4");
             
             // TJE - let's do the hosts update right here
             try
@@ -480,7 +489,7 @@ namespace GuardianConnect.Helpers
             }
             catch (HttpRequestException hrex)
             {
-                Log.Error(hrex, $"CreateStandaloneCredentialsForTransportProtocol: http request error while getting region's hosts. Status={hrex.StatusCode}, RequestError={hrex.HttpRequestError}");
+                _logger.LogError(hrex, $"CreateStandaloneCredentialsForTransportProtocol: http request error while getting region's hosts. Status={hrex.StatusCode}, RequestError={hrex.HttpRequestError}");
                 errorResponse = new ErrorResponse().SetException(hrex).SetErrorMessage("HttpRequestError")
                     .SetData(new List<GRDCredential>());
                 return errorResponse;
@@ -509,7 +518,7 @@ namespace GuardianConnect.Helpers
         public async Task<ErrorResponse> CreateStandaloneCredentialsForTransportProtocol(ITransportProvider.TransportProtocol protocol, int days, string hostname)
         {
             // CONN#6
-            Log.Information("CONN#6");
+            _logger.LogInformation("CONN#6");
             
             //string errorMessage = "NONE";
             ErrorResponse errorResponse;
@@ -542,7 +551,7 @@ namespace GuardianConnect.Helpers
             ErrorResponse errorResponse = new ErrorResponse();
             
             // CONN#13
-            Log.Information("CONN#13");
+            _logger.LogInformation("CONN#13");
             // TJE: - called from configureAndConnectVPNWithCompletion after Server check
 
             // Make WCF call to GuardianWindowsService to start the connection
@@ -555,21 +564,21 @@ namespace GuardianConnect.Helpers
                 EntryName = $"Guardian Firewall - {mainCredential.HostnameDisplayValue}"
             };
 
-            Log.Information("Starting VPN connection...");
+            _logger.LogInformation("Starting VPN connection...");
             
             try
             {
                 await Task.Run(() =>
                 {
-                    Log.Information("Calling ClientPipe.StartVPNConnection()...");
+                    _logger.LogInformation("Calling ClientPipe.StartVPNConnection()...");
                     errorResponse = ClientPipe.StartVPNConnection(vpnValues);
                     if (errorResponse.IsError)
                     {
-                        Log.Error($"FAILURE to establish VPN connection. ErrorResponse = {errorResponse}");
+                        _logger.LogError($"FAILURE to establish VPN connection. ErrorResponse = {errorResponse}");
                     }
                     else
                     {
-                        Log.Information("VPN connection established.");
+                        _logger.LogInformation("VPN connection established.");
                     }
                 });
             }
@@ -577,7 +586,7 @@ namespace GuardianConnect.Helpers
             {
                 Debug.WriteLine(e);
                 errorResponse.SetException(e).SetErrorMessage(e.Message);
-                Log.Error(e, $"{errorResponse}");
+                _logger.LogError(e, $"{errorResponse}");
             }
 
             return errorResponse;
