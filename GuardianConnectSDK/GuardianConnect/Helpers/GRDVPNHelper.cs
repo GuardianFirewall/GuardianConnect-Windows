@@ -192,11 +192,6 @@ namespace GuardianConnect.Helpers
         public bool IsConnected(out string activeConnectionName)
         {
             activeConnectionName = string.Empty;
-#if OLD_VIA_PIPES
-            _logger.LogInformation("Calling ClientPipe.GetCurrentVpnConnectionStatus()...");
-            var state = ClientPipe.GetCurrentVpnConnectionStatus();
-            return state.ConnectionState == ConnectionStateEnum.Connected;
-#else
             _logger.LogInformation( "GRDVPNHelper.IsConnected: Calling Win32Calls.ConnectionRoutines.IsAnyConnectionActive()...");
             bool ifConnected;
             ifConnected = Win32Calls.ConnectionRoutines.IsAnyConnectionActive(out string entryName);
@@ -204,19 +199,12 @@ namespace GuardianConnect.Helpers
             _logger.LogInformation($"CheckConnectionState: IsConnected returned {ifConnected}. ACN='{activeConnectionName}',  Name='{entryName}'");
 
             return ifConnected;
-#endif
         }
 
         public String GetNameOfConnectionEntry()
         {
-#if OLD_VIA_PIPES
-            _logger.LogInformation("GetNameOfCOnnectionEntry: Calling ClientPipe.GetCurrentVpnConnectionStatus to get any entry name if connected...");
-            var state = ClientPipe.GetCurrentVpnConnectionStatus();
-            return state.EntryName;
-#else
             var isConnected = IsConnected(out string activeConnectionName);
             return isConnected ? activeConnectionName : string.Empty;
-#endif
         }
 
         public bool IsBusy;

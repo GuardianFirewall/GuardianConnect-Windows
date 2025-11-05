@@ -74,3 +74,7 @@
 /GuardianConnectSDK/Win32CallsTestApp/bin/x64/Release/net9.0-windows/win-x64
 /GuardianConnectSDK/Win32CallsTestApp/obj
 /GuardianConnectSDK/GRDWIN_WIP_0.23.9_PreRelease.zip
+/GuardianConnectSDK/Win32Calls/obj/x64/Release/net9.0-windows/Win32Calls.csproj.CoreCompileInputs.cache
+/GuardianConnectSDK/Win32Calls/obj/Win32Calls.csproj.nuget.g.targets
+/GuardianConnectSDK/Win32Calls.WFP/obj/Win32Calls.WFP.csproj.nuget.g.targets
+/GuardianConnectSDK/Win32CallsTestApp/obj/Win32CallsTestApp.csproj.nuget.g.targets
