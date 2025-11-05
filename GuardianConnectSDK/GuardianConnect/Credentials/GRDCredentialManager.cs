@@ -1,14 +1,28 @@
-﻿using System.Text;
+﻿using GuardianConnect.API;
+using GuardianConnect.Shared;
+using Microsoft.Extensions.Logging;
+using Microsoft.Extensions.Logging.Abstractions;
+using System.Text;
 using System.Text.Json;
 using System.Text.Json.Serialization;
-using GuardianConnect.API;
-using Microsoft.Extensions.Logging;
 
 namespace GuardianConnect.Credentials
 {
     public static class GRDCredentialManager
     {
-        public static Microsoft.Extensions.Logging.ILogger Logger { get; set; }
+        private static Microsoft.Extensions.Logging.ILogger _logger = NullLogger.Instance;
+        public static Microsoft.Extensions.Logging.ILogger Logger
+        {
+            get
+            {
+                if (_logger == NullLogger.Instance)
+                {
+                    _logger = StaticLoggerFactory.CreateLogger("GRDCredentialManager");
+                }
+                return _logger;
+            }
+        }
+
 
         private const string ZERO = "ZERO";
         private static List<GRDCredential> _credentialsList = new List<GRDCredential>();

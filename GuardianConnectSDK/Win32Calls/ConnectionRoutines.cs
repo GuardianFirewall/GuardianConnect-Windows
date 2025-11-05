@@ -1,5 +1,6 @@
 using GuardianConnect.Shared;
-using Serilog;
+using Microsoft.Extensions.Logging;
+using Microsoft.Extensions.Logging.Abstractions;
 using System.Reflection;
 using System.Runtime.InteropServices;
 using Windows.Win32;
@@ -10,6 +11,19 @@ namespace Win32Calls;
 
 public static class ConnectionRoutines
 {
+    private static Microsoft.Extensions.Logging.ILogger _logger = NullLogger.Instance;
+    public static Microsoft.Extensions.Logging.ILogger Log
+    {
+        get
+        {
+            if (_logger == NullLogger.Instance)
+            {
+                _logger = StaticLoggerFactory.CreateLogger("ConnectionRoutines");
+            }
+            return _logger;
+        }
+    }
+
     internal const string defaultPhonebookPath = @"C:\ProgramData\Microsoft\Network\Connections\Pbk\rasphone.pbk";
 
     internal static HRASCONN ActiveConnectionHandle;
@@ -23,10 +37,12 @@ public static class ConnectionRoutines
         cConnections = 0;
 
         // First call to RasEnumConnections to get count of connections and required buffer size
-        var retVal = PInvoke.RasEnumConnections((RASCONNW*)null, (uint*) cb, (uint*)cConnections);
+
+        var retVal = PInvoke.RasEnumConnections(null, ref cb, out cConnections);
+        Log.LogInformation($"GetRasConnections: First call for size returned {retVal}, cb={cb}, # of Connections = {cConnections}");
         if (cConnections == 0)
         {
-            Log.Information($"GetRasConnections: There are no active RAS connections. Setting empty values for name and handle and returning empty array to caller.");
+            Log.LogInformation($"GetRasConnections: There are no active RAS connections. Setting empty values for name and handle and returning empty array to caller.");
             ActiveConnectionHandle = HRASCONN.Null;
             ActiveConnectionEntryName = "";
             return Array.Empty<RASCONNW>();
@@ -37,10 +53,11 @@ public static class ConnectionRoutines
         var pConnectionsZero = &ConnectionsZero;
         pConnectionsZero->dwSize = cb;
 
-        retVal = PInvoke.RasEnumConnections(ref ConnectionsZero, ref cb, out cConnections);
+        //retVal = PInvoke.RasEnumConnections(ref ConnectionsZero, ref cb, out cConnections);
+        retVal = PInvoke.RasEnumConnections(pConnectionsZero, ref cb, out cConnections);
         if (retVal != 0)
         {
-            Log.Error($"GetRasConnections: Call to RasEnumConnections returned NON-SUCCESS value of {retVal}");
+            Log.LogError($"GetRasConnections: Call to RasEnumConnections returned NON-SUCCESS value of {retVal}");
             return new RASCONNW[0];
         }
 
@@ -65,7 +82,7 @@ public static class ConnectionRoutines
         var connections = GetRasConnections(out uint cConnections);
         if (connections.Length == 0)
         {
-            Log.Error("FindAnyActiveConnection: GetRasConnections returned empty collection");
+            Log.LogError("FindAnyActiveConnection: GetRasConnections returned empty collection");
             return HRASCONN.Null;
         }
 
@@ -84,12 +101,12 @@ public static class ConnectionRoutines
             {
                 ActiveConnectionEntryName = connections[i].szEntryName.ToString();
                 ActiveConnectionHandle = connections[i].hrasconn;
-                Log.Information($"FindAnyActiveConnection: Found active connection for entry {ActiveConnectionEntryName}");
+                Log.LogInformation($"FindAnyActiveConnection: Found active connection for entry {ActiveConnectionEntryName}");
                 return connections[i].hrasconn;
             }
         }
 
-        Log.Information("FindAnyActiveConnection: No active Guardian Firewall IKEv2 connections found under Ras networking");
+        Log.LogInformation("FindAnyActiveConnection: No active Guardian Firewall IKEv2 connections found under Ras networking");
 
         return HRASCONN.Null;
     }
@@ -130,12 +147,12 @@ public static class ConnectionRoutines
             dwCustomAuthKey = 26
         };
 
-        Log.Information($"CreateOrUpdateEntry: Entry values are '{entryName}', '{entry.szLocalPhoneNumber}'");
+        Log.LogInformation($"CreateOrUpdateEntry: Entry values are '{entryName}', '{entry.szLocalPhoneNumber}'");
 
         uint dwRet = PInvoke.RasSetEntryProperties(null, entryName, entry, entry.dwSize, null, 0);
         if (dwRet != 0)
         {
-            Log.Error($"CreateOrUpdateEntry: Call to RasSetEntryProperties returned NON-SUCCESS value of {dwRet}");
+            Log.LogError($"CreateOrUpdateEntry: Call to RasSetEntryProperties returned NON-SUCCESS value of {dwRet}");
             return new ErrorResponse("NON-SUCCESS return from call to RasSetEntryProperties", null, true, null, dwRet);
         }
 
@@ -150,19 +167,19 @@ public static class ConnectionRoutines
         dwRet = PInvoke.RasSetCredentials(null, entryName, credentials, false);
         if (dwRet != 0)
         {
-            Log.Error($"CreateOrUpdateEntry: Call to RasSetCredentials returned NON-SUCCESS value of {dwRet:X8}");
+            Log.LogError($"CreateOrUpdateEntry: Call to RasSetCredentials returned NON-SUCCESS value of {dwRet:X8}");
             return new ErrorResponse("NON-SUCCESS return from call to RasSetCredentials", null, true, null, dwRet);
         }
 
 #if DEBUG
-        Log.Debug($"CreateOrUpdateEntry: Credentials values set are '{credentials.szUserName}', '{credentials.szPassword}'");
+        Log.LogDebug($"CreateOrUpdateEntry: Credentials values set are '{credentials.szUserName}', '{credentials.szPassword}'");
 #endif
 
         bool entryWasWritten = PInvoke.WritePrivateProfileString(entryName, "NumCustomPolicy", "1", phonebookPath);
         if (!entryWasWritten)
         {
             var error = Marshal.GetLastWin32Error();
-            Log.Error($"CreateOrUpdateEntry: Call to WritePrivateProfileString for NumCustomPolicy returned false. LastWin32Error = {error}");
+            Log.LogError($"CreateOrUpdateEntry: Call to WritePrivateProfileString for NumCustomPolicy returned false. LastWin32Error = {error}");
             return new ErrorResponse("Call to WritePrivateProfileString for NumCustomPolicy returned false", null, true, null, error);
         }
 
@@ -171,7 +188,7 @@ public static class ConnectionRoutines
         if (!entryWasWritten)
         {
             var error = Marshal.GetLastWin32Error();
-            Log.Error($"CreateOrUpdateEntry: Call to WritePrivateProfileString for CustomIPSecPolicies returned false. LastWin32Error = {error}");
+            Log.LogError($"CreateOrUpdateEntry: Call to WritePrivateProfileString for CustomIPSecPolicies returned false. LastWin32Error = {error}");
             return new ErrorResponse("Call to WritePrivateProfileString returned false", null, true, null, error);
         }
 
@@ -182,7 +199,7 @@ public static class ConnectionRoutines
 
     public static unsafe ErrorResponse ConnectEntry()
     {
-        Log.Information($"In ConnectEntry - Entry name = {ActiveConnectionEntryName}");
+        Log.LogInformation($"In ConnectEntry - Entry name = {ActiveConnectionEntryName}");
 
         // First - check to see if our connection is already active
         // We now only use our previously stored handle if it is valid, instead of calling FindAnyActiveConnection which uses RasEnumConnections
@@ -197,7 +214,7 @@ public static class ConnectionRoutines
             Utility.CheckConnectionResult checkResult = GetRasConnectStatus(ActiveConnectionHandle, ref status);
             if (checkResult == Utility.CheckConnectionResult.CONNECTED)
             {
-                Log.Information("In ConnectEntry - connection already active");
+                Log.LogInformation("In ConnectEntry - connection already active");
                 return new ErrorResponse("Connection already active", null, false, null, 0);
             }
         }
@@ -206,7 +223,7 @@ public static class ConnectionRoutines
         var retVal = PInvoke.RasGetCredentials(null, ActiveConnectionEntryName, ref ActiveConnectionCredentials);
         if (retVal != 0)
         {
-            Log.Error($"ConnectEntry: Call to RasGetCredentials returned NON-SUCCESS value of {retVal}");
+            Log.LogError($"ConnectEntry: Call to RasGetCredentials returned NON-SUCCESS value of {retVal}");
             return new ErrorResponse("NON-SUCCESS return from call to RasGetCredentials", null, true, null, retVal);
         }
 
@@ -226,36 +243,36 @@ public static class ConnectionRoutines
 
             if (retVal != 0)
             {
-                Log.Error($"ConnectEntry: Call to RasDial returned NON-SUCCESS value of {retVal}");
+                Log.LogError($"ConnectEntry: Call to RasDial returned NON-SUCCESS value of {retVal}");
                 return new ErrorResponse("NON-SUCCESS return from call to RasDial", null, true, null, retVal);
             }
         }
 
         // Update Filters to shape traffic as needed
-        Log.Information("ConnectEntry: Calling VpnDnsFilteringHandler.UpdateFiltersState to turn on traffic filtering...");
+        Log.LogInformation("ConnectEntry: Calling VpnDnsFilteringHandler.UpdateFiltersState to turn on traffic filtering...");
         VpnDnsFilteringHandler.UpdateFiltersState(ActiveConnectionEntryName);
 
-        Log.Information("ConnectEntry: exiting...");
+        Log.LogInformation("ConnectEntry: exiting...");
         return new ErrorResponse();
     }
 
     public static bool DisconnectEntry()
     {
-        Log.Information($"ConnectionRoutines.DisconnectEntry: ActiveConnectionHandle null? {(ActiveConnectionHandle == HRASCONN.Null)}, ActiveConnectionEntryName = '{ActiveConnectionEntryName}'");
+        Log.LogInformation($"ConnectionRoutines.DisconnectEntry: ActiveConnectionHandle null? {(ActiveConnectionHandle == HRASCONN.Null)}, ActiveConnectionEntryName = '{ActiveConnectionEntryName}'");
         bool disconnectResult = false;
         var connectionResult = CheckConnection(ActiveConnectionEntryName, ref ActiveConnectionHandle);
-        Log.Information($"ConnectionRoutines.DisconnectEntry: checking connection returned {connectionResult}");
+        Log.LogInformation($"ConnectionRoutines.DisconnectEntry: checking connection returned {connectionResult}");
         if (connectionResult == Utility.CheckConnectionResult.CONNECTED && ActiveConnectionHandle != HRASCONN.Null)
         {
             var retVal = PInvoke.RasHangUp(ActiveConnectionHandle);
             if (retVal != 0)
             {
-                Log.Error($"DisconnectEntry: Call to RasHangUp returned NON-SUCCESS value of {retVal:X8}");
+                Log.LogError($"DisconnectEntry: Call to RasHangUp returned NON-SUCCESS value of {retVal:X8}");
                 disconnectResult = false;
             }
             else
             {
-                Log.Information("DisconnectEntry: Successful return from call to RasHangup. Calling UpdateFiltersState to remove all traffic filters...");
+                Log.LogInformation("DisconnectEntry: Successful return from call to RasHangup. Calling UpdateFiltersState to remove all traffic filters...");
 
                 // Update Filters to shape traffic as needed
                 VpnDnsFilteringHandler.UpdateFiltersState(ActiveConnectionEntryName);
@@ -267,7 +284,7 @@ public static class ConnectionRoutines
         else
         {
             // Not connected, so nothing to do
-            Log.Information($"Entry '{ActiveConnectionEntryName} is not in a CONNECTED state. Its state is {connectionResult}");
+            Log.LogInformation($"Entry '{ActiveConnectionEntryName} is not in a CONNECTED state. Its state is {connectionResult}");
             disconnectResult = true;
         }
 
@@ -291,7 +308,7 @@ public static class ConnectionRoutines
         var connections = GetRasConnections(out uint cConnections);
         if (connections.Length == 0)
         {
-            Log.Error("CheckConnection: GetRasConnections returned empty collection");
+            Log.LogError("CheckConnection: GetRasConnections returned empty collection");
             return result;
         }
 
@@ -329,7 +346,7 @@ public static class ConnectionRoutines
         var retVal = PInvoke.RasGetConnectStatus(h_ras_conn, ref lp_ras_status);
         if (retVal != 0)
         {
-            Log.Error($"GetRasConnectStatus: Call to RasGetConnectStatus returned NON-SUCCESS value of {retVal}");
+            Log.LogError($"GetRasConnectStatus: Call to RasGetConnectStatus returned NON-SUCCESS value of {retVal}");
             return Utility.CheckConnectionResult.DISCONNECTED;
         }
 
