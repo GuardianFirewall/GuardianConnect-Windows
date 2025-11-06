@@ -1,15 +1,28 @@
-﻿using System.Diagnostics;
-using System.Text;
-using GuardianConnect.Shared;
+﻿using GuardianConnect.Shared;
 using GuardianConnect.Win32;
-using Microsoft.Win32;
 using Microsoft.Extensions.Logging;
+using Microsoft.Extensions.Logging.Abstractions;
+using Microsoft.Win32;
+using System.Diagnostics;
+using System.Text;
 
 namespace GuardianConnect.Credentials
 {
     public class GRDKeychain : IGRDKeychain
     {
-        private static Microsoft.Extensions.Logging.ILogger<GRDKeychain> _logger;
+        private static Microsoft.Extensions.Logging.ILogger _logger = NullLogger.Instance;
+        public static Microsoft.Extensions.Logging.ILogger Logger
+        {
+            get
+            {
+                if (_logger == NullLogger.Instance)
+                {
+                    _logger = StaticLoggerFactory.CreateLogger<GRDKeychain>();
+                }
+                return _logger;
+            }
+        }
+
 
         private const string GRDKeyPath = @"Software\GuardianVPN";
         private static string _entropyData = @"Быстрая, коричневая лиса, перепрыгнула через ленивого пса";
@@ -97,12 +110,6 @@ namespace GuardianConnect.Credentials
             return encryptedDataBytes;
         }
         
-        public static Microsoft.Extensions.Logging.ILogger<GRDKeychain> Logger
-        {
-            get => _logger;
-            set => _logger = value;
-        }
-
         public static string GetDataForAccount(string accountKey)
         {
             string data = string.Empty;
