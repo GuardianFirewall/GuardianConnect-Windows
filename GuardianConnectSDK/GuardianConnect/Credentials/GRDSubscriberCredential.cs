@@ -11,7 +11,9 @@ namespace GuardianConnect.Credentials
 {
     public class GRDSubscriberCredential
     {
+        [JsonIgnore]
         private static Microsoft.Extensions.Logging.ILogger _logger = NullLogger.Instance;
+        [JsonIgnore]
         public static Microsoft.Extensions.Logging.ILogger Logger
         {
             get
@@ -23,7 +25,6 @@ namespace GuardianConnect.Credentials
                 return _logger;
             }
         }
-
 
         #region json properties
         [JsonPropertyName("jwt")]
@@ -82,6 +83,10 @@ namespace GuardianConnect.Credentials
             string jsonOut = JsonSerializer.Serialize(this, GRDSubscriberCredentialJsonContext.Default.GRDSubscriberCredential);
             byte[] bytes = Encoding.UTF8.GetBytes(jsonOut);
             GRDKeychain.StoreData(Common.kKeychainStr_SubscriberCredential, bytes);
+        }
+
+        public GRDSubscriberCredential()
+        {
         }
 
         public GRDSubscriberCredential(string subscriberCredential)

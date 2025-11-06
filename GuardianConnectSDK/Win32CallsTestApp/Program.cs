@@ -31,6 +31,9 @@ var loggerFactory = serviceProvider.GetRequiredService<ILoggerFactory>();
 StaticLoggerFactory.Initialize(loggerFactory);
 
 Log.Information("Hello, World!");
+var subcreds = GRDSubscriberCredential.GetCurrentStoredSubscriberCredential();
+subcreds.Store();
+
 bool f = ClientPipe.Connect();
 Win32Calls.ConnectionRoutines.GetRasConnections(out uint cConnections);
 
