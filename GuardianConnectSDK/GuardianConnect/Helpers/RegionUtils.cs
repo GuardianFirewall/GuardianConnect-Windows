@@ -2,6 +2,7 @@
 using GuardianConnect.API.Model;
 using GuardianConnect.Shared;
 using Microsoft.Extensions.Logging;
+using Microsoft.Extensions.Logging.Abstractions;
 using System.Text.Json;
 using System.Text.Json.Serialization;
 
@@ -9,13 +10,19 @@ namespace GuardianConnect.Helpers
 {
     public static class RegionUtils
     {
-        private static Microsoft.Extensions.Logging.ILogger _logger;
-
+        private static Microsoft.Extensions.Logging.ILogger _logger = NullLogger.Instance;
         public static Microsoft.Extensions.Logging.ILogger Logger
         {
-            get => _logger;
-            set => _logger = value;
+            get
+            {
+                if (_logger == NullLogger.Instance)
+                {
+                    _logger = StaticLoggerFactory.CreateLogger("RegionUtils");
+                }
+                return _logger;
+            }
         }
+
 
         private static Dictionary<string, List<string>> timezonesLookup = new();
         private static Dictionary<string, GRDRegion> regionLookup = new();

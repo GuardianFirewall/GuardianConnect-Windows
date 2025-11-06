@@ -44,7 +44,7 @@ namespace Win32Calls
             {
                 if (_logger == NullLogger.Instance)
                 {
-                    _logger = StaticLoggerFactory.CreateLogger("ConnectionRoutines");
+                    _logger = StaticLoggerFactory.CreateLogger("NotificationHandler");
                 }
                 return _logger;
             }

@@ -11,6 +11,7 @@ using GuardianConnect.Shared.Extensions;
 using Win32Calls;
 using System.Text.Json.Serialization;
 using Microsoft.Extensions.Logging;
+using Microsoft.Extensions.Logging.Abstractions;
 
 namespace GuardianConnect.VPNTransports;
 
@@ -24,7 +25,6 @@ public class VPNTransportIKEV2 :ITransportProvider
     private ITransportProvider.VPNConnectionError _lastVpnError = 0;
     private DateTime _connectedDate = DateTime.MinValue;
     private Task? PollingTask;
-    private static Microsoft.Extensions.Logging.ILogger? _logger;
 
    public static VPNCallParameters VpnResumeParameters = new VPNCallParameters();
    public delegate void PowerEventHandlerCallback();
@@ -32,11 +32,19 @@ public class VPNTransportIKEV2 :ITransportProvider
    public static PowerEventHandlerCallback SetVPNStateAtSuspend = () => { };
    public static PowerEventHandlerCallback ResetVPNStateAtSuspend = () => { };
 
-    public VPNTransportIKEV2(Microsoft.Extensions.Logging.ILogger logger)
-    {
-        _logger = logger;
-        _logger.LogInformation("VPNTransportIKEV2 logger!");
-    }
+   private static Microsoft.Extensions.Logging.ILogger _logger = NullLogger.Instance;
+   public static Microsoft.Extensions.Logging.ILogger Logger
+   {
+       get
+       {
+           if (_logger == NullLogger.Instance)
+           {
+               _logger = StaticLoggerFactory.CreateLogger("VPNTransportIKEV2");
+           }
+           return _logger;
+       }
+   }
+
 
     public virtual ITransportProvider.TransportProtocol ProtocolType => _protocolType;
 
@@ -76,14 +84,14 @@ public class VPNTransportIKEV2 :ITransportProvider
     public static void PowerSuspendVPNConnection()
     {
         string entryName = VpnResumeParameters.EntryName;
-        var vpnTransportIkev2 = new VPNTransportIKEV2(_logger);
+        var vpnTransportIkev2 = new VPNTransportIKEV2();
         vpnTransportIkev2.StopVPNTunnel();
     }
     
     public static ErrorResponse PowerResumeVPNConnection()
     {
         _logger.LogInformation("*************** PowerResumeVPNConnection **************** - Entry...");
-        var vpnTransportIkev2 = new VPNTransportIKEV2(_logger);
+        var vpnTransportIkev2 = new VPNTransportIKEV2();
 // TJE - don't do this - we already have phonebook entry created. Just MakeTheCall
 //        var result = vpnTransportIkev2.StartVPNTunnelWithOptions(VpnResumeParameters).Result;
         var userName = VpnResumeParameters.EapuserName;

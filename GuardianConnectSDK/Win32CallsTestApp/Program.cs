@@ -31,10 +31,17 @@ var loggerFactory = serviceProvider.GetRequiredService<ILoggerFactory>();
 StaticLoggerFactory.Initialize(loggerFactory);
 
 Log.Information("Hello, World!");
-Win32Calls.ConnectionRoutines.GetRasConnections(out uint cConnections);
 bool f = ClientPipe.Connect();
+Win32Calls.ConnectionRoutines.GetRasConnections(out uint cConnections);
 
 Log.Information($"Connected to service? {f}");
+var currentStatus = ClientPipe.GetCurrentVpnConnectionStatus();
+if (currentStatus.ConnectionState == ConnectionStateEnum.Connected)
+{
+    ClientPipe.DisconnectVPNConnection(currentStatus.EntryName);
+}
+
+
 var serviceLogs = ClientPipe.GetServiceLogLinesAsync(500);
 
 
