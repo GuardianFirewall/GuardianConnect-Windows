@@ -1,6 +1,7 @@
 using GuardianConnect.Abstractions;
 using GuardianConnect.Shared;
 using Microsoft.Extensions.Logging;
+using Microsoft.Extensions.Logging.Abstractions;
 using Serilog;
 using System.Collections;
 using System.Diagnostics;
@@ -14,12 +15,17 @@ namespace GuardianConnect.Helpers;
 public static class ClientPipe
 {
     private static readonly ClientPipeImpl Instance = new ClientPipeImpl();
-    private static Microsoft.Extensions.Logging.ILogger<ClientPipeImpl> _logger;
-
-    public static Microsoft.Extensions.Logging.ILogger<ClientPipeImpl> Logger
+    private static Microsoft.Extensions.Logging.ILogger _logger = NullLogger.Instance;
+    public static Microsoft.Extensions.Logging.ILogger Logger
     {
-        get => _logger;
-        set => _logger = value;
+        get
+        {
+            if (_logger == NullLogger.Instance)
+            {
+                _logger = StaticLoggerFactory.CreateLogger("ClientPipe");
+            }
+            return _logger;
+        }
     }
 
     public static bool Connect(string servicePipeName = Common.kGRDServicePipeName)

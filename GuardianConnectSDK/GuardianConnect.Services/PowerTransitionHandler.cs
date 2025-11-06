@@ -24,7 +24,19 @@ public static class PowerTransitionHandler
 
     private static ITransportProvider.VPNProviderStatus VPNStatusAtSuspendTime = ITransportProvider.VPNProviderStatus.VPNStatusInvalid;
 
-    private static ILogger _logger;
+    private static Microsoft.Extensions.Logging.ILogger _logger = NullLogger.Instance;
+    public static Microsoft.Extensions.Logging.ILogger Logger
+    {
+        get
+        {
+            if (_logger == NullLogger.Instance)
+            {
+                _logger = StaticLoggerFactory.CreateLogger("PowerTransitionHandler");
+            }
+            return _logger;
+        }
+    }
+
 
     internal static bool ConnectedAtSuspendTime() => VPNStatusAtSuspendTime == ITransportProvider.VPNProviderStatus.VPNStatusConnected;
     internal static void SetConnectedAtSuspendTime()
@@ -36,9 +48,8 @@ public static class PowerTransitionHandler
     internal static void ResetVpnStatusAtSuspendTime() =>
         VPNStatusAtSuspendTime = ITransportProvider.VPNProviderStatus.VPNStatusInvalid;
 
-    public static void SetupPowerTransitionHandler(Microsoft.Extensions.Logging.ILogger melLogger)
+    public static void SetupPowerTransitionHandler()
     {
-        _logger = melLogger;
         _logger.LogInformation("PowerTransitionHandler.SetupPowerTransitionHandler: TESTING LOG!");
         SystemEvents.PowerModeChanged += SystemEventsOnPowerModeChanged;
         NetworkChange.NetworkAvailabilityChanged += NetworkChangeOnNetworkAvailabilityChanged;

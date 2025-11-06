@@ -1,20 +1,29 @@
 ﻿//using NativeRoutines;
 
+using GuardianConnect.Shared;
+using Microsoft.Extensions.Logging;
+using Microsoft.Extensions.Logging.Abstractions;
 using System.Text;
 using System.Text.Json;
-using GuardianConnect.Shared;
 using System.Text.Json.Serialization;
-using Microsoft.Extensions.Logging;
 
 namespace GuardianConnect.Credentials
 {
     public class GRDSubscriberCredential
     {
-        public static Microsoft.Extensions.Logging.ILogger<GRDSubscriberCredential> _logger;
-//        public GRDSubscriberCredential(Microsoft.Extensions.Logging.ILogger logger)
-//        {
-//            _logger = logger;
-//        }
+        private static Microsoft.Extensions.Logging.ILogger _logger = NullLogger.Instance;
+        public static Microsoft.Extensions.Logging.ILogger Logger
+        {
+            get
+            {
+                if (_logger == NullLogger.Instance)
+                {
+                    _logger = StaticLoggerFactory.CreateLogger("GRDSubscriberCredential");
+                }
+                return _logger;
+            }
+        }
+
 
         #region json properties
         [JsonPropertyName("jwt")]

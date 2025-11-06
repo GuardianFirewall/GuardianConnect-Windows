@@ -8,6 +8,7 @@ using GuardianConnect.Shared;
 using GuardianConnect.Shared.Extensions;
 using GuardianConnect.VPNTransports;
 using Microsoft.Extensions.Logging;
+using Microsoft.Extensions.Logging.Abstractions;
 
 [assembly: InternalsVisibleTo("GuardianCore")]
 
@@ -16,9 +17,21 @@ namespace GuardianConnect.Helpers
      public class GRDVPNHelper
      {
          private static bool _instanceCreated = false;
-         private static Microsoft.Extensions.Logging.ILogger _logger;
+         private static Microsoft.Extensions.Logging.ILogger _logger = NullLogger.Instance;
+         public static Microsoft.Extensions.Logging.ILogger Logger
+         {
+             get
+             {
+                 if (_logger == NullLogger.Instance)
+                 {
+                     _logger = StaticLoggerFactory.CreateLogger("GRDVPNHelper");
+                 }
+                 return _logger;
+             }
+         }
 
-         public enum GRDVPNHelperStatusCode {
+
+        public enum GRDVPNHelperStatusCode {
              GRDVPNHelperSuccess,
              GRDVPNHelperFail,
              GRDVPNHelperDoesNeedMigration,
@@ -35,12 +48,6 @@ namespace GuardianConnect.Helpers
          protected internal GRDServerFeatureEnvironment? _featureEnvironment;
          public GRDPEToken? PeToken;
          public static bool IsClientSet = false;
-        public static Microsoft.Extensions.Logging.ILogger Logger
-         {
-             get => _logger;
-             set => _logger = value;
-        }
-
         public DeviceFilterConfig? CurrentDeviceBlocklistConfig;
          
          private GRDServerManager? _grdServerManager;

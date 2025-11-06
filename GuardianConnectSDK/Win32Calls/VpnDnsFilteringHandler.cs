@@ -1,25 +1,32 @@
-﻿using System;
+﻿using GuardianConnect.Shared;
+using Microsoft.Extensions.Logging;
+using Microsoft.Extensions.Logging.Abstractions;
+using Serilog;
+using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Text;
 using System.Threading.Tasks;
-using Windows.Win32.Foundation;
-using GuardianConnect.Shared;
-using Serilog;
 using Win32Calls.WFP;
-using Microsoft.Extensions.Logging;
+using Windows.Win32.Foundation;
 
 namespace Win32Calls
 {
     internal class VpnDnsFilteringHandler
     {
-        private static Microsoft.Extensions.Logging.ILogger _logger;
+        private static Microsoft.Extensions.Logging.ILogger _logger = NullLogger.Instance;
         public static Microsoft.Extensions.Logging.ILogger Logger
         {
-            get => _logger ?? StaticLoggerFactory.CreateLogger("VpnDnsFilteringHandler");
-            set => _logger = value;
+            get
+            {
+                if (_logger == NullLogger.Instance)
+                {
+                    _logger = StaticLoggerFactory.CreateLogger("VpnDnsFilteringHandler");
+                }
+                return _logger;
+            }
         }
-        
+
         internal static HANDLE engine_ = HANDLE.Null;
 
         internal static bool IsActive()
