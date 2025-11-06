@@ -73,6 +73,7 @@ public class ClientPipeService : BackgroundService
 
             //_logger.LogError(oce, "{Message}", oce.Message);
             _logger.Log(LogLevel.Error,  oce.ToString());
+            StopServerListenerThreads();
         }
         catch (Exception ex)
         {

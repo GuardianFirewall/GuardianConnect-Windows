@@ -80,7 +80,7 @@ public class VpnManagerService : BackgroundService
             NotificationHandler.StartRasConnectStateWatcher();
         }
 
-        vpnikeInstance.StartMonitoringTask();
+        vpnikeInstance.StartMonitoringTask(stoppingToken);
 
         try
         {
@@ -101,7 +101,7 @@ public class VpnManagerService : BackgroundService
                 else if (++heartbeatCounter % 5 == 0) _logger.LogInformation("VpnService is running...");
                 
                 // Do stuff with vpnManager here
-                await Task.Delay(60000);
+                await Task.Delay(60000, stoppingToken);
             }
 
             _logger.LogInformation(
