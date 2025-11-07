@@ -141,7 +141,7 @@ jobs:
 
     - name: Create GuardianConnectSDK.Services.Abstractions.nupkg package bundle
       if: github.ref_name == 'main'
-      run: nuget pack GuardianConnectSDK.Services.Abstractions.nuspec -Version ${{env.PKGVERSION}}.1
+      run: nuget pack GuardianConnectSDK.Services.Abstractions.nuspec -Version ${{env.PKGVERSION}}.2
       shell: cmd
 
 #    - name: Upload build artifacts - both Service SDKs - x64 first- UNSIGNED SO WE CAN GIVE AS SAMPLE TO SIGNPATH
@@ -299,7 +299,7 @@ jobs:
     # Update GitHub Packages for ConnectSDK.Services.Abstractions with nuget package
     - name: Update GitHub with nuget packages - SDK Services Abstractions
       if: github.ref_name == 'main'
-      run: nuget push GuardianConnectSDK_Services_Abstractions.${{env.PKGVERSION}}.1.nupkg `${{ secrets.GUARDIANFIREWALL_GH_PKG_TOKEN }} -Source GitHub
+      run: nuget push GuardianConnectSDK_Services_Abstractions.${{env.PKGVERSION}}.2.nupkg `${{ secrets.GUARDIANFIREWALL_GH_PKG_TOKEN }} -Source GitHub
       
 ####    - name: Update GitHub with nuget packages - Service
 ####      run: nuget push SIGNED_GuardianFirewallService.${{env.PKGVERSION}}.nupkg ${{ secrets.GUARDIANFIREWALL_GH_PKG_TOKEN }} -Source GitHub -SkipDuplicate
