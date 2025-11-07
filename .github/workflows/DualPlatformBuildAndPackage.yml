@@ -75,6 +75,9 @@ jobs:
     - name: Build GuardianConnect.Services for ARM64 CPU
       run: msbuild /t:restore /t:Build /p:Platform=arm64 /p:Configuration=Release /p:RuntimeIdentifier=win-arm64 GuardianConnect.Services\GuardianConnect.Services.csproj
       
+    - name: Build GuardianConnectSDK.Services.Abstractions for any CPU
+      run: msbuild /t:restore /t:Build /p:Configuration=Release GuardianConnect.Abstractions\GuardianConnect.Abstractions.csproj
+      
 ####    - name: Build GuardianFirewall Service for x64 CPU
 ####      run: |
 ####            msbuild /t:restore /t:Build /p:Configuration=Release /p:Platform=x64 /p:WarningLevel=0 /p:RuntimeIdentifier=win-x64 GuardianFirewallService\GuardianFirewallService.csproj
@@ -132,6 +135,10 @@ jobs:
       
     - name: Create GuardianConnect.Services.SDK_arm64.nupkg package bundle for EACH CPU build - arm64 first
       run: nuget pack GuardianConnect.Services.SDK_arm64.nuspec -Version ${{env.PKGVERSION}}.1
+      shell: cmd
+
+    - name: Create GuardianConnectSDK.Services.Abstractions.nupkg package bundle
+      run: nuget pack GuardianConnectSDK.Services.Abstractions.nuspec -Version ${{env.PKGVERSION}}.1
       shell: cmd
 
 #    - name: Upload build artifacts - both Service SDKs - x64 first- UNSIGNED SO WE CAN GIVE AS SAMPLE TO SIGNPATH
@@ -295,6 +302,11 @@ jobs:
     - name: Update GitHub with nuget packages - SDK Services ARM64
       if: github.ref_name == 'main'
       run: nuget push SIGNED_GuardianConnect_Services_SDK_ARM64.${{env.PKGVERSION}}.1.nupkg `${{ secrets.GUARDIANFIREWALL_GH_PKG_TOKEN }} -Source GitHub
+      
+    # Update GitHub Packages for ConnectSDK.Services.Abstractions with nuget package
+    - name: Update GitHub with nuget packages - SDK Services Abstractions
+      if: github.ref_name == 'main'
+      run: nuget push GuardianConnectSDK_Services_Abstractions.${{env.PKGVERSION}}.1.nupkg `${{ secrets.GUARDIANFIREWALL_GH_PKG_TOKEN }} -Source GitHub
       
 ####    - name: Update GitHub with nuget packages - Service
 ####      run: nuget push SIGNED_GuardianFirewallService.${{env.PKGVERSION}}.nupkg ${{ secrets.GUARDIANFIREWALL_GH_PKG_TOKEN }} -Source GitHub -SkipDuplicate
