@@ -132,12 +132,15 @@ jobs:
     - name: Create GuardianConnect.Services.SDK_x64.nupkg package bundle for EACH CPU build - x64 first
       if: github.ref_name == 'main'
       run: nuget pack GuardianConnect.Services.SDK_x64.nuspec -Version ${{env.PKGVERSION}}.1
+      shell: cmd
       
     - name: Create GuardianConnect.Services.SDK_arm64.nupkg package bundle for EACH CPU build - arm64 first
+      if: github.ref_name == 'main'
       run: nuget pack GuardianConnect.Services.SDK_arm64.nuspec -Version ${{env.PKGVERSION}}.1
       shell: cmd
 
     - name: Create GuardianConnectSDK.Services.Abstractions.nupkg package bundle
+      if: github.ref_name == 'main'
       run: nuget pack GuardianConnectSDK.Services.Abstractions.nuspec -Version ${{env.PKGVERSION}}.1
       shell: cmd
 
@@ -165,16 +168,6 @@ jobs:
 #        name: "GuardianConnectSDK_ARM64.${{env.PKGVERSION}}.nupkg"
 #        path: D:\a\GuardianConnect-Windows\GuardianConnect-Windows\GuardianConnectSDK\GuardianConnectSDK_ARM64.${{env.PKGVERSION}}.nupkg
 
-####    - name: Create GuardianFirewallService.nupkg package bundle
-####      run: nuget pack GuardianFirewallService.nuspec -Version ${{env.PKGVERSION}}
-####      shell: cmd
-####      
-####    - name: Upload build artifacts - GuardianFirewall Service - UNSIGNED SO WE CAN GIVE AS SAMPLE TO SIGNPATH
-####      uses: actions/upload-artifact@v4
-####      with:
-####        name: GuardianFirewallService.${{env.PKGVERSION}}.nupkg 
-####        path: D:\a\GuardianConnect-Windows\GuardianConnect-Windows\GuardianConnectSDK\GuardianFirewallService.${{env.PKGVERSION}}.nupkg 
-        
       # Sign GuardianConnectSDK x64 package with certificate
       # Name GuardianConnectSDK<Platform> Nuget Package
       # Slug GuardianConnectSDK_<Platform>_Nuget_Package
@@ -266,13 +259,13 @@ jobs:
       uses: actions/upload-artifact@v4
       with:
         name: SIGNED_GuardianConnectServicesSDK_x64.${{env.PKGVERSION}}.nupkg
-        path: D:\a\GuardianConnect-Windows\GuardianConnect-Windows\GuardianConnectSDK\SIGNED_GuardianConnect_Services_SDK_x64.${{env.PKGVERSION}}.nupkg
+        path: D:\a\GuardianConnect-Windows\GuardianConnect-Windows\GuardianConnectSDK\SIGNED_GuardianConnect_Services_SDK_x64.${{env.PKGVERSION}}.1.nupkg
 
     - name: Upload build artifacts - GuardianConnect.Services.SDK_ARM64
       uses: actions/upload-artifact@v4
       with:
         name: SIGNED_GuardianConnectServicesSDK_ARM64.${{env.PKGVERSION}}.nupkg
-        path: D:\a\GuardianConnect-Windows\GuardianConnect-Windows\GuardianConnectSDK\SIGNED_GuardianConnect_Services_SDK_ARM64.${{env.PKGVERSION}}.nupkg
+        path: D:\a\GuardianConnect-Windows\GuardianConnect-Windows\GuardianConnectSDK\SIGNED_GuardianConnect_Services_SDK_ARM64.${{env.PKGVERSION}}.1.nupkg
         
         ####    - name: Upload build artifacts - GuardianFirewall Service
 ####      uses: actions/upload-artifact@v4
