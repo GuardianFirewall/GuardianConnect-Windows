@@ -1,9 +1,9 @@
 <?xml version="1.0" encoding="utf-8"?>
 <package>
     <metadata>
-        <id>GuardianConnect_Services_SDK_arm64</id>
+        <id>GuardianConnectSDK_Services_Abstractions</id>
         <version>0.24.7</version>
-        <title>GuardianConnect SDK Nuget Bundle Package for arm64</title>
+        <title>GuardianConnect SDK Nuget Bundle Package for x64</title>
         <authors>DNSFilter, Inc.</authors>
         <license type="expression">MIT</license>
         <icon>Guardian.png</icon>
@@ -19,10 +19,9 @@
         </dependencies>
     </metadata>
     <files>
-        <!--    <file src="GuardianConnectSDK.targets" target="buildTransitive\GuardianConnectSDK.targets" />-->
         <file src=".\README.md" target="content"/>
         <file src="Guardian.png"/>
-        <file src="BuildOutput\GuardianConnect.Services\runtimes\win10-arm64\lib\net9.0-windows\GuardianConnect.Services.dll"
-              target="lib\net9.0\GuardianConnect.Services.dll"/>
+        <file src="BuildOutput\GuardianConnect.Abstractions\runtimes\win10-\lib\net9.0-windows\GuardianConnect.Abstractions.dll"
+			  target="lib\net9.0\GuardianConnect.Abstractions.dll"/>
     </files>
 </package>
