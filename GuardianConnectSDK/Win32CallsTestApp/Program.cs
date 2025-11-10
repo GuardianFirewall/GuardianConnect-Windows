@@ -31,6 +31,8 @@ var loggerFactory = serviceProvider.GetRequiredService<ILoggerFactory>();
 StaticLoggerFactory.Initialize(loggerFactory);
 
 Log.Information("Hello, World!");
+TestRegionStuff();
+#if false
 var subcreds = GRDSubscriberCredential.GetCurrentStoredSubscriberCredential();
 subcreds.Store();
 
@@ -46,10 +48,6 @@ if (currentStatus.ConnectionState == ConnectionStateEnum.Connected)
 
 
 var serviceLogs = ClientPipe.GetServiceLogLinesAsync(500);
-
-
-#if false
-TestRegionStuff();
 
 string connectHost = "connect-api.guardianapp.com";
 string petValue = "7uImrN1BoKOT0UMC7Zmc4r7vFlgnGl9U";
@@ -109,26 +107,24 @@ void subcredtest2()
 //SubscriptionTypePretty = (string)gscDict["subscription-type"];
 
 }
-
-void TestRegionStuff()
+#endif
+void TestCredsStuff()
 {
-#if false
     GRDLoginCredentials lc = new GRDLoginCredentials();
     lc.Email = "terdies@dnsfilter.com";
     lc.Password = "P@ssw0rd!";
-    _logger.LogInformation($"lc.Email = '{lc.Email}', lc.Password = '{lc.Password}'");
-    string lcSerial =
-        System.Text.Json.JsonSerializer.Serialize(lc, GRDLoginCredentialsJsonContext.Default.GRDLoginCredentials);
+    Log.Information($"lc.Email = '{lc.Email}', lc.Password = '{lc.Password}'");
+    string lcSerial = System.Text.Json.JsonSerializer.Serialize(lc, GRDLoginCredentialsJsonContext.Default.GRDLoginCredentials);
     Log.Information($"lcSerial = '{lcSerial}'");
     Console.ReadLine();
     GRDCredentialManager.LoadCredentialsList();
     var _credentialsList = GRDCredentialManager.CredentialsList;
     var singleCred = _credentialsList[0];
-    var serializedSingle =
-        System.Text.Json.JsonSerializer.Serialize(singleCred, GRDCredentialJsonContext.Default.GRDCredential);
-    var serializedData =
-        System.Text.Json.JsonSerializer.Serialize(_credentialsList, GRDCredentialJsonContext.Default.ListGRDCredential);
-
+    var serializedSingle = System.Text.Json.JsonSerializer.Serialize(singleCred, GRDCredentialJsonContext.Default.GRDCredential);
+    var serializedData = System.Text.Json.JsonSerializer.Serialize(_credentialsList, GRDCredentialJsonContext.Default.ListGRDCredential);
+}
+void TestRegionStuff()
+{
     RegionInputParameter rip = new RegionInputParameter()
     {
         Region = "us-east",
@@ -142,13 +138,13 @@ void TestRegionStuff()
 
     Log.Information(
         $"NSJ: '{nsjRIPSerialized}', STJ: '{stjRIPSerialized}', STJOPT: '{stjRIPSerializedWithDfltOpts}', STJCTX: '{stjRIPSerializedWithContext}'");
-#endif
     Task t = RegionUtils.RefreshDataAsync();
     t.Wait();
     Task u = RegionUtils.GetHostsForRegion("us-east");
     u.Wait();
 
     var rhrec = RegionUtils.GetMyRegionHostRecord("us-east");
+    Log.Information($"For our region '{rip.Region} we have selected host '{rhrec.Hostname}' in host location '{rhrec.HostLocation()}'");
 
 }
 
@@ -186,6 +182,6 @@ if (hrcArray.Length == 0)
 }
 Console.WriteLine($"Connection Name = '{hrcArray[0].szEntryName}', Device={hrcArray[0].szDeviceName}, Type='{hrcArray[0].szDeviceType}'");
 #endif
-#endif
+//#endif
 Console.Write("Press ENTER...");
 Console.ReadLine();

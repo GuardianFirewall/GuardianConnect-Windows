@@ -63,7 +63,7 @@ namespace GuardianConnect.Credentials
         public static GRDSubscriberCredential GetCurrentStoredSubscriberCredential()
         {
             // CONN#8
-            _logger.LogDebug("CONN#8");
+            Logger.LogDebug("CONN#8");
             
             var subCredBytes = GRDKeychain.GetDataForAccount(Common.kKeychainStr_SubscriberCredential);
             GRDSubscriberCredential subscriberCredential = new GRDSubscriberCredential("");
@@ -79,7 +79,7 @@ namespace GuardianConnect.Credentials
 
         public void Store()
         {
-            _logger.LogInformation("Storing SubscriberCredentials to keychain...");
+            Logger.LogInformation("Storing SubscriberCredentials to keychain...");
             string jsonOut = JsonSerializer.Serialize(this, GRDSubscriberCredentialJsonContext.Default.GRDSubscriberCredential);
             byte[] bytes = Encoding.UTF8.GetBytes(jsonOut);
             GRDKeychain.StoreData(Common.kKeychainStr_SubscriberCredential, bytes);
@@ -141,7 +141,7 @@ namespace GuardianConnect.Credentials
             string base64Payload = payloadString + (padSizeForB64 != 4 ? new string('=', padSizeForB64) : "");
 
             string payLoad = Common.DecodeFrom64(base64Payload);
-            _logger.LogInformation($"ParseSubscriberCredentials: jwt payload = '{payLoad}'");
+            Logger.LogInformation($"ParseSubscriberCredentials: jwt payload = '{payLoad}'");
             var subCred = JsonSerializer.Deserialize<GRDSubscriberCredential>(payLoad, GRDSubscriberCredentialJsonContext.Default.GRDSubscriberCredential);
 
             SubscriptionType = subCred.SubscriptionType ?? string.Empty;

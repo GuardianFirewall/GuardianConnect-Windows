@@ -39,7 +39,7 @@ namespace GuardianConnect.Credentials
             }
             catch (Exception e)
             {
-                _logger.LogError(e, "Exception thrown when writing to registry key: ", key);
+                Logger.LogError(e, "Exception thrown when writing to registry key: ", key);
                 throw;
             }
         }
@@ -53,7 +53,7 @@ namespace GuardianConnect.Credentials
             }
             catch (Exception e)
             {
-                _logger.LogError(e, "Exception thrown when writing to registry key: ", key);
+                Logger.LogError(e, "Exception thrown when writing to registry key: ", key);
                 throw;
             }
         } 
@@ -68,7 +68,7 @@ namespace GuardianConnect.Credentials
             }
             catch (Exception e)
             {
-                _logger.LogError(e, "Exception thrown when reading from registry key: ", key);
+                Logger.LogError(e, "Exception thrown when reading from registry key: ", key);
             }
             return encryptedDataString;
         }
@@ -88,7 +88,7 @@ namespace GuardianConnect.Credentials
                 if (o == null) return defaultValue;
                 
                 var t = rk.GetValueKind(key);
-                _logger.LogInformation($"Type of value for key {key} is {t}");
+                Logger.LogInformation($"Type of value for key {key} is {t}");
                 if (t == RegistryValueKind.String)
                 {
                     string s = (string)o;
@@ -104,7 +104,7 @@ namespace GuardianConnect.Credentials
             }
             catch (Exception e)
             {
-                _logger.LogError(e, "Exception thrown when reading from registry key: ", key);
+                Logger.LogError(e, "Exception thrown when reading from registry key: ", key);
             }            
             
             return encryptedDataBytes;
@@ -124,7 +124,7 @@ namespace GuardianConnect.Credentials
                 }
                 catch (Exception e)
                 {
-                    _logger.LogError(e, $"Exception thrown while decrypting accocunt data retrieved from keychain. Setting to empty.");
+                    Logger.LogError(e, $"Exception thrown while decrypting accocunt data retrieved from keychain. Setting to empty.");
                 }
             }
 
@@ -184,7 +184,7 @@ namespace GuardianConnect.Credentials
             var rootGrdKey = Registry.CurrentUser.OpenSubKey(GRDKeyPath, true);
             if (rootGrdKey == null)
             {
-                _logger.LogError("RemoveGuardianKeychainItems(): Could not open Guardian Keychain root key.");
+                Logger.LogError("RemoveGuardianKeychainItems(): Could not open Guardian Keychain root key.");
                 return;
             }
 
@@ -196,7 +196,7 @@ namespace GuardianConnect.Credentials
                     if (o is null)
                     {
                         var errmsg = $"DELETING Registry Value with key '{key} found that value is not present.";
-                        _logger.LogError(errmsg);
+                        Logger.LogError(errmsg);
                         Debug.WriteLine(errmsg);
                         continue;
                     }
@@ -207,7 +207,7 @@ namespace GuardianConnect.Credentials
                     if (e is UnauthorizedAccessException)
                     {
                         var errmsg = $"Exception 'UnauthorizedAccessException' thrown when attemnpting deletion of key {key}";
-                        _logger.LogError(errmsg);
+                        Logger.LogError(errmsg);
                         Debug.WriteLine(errmsg);
                     }
                 }
