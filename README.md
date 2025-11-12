@@ -6,11 +6,11 @@ The SDK is built using native Windows C# technologies and supports .NET AOT ([ah
 For more information and a direct contact please visit https://guardianapp.com/company/partners
 
 ## Integration
-The SDK is being published as a nuget package available through this repo as well as archived releases in this repo
+GuardianConnect for Windows is published as a NuGet [package through Github](https://github.com/orgs/GuardianFirewall/packages?repo_name=GuardianConnect-Windows) as well as archived releases in this repo.
+
+The SDK provides all of the abstractions to integrate the ability to establish a VPN connection to the global Guardian Firewall infrastructure by integrating the abstractions into a Windows service as well as into the main application a user or other system may interact with. Communcation between the SDK components in the main app & service are handled by the SDK.  
+The benefit of the separation is that the service can maintain a reliable VPN connection. The service is required to be executed with SYSTEM authority for necessary Windows OS operations.
 
 ## Building
-The SDK is currently based on .NET version 9 though older versions may be compatible as well.  
-For local builds please ensure that you have the .NET SDK installed which you can verify by entering `dotnet --version` into a PowerShell terminal.
-
-To create a debug build open a local PowerShell terminal and move into the root of the repo's folder. The build can then be started by entering `dotnet build`. Upon completion the build artifacts will be available in <needs more info here>
+The SDK is currently based on .NET version 9, though older versions may be compatible as well.  
 
