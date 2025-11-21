@@ -177,7 +177,7 @@ public class ClientPipeImpl : IGuardianNPContract
         return value;
     }
 
-    public ErrorResponse StartVPNConnection(VPNCallParameters protocolRequest)
+    public ErrorResponse StartVPNConnection(VPNCallParameters? protocolRequest)
     {
         var cmdPayload = JsonSerializer.Serialize(protocolRequest, VPNCallParametersJsonContext.Default.VPNCallParameters);
         var cmdString = $"{(int)IGuardianNPContract.NPCommands.StartVPNConnection}.{cmdPayload}";

@@ -61,7 +61,7 @@ namespace GuardianConnect.Helpers
         public static async Task LongRunningRefreshTask(CancellationToken cancellationToken)
         {
             var RefreshMinutesStr =
-                RegistrySettings.RetrieveGuardianUserSettings("TimepanBetweenEachGeoRefreshMinutes");
+                RegistrySettings.RetrieveGuardianUserSettings("MinutesBetweenGeoRefreshChecks");
             if (String.IsNullOrEmpty(RefreshMinutesStr))
             {
                 TimeSpanBetweenEachGeoRefresh = new TimeSpan(1, 0, 0); // 1 hour default
@@ -83,12 +83,9 @@ namespace GuardianConnect.Helpers
                     {
                         Log.Information(
                             "RegionUtils.LongRunningRefreshTask: The latest refresh has changes. Toggling ACTIVE to point LIVE to newest data.");
-                        Log.Information($"Latest: {Alternate.Checksum()}, Active: {Live.Checksum()}");
+                        Log.Information($"Pre-Switch: Latest(on index {Inactive}): {Alternate.Checksum()}, Active (on index {Active}): {Live.Checksum()}");
                         SetActiveToLatest();
-#if DEBUG
-                    _geoInfoCaches[Inactive].Sha[0] = 0;
-#endif
-                        Log.Information($"Latest: {Alternate.Checksum()}, Active: {Live.Checksum()}");
+                        Log.Information($"Active Switched (to index {Active}): Latest (now on index {Inactive}): {Alternate.Checksum()}, Active: {Live.Checksum()}");
                     }
 
                     InitialGeoInformationLoadComplete.Set();
@@ -242,16 +239,6 @@ namespace GuardianConnect.Helpers
                 Logger.LogError(ex, $"RefreshInactiveRegionsLists(): Exception thrown when calling all-server-regions...: {ex.Message}. (STATIC) Using GRDRegion.StaticRegions list data");
                 regionsList = GRDRegion.StaticRegions;
             }
-#if DEBUG
-            regionsList.Add(new GRDRegion()
-            {
-                BestHost = "BESTHOST",
-                BestHostLocation = "SOMEWHERE",
-                Continent = "ANTARCTICA",
-                DisplayName = "Debug Region",
-                RegionName = "debug-region"
-            });
-#endif
 
             // Populate region lookup collections
             Alternate.RegionKeysByDisplay.TryAdd("Automatic", "Automatic");
@@ -276,7 +263,6 @@ namespace GuardianConnect.Helpers
                 }
                 Alternate.RegionKeys.Add(regionRec.RegionName);
                 Alternate.RegionKeysByDisplay.TryAdd(regionRec.DisplayName, regionRec.RegionName);
-// DEFER                await GetHostsForRegion(regionRec.RegionName);
             }
 
             return regionsList;

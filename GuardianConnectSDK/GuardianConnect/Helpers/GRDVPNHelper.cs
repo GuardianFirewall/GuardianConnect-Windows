@@ -200,7 +200,7 @@ namespace GuardianConnect.Helpers
                     GRDCredentialManager.MainCredentials.ApiAuthToken,
             };
 
-            RegionUtils.InitialGeoInformationLoadComplete.Wait(15 * 1000);
+            RegionUtils.InitialGeoInformationLoadComplete.Wait(1 * 1000);
             GetRegionForOurTimeZone();
         }
 

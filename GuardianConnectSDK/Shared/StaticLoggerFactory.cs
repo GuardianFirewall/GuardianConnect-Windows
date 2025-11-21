@@ -9,7 +9,7 @@ namespace GuardianConnect.Shared
 {
     public static class StaticLoggerFactory
     {
-        private static ILoggerFactory _loggerFactory;
+        private static ILoggerFactory? _loggerFactory;
 
         public static void Initialize(ILoggerFactory loggerFactory)
         {
