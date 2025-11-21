@@ -17,6 +17,7 @@ public record ErrorResponse(
     public object? ThrownException { get; set; } = ThrownExceptionArg;
     public object? Response { get; set; } = ResponseArg;
     public object? Data { get; set; } = DataArg;
+    [JsonIgnore]
     public HttpResponseMessage HttpResponse { get; set; } = (HttpResponse ?? null) ?? new HttpResponseMessage();
 
     public static ErrorResponse FromException(Exception exception)
