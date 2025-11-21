@@ -17,6 +17,7 @@ namespace GuardianConnect.Shared
         [JsonConstructor]
         public CurrentVPNStatus()
         {
+            EntryName = string.Empty;
         }
 
         public CurrentVPNStatus(ConnectionStateEnum state, string entryName)

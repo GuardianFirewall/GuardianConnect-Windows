@@ -17,7 +17,7 @@ namespace Win32Calls.WFP
         static UInt64 QBlock_IPv6_Id = 0;
         static UInt64 QBlock_IPv4_Id = 0;
 
-        public static char[] adapterNameToMatch;
+        public static char[] adapterNameToMatch = new char[] { '\0' };
         static IP_ADAPTER_INFO adapterInfo = new IP_ADAPTER_INFO();
 
         // Microsoft-Windows-NetworkProfile
@@ -107,7 +107,6 @@ namespace Win32Calls.WFP
 
         internal static unsafe uint AddSublayer(HANDLE engineHandle, Guid uuid)
         {
-            FWPM_SESSION0 session = new FWPM_SESSION0();
             uint result = 0;
 
             FWPM_SUBLAYER0 subLayer = new FWPM_SUBLAYER0();
