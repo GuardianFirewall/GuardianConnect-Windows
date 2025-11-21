@@ -31,8 +31,10 @@ var loggerFactory = serviceProvider.GetRequiredService<ILoggerFactory>();
 StaticLoggerFactory.Initialize(loggerFactory);
 
 Log.Information("Hello, World!");
-TestRegionStuff();
+RegionUtils.LongRunningRefreshTask(new CancellationToken());
+
 #if false
+TestRegionStuff();
 var subcreds = GRDSubscriberCredential.GetCurrentStoredSubscriberCredential();
 subcreds.Store();
 
@@ -107,7 +109,6 @@ void subcredtest2()
 //SubscriptionTypePretty = (string)gscDict["subscription-type"];
 
 }
-#endif
 void TestCredsStuff()
 {
     GRDLoginCredentials lc = new GRDLoginCredentials();
@@ -182,6 +183,6 @@ if (hrcArray.Length == 0)
 }
 Console.WriteLine($"Connection Name = '{hrcArray[0].szEntryName}', Device={hrcArray[0].szDeviceName}, Type='{hrcArray[0].szDeviceType}'");
 #endif
-//#endif
+#endif
 Console.Write("Press ENTER...");
 Console.ReadLine();

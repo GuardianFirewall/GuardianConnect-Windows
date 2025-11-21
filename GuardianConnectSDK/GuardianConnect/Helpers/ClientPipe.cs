@@ -183,7 +183,6 @@ public class ClientPipeImpl : IGuardianNPContract
         var cmdString = $"{(int)IGuardianNPContract.NPCommands.StartVPNConnection}.{cmdPayload}";
         ss.WriteString(cmdString);
         var startedJson = ss.ReadStringAsync().Result;
-        ClientPipe.Logger.LogInformation($"ClientPipe.StartVPNConnection - string is '{startedJson}'");
 
         ErrorResponse startedErrorResponse = new ErrorResponse();
         try
@@ -193,6 +192,11 @@ public class ClientPipeImpl : IGuardianNPContract
         catch (Exception e)
         {
             ClientPipe.Logger.LogError(e, $"ClientPipe.StartVPNConnection: Exception when parsing response from pipe: {e.Message}");
+        }
+
+        if (startedErrorResponse.IsError)
+        {
+            ClientPipe.Logger.LogError( $"ClientPipe.StartVPNConnection - error response from service: is '{startedJson}'");
         }
 
         return startedErrorResponse;
