@@ -258,7 +258,7 @@ namespace GuardianConnect.Helpers
                     catch (Exception e)
                     {
                         Logger.LogCritical(e, $"GetLatestRegionsList: FATAL - Could not add region '{regionRec.RegionName}' object to regionLookup collection!");
-                        Poof();
+                        throw;
                     }
                 }
                 Alternate.RegionKeys.Add(regionRec.RegionName);
@@ -266,12 +266,6 @@ namespace GuardianConnect.Helpers
             }
 
             return regionsList;
-        }
-
-        private static void Poof()
-        {
-            //Log.CloseAndFlush();
-            Environment.Exit(-1);
         }
 
         private static async Task GetLatestTimeZonesForRegions()
