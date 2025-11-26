@@ -4,7 +4,6 @@ using Microsoft.Extensions.Logging.Abstractions;
 using System.Reflection;
 using System.Runtime.InteropServices;
 using Windows.Win32;
-using Windows.Win32;
 using Windows.Win32.NetworkManagement.Rras;
 
 namespace Win32Calls;

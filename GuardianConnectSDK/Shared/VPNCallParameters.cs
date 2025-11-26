@@ -2,11 +2,11 @@
 {
     public class VPNCallParameters
     {
-        public string EapuserName { get; set; }
-        public string Eappassword { get; set; }
-        public string VpnHostName { get; set; }
-        public string VpnHostDisplay { get; set; }
-        public string EntryName { get; set; }
+        public string EapuserName { get; set; } = string.Empty;
+        public string Eappassword { get; set; } = string.Empty;
+        public string VpnHostName { get; set; } = string.Empty;
+        public string VpnHostDisplay { get; set; } = string.Empty;
+        public string EntryName { get; set; } = string.Empty;
 
         public VPNCallParameters()
         {

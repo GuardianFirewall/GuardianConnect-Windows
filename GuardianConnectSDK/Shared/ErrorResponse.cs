@@ -17,7 +17,8 @@ public record ErrorResponse(
     public object? ThrownException { get; set; } = ThrownExceptionArg;
     public object? Response { get; set; } = ResponseArg;
     public object? Data { get; set; } = DataArg;
-    public HttpResponseMessage HttpResponse { get; set; } = HttpResponse;
+    [JsonIgnore]
+    public HttpResponseMessage HttpResponse { get; set; } = (HttpResponse ?? null) ?? new HttpResponseMessage();
 
     public static ErrorResponse FromException(Exception exception)
     {
@@ -37,7 +38,7 @@ public record ErrorResponse(
     
     public string GetReasonPhrase()
     {
-        var resp = (HttpResponseMessage)Response ?? new HttpResponseMessage();
+        var resp = Response as HttpResponseMessage ?? new HttpResponseMessage();
         return resp.ReasonPhrase ?? "";
     }
 
@@ -52,7 +53,7 @@ public record ErrorResponse(
         }
         var message = string.IsNullOrEmpty(Message) ? "" : Message;
         var response = (HttpResponseMessage)Response!;
-        var logText = $"ErrorResponse: IsError: {IsError}, Message: {message}, Exception: {xt}, Response: {response}, Data: {Data ?? string.Empty}";
+        var logText = $"ErrorResponse: IsError: {IsError}, Message: {message}, Exception: {xt}, Response: {response}, Data: {Data ?? string.Empty}, HttpResponse: [{HttpResponse.StatusCode}]{HttpResponse.ReasonPhrase}";
         return logText;
     }
 }

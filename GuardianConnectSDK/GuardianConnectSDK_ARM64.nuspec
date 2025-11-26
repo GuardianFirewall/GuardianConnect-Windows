@@ -2,7 +2,7 @@
 <package >
   <metadata>
     <id>GuardianConnectSDK_ARM64</id>
-    <version>0.23.12</version>
+    <version>0.26.4</version>
     <title>GuardianConnect SDK Nuget Bundle Package for arm64</title>
     <authors>DNSFilter, Inc.</authors>
     <license type="expression">MIT</license>
@@ -19,46 +19,17 @@
     </dependencies>
   </metadata>
   <files>
-<!--    <file src="GuardianConnectSDK.targets" target="buildTransitive\GuardianConnectSDK.targets" />-->
     <file src=".\README.md" target="content"/>
     <file src="Guardian.png"/>
 
     <file src="BuildOutput\GuardianConnect\runtimes\win10-arm64\lib\net9.0-windows\GuardianConnect.dll" target="lib\net9.0\GuardianConnect.dll"  />
     <file src="BuildOutput\GuardianConnect\runtimes\win10-arm64\lib\net9.0-windows\GuardianConnect.Shared.dll" target="lib\net9.0\GuardianConnect.Shared.dll"  />
-    <file src="BuildOutput\GuardianConnect\runtimes\win10-x64\lib\net9.0-windows\Win32Calls.dll" target="lib\net9.0\Win32Calls.dll"  />
-    <file src="BuildOutput\GuardianConnect\runtimes\win10-x64\lib\net9.0-windows\Win32Calls.WFP.dll" target="lib\net9.0\Win32Calls.WFP.dll"  />
-    <!-- Placeholder for the GuardianConnect SDK for lib so that nuget resolution works - go figure. -->
-    <!--
-      <file src="BuildOutput\GuardianConnect\runtimes\win10-arm64\lib\net9.0-windows\GuardianConnect.dll" target="lib\net9.0\GuardianConnect.dll"  />
-      <file src="BuildOutput\GuardianConnect\runtimes\win10-arm64\lib\net9.0-windows\GuardianConnect.Shared.dll" target="lib\net9.0\GuardianConnect.Shared.dll"  />
-      <file src="BuildOutput\GuardianConnect\runtimes\win10-arm64\lib\net9.0-windows\NativeRoutines.dll" target="lib\net9.0\NativeRoutines.dll"  />
-      <file src="BuildOutput\GuardianConnect\runtimes\win10-arm64\lib\net9.0-windows\Ijwhost.dll" target="lib\net9.0\Ijwhost.dll"  />
-    -->
-
-    <!-- Compile-time ref assemblies -->
-<!--    <file src="Shared\obj\x64\Release\net9.0-windows\ref\GuardianConnect.Shared.dll" target="ref\net9.0-windows\win-x64\GuardianConnect.Shared.dll"  />-->
-<!--    <file src="GuardianConnect\obj\x64\Release\net9.0-windows\win-x64\ref\GuardianConnect.dll" target="ref\net9.0-windows\win-x64\GuardianConnect.dll"  />-->
-
-    <!-- Runtime assemblies -->
-<!--    <file src="BuildOutput\GuardianConnect\runtimes\win10-arm64\lib\net9.0-windows\GuardianConnect.dll" target="runtimes\lib\net9.0-windows\win-arm64\GuardianConnect.dll"  />-->
-<!--    <file src="BuildOutput\GuardianConnect\runtimes\win10-arm64\lib\net9.0-windows\GuardianConnect.Shared.dll" target="runtimes\lib\net9.0-windows\win-arm64\GuardianConnect.Shared.dll"  />-->
-<!--    <file src="BuildOutput\GuardianConnect\runtimes\win10-arm64\lib\net9.0-windows\Ijwhost.dll" target="runtimes\win10-arm64\native\Ijwhost.dll"  />-->
-<!--    <file src="BuildOutput\GuardianConnect\runtimes\win10-arm64\lib\net9.0-windows\NativeRoutines.dll" target="runtimes\win10-arm64\native\NativeRoutines.dll"  />-->
-
-<!--    <file src="BuildOutput\GuardianConnect\runtimes\win10-x64\lib\net9.0-windows\GuardianConnect.dll" target="runtimes\lib\net9.0-windows\win-x64\GuardianConnect.dll"   />-->
-<!--    <file src="BuildOutput\GuardianConnect\runtimes\win10-x64\lib\net9.0-windows\GuardianConnect.Shared.dll" target="runtimes\lib\net9.0-windows\win-x64\GuardianConnect.Shared.dll"   />-->
-<!--    <file src="BuildOutput\GuardianConnect\runtimes\win10-x64\lib\net9.0-windows\Ijwhost.dll" target="runtimes\win10-x64\native\Ijwhost.dll"   />-->
-<!--    <file src="BuildOutput\GuardianConnect\runtimes\win10-x64\lib\net9.0-windows\NativeRoutines.dll" target="runtimes\win10-x64\native\NativeRoutines.dll"   />-->
+    <file src="BuildOutput\GuardianConnect\runtimes\win10-arm64\lib\net9.0-windows\GuardianConnect.Abstractions.dll" target="lib\net9.0\GuardianConnect.Abstractions.dll"/>
+    <file src="BuildOutput\GuardianConnect\runtimes\win10-arm64\lib\net9.0-windows\Win32Calls.dll" target="lib\net9.0\Win32Calls.dll"  />
+    <file src="BuildOutput\GuardianConnect\runtimes\win10-arm64\lib\net9.0-windows\Win32Calls.WFP.dll" target="lib\net9.0\Win32Calls.WFP.dll"  />
 
     <!-- TODO
     <file src="BuildOutput\GuardianConnect\runtimes\win10-arm64\lib\net9.0-windows\*.dll" target="lib\net9.0" />
     -->
-    
-    <!-- DIFFERENT APPROACH AS NEEDED - INCLUDE SOURCE CODE OF THE THREE PROJECTS FOR GUARDIAN FIREWALL UI CLIENT:
-      GuardianConnect\**, Shared\**, NativeRoutines\**
-    <file src="Shared\**\*.*" target="src\Shared" exclude="Shared\obj"/>
-    <file src="GuardianConnect\**\*.*" target="src\GuardianConnect" exclude="GuardianConnect\obj"/>
-    <file src="NativeRoutines\**\*.*" target="src\NativeRoutines" exclude="NativeRoutines\obj"/>
-      -->
   </files>
 </package>

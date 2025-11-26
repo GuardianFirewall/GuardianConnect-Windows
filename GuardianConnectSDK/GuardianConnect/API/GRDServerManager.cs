@@ -12,6 +12,7 @@ public class GRDServerManager
     public GRDHousekeepingAPI Housekeeping { get; set; }
     public GRDVPNHelper.GRDServerFeatureEnvironment FeatureEnv;
     public bool BetaCapable { get; set; }
+    public GRDRegion SelectedRegion { get; set; }
 
     public GRDServerManager()
     {
@@ -25,19 +26,22 @@ public class GRDServerManager
 
     /// Used to find and return the VPN server node we will connect to based on the results of a call to 'getGuardianHostsWithCompletion:"
     /// @param completion Completion block that will contain the selected host, hostLocation upon success or an error message upon failure.
-    public (string, string, ErrorResponse) SelectGuardianHostWithCompletion()
+    // This is called from GRDVPNHelper.SelectAndSetBestGuardianHost
+    public (string, string, ErrorResponse) SelectGuardianHostWithCompletion(string? selectedRegionKey)
     // CHANGE ^-----------------------^
     {
         // CONN#5
-        _logger.LogInformation("CONN#5");
+        _logger.LogInformation("GRDServerManager.SelectGuardianHostWithCompletion: CONN#5");
+
+
+        _logger.LogInformation("GRDServerManager.SelectGuardianHostWithCompletion: selectedRegionKey: " + (selectedRegionKey ?? "null"));
+            SelectedRegion = RegionUtils.GetGRDRegionByKey(selectedRegionKey ?? GRDVPNHelper.RegionKeyForOurTimeZone);
 
         // TJE - taking first host in our region for now.
-        RegionalHostRecord regionHostRecord = new RegionalHostRecord();
+        _logger.LogInformation(
+            $"GRDServerManager.SelectGuardianHostWithCompletion: Calling RegionUtils.SelectBestHostInRegion for region '{SelectedRegion.RegionName}'");
+        RegionalHostRecord regionHostRecord = RegionUtils.SelectBestHostInRegion(SelectedRegion.RegionName);
 
-        if (RegionUtils.KeyForCurrentlySelectedRegion != null)
-            regionHostRecord = RegionUtils.GetMyRegionHostRecord(RegionUtils.KeyForCurrentlySelectedRegion);
-
-        // CHANGE
         return (regionHostRecord.Hostname, regionHostRecord.HostLocation(), new ErrorResponse() ); // CHANGE!!
     }
 }
