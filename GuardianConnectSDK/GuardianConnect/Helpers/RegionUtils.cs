@@ -87,7 +87,6 @@ namespace GuardianConnect.Helpers
                             if (string.IsNullOrEmpty(regionsList[0].RegionName))
                             {
                                 Logger.LogCritical( "!!!!!!!!!!!!!!!!!!! AOT/JSON BUG - INDIVIDUAL GRDRegion objects parsed empty !!!!!!!!!!!!!!!!");
-                                Poof();
                             }
                             else
                             {
@@ -138,7 +137,7 @@ namespace GuardianConnect.Helpers
                     catch (Exception e)
                     {
                         Logger.LogCritical(e, $"GetLatestRegionsList: FATAL - Could not add region '{regionRec.RegionName}' object to regionLookup collection!");
-                        Poof();
+                        throw;
                     }
                 }
                 RegionKeys.Add(regionRec.RegionName);
@@ -146,12 +145,6 @@ namespace GuardianConnect.Helpers
             }
 
             return regionsList;
-        }
-
-        private static void Poof()
-        {
-            //Log.CloseAndFlush();
-            Environment.Exit(-1);
         }
 
         private static async Task<List<GeoData>> GetLatestTimeZonesForRegions()
