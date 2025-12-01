@@ -165,20 +165,6 @@ namespace GuardianConnect.Credentials
             Registry.CurrentUser.DeleteSubKeyTree(GRDKeyPath);
         }
 
-        /// <summary>
-        /// Code from macOs:
-        /// + (void)removeGuardianKeychainItems {
-        /// NSArray *guardianKeys = @[kKeychainStr_EapUsername,
-        ///                           kKeychainStr_EapPassword,
-        ///                           kKeychainStr_AuthToken,
-        ///                           kKeychainStr_APIAuthToken,
-        ///                           kKeychainStr_WireGuardConfig];
-        /// [guardianKeys enumerateObjectsUsingBlock:^(id  _Nonnull obj, NSUInteger idx, BOOL * _Nonnull stop) {
-        ///     [self removeKeychainItemForAccount:obj];
-        /// }];
-        /// [GRDCredentialManager clearMainCredentials];
-        ///}
-        /// </summary>
         public static void RemoveGuardianKeychainItems()
         {
             var rootGrdKey = Registry.CurrentUser.OpenSubKey(GRDKeyPath, true);

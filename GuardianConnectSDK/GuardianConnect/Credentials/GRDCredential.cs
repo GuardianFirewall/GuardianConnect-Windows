@@ -18,12 +18,12 @@ namespace GuardianConnect.Credentials
 	    public DateTime LastUpdated { get; set; }
         public string Name { get; set; } = string.Empty;
         public string Identifer { get; set; } = string.Empty;
-        public bool MainCredential  {get; set; }
+        public bool MainCredential  { get; set; }
 
 		//[JsonIgnore]
         public ITransportProvider.TransportProtocol TransportProtocol  {get; set; }
         public string HostnameDisplayValue { get; set; } = string.Empty;
-        public DateTime ExpirationDate  {get; set; }
+        public DateTime ExpirationDate  { get; set; }
         public string HostName { get; set; } = string.Empty;
         public string ClientId { get; set; } = string.Empty;
 

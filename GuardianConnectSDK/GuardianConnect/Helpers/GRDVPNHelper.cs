@@ -19,7 +19,6 @@ namespace GuardianConnect.Helpers
     {
         // Set up a singleton
         private static GRDVPNHelper? _instance;
-        private static bool _instanceCreated = false;
         private GRDServerManager? _grdServerManager;
         private static Microsoft.Extensions.Logging.ILogger _logger = NullLogger.Instance;
 
@@ -41,7 +40,6 @@ namespace GuardianConnect.Helpers
         }
 
         public GRDPEToken? PeToken;
-        public static bool IsClientSet = false;
         public DeviceFilterConfig? CurrentDeviceBlocklistConfig;
         public static Microsoft.Extensions.Logging.ILogger Logger
         {
@@ -61,16 +59,6 @@ namespace GuardianConnect.Helpers
         {
             _preferBetaCapableServers = preferBetaCapableServers;
             _featureEnvironment = featureEnvironment;
-        }
-
-        protected internal GRDVPNHelper(bool preferBetaCapableServers, GRDServerFeatureEnvironment featureEnvironment)
-        {
-            _preferBetaCapableServers = preferBetaCapableServers;
-            _featureEnvironment = featureEnvironment;
-//             if (!_instanceCreated)
-//             {
-//                 CreateInstance(preferBetaCapableServers, featureEnvironment);
-//             }
         }
 
         public static GRDVPNHelper Instance => _instance ?? throw new InvalidOperationException();
@@ -100,9 +88,6 @@ namespace GuardianConnect.Helpers
         /// GuardianConnect app key used to authenticate API requests
         public string? ConnectPublishableKey => _connectPublishableKey;
 
-        /// can be set to true to make - (void)getEvents return dummy alerts for debugging purposes
-        public bool DummyDataForDebugging => _dummyDataForDebugging;
-
         /// don't set this value manually, it is set upon the region selection code working successfully
         public static string? PreferredRegion
         {
@@ -120,59 +105,7 @@ namespace GuardianConnect.Helpers
             set => _regionKeyForOurTimeZone = value;
         }
 
-        /// a separate reference is kept of the mainCredential because the credential manager instance needs to be fetched from preferences
-        /// & the keychain every time its called.
-        private GRDCredential? _mainCredential;
-
-        public GRDCredential? mainCredential
-        {
-            get => _mainCredential;
-            set
-            {
-                StackTrace stackTrace = new StackTrace(); // get call stack
-                StackFrame[] stackFrames = stackTrace.GetFrames(); // get method calls (frames)
-
-                var sfm2 =
-                    $"{stackFrames[^2].GetMethod()}:{stackFrames[^2].GetFileLineNumber():dd}";
-                var sfm1 =
-                    $"{stackFrames[^1].GetMethod()}:{stackFrames[^1].GetFileLineNumber():dd}";
-                _logger.LogInformation($"Callers to setting mainCredential...");
-                _logger.LogDebug($"{sfm2}");
-                _logger.LogDebug($"{sfm1}");
-                _mainCredential = value ?? null;
-            }
-        }
-
-        /// This string will be used as the localized description of the NEVPNManager
-        /// configuration. The string will be visible in the network preferences on macOS
-        /// or in the VPN settings on iOS/iPadOS
-        ///
-        /// Please note that this value is different than the grdTunnelProviderManagerLocalizedDescription
-        /// and it is not recommended to set the same values for both tunnels to avoid customers confusion
-        public string? TunnelLocalizedDescription
-        {
-            get => _tunnelLocalizedDescription;
-            set => _tunnelLocalizedDescription = value;
-        }
-
-
-        /// Indicate whether or not GRDVPNHelper should append a formatted server
-        /// location string at the end of the localized tunnel description string
-        ///
-        /// Eg. "Guardian Firewall" -> "Guardian Firewall: Frankfurt, Germany"
-        public bool AppendServerRegionToTunnelLocalizedDescription
-        {
-            get => _appendServerRegionToTunnelLocalizedDescription;
-            set => _appendServerRegionToTunnelLocalizedDescription = value;
-        }
-
-        /// Tunnel provider manager wrapper class to help with
-        /// starting and stopping a WireGuard VPN tunnel or a local tunnel.
-        /// private static GRDTunnelManager tunnelManager;
-        /// Bundle Identifier string of the PacketTunnelProvider bundled with the main app.
-        /// May be omitted if WireGuard as the Transport Protocol or a local tunnel is not used.
-        /// It is recommended to set this up as early as possible
-        public string? tunnelProviderBundleIdentifier;
+        public GRDCredential? mainCredential { get; set; }
 
         /// Preferred DNS Server set here currently only apply to WireGuard VPN connections
         ///
@@ -187,11 +120,12 @@ namespace GuardianConnect.Helpers
         {
             _logger = StaticLoggerFactory.CreateLogger<GRDVPNHelper>();
             _logger.LogInformation("GRDVPNHelper.CreateInstance() - Entry.");
-            _instanceCreated = true;
-            _instance = new GRDVPNHelper(prefBetaServers, featureEnv);
+            _instance = new GRDVPNHelper();
             _instance._grdServerManager = new GRDServerManager();
             _instance.mainCredential = GRDCredentialManager.MainCredentials;
             _instance.PeToken = GRDPEToken.GetCurrentPEToken();
+            _instance._preferBetaCapableServers = prefBetaServers;
+            _instance._featureEnvironment = featureEnv;
 
             _instance.CurrentDeviceBlocklistConfig = new DeviceFilterConfig()
             {
@@ -226,12 +160,8 @@ namespace GuardianConnect.Helpers
             return isConnected ? activeConnectionName : string.Empty;
         }
 
-        public bool IsBusy;
         private string? _connectApiHostname;
         private readonly string? _connectPublishableKey;
-        private readonly bool _dummyDataForDebugging;
-        private string? _tunnelLocalizedDescription;
-        private bool _appendServerRegionToTunnelLocalizedDescription;
 
 
         private static void GetLocalTimeZone()
@@ -332,11 +262,6 @@ namespace GuardianConnect.Helpers
                         $"Failed to invalidate VPN credentials: {responseMessage.ReasonPhrase ?? errorResponse.Message})");
                 }
             }
-
-            // set user defaults to standard user defaults? TBD
-            // remove hostname override - should we allow host name override yet?
-            // bool - AppNeedsSelfRepair = false; - TBD
-            // Update UI to clear out servers/hosts anything else we reset above
         }
 
         public void ClearAllGuardianRegistrySettings()
@@ -344,11 +269,6 @@ namespace GuardianConnect.Helpers
             GRDCredentialManager.ClearMainCredentials();
             GRDKeychain.RemoveGuardianKeychainItems();
         }
-
-        // *******************
-        // TJE TODO NOTE 100323 - Instead of Mac version of the flow across multiple similar - will instead use one
-        // With intermixed calls for credentials or server selection/setting
-        // *******************
 
         /// <summary>
         /// Used as a helper to calling clients to return the name of the active connection, else null if not
@@ -365,39 +285,20 @@ namespace GuardianConnect.Helpers
             return isConnected;
         }
 
-        /// Used to create a new VPN connection if an active subscription exists. This is the main function to call when no EAP credentials
-        /// or subscriber credentials exist yet and
-        /// you want to establish a new connection on a server that is chosen automatically for you.
-        /// @param mid block This is a block you can assign for when this process has approached a mid point (a server is selected, subscriber
-        /// & eap credentials are generated). optional.
-        /// @param completion block This is a block that will return upon completion of the process, if success is TRUE and errorMessage is nil
-        /// then we will be successfully connected to a VPN node.
         public void ConfigureFirstTimeUserPostCredential(Action mid, Action<bool, string> completion)
         {
             (string host, string hostLocation, ErrorResponse errorResponse) =
                 _grdServerManager.SelectGuardianHostWithCompletion(PreferredRegion);
         }
 
-        /// Used to create a new VPN connection if an active subscription exists. This is the main function to call when no VPN credentials or a
-        /// Subscriber Credential exist yet and a new connection should be established to a server chosen automatically.
-        /// @param protocol The desired transport protocol to use to establish the connection. IKEv2 (builtin) as well as WireGuard via a
-        /// PacketTunnelProvider are supported
-        /// @param mid block This is a block you can assign for when this process has approached a mid point (a server is selected, subscriber
-        /// & eap credentials are generated). optional.
-        /// @param completion block This is a block that will return upon completion of the process, if success is TRUE and errorMessage is nil
-        /// then we will be successfully connected to a VPN node.
-        public async Task<ErrorResponse> ConnectVpnWithNewUserCredentialsThruProtocol(
+        public async Task<ErrorResponse> ConnectVpnWithNewUserCredentialsForProtocol(
             ITransportProvider.TransportProtocol protocol)
         {
-            IsBusy = true;
             ErrorResponse? errorResponse = new ErrorResponse();
 
             // CONN#3
             _logger.LogInformation("CONN#3");
 
-            // TJE - just go get Subscriber Credentials for IKEv2 for now
-            // also - just use first server for my region for now
-            // TODO!! - check errorResponse
             errorResponse = await CreateStandaloneCredentialsForTransportProtocol(protocol, 30); // CONN#4-CONN#10
             if (errorResponse.IsError) return errorResponse;
 
@@ -412,7 +313,6 @@ namespace GuardianConnect.Helpers
             errorResponse = await ConnectVpnWithConfiguredCredentials();
             // TODO - Followup here with either result from GRDGatewayAPI.GetServerStatus or actual WCF call over to GuardianFirewallService to make Ras CreateEntry->ConnectEntry calls
 
-            IsBusy = false;
             return errorResponse;
         }
 
@@ -471,15 +371,6 @@ namespace GuardianConnect.Helpers
             return errorResponse;
         }
 
-        /// Used to disconnect from the current VPN node
-        ///
-        /// The sibling to this function - (void) disconnectVPN does not expose various potential errors as it tries to mitigate various OS bugs as
-        /// well as trigger race conditions
-        /// to provide the expected behavior to begin with.
-        ///
-        /// This function might be hazardous to your health
-        /// - Parameter completion: completion block potentially containing an error message. This completion block may be called multiple times and
-        /// could potentially include an error every time
         public async void DisconnectVPN()
         {
             _logger.LogInformation("DISCONN#2");
@@ -521,12 +412,6 @@ namespace GuardianConnect.Helpers
             return (GRDHousekeepingAPI.LiveGrdCredential, errorResponse);
         }
 
-        /// Used to create standalone VPN credentials on an automatically chosen host that is valid for a certain number of days. Good for exporting
-        /// VPN credentials for use on other devices.
-        /// @param protocol The desired transport protocol to use to establish the connection. IKEv2 (builtin) as well as WireGuard via a
-        /// PacketTunnelProvider are supported
-        /// @param validForDays integer number of days these credentials will be valid for
-        /// @param ErrorResponse response that has the Data field that will contain a List<GRDCredentials> collection of credentials upon success
         public async Task<ErrorResponse> CreateStandaloneCredentialsForTransportProtocol(
             ITransportProvider.TransportProtocol protocol, int validForDays = 30)
         {
@@ -534,24 +419,6 @@ namespace GuardianConnect.Helpers
             // CONN#4
             _logger.LogInformation("CONN#4");
 
-#if NOTNEEDEDNOW
-            // TJE - let's do the hosts update right here
-            // TJE TODO: CHANGE THIS! NO NEED HERE. WE ARE GETTING HOSTS IN BACKGROUND TASK NOW
-            try
-            {
-                // AND BELOW WE WILL ASK GRDServerManager TO SELECT HOST FOR US from static tables.
-                await RegionUtils.GetHostsForRegionKey(PreferredRegion);
-            }
-            catch (HttpRequestException hrex)
-            {
-                _logger.LogError(hrex, $"CreateStandaloneCredentialsForTransportProtocol: http request error while getting region's hosts. Status={hrex.StatusCode}, RequestError={hrex.HttpRequestError}");
-                errorResponse = new ErrorResponse().SetException(hrex).SetErrorMessage("HttpRequestError")
-                    .SetData(new List<GRDCredential>());
-                return errorResponse;
-            }
-
-#endif
-            // TJE - This call to SelectGuardianHost is done instead of Mac's version: hostname:[[NSUserDefaults standardUserDefaults]valueForKey:kGRDHostnameOverride]
             GRDServerManager svmgr = new GRDServerManager();
             (var host, var hostDisplay, ErrorResponse error) = svmgr.SelectGuardianHostWithCompletion(PreferredRegion);
             errorResponse = await CreateStandaloneCredentialsForTransportProtocol(protocol, validForDays, host);
