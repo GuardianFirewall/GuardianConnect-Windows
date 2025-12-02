@@ -18,7 +18,7 @@ namespace GuardianConnect.Helpers
     public class GRDVPNHelper
     {
         // Set up a singleton
-        private static GRDVPNHelper? _instance;
+        private static GRDVPNHelper? _singleton;
         private static bool _instanceCreated = false;
         private GRDServerManager? _grdServerManager;
         private static Microsoft.Extensions.Logging.ILogger _logger = NullLogger.Instance;
@@ -69,11 +69,11 @@ namespace GuardianConnect.Helpers
             _featureEnvironment = featureEnvironment;
 //             if (!_instanceCreated)
 //             {
-//                 CreateInstance(preferBetaCapableServers, featureEnvironment);
+//                 CreateSingleton(preferBetaCapableServers, featureEnvironment);
 //             }
         }
 
-        public static GRDVPNHelper Instance => _instance ?? throw new InvalidOperationException();
+        public static GRDVPNHelper Singleton => _singleton ?? throw new InvalidOperationException();
 
         public enum GRDServerFeatureEnvironment
         {
@@ -183,17 +183,17 @@ namespace GuardianConnect.Helpers
         /// payment validation mechanisms already known to the Connect API
         public Dictionary<string, object>? customSubscriberCredentialAuthKeys;
 
-        public static void CreateInstance(bool prefBetaServers, GRDServerFeatureEnvironment featureEnv)
+        public static void CreateSingleton(bool prefBetaServers, GRDServerFeatureEnvironment featureEnv)
         {
             _logger = StaticLoggerFactory.CreateLogger<GRDVPNHelper>();
-            _logger.LogInformation("GRDVPNHelper.CreateInstance() - Entry.");
+            _logger.LogInformation("GRDVPNHelper.CreateSingleton() - Entry.");
             _instanceCreated = true;
-            _instance = new GRDVPNHelper(prefBetaServers, featureEnv);
-            _instance._grdServerManager = new GRDServerManager();
-            _instance.mainCredential = GRDCredentialManager.MainCredentials;
-            _instance.PeToken = GRDPEToken.GetCurrentPEToken();
+            _singleton = new GRDVPNHelper(prefBetaServers, featureEnv);
+            _singleton._grdServerManager = new GRDServerManager();
+            _singleton.mainCredential = GRDCredentialManager.MainCredentials;
+            _singleton.PeToken = GRDPEToken.GetCurrentPEToken();
 
-            _instance.CurrentDeviceBlocklistConfig = new DeviceFilterConfig()
+            _singleton.CurrentDeviceBlocklistConfig = new DeviceFilterConfig()
             {
                 Api_auth_token = GRDCredentialManager.MainCredentials == null ? "" :
                     GRDCredentialManager.MainCredentials.ApiAuthToken == null ? "" :
@@ -226,7 +226,6 @@ namespace GuardianConnect.Helpers
             return isConnected ? activeConnectionName : string.Empty;
         }
 
-        public bool IsBusy;
         private string? _connectApiHostname;
         private readonly string? _connectPublishableKey;
         private readonly bool _dummyDataForDebugging;
@@ -261,7 +260,7 @@ namespace GuardianConnect.Helpers
         }
 
 
-        /// retrieves values out of the system keychain and stores them in the Instance singleton object in memory for other
+        /// retrieves values out of the system keychain and stores them in the Singleton object in memory for other
         /// functions to use in the future
         public void _loadCredentialsFromKeychain()
         {
@@ -386,10 +385,9 @@ namespace GuardianConnect.Helpers
         /// & eap credentials are generated). optional.
         /// @param completion block This is a block that will return upon completion of the process, if success is TRUE and errorMessage is nil
         /// then we will be successfully connected to a VPN node.
-        public async Task<ErrorResponse> ConnectVpnWithNewUserCredentialsThruProtocol(
+        public async Task<ErrorResponse> ConnectVpnWithNewUserCredentialsForProtocol(
             ITransportProvider.TransportProtocol protocol)
         {
-            IsBusy = true;
             ErrorResponse? errorResponse = new ErrorResponse();
 
             // CONN#3
@@ -412,7 +410,6 @@ namespace GuardianConnect.Helpers
             errorResponse = await ConnectVpnWithConfiguredCredentials();
             // TODO - Followup here with either result from GRDGatewayAPI.GetServerStatus or actual WCF call over to GuardianFirewallService to make Ras CreateEntry->ConnectEntry calls
 
-            IsBusy = false;
             return errorResponse;
         }
 

@@ -39,15 +39,15 @@ public class GRDGateway
         public string SubscriberCredential { get; set; } = string.Empty;
     }
 
-    public string ApiHostname => GRDVPNHelper.Instance.mainCredential?.HostName ?? string.Empty;
+    public string ApiHostname => GRDVPNHelper.Singleton.mainCredential?.HostName ?? string.Empty;
 
-    public string ApiAuthToken => GRDVPNHelper.Instance.mainCredential?.ApiAuthToken ?? string.Empty;
+    public string ApiAuthToken => GRDVPNHelper.Singleton.mainCredential?.ApiAuthToken ?? string.Empty;
 
     public string DeviceIdentifier
     {
         get
         {
-            var mainCreds = GRDVPNHelper.Instance.mainCredential;
+            var mainCreds = GRDVPNHelper.Singleton.mainCredential;
             if (mainCreds is { TransportProtocol: ITransportProvider.TransportProtocol.TransportIKEv2 })
             {
                 return mainCreds.UserName;
@@ -228,7 +228,7 @@ public class GRDGateway
 
     public async void SetDeviceFilterConfigsForDeviceId()
     {
-        if (!GRDVPNHelper.Instance.IsConnected(out _)) return;
+        if (!GRDVPNHelper.Singleton.IsConnected(out _)) return;
         if (string.IsNullOrEmpty(BaseHostName))
         {
             _logger.LogError("Cannot set DeviceFilterConfig since BaseHostName is not set!");
@@ -236,11 +236,11 @@ public class GRDGateway
         }
         
         // Get DeviceFilterConfig object
-        var dfcCurrent = GRDVPNHelper.Instance.CurrentDeviceBlocklistConfig;
+        var dfcCurrent = GRDVPNHelper.Singleton.CurrentDeviceBlocklistConfig;
         dfcCurrent.Api_auth_token =  ApiAuthToken;
         // TJE 102225: Check and set our CurrentDeviceBlockListConfig's Api-Auth-Token value from MainCredentials
         _logger.LogInformation("SetDeviceFilterConfigsForDevice: Updating CurrentDeviceBlocklistConfig api_auth_token");
-        GRDVPNHelper.Instance.CurrentDeviceBlocklistConfig.Api_auth_token = ApiAuthToken;
+        GRDVPNHelper.Singleton.CurrentDeviceBlocklistConfig.Api_auth_token = ApiAuthToken;
         //
         var dfcJson = JsonSerializer.Serialize(dfcCurrent, DeviceFilterConfigJsonContext.Default.DeviceFilterConfig);
         //var clientId = GRDCredentialManager.MainCredentials.ClientId;
