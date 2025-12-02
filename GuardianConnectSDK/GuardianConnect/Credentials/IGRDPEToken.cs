@@ -1,6 +1,6 @@
 ﻿namespace GuardianConnect.Credentials
 {
-    internal interface IGRDPEToken
+    public interface IGRDPEToken
     {
         /// The Password Equivalent Token itself
         string Token { get; }
@@ -36,6 +36,11 @@
         void Store();
 
         /// Convenience method to delete the persistent references of the current PET as well as the token's expiration date
-        int DestroyAllPersisted();
+
+        static void DestroyAllPersisted()
+        {
+            GRDKeychain.RemoveKeychainItemForAccount(IGRDKeychain.kKeychainStr_PEToken_Object);
+            GRDKeychain.RemoveKeychainItemForAccount(IGRDKeychain.kKeychainStr_PEToken_Itself);
+        }
     }
 }

@@ -110,9 +110,9 @@ public class GRDHousekeepingAPI
         // TJE: Called by GRDVPNHelper.GetValidSubscriberCredentialWithCompletion()
         
         // set host to use
-        string connectHost = GRDVPNHelper.Instance.PeToken?.ConnectAPIEnv ?? Common.kConnectAPIHostname;
+        string connectHost = GRDVPNHelper.Singleton.PeToken?.ConnectAPIEnv ?? Common.kConnectAPIHostname;
         // Validation Method PEToken...
-        string peToken = GRDVPNHelper.Instance.PeToken?.Token;
+        string peToken = GRDVPNHelper.Singleton.PeToken?.Token;
         if (string.IsNullOrEmpty(peToken))
         {
             _logger.LogError(@"PEToken Object has empty token. Trying string from keychain...");
