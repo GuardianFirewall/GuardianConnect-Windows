@@ -168,7 +168,7 @@ public class VPNTransportIKEV2 : ITransportProvider
         Logger.LogInformation(
             $"StopVPNTunnel: WasDisconnectPlanned now equals {NotificationHandler.WasDisconnectPlanned}");
         ResetVPNStateAtSuspend(); // CHECK THIS - moving to here - makes sense after non-error Disconnect command return
-        ConnectionRoutines.DisconnectEntry();
+        ConnectionRoutines.DisconnectEntryAndRemove();
     }
 
     public virtual ErrorResponse FetchLastDisonnectError()

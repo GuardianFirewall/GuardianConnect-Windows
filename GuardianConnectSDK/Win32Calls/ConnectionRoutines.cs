@@ -1,6 +1,7 @@
 using GuardianConnect.Shared;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Logging.Abstractions;
+using Serilog;
 using System.Reflection;
 using System.Runtime.InteropServices;
 using Windows.Win32;
@@ -184,6 +185,9 @@ public static class ConnectionRoutines
 
         entryWasWritten = PInvoke.WritePrivateProfileString(entryName, "CustomIPSecPolicies",
             "030000000400000002000000050000000200000000000000", phonebookPath);
+        /* given by BC/Brave - the 5 in the middle here could be the ECP384 curve specifier
+                   "030000000400000005000000050000000200000000000000", 
+        */
         if (!entryWasWritten)
         {
             var error = Marshal.GetLastWin32Error();
@@ -255,23 +259,23 @@ public static class ConnectionRoutines
         return new ErrorResponse();
     }
 
-    public static bool DisconnectEntry()
+    public static bool DisconnectEntryAndRemove()
     {
-        Logger.LogInformation($"ConnectionRoutines.DisconnectEntry: ActiveConnectionHandle null? {(ActiveConnectionHandle == HRASCONN.Null)}, ActiveConnectionEntryName = '{ActiveConnectionEntryName}'");
+        Logger.LogInformation($"ConnectionRoutines.DisconnectEntryAndRemove: ActiveConnectionHandle null? {(ActiveConnectionHandle == HRASCONN.Null)}, ActiveConnectionEntryName = '{ActiveConnectionEntryName}'");
         bool disconnectResult = false;
         var connectionResult = CheckConnection(ActiveConnectionEntryName, ref ActiveConnectionHandle);
-        Logger.LogInformation($"ConnectionRoutines.DisconnectEntry: checking connection returned {connectionResult}");
+        Logger.LogInformation($"ConnectionRoutines.DisconnectEntryAndRemove: checking connection returned {connectionResult}");
         if (connectionResult == Utility.CheckConnectionResult.CONNECTED && ActiveConnectionHandle != HRASCONN.Null)
         {
             var retVal = PInvoke.RasHangUp(ActiveConnectionHandle);
             if (retVal != 0)
             {
-                Logger.LogError($"DisconnectEntry: Call to RasHangUp returned NON-SUCCESS value of {retVal:X8}");
+                Logger.LogError($"DisconnectEntryAndRemove: Call to RasHangUp returned NON-SUCCESS value of {retVal:X8}");
                 disconnectResult = false;
             }
             else
             {
-                Logger.LogInformation("DisconnectEntry: Successful return from call to RasHangup. Calling UpdateFiltersState to remove all traffic filters...");
+                Logger.LogInformation("DisconnectEntryAndRemove: Successful return from call to RasHangup. Calling UpdateFiltersState to remove all traffic filters...");
 
                 // Update Filters to shape traffic as needed
                 VpnDnsFilteringHandler.UpdateFiltersState(ActiveConnectionEntryName);
@@ -286,6 +290,9 @@ public static class ConnectionRoutines
             Logger.LogInformation($"Entry '{ActiveConnectionEntryName} is not in a CONNECTED state. Its state is {connectionResult}");
             disconnectResult = true;
         }
+
+        // Now remove all entries in phonebook - for now we only have Guardian Firewall entries
+        RemoveAnyGuardianEntries();
 
         return disconnectResult;
     }
@@ -360,5 +367,35 @@ public static class ConnectionRoutines
         };
     }
 
+    internal static unsafe void RemoveAnyGuardianEntries()
+    {
+        try
+        {
+            var entries = GetRasConnections(out uint numberOfConnections);
+            Log.Information($"Number of RAS connections = {numberOfConnections}");
+            for (int i = 0; i < numberOfConnections; i++)
+            {
+                var conn = entries[i];
+                // We only care about connections that start with "Guardian Firewall -"
+                if (!conn.szEntryName.ToString().StartsWith("Guardian Firewall -")) continue;
+
+                var status = new RASCONNSTATUSW
+                {
+                    dwSize = (uint)sizeof(RASCONNSTATUSW)
+                };
+                var checkResult = GetRasConnectStatus(entries[i].hrasconn, ref status);
+                if (checkResult == Utility.CheckConnectionResult.CONNECTED)
+                {
+                    Log.Information($"RemoveAnyGuardianEntries: Found active connection for entry {entries[i].szEntryName}");
+                    Log.Information("Disconnecting now...");
+                    PInvoke.RasHangUp(conn.hrasconn);
+                }
+            }
+        }
+        catch (Exception e)
+        {
+            Log.Error(e, $"RemoveAnyGuardianEntries: Exeption thrown {e.Message}");
+        }
+    }
 }
     

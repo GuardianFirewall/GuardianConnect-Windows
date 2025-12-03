@@ -19,26 +19,11 @@ namespace GuardianConnect.Helpers
     {
         // Set up a singleton
         private static GRDVPNHelper? _singleton;
-        private static bool _instanceCreated = false;
         private GRDServerManager? _grdServerManager;
         private static Microsoft.Extensions.Logging.ILogger _logger = NullLogger.Instance;
 
         protected internal bool _preferBetaCapableServers;
         protected internal GRDServerFeatureEnvironment? _featureEnvironment;
-
-        public enum GRDVPNHelperStatusCode
-        {
-            GRDVPNHelperSuccess,
-            GRDVPNHelperFail,
-            GRDVPNHelperDoesNeedMigration,
-            GRDVPNHelperMigrating,
-            GRDVPNHelperNetworkConnectionError, // add other network errors
-            GRDVPNHelperCoudNotReachAPIError,
-            GRDVPNHelperApp_VpnPrefsLoadError,
-            GRDVPNHelperApp_VpnPrefsSaveError,
-            GRDVPNHelperAPI_AuthenticationError,
-            GRDVPNHelperAPI_ProvisioningError
-        }
 
         public GRDPEToken? PeToken;
         public static bool IsClientSet = false;
@@ -67,10 +52,6 @@ namespace GuardianConnect.Helpers
         {
             _preferBetaCapableServers = preferBetaCapableServers;
             _featureEnvironment = featureEnvironment;
-//             if (!_instanceCreated)
-//             {
-//                 CreateSingleton(preferBetaCapableServers, featureEnvironment);
-//             }
         }
 
         public static GRDVPNHelper Singleton => _singleton ?? throw new InvalidOperationException();
@@ -187,7 +168,6 @@ namespace GuardianConnect.Helpers
         {
             _logger = StaticLoggerFactory.CreateLogger<GRDVPNHelper>();
             _logger.LogInformation("GRDVPNHelper.CreateSingleton() - Entry.");
-            _instanceCreated = true;
             _singleton = new GRDVPNHelper(prefBetaServers, featureEnv);
             _singleton._grdServerManager = new GRDServerManager();
             _singleton.mainCredential = GRDCredentialManager.MainCredentials;
@@ -200,7 +180,7 @@ namespace GuardianConnect.Helpers
                     GRDCredentialManager.MainCredentials.ApiAuthToken,
             };
 
-            RegionUtils.InitialGeoInformationLoadComplete.Wait(1 * 1000);
+            GRDServerManager.InitialGeoInformationLoadComplete.Wait(1 * 1000);
             GetRegionForOurTimeZone();
         }
 
@@ -247,7 +227,7 @@ namespace GuardianConnect.Helpers
         {
             GetLocalTimeZone();
             // Let's just tuck away our fixed region where we are
-            var timezoneMissing = RegionUtils.LookUpRegionIndexForMyTimeZone(OurTimeZoneId, out _regionKeyForOurTimeZone);
+            var timezoneMissing = GRDServerManager.LookUpRegionIndexForMyTimeZone(OurTimeZoneId, out _regionKeyForOurTimeZone);
             if (timezoneMissing)
             {
                 Log.Warning(
@@ -393,9 +373,6 @@ namespace GuardianConnect.Helpers
             // CONN#3
             _logger.LogInformation("CONN#3");
 
-            // TJE - just go get Subscriber Credentials for IKEv2 for now
-            // also - just use first server for my region for now
-            // TODO!! - check errorResponse
             errorResponse = await CreateStandaloneCredentialsForTransportProtocol(protocol, 30); // CONN#4-CONN#10
             if (errorResponse.IsError) return errorResponse;
 
@@ -408,7 +385,6 @@ namespace GuardianConnect.Helpers
 
             // Do connection call here
             errorResponse = await ConnectVpnWithConfiguredCredentials();
-            // TODO - Followup here with either result from GRDGatewayAPI.GetServerStatus or actual WCF call over to GuardianFirewallService to make Ras CreateEntry->ConnectEntry calls
 
             return errorResponse;
         }
@@ -436,10 +412,7 @@ namespace GuardianConnect.Helpers
             errorResponse = await gw.GetServerStatus();
             if (errorResponse.IsError)
             {
-                errorResponse
-                    .SetErrorMessage(
-                        $"ConfigureAndConnectVPNWithCompletion: GetServerStatus returned: {errorResponse.GetReasonPhrase()}")
-                    .SetData(GRDVPNHelperStatusCode.GRDVPNHelperFail);
+                errorResponse.SetErrorMessage( $"ConfigureAndConnectVPNWithCompletion: GetServerStatus returned: {errorResponse.GetReasonPhrase()}");
                 return errorResponse;
             }
 
@@ -537,7 +510,7 @@ namespace GuardianConnect.Helpers
             try
             {
                 // AND BELOW WE WILL ASK GRDServerManager TO SELECT HOST FOR US from static tables.
-                await RegionUtils.GetHostsForRegionKey(PreferredRegion);
+                await GRDServerManager.GetHostsForRegionKey(PreferredRegion);
             }
             catch (HttpRequestException hrex)
             {
