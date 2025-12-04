@@ -48,7 +48,7 @@ public class GRDServerManager
 
     public GRDVPNHelper.GRDServerFeatureEnvironment FeatureEnv;
     public bool BetaCapable { get; set; }
-    public GRDRegion SelectedRegion { get; set; }
+    private static GRDRegion SelectedRegion { get; set; }
 
     public GRDServerManager()
     {
@@ -59,12 +59,12 @@ public class GRDServerManager
     /// Used to find and return the VPN server node we will connect to based on the results of a call to 'getGuardianHostsWithCompletion:"
     /// @param completion Completion block that will contain the selected host, hostLocation upon success or an error message upon failure.
     // This is called from GRDVPNHelper.SelectAndSetBestGuardianHost
-    public (string, string, ErrorResponse) SelectGuardianHostWithCompletion(string? selectedRegionKey)
+    public static (string, string, ErrorResponse) SelectGuardianHostWithCompletion(string? selectedRegionKey)
     // CHANGE ^-----------------------^
     {
         // CONN#5
         _logger.LogInformation("GRDServerManager.SelectGuardianHostWithCompletion: [CONN#5]  selectedRegionKey: " + (selectedRegionKey ?? "null"));
-        SelectedRegion = GetGRDRegionByKey(selectedRegionKey ?? GRDVPNHelper.RegionKeyForOurTimeZone);
+        SelectedRegion = GetGRDRegionByKey(selectedRegionKey ?? GetRegionForOurTimeZone());
 
         _logger.LogInformation(
             $"GRDServerManager.SelectGuardianHostWithCompletion: Calling SelectBestHostInRegion for region '{SelectedRegion.RegionName}'");
@@ -186,7 +186,7 @@ public class GRDServerManager
 
     public static string GetRegionKeyByDisplayName(string pn)
     {
-        if (pn == "Automatic") return GRDVPNHelper.RegionKeyForOurTimeZone ?? string.Empty;
+        if (pn == "Automatic") return "Automatic";
         return Live.regionLookup.Values.First(v => v.DisplayName == pn).RegionName;
     }
 
@@ -265,6 +265,16 @@ public class GRDServerManager
 
         // Populate region lookup collections
         Alternate.RegionKeysByDisplay.TryAdd("Automatic", "Automatic");
+        Alternate.regionLookup.Add("Automatic",
+            new GRDRegion
+            {
+                RegionName = "Automatic",
+                DisplayName = "Automatic",
+                BestHost = string.Empty,
+                BestHostLocation = string.Empty,
+                Continent = string.Empty,
+                CountryISOCode = string.Empty
+            });
         Logger.LogInformation($"RefreshInactiveRegionsLists: regionLookup pre-load has {Alternate.regionLookup.Count} items.");
         var rluKeys = String.Join(',', Alternate.regionLookup.Keys);
         Logger.LogDebug($"regionLookup dictionary keys are: '{rluKeys}");
@@ -448,6 +458,31 @@ public class GRDServerManager
 
         return regionHosts.ElementAt(Random.Shared.Next(regionHosts.Count - 1));
     }
+
+    private static string GetLocalTimeZone()
+    {
+        // Get some time and timezone stuff
+        var localTimeZoneInfo = TimeZoneInfo.Local;
+        var inanaId = TimeZoneInfo.TryConvertWindowsIdToIanaId(localTimeZoneInfo.Id, out string otzID);
+        Log.Information($"GetLocalTimeZone(): Local time zone is {TimeZoneInfo.Local}. Our Time Zone ID: '{otzID}'");
+
+        return otzID;
+    }
+
+    private static string GetRegionForOurTimeZone()
+    {
+        string ourTimeZoneId = GetLocalTimeZone();
+        // Let's just tuck away our fixed region where we are
+        var timezoneMissing = GRDServerManager.LookUpRegionIndexForMyTimeZone(ourTimeZoneId, out string regionKeyForOurTimeZone);
+        if (timezoneMissing)
+        {
+            Log.Warning($"Our time zone ID '{ourTimeZoneId}' was NOT FOUND in our Regions' Time Zones Lookup tables!!");
+            ourTimeZoneId = "America/New_York";
+        }
+
+        return regionKeyForOurTimeZone;
+    }
+
     #endregion - private methods
 
     #endregion
