@@ -280,8 +280,8 @@ public static class ConnectionRoutines
                 // Update Filters to shape traffic as needed
                 VpnDnsFilteringHandler.UpdateFiltersState(ActiveConnectionEntryName);
                 ActiveConnectionHandle = HRASCONN.Null;
-                ActiveConnectionEntryName = "";
                 disconnectResult = true;
+                ActiveConnectionEntryName = "";
             }
         }
         else
@@ -292,7 +292,8 @@ public static class ConnectionRoutines
         }
 
         // Now remove all entries in phonebook - for now we only have Guardian Firewall entries
-        RemoveAnyGuardianEntries();
+        //RemoveAnyGuardianEntries();
+        RemoveAllRasEntries();
 
         return disconnectResult;
     }
@@ -367,34 +368,104 @@ public static class ConnectionRoutines
         };
     }
 
+#if NOTWORKING
     internal static unsafe void RemoveAnyGuardianEntries()
     {
         try
         {
-            var entries = GetRasConnections(out uint numberOfConnections);
-            Log.Information($"Number of RAS connections = {numberOfConnections}");
+            //var entries = GetRasConnections(out uint numberOfConnections);
+            //var entries = PInvoke.RasEnumEntries(null, null, out uint numberOfConnections);
+            //
+            uint entriesBufferSize = 0;
+            uint numberOfConnections = 0;
+            RASENTRYNAMEW[] entries = Array.Empty<RASENTRYNAMEW>();
+
+            // First call to get required buffer size and number of entries
+            uint ret = PInvoke.RasEnumEntries(null, null, null, ref entriesBufferSize, out numberOfConnections);
+            if (numberOfConnections == 0)
+            {
+                Logger.LogInformation("RemoveAnyGuardianEntries: No RAS entries found in phonebook.");
+                return;
+            }
+            if (ret == PInvoke.ERROR_BUFFER_TOO_SMALL && entriesBufferSize > 0)
+            {
+                entries = new RASENTRYNAMEW[entriesBufferSize / (uint)Marshal.SizeOf<RASENTRYNAMEW>()];
+                var pEntries = &entries;
+                for (int i = 0; i < entries.Length; i++)
+                {
+                    entries[i].dwSize = (uint)Marshal.SizeOf<RASENTRYNAMEW>();
+                }
+                //ret = PInvoke.RasEnumEntries(null, null, pEntries, ref entriesBufferSize, out numberOfConnections);
+            }
+            //
+            Logger.LogInformation($"Number of RAS connections = {numberOfConnections}");
             for (int i = 0; i < numberOfConnections; i++)
             {
                 var conn = entries[i];
                 // We only care about connections that start with "Guardian Firewall -"
                 if (!conn.szEntryName.ToString().StartsWith("Guardian Firewall -")) continue;
 
-                var status = new RASCONNSTATUSW
-                {
-                    dwSize = (uint)sizeof(RASCONNSTATUSW)
-                };
-                var checkResult = GetRasConnectStatus(entries[i].hrasconn, ref status);
-                if (checkResult == Utility.CheckConnectionResult.CONNECTED)
-                {
-                    Log.Information($"RemoveAnyGuardianEntries: Found active connection for entry {entries[i].szEntryName}");
-                    Log.Information("Disconnecting now...");
-                    PInvoke.RasHangUp(conn.hrasconn);
-                }
+                Logger.LogInformation($"RemoveAnyGuardianEntries: Removing entry '{conn.szEntryName}' from phonebook...");
+                PInvoke.RasDeleteEntry(null, conn.szEntryName.ToString());
             }
         }
         catch (Exception e)
         {
             Log.Error(e, $"RemoveAnyGuardianEntries: Exeption thrown {e.Message}");
+        }
+    }
+#endif
+
+    internal static unsafe void RemoveAllRasEntries()
+    {
+        try
+        {
+            uint entriesBufferSize = 0;
+            uint numberOfEntries = 0;
+
+            // First call to get required buffer size and number of entries
+            uint ret = PInvoke.RasEnumEntries(null, null, null, ref entriesBufferSize, out numberOfEntries);
+            if (numberOfEntries == 0)
+            {
+                Logger.LogInformation("RemoveAllRasEntries: No RAS entries found in phonebook.");
+                return;
+            }
+            if (ret != PInvoke.ERROR_BUFFER_TOO_SMALL || entriesBufferSize == 0)
+            {
+                Logger.LogError($"RemoveAllRasEntries: Unexpected return value from RasEnumEntries: {ret}, buffer size: {entriesBufferSize}");
+                return;
+            }
+
+            RASENTRYNAMEW[] entries = new RASENTRYNAMEW[numberOfEntries];
+            fixed (RASENTRYNAMEW* pEntries = entries)
+            {
+                for (int i = 0; i < numberOfEntries; i++)
+                {
+                    pEntries[i].dwSize = (uint)Marshal.SizeOf<RASENTRYNAMEW>();
+                }
+
+                ret = PInvoke.RasEnumEntries(null, null, pEntries, ref entriesBufferSize, out numberOfEntries);
+                if (ret != 0)
+                {
+                    Logger.LogError($"RemoveAllRasEntries: RasEnumEntries failed with error {ret}");
+                    return;
+                }
+
+                for (int i = 0; i < numberOfEntries; i++)
+                {
+                    string entryName = pEntries[i].szEntryName.ToString();
+                    Logger.LogInformation($"RemoveAllRasEntries: Deleting entry '{entryName}'...");
+                    uint deleteRet = PInvoke.RasDeleteEntry(null, entryName);
+                    if (deleteRet != 0)
+                    {
+                        Logger.LogError($"RemoveAllRasEntries: RasDeleteEntry failed for '{entryName}' with error {deleteRet}");
+                    }
+                }
+            }
+        }
+        catch (Exception ex)
+        {
+            Logger.LogError($"RemoveAllRasEntries: Exception thrown: {ex.Message}");
         }
     }
 }
