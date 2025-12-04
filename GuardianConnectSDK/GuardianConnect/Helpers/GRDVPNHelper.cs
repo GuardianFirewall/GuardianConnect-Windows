@@ -19,26 +19,11 @@ namespace GuardianConnect.Helpers
     {
         // Set up a singleton
         private static GRDVPNHelper? _singleton;
-        private static bool _instanceCreated = false;
         private GRDServerManager? _grdServerManager;
         private static Microsoft.Extensions.Logging.ILogger _logger = NullLogger.Instance;
 
         protected internal bool _preferBetaCapableServers;
         protected internal GRDServerFeatureEnvironment? _featureEnvironment;
-
-        public enum GRDVPNHelperStatusCode
-        {
-            GRDVPNHelperSuccess,
-            GRDVPNHelperFail,
-            GRDVPNHelperDoesNeedMigration,
-            GRDVPNHelperMigrating,
-            GRDVPNHelperNetworkConnectionError, // add other network errors
-            GRDVPNHelperCoudNotReachAPIError,
-            GRDVPNHelperApp_VpnPrefsLoadError,
-            GRDVPNHelperApp_VpnPrefsSaveError,
-            GRDVPNHelperAPI_AuthenticationError,
-            GRDVPNHelperAPI_ProvisioningError
-        }
 
         public GRDPEToken? PeToken;
         public static bool IsClientSet = false;
@@ -67,10 +52,6 @@ namespace GuardianConnect.Helpers
         {
             _preferBetaCapableServers = preferBetaCapableServers;
             _featureEnvironment = featureEnvironment;
-//             if (!_instanceCreated)
-//             {
-//                 CreateSingleton(preferBetaCapableServers, featureEnvironment);
-//             }
         }
 
         public static GRDVPNHelper Singleton => _singleton ?? throw new InvalidOperationException();
@@ -110,15 +91,7 @@ namespace GuardianConnect.Helpers
             set => _preferredRegion = value;
         }
 
-        public static string OurTimeZoneId;
         private static string? _preferredRegion;
-        private static string _regionKeyForOurTimeZone;
-
-        public static string RegionKeyForOurTimeZone
-        {
-            get => _regionKeyForOurTimeZone;
-            set => _regionKeyForOurTimeZone = value;
-        }
 
         /// a separate reference is kept of the mainCredential because the credential manager instance needs to be fetched from preferences
         /// & the keychain every time its called.
@@ -187,7 +160,6 @@ namespace GuardianConnect.Helpers
         {
             _logger = StaticLoggerFactory.CreateLogger<GRDVPNHelper>();
             _logger.LogInformation("GRDVPNHelper.CreateSingleton() - Entry.");
-            _instanceCreated = true;
             _singleton = new GRDVPNHelper(prefBetaServers, featureEnv);
             _singleton._grdServerManager = new GRDServerManager();
             _singleton.mainCredential = GRDCredentialManager.MainCredentials;
@@ -200,8 +172,8 @@ namespace GuardianConnect.Helpers
                     GRDCredentialManager.MainCredentials.ApiAuthToken,
             };
 
-            RegionUtils.InitialGeoInformationLoadComplete.Wait(1 * 1000);
-            GetRegionForOurTimeZone();
+            GRDServerManager.InitialGeoInformationLoadComplete.Wait(1 * 1000);
+            PreferredRegion = Preferences.Get(Common.kPreferredRegion, null);
         }
 
         /// Helper function to quickly determine if a VPN tunnel of any kind
@@ -231,34 +203,6 @@ namespace GuardianConnect.Helpers
         private readonly bool _dummyDataForDebugging;
         private string? _tunnelLocalizedDescription;
         private bool _appendServerRegionToTunnelLocalizedDescription;
-
-
-        private static void GetLocalTimeZone()
-        {
-            // Get some time and timezone stuff
-            var localTimeZoneInfo = TimeZoneInfo.Local;
-            var inanaId = TimeZoneInfo.TryConvertWindowsIdToIanaId(localTimeZoneInfo.Id, out OurTimeZoneId);
-            Log.Information(
-                $"GetLocalTimeZone(): Local time zone is {TimeZoneInfo.Local}. Our Time Zone ID: '{OurTimeZoneId}'");
-
-        }
-
-        public static void GetRegionForOurTimeZone()
-        {
-            GetLocalTimeZone();
-            // Let's just tuck away our fixed region where we are
-            var timezoneMissing = RegionUtils.LookUpRegionIndexForMyTimeZone(OurTimeZoneId, out _regionKeyForOurTimeZone);
-            if (timezoneMissing)
-            {
-                Log.Warning(
-                    $"Our time zone ID '{OurTimeZoneId}' was NOT FOUND in our Regions' Time Zones Lookup tables!!");
-                OurTimeZoneId = "America/New_York";
-            }
-
-            var regionForOurActualLocation = RegionKeyForOurTimeZone;
-            PreferredRegion = Preferences.Get(Common.kPreferredRegion, RegionKeyForOurTimeZone);
-        }
-
 
         /// retrieves values out of the system keychain and stores them in the Singleton object in memory for other
         /// functions to use in the future
@@ -374,7 +318,7 @@ namespace GuardianConnect.Helpers
         public void ConfigureFirstTimeUserPostCredential(Action mid, Action<bool, string> completion)
         {
             (string host, string hostLocation, ErrorResponse errorResponse) =
-                _grdServerManager.SelectGuardianHostWithCompletion(PreferredRegion);
+                GRDServerManager.SelectGuardianHostWithCompletion(PreferredRegion);
         }
 
         /// Used to create a new VPN connection if an active subscription exists. This is the main function to call when no VPN credentials or a
@@ -393,9 +337,6 @@ namespace GuardianConnect.Helpers
             // CONN#3
             _logger.LogInformation("CONN#3");
 
-            // TJE - just go get Subscriber Credentials for IKEv2 for now
-            // also - just use first server for my region for now
-            // TODO!! - check errorResponse
             errorResponse = await CreateStandaloneCredentialsForTransportProtocol(protocol, 30); // CONN#4-CONN#10
             if (errorResponse.IsError) return errorResponse;
 
@@ -408,7 +349,6 @@ namespace GuardianConnect.Helpers
 
             // Do connection call here
             errorResponse = await ConnectVpnWithConfiguredCredentials();
-            // TODO - Followup here with either result from GRDGatewayAPI.GetServerStatus or actual WCF call over to GuardianFirewallService to make Ras CreateEntry->ConnectEntry calls
 
             return errorResponse;
         }
@@ -436,10 +376,7 @@ namespace GuardianConnect.Helpers
             errorResponse = await gw.GetServerStatus();
             if (errorResponse.IsError)
             {
-                errorResponse
-                    .SetErrorMessage(
-                        $"ConfigureAndConnectVPNWithCompletion: GetServerStatus returned: {errorResponse.GetReasonPhrase()}")
-                    .SetData(GRDVPNHelperStatusCode.GRDVPNHelperFail);
+                errorResponse.SetErrorMessage( $"ConfigureAndConnectVPNWithCompletion: GetServerStatus returned: {errorResponse.GetReasonPhrase()}");
                 return errorResponse;
             }
 
@@ -531,26 +468,7 @@ namespace GuardianConnect.Helpers
             // CONN#4
             _logger.LogInformation("CONN#4");
 
-#if NOTNEEDEDNOW
-            // TJE - let's do the hosts update right here
-            // TJE TODO: CHANGE THIS! NO NEED HERE. WE ARE GETTING HOSTS IN BACKGROUND TASK NOW
-            try
-            {
-                // AND BELOW WE WILL ASK GRDServerManager TO SELECT HOST FOR US from static tables.
-                await RegionUtils.GetHostsForRegionKey(PreferredRegion);
-            }
-            catch (HttpRequestException hrex)
-            {
-                _logger.LogError(hrex, $"CreateStandaloneCredentialsForTransportProtocol: http request error while getting region's hosts. Status={hrex.StatusCode}, RequestError={hrex.HttpRequestError}");
-                errorResponse = new ErrorResponse().SetException(hrex).SetErrorMessage("HttpRequestError")
-                    .SetData(new List<GRDCredential>());
-                return errorResponse;
-            }
-
-#endif
-            // TJE - This call to SelectGuardianHost is done instead of Mac's version: hostname:[[NSUserDefaults standardUserDefaults]valueForKey:kGRDHostnameOverride]
-            GRDServerManager svmgr = new GRDServerManager();
-            (var host, var hostDisplay, ErrorResponse error) = svmgr.SelectGuardianHostWithCompletion(PreferredRegion);
+            (var host, var hostDisplay, ErrorResponse error) = GRDServerManager.SelectGuardianHostWithCompletion(PreferredRegion);
             errorResponse = await CreateStandaloneCredentialsForTransportProtocol(protocol, validForDays, host);
             if (errorResponse.IsError) return errorResponse;
 
