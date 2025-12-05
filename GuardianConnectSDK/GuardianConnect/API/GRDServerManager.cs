@@ -1,9 +1,10 @@
+using GuardianConnect.API;
 using GuardianConnect.API.Model;
+using GuardianConnect.Credentials;
 using GuardianConnect.Helpers;
 using GuardianConnect.Shared;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Logging.Abstractions;
-using Serilog;
 using System.Text.Json;
 using System.Text.Json.Serialization;
 
@@ -11,9 +12,6 @@ namespace GuardianConnect.API;
 
 public class GRDServerManager
 {
-    const string GetTimeZonesForRegionsUrl = $"https://{Common.kConnectAPIHostname}/api/v1.1/servers/timezones-for-regions";
-    const string GetAllRegionsUrl = $"https://{Common.kConnectAPIHostname}/api/v1/servers/all-server-regions";
-
     #region GRDServerManager private stuff
     private static int _latest = 1;
     private static int Active = 0;
@@ -63,10 +61,10 @@ public class GRDServerManager
     // CHANGE ^-----------------------^
     {
         // CONN#5
-        _logger.LogInformation("GRDServerManager.SelectGuardianHostWithCompletion: [CONN#5]  selectedRegionKey: " + (selectedRegionKey ?? "null"));
+        Logger.LogInformation("GRDServerManager.SelectGuardianHostWithCompletion: [CONN#5]  selectedRegionKey: " + (selectedRegionKey ?? "null"));
         SelectedRegion = GetGRDRegionByKey(selectedRegionKey ?? GetRegionForOurTimeZone());
 
-        _logger.LogInformation(
+        Logger.LogInformation(
             $"GRDServerManager.SelectGuardianHostWithCompletion: Calling SelectBestHostInRegion for region '{SelectedRegion.RegionName}'");
         RegionalHostRecord regionHostRecord = SelectBestHostInRegion(SelectedRegion.RegionName);
 
@@ -101,14 +99,14 @@ public class GRDServerManager
             do
             {
                 await RefreshDataAsync(); // sub-second - no need to pass cancellation token
-                Log.Information($"GRDServerManager.LongRunningRefreshTask: RefreshDataAsync completed. ");
+                Logger.LogInformation($"GRDServerManager.LongRunningRefreshTask: RefreshDataAsync completed. ");
                 if (_geoInfoCaches[Inactive].Checksum() != _geoInfoCaches[Active].Checksum())
                 {
-                    Log.Information(
+                    Logger.LogInformation(
                         "GRDServerManager.LongRunningRefreshTask: The latest refresh has changes. Toggling ACTIVE to point LIVE to newest data.");
-                    Log.Information($"Pre-Switch: Latest(on index {Inactive}): {Alternate.Checksum()}, Active (on index {Active}): {Live.Checksum()}");
+                    Logger.LogInformation($"Pre-Switch: Latest(on index {Inactive}): {Alternate.Checksum()}, Active (on index {Active}): {Live.Checksum()}");
                     SetActiveToLatest();
-                    Log.Information($"Active Switched (to index {Active}): Latest (now on index {Inactive}): {Alternate.Checksum()}, Active: {Live.Checksum()}");
+                    Logger.LogInformation($"Active Switched (to index {Active}): Latest (now on index {Inactive}): {Alternate.Checksum()}, Active: {Live.Checksum()}");
                 }
 
                 InitialGeoInformationLoadComplete.Set();
@@ -134,7 +132,7 @@ public class GRDServerManager
         Logger.LogInformation($"Checksum : {_geoInfoCaches[1].Checksum()}");
         DateTime endTime = DateTime.Now;
         Logger.LogInformation($"Region Collection refreshed. Checksum = {Alternate.Checksum()}");
-        Log.Information($"Total GRDServerManager.RefreshDataAsync execution time = {((endTime - startTime).TotalMilliseconds) / 1000} seconds");
+        Logger.LogInformation($"Total GRDServerManager.RefreshDataAsync execution time = {((endTime - startTime).TotalMilliseconds) / 1000} seconds");
     }
 
     public static List<string> GetSortedRegionKeys() => Live.RegionKeysByDisplay.Keys.ToList();
@@ -217,50 +215,48 @@ public class GRDServerManager
     private static async Task<List<GRDRegion>> RefreshInactiveRegionsLists()
     {
         Logger.LogInformation("RefreshInactiveRegionsLists() executing...");
+        ErrorResponse errorResponse = new ErrorResponse();
         string errorMessage = string.Empty;
         int responseCode = 0;
 
         var regionsList = new List<GRDRegion>();
-
-        Uri uri = new Uri(GetAllRegionsUrl);
         try
         {
-            Logger.LogInformation("RefreshInactiveRegionsLists: Getting latest Regions collection from backend...");
+            errorResponse = await GRDHousekeepingAPI.RequestServerRegions();
+            var response = errorResponse.HttpResponse;
+            if (response.IsSuccessStatusCode)
             {
-                HttpResponseMessage response = HttpUtils.Client.GetAsync(uri).GetAwaiter().GetResult(); // Task short-circuit jump
-                if (response.IsSuccessStatusCode)
+                Logger.LogInformation($"RefreshInactiveRegionsLists: Return from getting regions: Response statusCode = {response.StatusCode}");
+                string content = errorResponse.Data.ToString();
+                if (string.IsNullOrEmpty(content))
                 {
-                    Logger.LogInformation($"RefreshInactiveRegionsLists: Return from getting regions: Response statusCode = {response.StatusCode}");
-                    string content = await response.Content.ReadAsStringAsync(); // Task short-circuit jump
-                    if (string.IsNullOrEmpty(content))
-                    {
-                        Logger.LogInformation("RefreshInactiveRegionsLists: content returned for regions is empty");
-                    }
-                    else
-                    {
-                        Alternate.contentstrings.Add(content);
-                        var jsonOptions = new JsonSerializerOptions
-                        {
-                            AllowOutOfOrderMetadataProperties = true,
-                            AllowTrailingCommas = true,
-                            DefaultIgnoreCondition = JsonIgnoreCondition.Never,
-                        };
-                        regionsList = JsonSerializer.Deserialize<List<GRDRegion>>(content, GRDRegionJsonContext.Default.ListGRDRegion);
-                        Logger.LogInformation($"RefreshInactiveRegionsLists: Regions Collection loaded with (ACTUAL) {regionsList.Count} items");
-                    }
-
-                    responseCode = (int)response.StatusCode;
+                    Logger.LogInformation("RefreshInactiveRegionsLists: content returned for regions is empty");
                 }
                 else
                 {
-                    Logger.LogInformation($"RefreshInactiveRegionsLists: Response from attempting to get latest regions is {response.StatusCode}");
+                    Logger.LogInformation("RefreshInactiveRegionsLists: Successfully retrieved latest regions from backend.");
+                    Alternate.contentstrings.Add(content);
+                    var jsonOptions = new JsonSerializerOptions
+                    {
+                        AllowOutOfOrderMetadataProperties = true,
+                        AllowTrailingCommas = true,
+                        DefaultIgnoreCondition = JsonIgnoreCondition.Never,
+                    };
+                    regionsList = JsonSerializer.Deserialize<List<GRDRegion>>(content, GRDRegionJsonContext.Default.ListGRDRegion);
+                    Logger.LogInformation($"RefreshInactiveRegionsLists: Regions Collection loaded with (ACTUAL) {regionsList.Count} items");
                 }
+
+                responseCode = (int)response.StatusCode;
+            }
+            else
+            {
+                Logger.LogInformation($"RefreshInactiveRegionsLists: Response from attempting to get latest regions is {response.StatusCode}");
+                regionsList = GRDRegion.StaticRegions;
             }
         }
         catch (Exception ex)
         {
             Logger.LogError(ex, $"RefreshInactiveRegionsLists(): Exception thrown when calling all-server-regions...: {ex.Message}. (STATIC) Using GRDRegion.StaticRegions list data");
-            regionsList = GRDRegion.StaticRegions;
         }
 
         // Populate region lookup collections
@@ -308,37 +304,20 @@ public class GRDServerManager
 
         var geoDataCollection = new List<GeoData>();
 
-        Uri uri = new Uri(GetTimeZonesForRegionsUrl);
-        try
+        var response = await GRDHousekeepingAPI.RequestLatestTimeZonesForRegions();
+
+        if (response.IsError)
         {
-            Logger.LogInformation("GetLatestTimeZonesForRegions: Getting time zones for regions from backend...");
-            HttpResponseMessage?
-                response = HttpUtils.Client?.GetAsync(uri).GetAwaiter().GetResult(); // Task short-circuit jump
-            if (response != null && response.IsSuccessStatusCode)
-            {
-                string content = await response.Content.ReadAsStringAsync(); // Task short-circuit jump
-                Alternate.contentstrings.Add(content);
-                geoDataCollection = JsonSerializer.Deserialize<List<GeoData>>(content, GeoDataJsonContext.Default.ListGeoData);
-                Logger.LogInformation($"GetLatestTimeZonesForRegions: Regions Refresh: Regions GeoData Collection loaded with (ACTUAL) {geoDataCollection.Count} items");
-            }
-            else
-            {
-                if (response != null)
-                {
-                    errorMessage = $"GetLatestTimeZonesForRegions: ResponseCode for getting latest regions collection: {response.StatusCode}";
-                    Logger.LogError(errorMessage);
-                }
-                else
-                {
-                    Logger.LogError($"Response from server at uri '{uri}' to get latest regions returned NULL");
-                }
-            }
-        }
-        catch (Exception ex)
-        {
-            Logger.LogError(ex, $"GetLatestTimeZonesForRegions(): Exception thrown when calling GetTimeZonesForRegions...: {ex.Message}");
+            Logger.LogError($"GetLatestTimeZonesForRegions: Error retrieving latest timezones for regions: {response.Response}");
             geoDataCollection = GeoData.StaticGeoDataCollection;
-            Logger.LogInformation($"GetLatestTimeZonesForRegions: Regions Refresh: Regions GeoData Collection loaded with (STATIC) {geoDataCollection.Count} items");
+        }
+        else
+        {
+            Logger.LogInformation("GetLatestTimeZonesForRegions: Successfully retrieved latest timezones for regions from backend.");
+            string content = response.Data.ToString();
+            Alternate.contentstrings.Add(content);
+            geoDataCollection = JsonSerializer.Deserialize<List<GeoData>>(content, GeoDataJsonContext.Default.ListGeoData);
+            Logger.LogInformation($"GetLatestTimeZonesForRegions: Timezones Collection loaded with (ACTUAL) {geoDataCollection.Count} items");
         }
 
         Logger.LogInformation($"GetLatestTimeZonesForRegions: now populating timezonesLookup dictionary with {geoDataCollection.Count} entries...");
@@ -464,7 +443,7 @@ public class GRDServerManager
         // Get some time and timezone stuff
         var localTimeZoneInfo = TimeZoneInfo.Local;
         var inanaId = TimeZoneInfo.TryConvertWindowsIdToIanaId(localTimeZoneInfo.Id, out string otzID);
-        Log.Information($"GetLocalTimeZone(): Local time zone is {TimeZoneInfo.Local}. Our Time Zone ID: '{otzID}'");
+        Logger.LogInformation($"GetLocalTimeZone(): Local time zone is {TimeZoneInfo.Local}. Our Time Zone ID: '{otzID}'");
 
         return otzID;
     }
@@ -476,14 +455,14 @@ public class GRDServerManager
         var timezoneMissing = GRDServerManager.LookUpRegionIndexForMyTimeZone(ourTimeZoneId, out string regionKeyForOurTimeZone);
         if (timezoneMissing)
         {
-            Log.Warning($"Our time zone ID '{ourTimeZoneId}' was NOT FOUND in our Regions' Time Zones Lookup tables!!");
+            Logger.LogWarning($"Our time zone ID '{ourTimeZoneId}' was NOT FOUND in our Regions' Time Zones Lookup tables!!");
             ourTimeZoneId = "America/New_York";
         }
 
         return regionKeyForOurTimeZone;
     }
 
-    #endregion - private methods
+#endregion - private methods
 
-    #endregion
+#endregion
 }

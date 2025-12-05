@@ -450,8 +450,7 @@ namespace GuardianConnect.Helpers
                 return (null, errorResponse);
             }
 
-            GRDHousekeepingAPI houseKeeping = new GRDHousekeepingAPI();
-            errorResponse = await houseKeeping.CreateSubscriberCredentialForBundleId(peToken);
+            errorResponse = await GRDHousekeepingAPI.CreateSubscriberCredentialForBundleId(peToken);
             return (GRDHousekeepingAPI.LiveGrdCredential, errorResponse);
         }
 
