@@ -1,22 +1,31 @@
-using System.Diagnostics;
-using System.Text.Json;
+using GuardianConnect.API;
 using GuardianConnect.API.Model;
 using GuardianConnect.Credentials;
 using GuardianConnect.Helpers;
 using GuardianConnect.Shared;
 using GuardianConnect.Shared.Extensions;
-using System.Text.Json.Serialization;
 using Microsoft.Extensions.Logging;
+using Microsoft.Extensions.Logging.Abstractions;
+using System.Diagnostics;
+using System.Text.Json;
+using System.Text.Json.Serialization;
 
 namespace GuardianConnect;
 
-public class GRDHousekeepingAPI
+public static class GRDHousekeepingAPI
 {
-    private Microsoft.Extensions.Logging.ILogger<GRDHousekeepingAPI> _logger;
-
-    public GRDHousekeepingAPI()
+    private static Microsoft.Extensions.Logging.ILogger _logger = NullLogger.Instance;
+    private static Microsoft.Extensions.Logging.ILogger Logger
     {
-        _logger = StaticLoggerFactory.CreateLogger<GRDHousekeepingAPI>();
+        get
+        {
+            if (_logger == NullLogger.Instance)
+            {
+                _logger = StaticLoggerFactory.CreateLogger("GRDServerManager");
+                _logger.LogInformation("GRDServerManager: TEST Log");
+            }
+            return _logger;
+        }
     }
 
     public static GrdUserLoginResponse LoginResponse { get; set; } = new GrdUserLoginResponse();
@@ -25,7 +34,7 @@ public class GRDHousekeepingAPI
     /// endpoint: /api/v1/users/info-for-pe-token
     /// @param token password equivalent token for which to request information for
     /// @param completion completion block returning NSDictionary with information for the requested token, an error message and a bool indicating success of the request
-    public async Task<ErrorResponse> RequestPETokenInformationForToken(string peToken)
+    public static async Task<ErrorResponse> RequestPETokenInformationForToken(string peToken)
     {
         ErrorResponse errorResponse = new ErrorResponse();
         
@@ -102,7 +111,7 @@ public class GRDHousekeepingAPI
     /// @param validationMethod set to determine how to authenticate with housekeeping
     /// @param dict NSDictionary only used when the 'validationMethod' is set to 'ValidationMethodCustom'
     /// @param completion completion block returning a signed JWT, indicating request success and a user actionable error message if the request failed
-    public async Task<ErrorResponse> CreateSubscriberCredentialForBundleId(string bundleId)
+    public static async Task<ErrorResponse> CreateSubscriberCredentialForBundleId(string bundleId)
     {
         ErrorResponse errorResponse;
         // CONN#9
@@ -110,9 +119,9 @@ public class GRDHousekeepingAPI
         // TJE: Called by GRDVPNHelper.GetValidSubscriberCredentialWithCompletion()
         
         // set host to use
-        string connectHost = GRDVPNHelper.Instance.PeToken?.ConnectAPIEnv ?? Common.kConnectAPIHostname;
+        string connectHost = GRDVPNHelper.Singleton.PeToken?.ConnectAPIEnv ?? Common.kConnectAPIHostname;
         // Validation Method PEToken...
-        string peToken = GRDVPNHelper.Instance.PeToken?.Token;
+        string peToken = GRDVPNHelper.Singleton.PeToken?.Token;
         if (string.IsNullOrEmpty(peToken))
         {
             _logger.LogError(@"PEToken Object has empty token. Trying string from keychain...");
@@ -209,6 +218,76 @@ public class GRDHousekeepingAPI
         {
             Data = LiveGrdCredential.Jwt
         };
+        return errorResponse;
+    }
+
+    internal static async Task<ErrorResponse> RequestLatestTimeZonesForRegions()
+    {
+        const string GetTimeZonesForRegionsUrl = $"https://{Common.kConnectAPIHostname}/api/v1.1/servers/timezones-for-regions";
+
+        ErrorResponse errorResponse = new ErrorResponse();
+        Uri uri = new Uri($"https://{Common.kConnectAPIHostname}/api/v1/timezones/regions");
+        try
+        {
+            HttpResponseMessage response = await HttpUtils.Client.GetAsync(uri);
+            if (response.IsSuccessStatusCode)
+            {
+                string result = await response.Content.ReadAsStringAsync();
+                errorResponse.SetData(result);
+            }
+            else
+            {
+                int statusCode = (int)response.StatusCode;
+                _logger.LogError($"RequestLatestTimeZonesForRegions: Failed with status code {statusCode}");
+                errorResponse.SetResponse(response).SetErrorMessage($"Failed with status code {statusCode}");
+            }
+        }
+        catch (Exception ex)
+        {
+            Debug.WriteLine(@"\tERROR {0}", ex.Message);
+            _logger.LogError(ex, $"Exception thrown - RequestLatestTimeZonesForRegions: {ex.Message}");
+            errorResponse.SetException(ex);
+        }
+        return errorResponse;
+    }
+
+    internal static async Task<ErrorResponse> RequestServerRegions()
+    {
+        string GetAllRegionsUrl = $"https://{Common.kConnectAPIHostname}/api/v1/servers/all-server-regions";
+        ErrorResponse errorResponse = new ErrorResponse();
+        Uri uri = new Uri(GetAllRegionsUrl);
+        try
+        {
+            Logger.LogInformation("RefreshInactiveRegionsLists: Getting latest Regions collection from backend...");
+            {
+                HttpResponseMessage response = HttpUtils.Client.GetAsync(uri).GetAwaiter().GetResult(); // Task short-circuit jump
+                if (response.IsSuccessStatusCode)
+                {
+                    Logger.LogInformation($"RefreshInactiveRegionsLists: Return from getting regions: Response statusCode = {response.StatusCode}");
+                    string content = await response.Content.ReadAsStringAsync(); // Task short-circuit jump
+                    if (string.IsNullOrEmpty(content))
+                    {
+                        Logger.LogInformation("RefreshInactiveRegionsLists: content returned for regions is empty");
+                        errorResponse.SetErrorMessage("Content returned for regions is empty").SetResponse(response).SetData(null).IsError = true;
+                    }
+                    else
+                    {
+                        errorResponse.SetData(content).SetResponse(response);
+                    }
+                }
+                else
+                {
+                    Logger.LogInformation($"RefreshInactiveRegionsLists: Response from attempting to get latest regions is {response.StatusCode}");
+                    errorResponse.SetErrorMessage("Content returned for regions is empty").SetResponse(response).SetData(null).IsError = true;
+                }
+            }
+        }
+        catch (Exception ex)
+        {
+            Logger.LogError(ex, $"RefreshInactiveRegionsLists(): Exception thrown when calling all-server-regions...: {ex.Message}. (STATIC) Using GRDRegion.StaticRegions list data");
+            errorResponse.SetException(ex);
+        }
+
         return errorResponse;
     }
 }

@@ -130,7 +130,7 @@ namespace Win32Calls
                     {
                         Logger.LogInformation("UpdateFiltersState: Failed to set DNS filters [CONNECT#1.2.3-FAIL]");
                         RemoveFilters(EntryName);
-                        ConnectionRoutines.DisconnectEntry();
+                        ConnectionRoutines.DisconnectEntryAndRemove();
                         return;
                     }
 

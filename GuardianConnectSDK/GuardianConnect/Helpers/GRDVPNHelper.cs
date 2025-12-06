@@ -18,26 +18,12 @@ namespace GuardianConnect.Helpers
     public class GRDVPNHelper
     {
         // Set up a singleton
-        private static GRDVPNHelper? _instance;
+        private static GRDVPNHelper? _singleton;
         private GRDServerManager? _grdServerManager;
         private static Microsoft.Extensions.Logging.ILogger _logger = NullLogger.Instance;
 
         protected internal bool _preferBetaCapableServers;
         protected internal GRDServerFeatureEnvironment? _featureEnvironment;
-
-        public enum GRDVPNHelperStatusCode
-        {
-            GRDVPNHelperSuccess,
-            GRDVPNHelperFail,
-            GRDVPNHelperDoesNeedMigration,
-            GRDVPNHelperMigrating,
-            GRDVPNHelperNetworkConnectionError, // add other network errors
-            GRDVPNHelperCoudNotReachAPIError,
-            GRDVPNHelperApp_VpnPrefsLoadError,
-            GRDVPNHelperApp_VpnPrefsSaveError,
-            GRDVPNHelperAPI_AuthenticationError,
-            GRDVPNHelperAPI_ProvisioningError
-        }
 
         public GRDPEToken? PeToken;
         public DeviceFilterConfig? CurrentDeviceBlocklistConfig;
@@ -61,7 +47,7 @@ namespace GuardianConnect.Helpers
             _featureEnvironment = featureEnvironment;
         }
 
-        public static GRDVPNHelper Instance => _instance ?? throw new InvalidOperationException();
+        public static GRDVPNHelper Singleton => _singleton ?? throw new InvalidOperationException();
 
         public enum GRDServerFeatureEnvironment
         {
@@ -95,15 +81,7 @@ namespace GuardianConnect.Helpers
             set => _preferredRegion = value;
         }
 
-        public static string OurTimeZoneId;
         private static string? _preferredRegion;
-        private static string _regionKeyForOurTimeZone;
-
-        public static string RegionKeyForOurTimeZone
-        {
-            get => _regionKeyForOurTimeZone;
-            set => _regionKeyForOurTimeZone = value;
-        }
 
         public GRDCredential? mainCredential { get; set; }
 
@@ -116,26 +94,24 @@ namespace GuardianConnect.Helpers
         /// payment validation mechanisms already known to the Connect API
         public Dictionary<string, object>? customSubscriberCredentialAuthKeys;
 
-        public static void CreateInstance(bool prefBetaServers, GRDServerFeatureEnvironment featureEnv)
+        public static void CreateSingleton()
         {
             _logger = StaticLoggerFactory.CreateLogger<GRDVPNHelper>();
-            _logger.LogInformation("GRDVPNHelper.CreateInstance() - Entry.");
-            _instance = new GRDVPNHelper();
-            _instance._grdServerManager = new GRDServerManager();
-            _instance.mainCredential = GRDCredentialManager.MainCredentials;
-            _instance.PeToken = GRDPEToken.GetCurrentPEToken();
-            _instance._preferBetaCapableServers = prefBetaServers;
-            _instance._featureEnvironment = featureEnv;
+            _logger.LogInformation("GRDVPNHelper.CreateSingleton() - Entry.");
+            _singleton = new GRDVPNHelper();
+            _singleton._grdServerManager = new GRDServerManager();
+            _singleton.mainCredential = GRDCredentialManager.MainCredentials;
+            _singleton.PeToken = GRDPEToken.GetCurrentPEToken();
 
-            _instance.CurrentDeviceBlocklistConfig = new DeviceFilterConfig()
+            _singleton.CurrentDeviceBlocklistConfig = new DeviceFilterConfig()
             {
                 Api_auth_token = GRDCredentialManager.MainCredentials == null ? "" :
                     GRDCredentialManager.MainCredentials.ApiAuthToken == null ? "" :
                     GRDCredentialManager.MainCredentials.ApiAuthToken,
             };
 
-            RegionUtils.InitialGeoInformationLoadComplete.Wait(1 * 1000);
-            GetRegionForOurTimeZone();
+            GRDServerManager.InitialGeoInformationLoadComplete.Wait(1 * 1000);
+            PreferredRegion = Preferences.Get(Common.kPreferredRegion, null);
         }
 
         /// Helper function to quickly determine if a VPN tunnel of any kind
@@ -163,35 +139,7 @@ namespace GuardianConnect.Helpers
         private string? _connectApiHostname;
         private readonly string? _connectPublishableKey;
 
-
-        private static void GetLocalTimeZone()
-        {
-            // Get some time and timezone stuff
-            var localTimeZoneInfo = TimeZoneInfo.Local;
-            var inanaId = TimeZoneInfo.TryConvertWindowsIdToIanaId(localTimeZoneInfo.Id, out OurTimeZoneId);
-            Log.Information(
-                $"GetLocalTimeZone(): Local time zone is {TimeZoneInfo.Local}. Our Time Zone ID: '{OurTimeZoneId}'");
-
-        }
-
-        public static void GetRegionForOurTimeZone()
-        {
-            GetLocalTimeZone();
-            // Let's just tuck away our fixed region where we are
-            var timezoneMissing = RegionUtils.LookUpRegionIndexForMyTimeZone(OurTimeZoneId, out _regionKeyForOurTimeZone);
-            if (timezoneMissing)
-            {
-                Log.Warning(
-                    $"Our time zone ID '{OurTimeZoneId}' was NOT FOUND in our Regions' Time Zones Lookup tables!!");
-                OurTimeZoneId = "America/New_York";
-            }
-
-            var regionForOurActualLocation = RegionKeyForOurTimeZone;
-            PreferredRegion = Preferences.Get(Common.kPreferredRegion, RegionKeyForOurTimeZone);
-        }
-
-
-        /// retrieves values out of the system keychain and stores them in the Instance singleton object in memory for other
+        /// retrieves values out of the system keychain and stores them in the Singleton object in memory for other
         /// functions to use in the future
         public void _loadCredentialsFromKeychain()
         {
@@ -288,7 +236,7 @@ namespace GuardianConnect.Helpers
         public void ConfigureFirstTimeUserPostCredential(Action mid, Action<bool, string> completion)
         {
             (string host, string hostLocation, ErrorResponse errorResponse) =
-                _grdServerManager.SelectGuardianHostWithCompletion(PreferredRegion);
+                GRDServerManager.SelectGuardianHostWithCompletion(PreferredRegion);
         }
 
         public async Task<ErrorResponse> ConnectVpnWithNewUserCredentialsForProtocol(
@@ -311,7 +259,6 @@ namespace GuardianConnect.Helpers
 
             // Do connection call here
             errorResponse = await ConnectVpnWithConfiguredCredentials();
-            // TODO - Followup here with either result from GRDGatewayAPI.GetServerStatus or actual WCF call over to GuardianFirewallService to make Ras CreateEntry->ConnectEntry calls
 
             return errorResponse;
         }
@@ -339,10 +286,7 @@ namespace GuardianConnect.Helpers
             errorResponse = await gw.GetServerStatus();
             if (errorResponse.IsError)
             {
-                errorResponse
-                    .SetErrorMessage(
-                        $"ConfigureAndConnectVPNWithCompletion: GetServerStatus returned: {errorResponse.GetReasonPhrase()}")
-                    .SetData(GRDVPNHelperStatusCode.GRDVPNHelperFail);
+                errorResponse.SetErrorMessage( $"ConfigureAndConnectVPNWithCompletion: GetServerStatus returned: {errorResponse.GetReasonPhrase()}");
                 return errorResponse;
             }
 
@@ -407,8 +351,7 @@ namespace GuardianConnect.Helpers
                 return (null, errorResponse);
             }
 
-            GRDHousekeepingAPI houseKeeping = new GRDHousekeepingAPI();
-            errorResponse = await houseKeeping.CreateSubscriberCredentialForBundleId(peToken);
+            errorResponse = await GRDHousekeepingAPI.CreateSubscriberCredentialForBundleId(peToken);
             return (GRDHousekeepingAPI.LiveGrdCredential, errorResponse);
         }
 
@@ -419,8 +362,7 @@ namespace GuardianConnect.Helpers
             // CONN#4
             _logger.LogInformation("CONN#4");
 
-            GRDServerManager svmgr = new GRDServerManager();
-            (var host, var hostDisplay, ErrorResponse error) = svmgr.SelectGuardianHostWithCompletion(PreferredRegion);
+            (var host, var hostDisplay, ErrorResponse error) = GRDServerManager.SelectGuardianHostWithCompletion(PreferredRegion);
             errorResponse = await CreateStandaloneCredentialsForTransportProtocol(protocol, validForDays, host);
             if (errorResponse.IsError) return errorResponse;
 

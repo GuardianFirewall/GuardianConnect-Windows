@@ -40,12 +40,6 @@ namespace GuardianConnect.Credentials
             return peToken;
         }
 
-        public static void DestroyAllPersisted()
-        {
-            GRDKeychain.RemoveKeychainItemForAccount(IGRDKeychain.kKeychainStr_PEToken_Object);
-            GRDKeychain.RemoveKeychainItemForAccount(IGRDKeychain.kKeychainStr_PEToken_Itself);
-        }
-
         public GRDPEToken InitFromDictionary(Dictionary<string, object> dict)
         {
             if (dict.Count == 0) return new GRDPEToken();
