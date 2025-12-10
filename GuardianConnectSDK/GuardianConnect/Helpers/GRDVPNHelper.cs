@@ -235,6 +235,7 @@ namespace GuardianConnect.Helpers
 
             // Do connection call here
             errorResponse = await ConnectVpnWithConfiguredCredentials();
+            _logger.LogInformation($"ConnectVpnWithNewUserCredentialsForProtocol: return from ConnectVpnWithConfiguredCredentials - errorResponse.IsError == {errorResponse.IsError}");
 
             return errorResponse;
         }
@@ -251,8 +252,7 @@ namespace GuardianConnect.Helpers
                 || string.IsNullOrEmpty(mainCredentials.HostName)
                 || string.IsNullOrEmpty(mainCredentials.ApiAuthToken))
             {
-                _logger.LogInformation(
-                    "GRDVPNHelper: our main credentials not set. Syncing now.");
+                _logger.LogInformation( "GRDVPNHelper: main credentials not set. Syncing now.");
             }
 
             // CONN#11
@@ -261,14 +261,14 @@ namespace GuardianConnect.Helpers
             errorResponse = await gw.GetServerStatus();
             if (errorResponse.IsError)
             {
-                errorResponse.SetErrorMessage( $"ConfigureAndConnectVPNWithCompletion: GetServerStatus returned: {errorResponse.GetReasonPhrase()}");
+                errorResponse.SetErrorMessage( $"ConnectVpnWithConfiguredCredentials: GetServerStatus returned: {errorResponse.GetReasonPhrase()}");
                 return errorResponse;
             }
 
             if (mainCredentials.TransportProtocol != ITransportProvider.TransportProtocol.TransportIKEv2)
             {
                 errorResponse.SetException(new InvalidOperationException("MainCredential.TransportProtocol not set!"))
-                    .SetErrorMessage("WHY CALLING OLDIKEV2 WITH PROTOCOL NOT SET??");
+                    .SetErrorMessage("WHY CALLING StartIKEv2Connection WITH PROTOCOL NOT SET??");
                 return errorResponse;
             }
 
@@ -279,12 +279,14 @@ namespace GuardianConnect.Helpers
                 !string.IsNullOrEmpty(eapPassword))
             {
                 // Credentials are usable - let's continue
-                errorResponse = await _oldStartIKEv2ConnectionWithCompletion();
+                errorResponse = await StartIKEv2Connection();
+                _logger.LogInformation($"ConnectVpnWithConfiguredCredentials: return from StartIKEv2Connection - errorResponse.IsError == {errorResponse.IsError}");
+
 
                 return errorResponse;
             }
 
-            // Return error that credentials are bod
+            // Return error that credentials are bad
             errorResponse.SetException(new Exception("Credentials are not set! VPN Connection not made"));
 
             return errorResponse;
@@ -387,7 +389,7 @@ namespace GuardianConnect.Helpers
             PreferredRegion = regionNameKey;
         }
 
-        private async Task<ErrorResponse> _oldStartIKEv2ConnectionWithCompletion()
+        private async Task<ErrorResponse> StartIKEv2Connection()
         {
             ErrorResponse errorResponse = new ErrorResponse();
 
@@ -406,21 +408,21 @@ namespace GuardianConnect.Helpers
                 EntryName = $"Guardian Firewall - {mainCredential.HostnameDisplayValue}"
             };
 
-            _logger.LogInformation("Starting VPN connection...");
+            _logger.LogInformation("StartIKEv2Connection: Starting VPN connection...");
 
             try
             {
                 await Task.Run(() =>
                 {
-                    _logger.LogInformation("Calling ClientPipe.StartVPNConnection()...");
+                    _logger.LogInformation("StartIKEv2Connection: Calling ClientPipe.StartVPNConnection()...");
                     errorResponse = ClientPipe.StartVPNConnection(vpnValues);
                     if (errorResponse.IsError)
                     {
-                        _logger.LogError($"FAILURE to establish VPN connection. ErrorResponse = {errorResponse}");
+                        _logger.LogError($"StartIKEv2Connection: FAILURE to establish VPN connection. ErrorResponse = {errorResponse}");
                     }
                     else
                     {
-                        _logger.LogInformation("VPN connection established.");
+                        _logger.LogInformation("StartIKEv2Connection: VPN connection established.");
                     }
                 });
             }
@@ -431,6 +433,7 @@ namespace GuardianConnect.Helpers
                 _logger.LogError(e, $"{errorResponse}");
             }
 
+            _logger.LogInformation($"StartIKEv2Connection: returning with errorResponse.IsError == {errorResponse.IsError}");
             return errorResponse;
         }
 

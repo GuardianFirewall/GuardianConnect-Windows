@@ -226,7 +226,7 @@ public static class GRDHousekeepingAPI
         const string GetTimeZonesForRegionsUrl = $"https://{Common.kConnectAPIHostname}/api/v1.1/servers/timezones-for-regions";
 
         ErrorResponse errorResponse = new ErrorResponse();
-        Uri uri = new Uri($"https://{Common.kConnectAPIHostname}/api/v1/timezones/regions");
+        Uri uri = new Uri(GetTimeZonesForRegionsUrl);
         try
         {
             HttpResponseMessage response = await HttpUtils.Client.GetAsync(uri);
@@ -238,7 +238,7 @@ public static class GRDHousekeepingAPI
             else
             {
                 int statusCode = (int)response.StatusCode;
-                _logger.LogError($"RequestLatestTimeZonesForRegions: Failed with status code {statusCode}");
+                _logger.LogError($"RequestLatestTimeZonesForRegions: Call to url '{uri.AbsoluteUri}' failed with status code {statusCode}");
                 errorResponse.SetResponse(response).SetErrorMessage($"Failed with status code {statusCode}");
             }
         }
@@ -258,16 +258,16 @@ public static class GRDHousekeepingAPI
         Uri uri = new Uri(GetAllRegionsUrl);
         try
         {
-            Logger.LogInformation("RefreshInactiveRegionsLists: Getting latest Regions collection from backend...");
+            Logger.LogInformation("RequestServerRegions: Getting latest Regions collection from backend...");
             {
                 HttpResponseMessage response = HttpUtils.Client.GetAsync(uri).GetAwaiter().GetResult(); // Task short-circuit jump
                 if (response.IsSuccessStatusCode)
                 {
-                    Logger.LogInformation($"RefreshInactiveRegionsLists: Return from getting regions: Response statusCode = {response.StatusCode}");
+                    Logger.LogInformation($"RequestServerRegions: Return from getting regions: Response statusCode = {response.StatusCode}");
                     string content = await response.Content.ReadAsStringAsync(); // Task short-circuit jump
                     if (string.IsNullOrEmpty(content))
                     {
-                        Logger.LogInformation("RefreshInactiveRegionsLists: content returned for regions is empty");
+                        Logger.LogInformation("RequestServerRegions: content returned for regions is empty");
                         errorResponse.SetErrorMessage("Content returned for regions is empty").SetResponse(response).SetData(null).IsError = true;
                     }
                     else
@@ -277,14 +277,14 @@ public static class GRDHousekeepingAPI
                 }
                 else
                 {
-                    Logger.LogInformation($"RefreshInactiveRegionsLists: Response from attempting to get latest regions is {response.StatusCode}");
+                    Logger.LogInformation($"RequestServerRegions: Response from attempting to get latest regions is {response.StatusCode}");
                     errorResponse.SetErrorMessage("Content returned for regions is empty").SetResponse(response).SetData(null).IsError = true;
                 }
             }
         }
         catch (Exception ex)
         {
-            Logger.LogError(ex, $"RefreshInactiveRegionsLists(): Exception thrown when calling all-server-regions...: {ex.Message}. (STATIC) Using GRDRegion.StaticRegions list data");
+            Logger.LogError(ex, $"RequestServerRegions(): Exception thrown when calling all-server-regions...: {ex.Message}. (STATIC) Using GRDRegion.StaticRegions list data");
             errorResponse.SetException(ex);
         }
 
