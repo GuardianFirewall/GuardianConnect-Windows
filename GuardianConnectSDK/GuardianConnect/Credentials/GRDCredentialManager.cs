@@ -23,85 +23,68 @@ namespace GuardianConnect.Credentials
             }
         }
 
-
         private const string ZERO = "ZERO";
-        private static List<GRDCredential> _credentialsList = new List<GRDCredential>();
 
-        internal static List<GRDCredential> CredentialsList
+        private static byte[] CredentialsToToData(List<GRDCredential> credentialsList)
         {
-            get
-            {
-                return _credentialsList;
-            }
-
-            set
-            {
-                _credentialsList = value;
-            }
-        }
-
-        private static byte[] CredentialsToToData()
-        {
-            var serializedData = JsonSerializer.Serialize(_credentialsList, GRDCredentialJsonContext.Default.ListGRDCredential);
+            var serializedData = JsonSerializer.Serialize(credentialsList, GRDCredentialJsonContext.Default.ListGRDCredential);
             var binData = Encoding.UTF8.GetBytes(serializedData);
 
             return binData;
         }
 
-        private static void DataToCredentials(string dataFromKeychain)
+        private static List<GRDCredential> DataToCredentials(string dataFromKeychain)
         {
-            CredentialsList = JsonSerializer.Deserialize<List<GRDCredential>>(dataFromKeychain, GRDCredentialJsonContext.Default.ListGRDCredential) ?? new List<GRDCredential>();
+            var CredentialsList = JsonSerializer.Deserialize<List<GRDCredential>>(dataFromKeychain, GRDCredentialJsonContext.Default.ListGRDCredential) ?? new List<GRDCredential>();
             
             Logger.LogInformation($"GRDCredentialsManager.DataToCredentials(): CredentialsList has {CredentialsList.Count}");
+
+            return CredentialsList;
         }
 
-        internal static GRDCredential? MainCredentials => CredentialsList.Find(c => c.MainCredential);
+        public static GRDCredential? GetMainCredentials() => GetCredentialsListFromStorage().Find(c => c.MainCredential);
 
-        internal static List<GRDCredential> FilteredCredentials => CredentialsList.Where(c => !c.MainCredential).ToList();
+        public static List<GRDCredential> NonMainFilteredCredentials => GetCredentialsListFromStorage().Where(c => !c.MainCredential).ToList();
 
-        internal static int FilteredCredential(string identifier) => CredentialsList.FindIndex(c => c.Identifer == identifier);
+        public static int FilteredCredential(string identifier) => GetCredentialsListFromStorage().FindIndex(c => c.Identifer == identifier);
 
-        internal static void AddOrUpdateCredential(GRDCredential credential)
+        public static void AddOrUpdateCredential(GRDCredential credential)
         {
             credential.LastUpdated = DateTime.Now;
-            int foundCredentialIndex = FilteredCredential(credential.Identifer);
+            var credentialsList = GetCredentialsListFromStorage();
+            int foundCredentialIndex = credentialsList.FindIndex(c => c.Identifer == credential.Identifer);
             if (foundCredentialIndex != -1)
             {
-                _credentialsList[foundCredentialIndex] = credential;
+                credentialsList[foundCredentialIndex] = credential;
             }
             else
             {
-                _credentialsList.Insert(0, credential);
+                credentialsList.Insert(0, credential);
             }
 
-            GRDKeychain.StoreData(IGRDKeychain.kGuardianCredentialsList, CredentialsToToData());
+            GRDKeychain.StoreData(IGRDKeychain.kGuardianCredentialsList, CredentialsToToData(credentialsList));
         }
 
-        public static void LoadCredentialsList()
+        public static List<GRDCredential> GetCredentialsListFromStorage()
         {
             var data = GRDKeychain.GetDataForAccount(IGRDKeychain.kGuardianCredentialsList);
             if (string.IsNullOrEmpty(data))
             {
                 data = JsonSerializer.Serialize(new List<GRDCredential>(), GRDCredentialJsonContext.Default.ListGRDCredential);
             }
-            DataToCredentials(data);
+            var credentials = DataToCredentials(data);
             
             // first time store empty list
-            if (data == "[]") GRDKeychain.StoreData(IGRDKeychain.kGuardianCredentialsList, CredentialsToToData());
+            if (data == "[]") GRDKeychain.StoreData(IGRDKeychain.kGuardianCredentialsList, CredentialsToToData(credentials));
             
-            string count = CredentialsList.Count == 0 ? ZERO : CredentialsList.Count.ToString();
+            string count = credentials.Count == 0 ? ZERO : credentials.Count.ToString();
             Logger.LogInformation( $"LoadCredentialsList(): Number of Credentials loaded from KeyChain is {count}");
+            return credentials;
         }
 
         public static void ClearMainCredentials()
         {
-            if (MainCredentials == null) return;
-            
-            MainCredentials.HostName = string.Empty;
-            MainCredentials.ApiAuthToken = string.Empty;
-            MainCredentials.Password = string.Empty;
-            MainCredentials.UserName = string.Empty;
-            AddOrUpdateCredential(MainCredentials);
+            GRDKeychain.RemoveKeychainItemForAccount(IGRDKeychain.kGuardianCredentialsList);
         }
     }
 }

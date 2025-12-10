@@ -1,3 +1,4 @@
+using GuardianConnect.Credentials;
 using GuardianConnect.Helpers;
 using GuardianConnect.Shared;
 //using Newtonsoft.Json;
@@ -60,6 +61,10 @@ public class DeviceFilterConfig
     {
         _logger = StaticLoggerFactory.CreateLogger<DeviceFilterConfig>();
         DeviceFilterConfigBlockList = DeviceFilterConfigFlags.BlocklistCleared;
+        var mc = GRDCredentialManager.GetMainCredentials();
+        Api_auth_token = mc == null ? "" :
+            mc.ApiAuthToken == null ? "" :
+            mc.ApiAuthToken;
     }
 
     public void Toggle(DeviceFilterConfigFlags flag)

@@ -57,7 +57,6 @@ public class Common
     public const string DefaultPowerResumeReconnectAttempts = "10";
     public const string kPowerResumeReconnectWatcherTries = "ClientPowerResumeWatcherTries";
     
-    public const string kAppNeedsSelfRepair = @"guardianNeedsSelfRepair";
     public const string kWhetherToSpawnUpdateChecker = "StartUpdateChecker";
     public const string kWhetherLoggingCurrentlyOn = "WhetherLoggingCurrentlyOn";
     public const string kVpnCallParametersForReboot = "VPNCallParametersForReboot";
@@ -150,16 +149,8 @@ public class Common
 
     public static readonly List<string> GuardianKeychainItemsKeys = new List<string>
     {
-//        kKeychainStr_EapUsername,
-//        kKeychainStr_EapPassword,
-//        kKeychainStr_AuthToken,
-//        kKeychainStr_APIAuthToken,
         kKeychainStr_SubscriberCredential,
-//        kKeychainStr_PEToken,
         kGuardianCredentialsList,
-        kKeychainStr_PEToken_Object,
-        kKeychainStr_PEToken_Itself
-
     };
 
     public const string kGuardianConnectSubscriberSecret = @"kGuardianConnectSubscriberSecret";
