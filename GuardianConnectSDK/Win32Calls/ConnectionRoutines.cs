@@ -39,10 +39,11 @@ public static class ConnectionRoutines
         // First call to RasEnumConnections to get count of connections and required buffer size
 
         var retVal = PInvoke.RasEnumConnections(null, ref cb, out cConnections);
-        Logger.LogInformation($"GetRasConnections: First call for size returned {retVal}, cb={cb}, # of Connections = {cConnections}");
+        //Logger.LogInformation($"GetRasConnections: First call for size returned {retVal}, cb={cb}, # of Connections = {cConnections}");
+        var msg = $"GetRasConnections: First call for size returned {retVal}, cb={cb}, # of Connections = {cConnections}";
         if (cConnections == 0)
         {
-            Logger.LogInformation($"GetRasConnections: There are no active RAS connections. Setting empty values for name and handle and returning empty array to caller.");
+            Logger.LogInformation($"GetRasConnections: There are no active RAS connections. Returning empty name, handle and collection array to caller.");
             ActiveConnectionHandle = HRASCONN.Null;
             ActiveConnectionEntryName = "";
             return Array.Empty<RASCONNW>();
@@ -53,6 +54,7 @@ public static class ConnectionRoutines
         var pConnectionsZero = &ConnectionsZero;
         pConnectionsZero->dwSize = cb;
 
+        Logger.LogInformation("GetRasConnections: There is an active RAS connection. Preparing to get connection details.");
         //retVal = PInvoke.RasEnumConnections(ref ConnectionsZero, ref cb, out cConnections);
         retVal = PInvoke.RasEnumConnections(pConnectionsZero, ref cb, out cConnections);
         if (retVal != 0)
@@ -360,10 +362,7 @@ public static class ConnectionRoutines
         return lp_ras_status.rasconnstate switch
         {
             RASCONNSTATE.RASCS_Connected => Utility.CheckConnectionResult.CONNECTED,
-            //RASCONNSTATE. => Utility.CheckConnectionResult.CONNECTING,
-            //PInvoke.RASCS_Disconnecting => Utility.CheckConnectionResult.DISCONNECTING,
             RASCONNSTATE.RASCS_Disconnected => Utility.CheckConnectionResult.DISCONNECTED,
-            //PInvoke.RASCS_ConnectFailed => Utility.CheckConnectionResult.CONNECT_FAILED,
             _ => Utility.CheckConnectionResult.Uninitialized
         };
     }

@@ -191,7 +191,7 @@ public class ClientPipeImpl : IGuardianNPContract
         }
         catch (Exception e)
         {
-            ClientPipe.Logger.LogError(e, $"ClientPipe.StartVPNConnection: Exception when parsing response from pipe: {e.Message}");
+            ClientPipe.Logger.LogError(e, $"ClientPipe.StartVPNConnection: Exception when parsing response from pipe: {e.Message}. Raw json='{startedJson}'");
         }
 
         if (startedErrorResponse.IsError)

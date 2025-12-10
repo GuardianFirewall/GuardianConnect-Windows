@@ -15,7 +15,7 @@ public class GRDServerManager
     #region GRDServerManager private stuff
     private static int _latest = 1;
     private static int Active = 0;
-    private static int Inactive => Active ^ 1;
+    private static int Standby => Active ^ 1;
     private static Dictionary<int, GeoInfoCache> _geoInfoCaches = new()
         {
             { 0, new GeoInfoCache() },
@@ -24,7 +24,7 @@ public class GRDServerManager
 
 
     private static GeoInfoCache Live => _geoInfoCaches[Active];
-    private static GeoInfoCache Alternate => _geoInfoCaches[Inactive];
+    private static GeoInfoCache Alternate => _geoInfoCaches[Standby];
     private static DateTime LastUpdateChangeTime;
     private static ManualResetEventSlim RegionHostsRetrievalWaiter = new ManualResetEventSlim();
 
@@ -100,13 +100,13 @@ public class GRDServerManager
             {
                 await RefreshDataAsync(); // sub-second - no need to pass cancellation token
                 Logger.LogInformation($"GRDServerManager.LongRunningRefreshTask: RefreshDataAsync completed. ");
-                if (_geoInfoCaches[Inactive].Checksum() != _geoInfoCaches[Active].Checksum())
+                if (_geoInfoCaches[Standby].Checksum() != _geoInfoCaches[Active].Checksum())
                 {
                     Logger.LogInformation(
                         "GRDServerManager.LongRunningRefreshTask: The latest refresh has changes. Toggling ACTIVE to point LIVE to newest data.");
-                    Logger.LogInformation($"Pre-Switch: Latest(on index {Inactive}): {Alternate.Checksum()}, Active (on index {Active}): {Live.Checksum()}");
+                    Logger.LogInformation($"Pre-Switch: Latest(on index {Standby}): {Alternate.Checksum()}, Active (on index {Active}): {Live.Checksum()}");
                     SetActiveToLatest();
-                    Logger.LogInformation($"Active Switched (to index {Active}): Latest (now on index {Inactive}): {Alternate.Checksum()}, Active: {Live.Checksum()}");
+                    Logger.LogInformation($"Active Switched (to index {Active}): Latest (now on index {Standby}): {Alternate.Checksum()}, Active: {Live.Checksum()}");
                 }
 
                 InitialGeoInformationLoadComplete.Set();
@@ -121,8 +121,8 @@ public class GRDServerManager
     {
         DateTime startTime = DateTime.Now;
         InitializeAlternate();
-        Logger.LogInformation("RefreshDataAsync: 1. calling RefreshInactiveRegionsList()...");
-        var regions = await RefreshInactiveRegionsLists();
+        Logger.LogInformation("RefreshDataAsync: 1. calling RefreshStandbyRegionsList()...");
+        var regions = await RefreshStandbyRegionsLists();
         Logger.LogInformation("RefreshDataAsync: 2. calling GetLatestTimeZonesForRegions()...");
         await GetLatestTimeZonesForRegions();
         Logger.LogInformation($"Latest Regions Collection has {Alternate.regionLookup.Count} region records");
@@ -209,12 +209,12 @@ public class GRDServerManager
         LastUpdateChangeTime = DateTime.Now;
     }
 
-    private static void InitializeAlternate() => _geoInfoCaches[Inactive] = new GeoInfoCache();
+    private static void InitializeAlternate() => _geoInfoCaches[Standby] = new GeoInfoCache();
 
 
-    private static async Task<List<GRDRegion>> RefreshInactiveRegionsLists()
+    private static async Task<List<GRDRegion>> RefreshStandbyRegionsLists()
     {
-        Logger.LogInformation("RefreshInactiveRegionsLists() executing...");
+        Logger.LogInformation("RefreshStandbyRegionsLists() executing...");
         ErrorResponse errorResponse = new ErrorResponse();
         string errorMessage = string.Empty;
         int responseCode = 0;
@@ -226,15 +226,15 @@ public class GRDServerManager
             var response = errorResponse.HttpResponse;
             if (response.IsSuccessStatusCode)
             {
-                Logger.LogInformation($"RefreshInactiveRegionsLists: Return from getting regions: Response statusCode = {response.StatusCode}");
+                Logger.LogInformation($"RefreshStandbyRegionsLists: Return from RequestServerRegions: Response statusCode = {response.StatusCode}");
                 string content = errorResponse.Data.ToString();
                 if (string.IsNullOrEmpty(content))
                 {
-                    Logger.LogInformation("RefreshInactiveRegionsLists: content returned for regions is empty");
+                    Logger.LogInformation("RefreshStandbyRegionsLists: content returned for regions is empty");
                 }
                 else
                 {
-                    Logger.LogInformation("RefreshInactiveRegionsLists: Successfully retrieved latest regions from backend.");
+                    Logger.LogInformation("RefreshStandbyRegionsLists: Successfully retrieved latest regions from backend.");
                     Alternate.contentstrings.Add(content);
                     var jsonOptions = new JsonSerializerOptions
                     {
@@ -243,20 +243,20 @@ public class GRDServerManager
                         DefaultIgnoreCondition = JsonIgnoreCondition.Never,
                     };
                     regionsList = JsonSerializer.Deserialize<List<GRDRegion>>(content, GRDRegionJsonContext.Default.ListGRDRegion);
-                    Logger.LogInformation($"RefreshInactiveRegionsLists: Regions Collection loaded with (ACTUAL) {regionsList.Count} items");
+                    Logger.LogInformation($"RefreshStandbyRegionsLists: Regions Collection loaded with (ACTUAL) {regionsList.Count} items");
                 }
 
                 responseCode = (int)response.StatusCode;
             }
             else
             {
-                Logger.LogInformation($"RefreshInactiveRegionsLists: Response from attempting to get latest regions is {response.StatusCode}");
+                Logger.LogInformation($"RefreshStandbyRegionsLists: Response for getting latest regions is {response.StatusCode}");
                 regionsList = GRDRegion.StaticRegions;
             }
         }
         catch (Exception ex)
         {
-            Logger.LogError(ex, $"RefreshInactiveRegionsLists(): Exception thrown when calling all-server-regions...: {ex.Message}. (STATIC) Using GRDRegion.StaticRegions list data");
+            Logger.LogError(ex, $"RefreshStandbyRegionsLists(): Exception thrown when calling all-server-regions...: {ex.Message}. (STATIC) Using GRDRegion.StaticRegions list data");
         }
 
         // Populate region lookup collections
@@ -271,7 +271,7 @@ public class GRDServerManager
                 Continent = string.Empty,
                 CountryISOCode = string.Empty
             });
-        Logger.LogInformation($"RefreshInactiveRegionsLists: regionLookup pre-load has {Alternate.regionLookup.Count} items.");
+        Logger.LogInformation($"RefreshStandbyRegionsLists: regionLookup pre-load has {Alternate.regionLookup.Count} items.");
         var rluKeys = String.Join(',', Alternate.regionLookup.Keys);
         Logger.LogDebug($"regionLookup dictionary keys are: '{rluKeys}");
         foreach (var regionRec in regionsList.OrderBy(region => region.DisplayName))
