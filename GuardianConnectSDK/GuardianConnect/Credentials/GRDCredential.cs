@@ -116,10 +116,6 @@ namespace GuardianConnect.Credentials
 	        }
         }
 
-        /*
-         //used for legacy EAP credentials, APIAuthToken will be empty because we were not saving those details when creating additional EAP's before.
-		- (id)initWithDictionary:(NSDictionary *)credDict hostname:(NSString *)hostname expiration:(NSDate *)expirationDate {
-         */
         public GRDCredential(Dictionary<string, object> credDict, string hostname, DateTime expirationDate)
         {
 	        GRDCredential self = new GRDCredential(credDict);
@@ -130,9 +126,6 @@ namespace GuardianConnect.Credentials
 	        _expired = false;
         }
 
-        /*
-         - (id)initWithFullDictionary:(NSDictionary *)credDict validFor:(NSInteger)validForDays isMain:(BOOL)mainCreds {
-         */
         public GRDCredential InitWithFullDictionary(Dictionary<string, object> credDict, int validForDays, bool isMain)
         {
 	        GRDCredential self = new GRDCredential(credDict);

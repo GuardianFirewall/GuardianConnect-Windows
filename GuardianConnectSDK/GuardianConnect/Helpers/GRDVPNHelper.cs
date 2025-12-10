@@ -83,8 +83,6 @@ namespace GuardianConnect.Helpers
 
         private static string? _preferredRegion;
 
-        public GRDCredential? mainCredential { get; set; }
-
         /// Preferred DNS Server set here currently only apply to WireGuard VPN connections
         ///
         /// Default: (Cloudflare) 1.1.1.1, 1.0.0.1
@@ -100,15 +98,9 @@ namespace GuardianConnect.Helpers
             _logger.LogInformation("GRDVPNHelper.CreateSingleton() - Entry.");
             _singleton = new GRDVPNHelper();
             _singleton._grdServerManager = new GRDServerManager();
-            _singleton.mainCredential = GRDCredentialManager.MainCredentials;
             _singleton.PeToken = GRDPEToken.GetCurrentPEToken();
 
-            _singleton.CurrentDeviceBlocklistConfig = new DeviceFilterConfig()
-            {
-                Api_auth_token = GRDCredentialManager.MainCredentials == null ? "" :
-                    GRDCredentialManager.MainCredentials.ApiAuthToken == null ? "" :
-                    GRDCredentialManager.MainCredentials.ApiAuthToken,
-            };
+            _singleton.CurrentDeviceBlocklistConfig = new DeviceFilterConfig();
 
             GRDServerManager.InitialGeoInformationLoadComplete.Wait(1 * 1000);
             PreferredRegion = Preferences.Get(Common.kPreferredRegion, null);
@@ -139,24 +131,17 @@ namespace GuardianConnect.Helpers
         private string? _connectApiHostname;
         private readonly string? _connectPublishableKey;
 
-        /// retrieves values out of the system keychain and stores them in the Singleton object in memory for other
-        /// functions to use in the future
-        public void _loadCredentialsFromKeychain()
-        {
-            mainCredential = GRDCredentialManager.MainCredentials;
-        }
-
         /// Used to determine if an active connection is possible, do we have all the necessary credentials (EAPUsername, Password, Host, etc)
         public static bool ActiveConnectionPossible()
         {
             _logger.LogInformation("In ActiveConnectionPossible()");
-            if (GRDCredentialManager.MainCredentials == null)
+            var mainCreds = GRDCredentialManager.GetMainCredentials();
+            if (mainCreds == null)
             {
                 _logger.LogInformation("ActiveConnectionPossible(): MainCredentials are not set");
                 return false;
             }
 
-            GRDCredential mainCreds = GRDCredentialManager.MainCredentials;
             if (mainCreds.TransportProtocol == ITransportProvider.TransportProtocol.TransportIKEv2
                 && !string.IsNullOrEmpty(mainCreds.HostName)
                 && !string.IsNullOrEmpty(mainCreds.ApiAuthToken)
@@ -176,13 +161,7 @@ namespace GuardianConnect.Helpers
         /// </summary>
         public static void ResetMainCredentials()
         {
-            _logger.LogInformation("In ResetMainCredentialsForRegionChange()");
-            if (GRDCredentialManager.MainCredentials == null)
-            {
-                _logger.LogInformation("ResetMainCredentialsForRegionChange(): MainCredentials are already not set.");
-                return;
-            }
-
+            _logger.LogInformation("In ResetMainCredentials()");
             GRDCredentialManager.ClearMainCredentials();
         }
 
@@ -190,19 +169,17 @@ namespace GuardianConnect.Helpers
         public async void ClearVpnConfiguration()
         {
             ErrorResponse errorResponse;
-            var creds = GRDCredentialManager.MainCredentials;
-            if (GRDCredentialManager.MainCredentials != null &&
-                !string.IsNullOrEmpty(GRDCredentialManager.MainCredentials.ClientId))
+            var mainCreds = GRDCredentialManager.GetMainCredentials();
+            if (mainCreds != null &&
+                !string.IsNullOrEmpty(mainCreds.ClientId))
             {
-                var clientId = GRDCredentialManager.MainCredentials.UserName;
+                var clientId = mainCreds.UserName;
                 (GRDSubscriberCredential subCreds, errorResponse) = await GetValidSubscriberCredentialWithCompletion();
                 if (subCreds == null || errorResponse.Message.Equals("PE TOKEN NOT SET"))
                     return; // TJE TODO: CHECK THIS
 
                 GRDGateway gw = new GRDGateway();
-                errorResponse =
-                    await gw.InvalidateCredentialsForClientId(clientId, creds.ApiAuthToken, creds.HostName,
-                        subCreds.Jwt);
+                errorResponse = await gw.InvalidateCredentialsForClientId(clientId, mainCreds.ApiAuthToken, mainCreds.HostName, subCreds.Jwt);
                 if (errorResponse.IsError)
                 {
                     var responseMessage = (HttpResponseMessage)errorResponse.Response;
@@ -239,8 +216,7 @@ namespace GuardianConnect.Helpers
                 GRDServerManager.SelectGuardianHostWithCompletion(PreferredRegion);
         }
 
-        public async Task<ErrorResponse> ConnectVpnWithNewUserCredentialsForProtocol(
-            ITransportProvider.TransportProtocol protocol)
+        public async Task<ErrorResponse> ConnectVpnWithNewUserCredentialsForProtocol(ITransportProvider.TransportProtocol protocol)
         {
             ErrorResponse? errorResponse = new ErrorResponse();
 
@@ -252,7 +228,7 @@ namespace GuardianConnect.Helpers
 
             List<GRDCredential> credentials = (List<GRDCredential>)errorResponse.Data;
 
-            mainCredential = credentials[0];
+            var mainCredential = credentials[0];
             mainCredential.TransportProtocol = protocol;
             mainCredential.MainCredential = true;
             GRDCredentialManager.AddOrUpdateCredential(mainCredential);
@@ -270,14 +246,13 @@ namespace GuardianConnect.Helpers
         {
             ErrorResponse errorResponse;
             // Need to check if we've set our local copy of credentials and if null then grab from GRDCM
-            if (mainCredential == null
-                || string.IsNullOrEmpty(mainCredential.HostName)
-                || string.IsNullOrEmpty(mainCredential.ApiAuthToken)
-                || mainCredential.LastUpdated < GRDCredentialManager.MainCredentials.LastUpdated)
+            var mainCredentials = GRDCredentialManager.GetMainCredentials();
+            if (mainCredentials == null
+                || string.IsNullOrEmpty(mainCredentials.HostName)
+                || string.IsNullOrEmpty(mainCredentials.ApiAuthToken))
             {
                 _logger.LogInformation(
-                    "GRDVPNHelper: our main credentials not set or older than GRDCredentialsManager's. Syncing now.");
-                mainCredential = GRDCredentialManager.MainCredentials;
+                    "GRDVPNHelper: our main credentials not set. Syncing now.");
             }
 
             // CONN#11
@@ -290,16 +265,16 @@ namespace GuardianConnect.Helpers
                 return errorResponse;
             }
 
-            if (mainCredential.TransportProtocol != ITransportProvider.TransportProtocol.TransportIKEv2)
+            if (mainCredentials.TransportProtocol != ITransportProvider.TransportProtocol.TransportIKEv2)
             {
                 errorResponse.SetException(new InvalidOperationException("MainCredential.TransportProtocol not set!"))
                     .SetErrorMessage("WHY CALLING OLDIKEV2 WITH PROTOCOL NOT SET??");
                 return errorResponse;
             }
 
-            var apiAuthToken = mainCredential.ApiAuthToken;
-            var eapUsername = mainCredential.UserName;
-            var eapPassword = mainCredential.Password;
+            var apiAuthToken = mainCredentials.ApiAuthToken;
+            var eapUsername = mainCredentials.UserName;
+            var eapPassword = mainCredentials.Password;
             if (!string.IsNullOrEmpty(apiAuthToken) && !string.IsNullOrEmpty(eapUsername) &&
                 !string.IsNullOrEmpty(eapPassword))
             {
@@ -355,8 +330,7 @@ namespace GuardianConnect.Helpers
             return (GRDHousekeepingAPI.LiveGrdCredential, errorResponse);
         }
 
-        public async Task<ErrorResponse> CreateStandaloneCredentialsForTransportProtocol(
-            ITransportProvider.TransportProtocol protocol, int validForDays = 30)
+        public async Task<ErrorResponse> CreateStandaloneCredentialsForTransportProtocol(ITransportProvider.TransportProtocol protocol, int validForDays = 30)
         {
             ErrorResponse errorResponse = new ErrorResponse();
             // CONN#4
@@ -380,8 +354,7 @@ namespace GuardianConnect.Helpers
         /// @param days NSInteger number of days these credentials will be valid for
         /// @param hostname NSString hostname to connect to ie: saopaulo-ipsec-4.sudosecuritygroup.com
         /// @param completion block Completion block that will contain an NSDictionary of credentials upon success
-        public async Task<ErrorResponse> CreateStandaloneCredentialsForTransportProtocol(
-            ITransportProvider.TransportProtocol protocol, int days, string hostname)
+        public async Task<ErrorResponse> CreateStandaloneCredentialsForTransportProtocol(ITransportProvider.TransportProtocol protocol, int days, string hostname)
         {
             // CONN#6
             _logger.LogInformation("CONN#6");
@@ -422,6 +395,7 @@ namespace GuardianConnect.Helpers
             _logger.LogInformation("CONN#13");
             // TJE: - called from configureAndConnectVPNWithCompletion after Server check
 
+            var mainCredential = GRDCredentialManager.GetMainCredentials();
             // Make WCF call to GuardianWindowsService to start the connection
             VPNCallParameters vpnValues = new VPNCallParameters
             {
@@ -461,9 +435,10 @@ namespace GuardianConnect.Helpers
         }
 
         /// Clear all on device cache related to cached Guardian hosts & keychain items including the Subscriber Credential
-        /// #85 TODO
-        public void clearLocalCache()
+        public void ClearLocalCache()
         {
+            GRDKeychain.RemoveGuardianKeychainItems();
+            GRDKeychain.RemoveSubscriberCredentialWithRetries(3);
         }
 
     }
