@@ -1,25 +1,32 @@
-﻿using System.Net;
+﻿using GuardianConnect.Abstractions;
+using GuardianConnect.API.Model;
 using GuardianConnect.Credentials;
 using GuardianConnect.Helpers;
 using GuardianConnect.Shared;
 using GuardianConnect.Shared.Extensions;
+using Microsoft.Extensions.Logging;
+using Microsoft.Extensions.Logging.Abstractions;
+using System.Net;
 //using Newtonsoft.Json;
 using System.Text.Json;
 using System.Text.Json.Serialization;
-using GuardianConnect.Abstractions;
-using GuardianConnect.API.Model;
-using Microsoft.Extensions.Logging;
 
 namespace GuardianConnect.API;
 
 public class GRDGateway
 {
-    private Microsoft.Extensions.Logging.ILogger<GRDGateway> _logger;
-
-    public GRDGateway()
+    private static Microsoft.Extensions.Logging.ILogger _logger = NullLogger.Instance;
+    private static Microsoft.Extensions.Logging.ILogger Logger
     {
-        _logger = StaticLoggerFactory.CreateLogger<GRDGateway>();
-        _logger.LogInformation("GRDGateway logger!");
+        get
+        {
+            if (_logger == NullLogger.Instance)
+            {
+                _logger = StaticLoggerFactory.CreateLogger("GRDGateway");
+                _logger.LogInformation("GRDGateway: TEST Log");
+            }
+            return _logger;
+        }
     }
 
     public class RegisterDevicePayload
@@ -39,11 +46,11 @@ public class GRDGateway
         public string SubscriberCredential { get; set; } = string.Empty;
     }
 
-    public string ApiHostname => GRDCredentialManager.GetMainCredentials()?.HostName ?? string.Empty;
+    public static string ApiHostname => GRDCredentialManager.GetMainCredentials()?.HostName ?? string.Empty;
 
-    public string ApiAuthToken => GRDCredentialManager.GetMainCredentials()?.ApiAuthToken ?? string.Empty;
+    public static string ApiAuthToken => GRDCredentialManager.GetMainCredentials()?.ApiAuthToken ?? string.Empty;
 
-    public string DeviceIdentifier
+    public static string DeviceIdentifier
     {
         get
         {
@@ -57,14 +64,14 @@ public class GRDGateway
         }
     }
 
-    public string BaseHostName => ApiHostname;
+    public static string BaseHostName => ApiHostname;
 
-    public bool CanMakeApiRequests
+    public static bool CanMakeApiRequests
     {
         get => !string.IsNullOrEmpty(BaseHostName);
     }
 
-    internal HttpRequestMessage RequestWithEndpoint(string apiEndpoint, string requestData)
+    public static HttpRequestMessage RequestWithEndpoint(string apiEndpoint, string requestData)
     {
         // TJE - do we need this?
         Uri reqUri = new Uri($"https://{BaseHostName}{apiEndpoint}");
@@ -77,7 +84,7 @@ public class GRDGateway
 
     /// endpoint: /vpnsrv/api/server-status
     /// hits the endpoint for the current VPN host to check if a VPN connection can be established
-    public async Task<ErrorResponse> GetServerStatus(string hostOverride, bool clientCall = false)
+    public static async Task<ErrorResponse> GetServerStatus(string hostOverride, bool clientCall = false)
     {
         var vpnHost = hostOverride;
         ErrorResponse errorResponse = new ErrorResponse();
@@ -122,7 +129,7 @@ public class GRDGateway
     /// hits the endpoint for the current VPN host to check if a VPN connection can be established
     /// This signature of method uses host from main credentials in GRDVPNHelper
     /// and calls dual-use (service/client) version that takes host parameter
-    public async Task<ErrorResponse> GetServerStatus()
+    public static async Task<ErrorResponse> GetServerStatus()
     {
         var vpnHost = ApiHostname;
         var t = await GetServerStatus(vpnHost, true);
@@ -140,7 +147,7 @@ public class GRDGateway
     /// @param validFor The amount of days the VPN credentials should be valid for
     /// @param options Optional non-standard values which should be passed to the VPN node via the JSON body of the request
     /// @param completion The completion handler called once the task is compeleted
-    public async Task<ErrorResponse> RegisterDeviceForTransportProtocol(
+    public static async Task<ErrorResponse> RegisterDeviceForTransportProtocol(
         ITransportProvider.TransportProtocol transportProtocol, string hostname, string subscriberCredentialJWT, int validForDays)
     {
         var errorResponse = new ErrorResponse();
@@ -183,7 +190,7 @@ public class GRDGateway
         return errorResponse;
     }
 
-    public async Task<ErrorResponse> InvalidateCredentialsForClientId(string clientId, string apiToken, string hostName, string subCred)
+    public static async Task<ErrorResponse> InvalidateCredentialsForClientId(string clientId, string apiToken, string hostName, string subCred)
     {
         ErrorResponse errorResponse = new ErrorResponse();
         HttpResponseMessage response = new HttpResponseMessage();
@@ -214,13 +221,12 @@ public class GRDGateway
 
     #region Device Filter Configs
 
-
-    public Task<int> GetDeviceFilterConfigsForDeviceId()
+    public static Task<int> GetDeviceFilterConfigsForDeviceId()
     {
         throw new NotImplementedException();
     }
 
-    public async void SetDeviceFilterConfigsForDeviceId()
+    public static async void SetDeviceFilterConfigsForDeviceId()
     {
         if (!GRDVPNHelper.Singleton.IsConnected(out _)) return;
         if (string.IsNullOrEmpty(BaseHostName))
@@ -258,5 +264,4 @@ public class GRDGateway
 
     #endregion - Device Filter Configs
     #endregion - v1.3 APIs
-    
 }

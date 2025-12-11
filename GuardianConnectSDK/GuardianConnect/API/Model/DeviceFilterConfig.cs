@@ -94,8 +94,7 @@ public class DeviceFilterConfig
             Preferences.Set(Common.kGRDDeviceFilterConfigBlocklist,
                 GRDVPNHelper.Singleton.CurrentDeviceBlocklistConfig.ToString());
         // Call GRDGateway setter.
-        GRDGateway gw = new GRDGateway();
-        gw.SetDeviceFilterConfigsForDeviceId();
+        GRDGateway.SetDeviceFilterConfigsForDeviceId();
     }
 
     public override string ToString()
