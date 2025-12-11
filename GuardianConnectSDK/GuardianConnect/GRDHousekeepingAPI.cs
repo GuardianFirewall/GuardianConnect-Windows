@@ -21,8 +21,8 @@ public static class GRDHousekeepingAPI
         {
             if (_logger == NullLogger.Instance)
             {
-                _logger = StaticLoggerFactory.CreateLogger("GRDServerManager");
-                _logger.LogInformation("GRDServerManager: TEST Log");
+                _logger = StaticLoggerFactory.CreateLogger("GRDHousekeepingAPI");
+                _logger.LogInformation("GRDHousekeepingAPI: TEST Log");
             }
             return _logger;
         }

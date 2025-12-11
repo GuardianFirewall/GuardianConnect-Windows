@@ -178,8 +178,7 @@ namespace GuardianConnect.Helpers
                 if (subCreds == null || errorResponse.Message.Equals("PE TOKEN NOT SET"))
                     return; // TJE TODO: CHECK THIS
 
-                GRDGateway gw = new GRDGateway();
-                errorResponse = await gw.InvalidateCredentialsForClientId(clientId, mainCreds.ApiAuthToken, mainCreds.HostName, subCreds.Jwt);
+                errorResponse = await GRDGateway.InvalidateCredentialsForClientId(clientId, mainCreds.ApiAuthToken, mainCreds.HostName, subCreds.Jwt);
                 if (errorResponse.IsError)
                 {
                     var responseMessage = (HttpResponseMessage)errorResponse.Response;
@@ -257,8 +256,7 @@ namespace GuardianConnect.Helpers
 
             // CONN#11
             _logger.LogInformation("CONN#11");
-            GRDGateway gw = new GRDGateway();
-            errorResponse = await gw.GetServerStatus();
+            errorResponse = await GRDGateway.GetServerStatus();
             if (errorResponse.IsError)
             {
                 errorResponse.SetErrorMessage( $"ConnectVpnWithConfiguredCredentials: GetServerStatus returned: {errorResponse.GetReasonPhrase()}");
@@ -366,8 +364,7 @@ namespace GuardianConnect.Helpers
             (GRDSubscriberCredential subCreds, errorResponse) = await GetValidSubscriberCredentialWithCompletion();
             if (errorResponse.IsError) return errorResponse;
             // TJE TODO - CHECK IF errorMessage is "PE TOKEN IS NOT SET"
-            GRDGateway gateway = new GRDGateway();
-            errorResponse = await gateway.RegisterDeviceForTransportProtocol(protocol, hostname, subCreds!.Jwt, days);
+            errorResponse = await GRDGateway.RegisterDeviceForTransportProtocol(protocol, hostname, subCreds!.Jwt, days);
 
             // TJE TODO - WHY NOT CHECKING success for false??
             return errorResponse;

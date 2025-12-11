@@ -209,8 +209,7 @@ public static class PowerTransitionHandler
             {
                 _logger.LogInformation(
                     $"Calling status of host '{host}' to verify if network is ready - retry # {maxRetriesCount - --readinessCheckCount}");
-                GRDGateway gw = new GRDGateway();
-                errorResponse = gw.GetServerStatus(host).Result;
+                errorResponse = GRDGateway.GetServerStatus(host).Result;
                 _logger.LogInformation($"{header}: errorResponse from GetServerStatus: {errorResponse}");
                 if (!errorResponse.IsError)
                 {
