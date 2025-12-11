@@ -47,11 +47,12 @@ public class GuardianNPCommandDispatcher :IGuardianNPContract
         return result;
     }
 
-    public void DisconnectVPNConnection()
+    public ErrorResponse DisconnectVPNConnection()
     {
         _vpnTransportIkev2 = new VPNTransportIKEV2();
         _logger.LogInformation($"GuardianNPCommandDispatcher.DisconnectVPNConnection: stopping VPN entry '{ConnectionRoutines.ActiveConnectionEntryName}'");
-        _vpnTransportIkev2.StopVPNTunnel();
+        var result = _vpnTransportIkev2.StopVPNTunnel();
+        return result;
     }
 
     public CurrentVPNStatus GetCurrentVpnConnectionStatus()

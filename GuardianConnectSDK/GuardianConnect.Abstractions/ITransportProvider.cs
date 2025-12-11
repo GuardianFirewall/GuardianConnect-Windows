@@ -114,7 +114,7 @@ public interface ITransportProvider
 	 * @return YES if the VPN tunnel was started successfully, NO if an error occurred.
 	 */
     Task<(ErrorResponse, bool)> StartVPNTunnelAndReturnError();
-    Task<ErrorResponse> DisconnectVPNTunnel();
+    ErrorResponse DisconnectVPNTunnel();
 
     /*!
 	 * @method startVPNTunnelWithOptions:andReturnError:
@@ -134,7 +134,7 @@ public interface ITransportProvider
 	 * @method stopVPNTunnel:
 	 * @discussion This function is used to stop the VPN tunnel. The VPN tunnel disconnect process is started and this function returns immediately.
 	 */
-    void StopVPNTunnel();
+    ErrorResponse StopVPNTunnel();
 
     /*!
 	 * @method fetchLastDisconnectErrorWithCompletionHandler:

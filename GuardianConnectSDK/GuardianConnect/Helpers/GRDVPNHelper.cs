@@ -290,19 +290,43 @@ namespace GuardianConnect.Helpers
             return errorResponse;
         }
 
-        public async void DisconnectVPN()
+        public async Task<ErrorResponse> DisconnectVPN()
         {
-            _logger.LogInformation("DISCONN#2");
+            ErrorResponse errorResponse = new ErrorResponse();
             _logger.LogInformation("In GRDVPNHelper.DisconnectVPN().");
+
+            _logger.LogInformation("DISCONN#2");
             var entryName = GetNameOfConnectionEntry();
             _logger.LogInformation($"GRDVPNHelper.DisconnectVPN(): Name of entry to disconnect is '{entryName}'");
-            _logger.LogInformation(
-                $"GRDVPNHelper.DisconnectVPN(): Calling ClientPipe.DisconnectVPNConnectionAsync() to disconnect '{entryName}'");
-            ClientPipe.DisconnectVPNConnection(entryName);
-            _logger.LogInformation(
-                $"GRDVPNHelper.DisconnectVPN(): Back from ClientPipe.DisconnectVPNConnectionAsync()");
+
+            _logger.LogInformation($"GRDVPNHelper.DisconnectVPN(): Calling ClientPipe.DisconnectVPNConnectionAsync() to disconnect '{entryName}'");
+            try
+                {
+                await Task.Run(() =>
+                {
+                    _logger.LogInformation("GRDVPNHelper.DisconnectVPN(): Inside Task.Run()");
+                    ClientPipe.DisconnectVPNConnection(entryName);
+                    errorResponse.Message = "Disconnected successfully";
+                });
+            }
+            catch (Exception e)
+            {
+                _logger.LogError(e, $"GRDVPNHelper.DisconnectVPN(): Exception during ClientPipe.DisconnectVPNConnectionAsync() for entry '{entryName}'");
+                errorResponse.SetException(e);
+                if (e.InnerException != null && e.InnerException is System.IO.IOException)
+                {
+                    errorResponse.SetErrorMessage("PIPE BROKEN. COMMUNICAION TO SERVICE LOST.");
+                }
+                else
+                {
+                    errorResponse.SetErrorMessage(e.Message);
+                }
+            }
+
+            _logger.LogInformation( $"GRDVPNHelper.DisconnectVPN(): Back from ClientPipe.DisconnectVPNConnectionAsync()");
             _logger.LogInformation("DISCONN#3");
 
+            return errorResponse;
         }
 
         /// There should be no need to call this directly, this is for internal use only.

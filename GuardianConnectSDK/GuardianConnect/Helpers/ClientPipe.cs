@@ -1,5 +1,6 @@
 using GuardianConnect.Abstractions;
 using GuardianConnect.Shared;
+using GuardianConnect.Shared.Extensions;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Logging.Abstractions;
 using Serilog;
@@ -45,10 +46,25 @@ public static class ClientPipe
         return Instance.StartVPNConnection(protocolRequest);
     }
 
-    public static void DisconnectVPNConnection(string entryName)
+    public static ErrorResponse DisconnectVPNConnection(string entryName)
     {
-        if (!Instance.IsConnected) Instance.ReopenNamedPipe();
-        Instance.DisconnectVPNConnection();
+        ErrorResponse errorResponse = new ErrorResponse();
+        try
+        {
+            if (!Instance.IsConnected) Instance.ReopenNamedPipe();
+            errorResponse = Instance.DisconnectVPNConnection();
+        }
+        catch (Exception e)
+        {
+            Logger.LogError(e, $"ClientPipe.DisconnectVPNConnection: Exception when disconnecting VPN connection: {e.Message}");
+            errorResponse.SetException(e);
+            if (e is System.IO.IOException)
+            {
+                Logger.LogError("ClientPipe.DisconnectVPNConnection: IOException detected");
+                errorResponse.Message = "PIPE BROKEN";
+            }
+        }
+        return errorResponse;
     }
 
     public static CurrentVPNStatus GetCurrentVpnConnectionStatus()
@@ -179,34 +195,57 @@ public class ClientPipeImpl : IGuardianNPContract
 
     public ErrorResponse StartVPNConnection(VPNCallParameters? protocolRequest)
     {
-        var cmdPayload = JsonSerializer.Serialize(protocolRequest, VPNCallParametersJsonContext.Default.VPNCallParameters);
-        var cmdString = $"{(int)IGuardianNPContract.NPCommands.StartVPNConnection}.{cmdPayload}";
-        ss.WriteString(cmdString);
-        var startedJson = ss.ReadStringAsync().Result;
-
         ErrorResponse startedErrorResponse = new ErrorResponse();
+        var startedJson = "";
         try
         {
+            var cmdPayload = JsonSerializer.Serialize(protocolRequest, VPNCallParametersJsonContext.Default.VPNCallParameters);
+            var cmdString = $"{(int)IGuardianNPContract.NPCommands.StartVPNConnection}.{cmdPayload}";
+            ss.WriteString(cmdString);
+            startedJson = ss.ReadStringAsync().Result;
+
             startedErrorResponse = JsonSerializer.Deserialize<ErrorResponse>(startedJson, ErrorResponseJsonContext.Default.ErrorResponse);
+            if (startedErrorResponse.IsError)
+            {
+                ClientPipe.Logger.LogError($"ClientPipe.StartVPNConnection - error response from service: is '{startedJson}'");
+            }
         }
         catch (Exception e)
         {
             ClientPipe.Logger.LogError(e, $"ClientPipe.StartVPNConnection: Exception when parsing response from pipe: {e.Message}. Raw json='{startedJson}'");
+            startedErrorResponse.SetException(e);
+            if (e is System.IO.IOException)
+            {
+                ClientPipe.Logger.LogError("ClientPipe.StartVPNConnection: IOException detected");
+                startedErrorResponse.Message = "PIPE BROKEN";
+            }
         }
 
-        if (startedErrorResponse.IsError)
-        {
-            ClientPipe.Logger.LogError( $"ClientPipe.StartVPNConnection - error response from service: is '{startedJson}'");
-        }
 
         return startedErrorResponse;
     }
 
-    public void DisconnectVPNConnection()
+    public ErrorResponse DisconnectVPNConnection()
     {
-        var cmdPayload = "";
-        var cmdString = $"{(int)IGuardianNPContract.NPCommands.DisconnectVPNConnection}.{cmdPayload}";
-        ss.WriteString(cmdString);
+        ErrorResponse errorResponse = new ErrorResponse();
+        try
+        {
+            var cmdPayload = "";
+            var cmdString = $"{(int)IGuardianNPContract.NPCommands.DisconnectVPNConnection}.{cmdPayload}";
+            ss.WriteString(cmdString);
+        }
+        catch (Exception e)
+        {
+            ClientPipe.Logger.LogError(e, $"ClientPipe.DisconnectVPNConnection: Exception when disconnecting VPN connection: {e.Message}");
+            errorResponse.SetException(e);
+            if (e is System.IO.IOException)
+            {
+                ClientPipe.Logger.LogError("ClientPipe.DisconnectVPNConnection: IOException detected");
+                errorResponse.Message = "PIPE BROKEN";
+            }
+        }
+
+        return errorResponse;
     }
 
     public CurrentVPNStatus GetCurrentVpnConnectionStatus()

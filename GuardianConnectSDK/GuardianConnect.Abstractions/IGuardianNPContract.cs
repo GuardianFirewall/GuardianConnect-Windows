@@ -27,7 +27,7 @@ public interface IGuardianNPContract
 
     ErrorResponse StartVPNConnection(VPNCallParameters? protocolRequest);
 
-    void DisconnectVPNConnection();
+    ErrorResponse DisconnectVPNConnection();
 
     CurrentVPNStatus GetCurrentVpnConnectionStatus();
 
