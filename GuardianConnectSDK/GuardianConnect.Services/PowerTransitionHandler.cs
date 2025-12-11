@@ -185,6 +185,7 @@ public static class PowerTransitionHandler
         // We don't care if user brought us out or not - we are resuming
         // IF we were connected, then reconnect now
         _logger.LogInformation($"*************** PerformResumeActions: VPNStatusAtSuspendTime was '{VPNStatusAtSuspendTime}'");
+#if DEBUG
         if (VPNStatusAtSuspendTime == ITransportProvider.VPNProviderStatus.VPNStatusConnected)
         {
             ErrorResponse errorResponse;
@@ -236,6 +237,10 @@ public static class PowerTransitionHandler
                 ? "**************** PerformResumeActions failed!"
                 : "**************** PerformResumeActions successful!");
         }
+#else
+        _logger.LogInformation("PerformResumeActions: RELEASE BUILD - skipping reconnect logic.");
+        ResetVPNStateAtSuspend();
+#endif
 
         CurrentPowerTransitionState = Common.PowerTransitionStates.Running;
     }

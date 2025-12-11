@@ -77,10 +77,10 @@ public class VPNTransportIKEV2 : ITransportProvider
         throw new NotImplementedException();
     }
 
-    public virtual async Task<ErrorResponse> DisconnectVPNTunnel()
+    public virtual ErrorResponse DisconnectVPNTunnel()
     {
-        await new Task(() => { StopVPNTunnel(); });
-        return new ErrorResponse();
+        var errorResponse = StopVPNTunnel();
+        return errorResponse;
     }
 
     public static void PowerSuspendVPNConnection()
@@ -134,7 +134,6 @@ public class VPNTransportIKEV2 : ITransportProvider
 
             if (result.IsError) return result;
 
-            // TJE - TODO: Add proper error reporting, bubble-up/handling
             ErrorResponse connectionCallResult = ConnectToVpnLongRunning(entryName, creds.UserName, creds.Password);
 
             if (connectionCallResult.IsError) return connectionCallResult;
@@ -160,15 +159,30 @@ public class VPNTransportIKEV2 : ITransportProvider
     }
 
     // Called from the ClientPipe Service when a Disconnect command is received
-    public virtual void StopVPNTunnel()
+    public virtual ErrorResponse StopVPNTunnel()
     {
         Logger.LogInformation(
             $"VPNTransportIKEV2.StopVPNTunnel(): Disconnecting entry '{ConnectionRoutines.ActiveConnectionEntryName}' ...");
         NotificationHandler.WasDisconnectPlanned = true;
         Logger.LogInformation(
             $"StopVPNTunnel: WasDisconnectPlanned now equals {NotificationHandler.WasDisconnectPlanned}");
-        ResetVPNStateAtSuspend(); // CHECK THIS - moving to here - makes sense after non-error Disconnect command return
-        ConnectionRoutines.DisconnectEntryAndRemove();
+        try
+        {
+
+            ResetVPNStateAtSuspend(); // CHECK THIS - moving to here - makes sense after non-error Disconnect command return
+            ConnectionRoutines.DisconnectEntryAndRemove();
+            return new ErrorResponse();
+        }
+        catch (Exception e)
+        {
+            Logger.LogError(e, $"VPNTransportIKEV2.StopVPNTunnel(): Exception during Disconnect: {e.Message}");
+            return new ErrorResponse
+            {
+                IsError = true,
+                Message = $"Exception during Disconnect: {e.Message}",
+                ThrownException = e
+            };
+        }
     }
 
     public virtual ErrorResponse FetchLastDisonnectError()

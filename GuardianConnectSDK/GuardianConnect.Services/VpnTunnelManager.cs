@@ -30,7 +30,7 @@ public class VpnTunnelManager : ITransportProvider
         throw new NotImplementedException();
     }
 
-    public async Task<ErrorResponse> DisconnectVPNTunnel()
+    public ErrorResponse DisconnectVPNTunnel()
     {
         throw new NotImplementedException();
     }
@@ -40,12 +40,12 @@ public class VpnTunnelManager : ITransportProvider
         throw new NotImplementedException();
     }
 
-    public void StopVPNTunnel(string entryName)
+    public ErrorResponse StopVPNTunnel(string entryName)
     {
         throw new NotImplementedException();
     }
 
-    public void StopVPNTunnel()
+    public ErrorResponse StopVPNTunnel()
     {
         throw new NotImplementedException();
     }
