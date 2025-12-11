@@ -239,7 +239,7 @@ public static class PowerTransitionHandler
         }
 #else
         _logger.LogInformation("PerformResumeActions: RELEASE BUILD - skipping reconnect logic.");
-        ResetVPNStateAtSuspend();
+        ResetVpnStatusAtSuspendTime();
 #endif
 
         CurrentPowerTransitionState = Common.PowerTransitionStates.Running;
