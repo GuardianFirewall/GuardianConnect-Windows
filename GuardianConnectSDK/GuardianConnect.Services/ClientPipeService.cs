@@ -177,7 +177,9 @@ public class ClientPipeService : BackgroundService
             StreamString ss = new StreamString(pipeServer);
             // Verify our identity to the connected client using a
             // string that the client anticipates.
-            ss.WriteString($"GuardianFirewallService#ACK#{PowerTransitionHandler.ConnectedAtSuspendTime()}");
+            var connectTestACKResponse = $"GuardianFirewallService#ACK#{PowerTransitionHandler.ConnectedAtSuspendTime()}";
+            _logger.Log(LogLevel.Information, $"ClientPipeService[{threadId}]: Writing connection ACK string to client: '{connectTestACKResponse}'");
+            ss.WriteString(connectTestACKResponse);
 
             while (pipeServer.IsConnected && !_cancellationToken.IsCancellationRequested && !AdministrativeShutdownRequested)
             {
