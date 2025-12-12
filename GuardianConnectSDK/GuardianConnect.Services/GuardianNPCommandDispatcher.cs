@@ -38,11 +38,12 @@ public class GuardianNPCommandDispatcher :IGuardianNPContract
         return composite;
     }
 
-    public ErrorResponse StartVPNConnection(VPNCallParameters? protocolRequest)
+    public async Task<ErrorResponse> StartVPNConnection(VPNCallParameters? protocolRequest)
     {
-        //return true;
+        _logger.LogInformation("GuardianNPCommandDispatcher.StartVPNConnection: Calling VpnTransportIkeV2.StartVPNTunnelWithOptions...");
         _vpnTransportIkev2 = new VPNTransportIKEV2();
-        var result = _vpnTransportIkev2.StartVPNTunnelWithOptions(protocolRequest).Result;
+        var result = await _vpnTransportIkev2.StartVPNTunnelWithOptions(protocolRequest);
+        _logger.LogInformation($"GuardianNPCommandDispatcher.StartVPNConnection: Return from VpnTransportIkeV2.StartVPNTunnelWithOptions. response: {result.IsError}");
 
         return result;
     }

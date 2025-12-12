@@ -25,7 +25,7 @@ public interface IGuardianNPContract
 
     CompositeType GetDataUsingDataContract(CompositeType composite);
 
-    ErrorResponse StartVPNConnection(VPNCallParameters? protocolRequest);
+    Task<ErrorResponse> StartVPNConnection(VPNCallParameters? protocolRequest);
 
     ErrorResponse DisconnectVPNConnection();
 

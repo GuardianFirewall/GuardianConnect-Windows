@@ -107,12 +107,13 @@ public class VPNTransportIKEV2 : ITransportProvider
         return result;
     }
 
-    public virtual Task<ErrorResponse> StartVPNTunnelWithOptions(VPNCallParameters options)
+    public async virtual Task<ErrorResponse> StartVPNTunnelWithOptions(VPNCallParameters options)
     {
+        Logger.LogInformation("VPNTransportIKEV2.StartVPNTunnelWithOptions(): Entry...");
         VpnResumeParameters = options;
 
-        Task<ErrorResponse> t = new Task<ErrorResponse>(() =>
-        {
+        //Task<ErrorResponse> t = new Task<ErrorResponse>(() =>
+        //{
             Logger.LogInformation("StartVPNTunnelWithOptions: Evaluating vpn connection parameters...");
             Logger.LogInformation($"EapuserName: {options.EapuserName}");
             Logger.LogInformation($"Eappassword: {options.Eappassword}");
@@ -153,9 +154,9 @@ public class VPNTransportIKEV2 : ITransportProvider
             ActiveEntryName = entryName;
 
             return new ErrorResponse();
-        });
-        t.Start();
-        return t;
+        //});
+        //t.Start();
+        //return t;
     }
 
     // Called from the ClientPipe Service when a Disconnect command is received
@@ -286,11 +287,13 @@ public class VPNTransportIKEV2 : ITransportProvider
                     _vpnStatus = ITransportProvider.VPNProviderStatus.VPNStatusDisconnected;
                     if (!NotificationHandler.WasDisconnectPlanned)
                     {
+#if NOTREADYYET
                         Logger.LogInformation(
                             "PollConnectionState: ****************** UNPLANNED DISCONNECT. Setting VPNStateAtSuspend to CONNECTED for when resuming...");
-                        //PowerResumeVPNConnection();
-                        //PowerResumeActions(); /* This is delegate into PowerHandler in PowerTransitionHandler
                         SetVPNStateAtSuspend();
+#else
+                        Logger.LogInformation( "PollConnectionState: ****************** UNPLANNED DISCONNECT. IGNORING for now...");
+#endif
                     }
 
                     break;
