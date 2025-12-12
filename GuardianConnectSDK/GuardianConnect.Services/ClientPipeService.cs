@@ -149,7 +149,7 @@ public class ClientPipeService : BackgroundService
 
     }
 
-    public void ServerThread(object? data)
+    public async void ServerThread(object? data)
     {
         GuardianNPCommandDispatcher cmdDispatcher = new GuardianNPCommandDispatcher();
         cmdDispatcher._logger = _logger;
@@ -202,19 +202,30 @@ public class ClientPipeService : BackgroundService
                     switch (cmd)
                     {
                         case IGuardianNPContract.NPCommands.StartVPNConnection:
-                            _logger.Log(LogLevel.Information, $"ClientPipeService[{threadId}]: Performing StartVPNConnection");
+                            _logger.Log(LogLevel.Information, $"ClientPipeService[{threadId}][12121026]: Performing spawn of StartVPNConnection command");
                             var serializedVpnParameters = cmdPayload;
                             var vpnCallParameters = JsonSerializer.Deserialize<VPNCallParameters>(serializedVpnParameters, VPNCallParametersJsonContext.Default.VPNCallParameters);
-                            var didItStart = cmdDispatcher.StartVPNConnection(vpnCallParameters);
-                            _logger.Log(LogLevel.Information, $"ClientPipeService[{threadId}]: Exiting StartVPNConnection");
-                            var startResponseJson = JsonSerializer.Serialize(didItStart, ErrorResponseJsonContext.Default.ErrorResponse);
-                            _logger.Log(LogLevel.Information, $"ClientPipeService.StartVPNConnection - string is '{startResponseJson}'");
-                            ss.WriteString(startResponseJson);
+                            try
+                            {
+                                var didItStart = await cmdDispatcher.StartVPNConnection(vpnCallParameters);
+                                _logger.Log(LogLevel.Information, $"ClientPipeService.StartVPNConnection - response IsError: {didItStart.IsError}");
+                                var startResponseJson = JsonSerializer.Serialize(didItStart, ErrorResponseJsonContext.Default.ErrorResponse);
+                                _logger.Log(LogLevel.Information, $"ClientPipeService.StartVPNConnection - writing response to pipe, string is '{startResponseJson}'");
+                                ss.WriteString(startResponseJson);
+                                _logger.Log(LogLevel.Information, $"ClientPipeService[{threadId}]: Exiting StartVPNConnection command.");
+                            }
+                            catch (Exception e)
+                            {
+                                _logger.LogError(e, $"Exception thrown when executing StartVPNConnection and parsing its response. '{e.Message}");
+                            }
                             break;
                         case IGuardianNPContract.NPCommands.DisconnectVPNConnection:
                             string entryName = ConnectionRoutines.ActiveConnectionEntryName;
                             _logger.Log(LogLevel.Information, $"ClientPipeService[{threadId}]: Performing DisconnectVPNConnection. Entry is '{entryName}'");
-                            cmdDispatcher.DisconnectVPNConnection();
+                            var response = cmdDispatcher.DisconnectVPNConnection();
+                            var discResponseJson = JsonSerializer.Serialize(response, ErrorResponseJsonContext.Default.ErrorResponse);
+                            _logger.Log(LogLevel.Information, $"ClientPipeService.StartVPNConnection - string is '{discResponseJson}'");
+                            ss.WriteString(discResponseJson);
                             break;
                         case IGuardianNPContract.NPCommands.GetCurrentVpnConnectionStatus:
                             _logger.Log(LogLevel.Information, $"ClientPipeService[{threadId}]: Performing GetCurrentVpnConnectionStatus");

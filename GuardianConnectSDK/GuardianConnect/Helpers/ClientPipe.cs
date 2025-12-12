@@ -40,10 +40,14 @@ public static class ClientPipe
         return Instance.GetDataUsingDataContract(composite);
     }
 
-    public static ErrorResponse StartVPNConnection(VPNCallParameters protocolRequest)
+    public async static Task<ErrorResponse> StartVPNConnection(VPNCallParameters protocolRequest)
     {
+        GRDVPNHelper.Logger.LogInformation("ClientPipe.StartVPNConnection: Starting VPN connection via pipe...[12120934]");
+        Logger.LogInformation($"ClientPipe.StartVPNConnection: Checking pipe connection...Instance.IsConnected={Instance.IsConnected}");
         if (!Instance.IsConnected) Instance.ReopenNamedPipe();
-        return Instance.StartVPNConnection(protocolRequest);
+        var startResponse = await Instance.StartVPNConnection(protocolRequest);
+        Logger.LogInformation($"ClientPipe.StartVPNConnection: startResponse .IsError={startResponse.IsError}");
+        return startResponse;
     }
 
     public static ErrorResponse DisconnectVPNConnection(string entryName)
@@ -114,6 +118,7 @@ public class ClientPipeImpl : IGuardianNPContract
 
     internal void OpenNamedPipe(string servicePipeName = Common.kGRDServicePipeName)
     {
+        ClientPipe.Logger.LogInformation($"ClientPipeImpl.OpenNamedPipe: Entered...[{usingResource}]");
         if (0 == Interlocked.Exchange(ref usingResource, 1))
         {
             ClientPipe.Logger.LogInformation("ClientPipeImpl.OpenNamedPipe: Opening Pipe Stream...");
@@ -140,6 +145,7 @@ public class ClientPipeImpl : IGuardianNPContract
                 }
             }
         }
+        ClientPipe.Logger.LogInformation($"ClientPipeImpl.OpenNamedPipe: Exiting...[{usingResource}]");
     }
 
     internal void ReopenNamedPipe()
@@ -193,8 +199,9 @@ public class ClientPipeImpl : IGuardianNPContract
         return value;
     }
 
-    public ErrorResponse StartVPNConnection(VPNCallParameters? protocolRequest)
+    public async Task<ErrorResponse> StartVPNConnection(VPNCallParameters? protocolRequest)
     {
+        ClientPipe.Logger.LogInformation("ClientPipeImpl.StartVPNConnection: Sending StartVPNConnection command to service...");
         ErrorResponse startedErrorResponse = new ErrorResponse();
         var startedJson = "";
         try
@@ -202,13 +209,16 @@ public class ClientPipeImpl : IGuardianNPContract
             var cmdPayload = JsonSerializer.Serialize(protocolRequest, VPNCallParametersJsonContext.Default.VPNCallParameters);
             var cmdString = $"{(int)IGuardianNPContract.NPCommands.StartVPNConnection}.{cmdPayload}";
             ss.WriteString(cmdString);
-            startedJson = ss.ReadStringAsync().Result;
+            ClientPipe.Logger.LogInformation("ClientPipeImpl.StartVPNConnection: command sent to service.");
+            startedJson = await ss.ReadStringAsync();
+            ClientPipe.Logger.LogInformation("ClientPipeImpl.StartVPNConnection: Received response from service.");
 
             startedErrorResponse = JsonSerializer.Deserialize<ErrorResponse>(startedJson, ErrorResponseJsonContext.Default.ErrorResponse);
             if (startedErrorResponse.IsError)
             {
                 ClientPipe.Logger.LogError($"ClientPipe.StartVPNConnection - error response from service: is '{startedJson}'");
             }
+            ClientPipe.Logger.LogInformation("ClientPipeImpl.StartVPNConnection: returning to caller.");
         }
         catch (Exception e)
         {

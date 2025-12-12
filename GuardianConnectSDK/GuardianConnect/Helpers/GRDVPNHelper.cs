@@ -433,19 +433,17 @@ namespace GuardianConnect.Helpers
 
             try
             {
-                await Task.Run(() =>
+                _logger.LogInformation("StartIKEv2Connection: Calling ClientPipe.StartVPNConnection[12120934]...");
+                errorResponse = await ClientPipe.StartVPNConnection(vpnValues);
+                _logger.LogInformation("StartIKEv2Connection: Past call to ClientPipe.StartVPNConnection[12120934]");
+                if (errorResponse.IsError)
                 {
-                    _logger.LogInformation("StartIKEv2Connection: Calling ClientPipe.StartVPNConnection()...");
-                    errorResponse = ClientPipe.StartVPNConnection(vpnValues);
-                    if (errorResponse.IsError)
-                    {
-                        _logger.LogError($"StartIKEv2Connection: FAILURE to establish VPN connection. ErrorResponse = {errorResponse}");
-                    }
-                    else
-                    {
-                        _logger.LogInformation("StartIKEv2Connection: VPN connection established.");
-                    }
-                });
+                    _logger.LogError($"StartIKEv2Connection: FAILURE to establish VPN connection. ErrorResponse = {errorResponse}");
+                }
+                else
+                {
+                    _logger.LogInformation("StartIKEv2Connection: VPN connection established.");
+                }
             }
             catch (Exception e)
             {
