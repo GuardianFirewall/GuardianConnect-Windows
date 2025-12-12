@@ -145,6 +145,7 @@ public class ClientPipeImpl : IGuardianNPContract
                 }
             }
         }
+        usingResource = 0;
         ClientPipe.Logger.LogInformation($"ClientPipeImpl.OpenNamedPipe: Exiting...[{usingResource}]");
     }
 
@@ -167,7 +168,7 @@ public class ClientPipeImpl : IGuardianNPContract
             var testAck = ss.ReadString();
             ClientPipe.Logger.LogInformation($"Client Pipe connected to Service. testAck returned '{testAck}'");
             var pieces = testAck.Split(new char[] { '#' } );
-            whetherPreviouslyConnectedAtSuspend = pieces[2].Equals("true", StringComparison.InvariantCultureIgnoreCase);
+            whetherPreviouslyConnectedAtSuspend = pieces.Length > 2 && pieces[2].Equals("true", StringComparison.InvariantCultureIgnoreCase);
         }
         catch (Exception e)
         {
