@@ -118,6 +118,7 @@ public class ClientPipeImpl : IGuardianNPContract
 
     internal void OpenNamedPipe(string servicePipeName = Common.kGRDServicePipeName)
     {
+        Exception lastThrownException = null;
         ClientPipe.Logger.LogInformation($"ClientPipeImpl.OpenNamedPipe: Entered...[{usingResource}]");
         if (0 == Interlocked.Exchange(ref usingResource, 1))
         {
@@ -130,19 +131,22 @@ public class ClientPipeImpl : IGuardianNPContract
             {
                 try
                 {
-                    _clientStream.Connect(30 * 1000);
+                    _clientStream.Connect(2 * 1000);
                     ClientPipe.Logger.LogInformation(
                         $"ClientPipeImpl.OpenNamedPipe: {retries} left to attempt opening of Client Pipe Stream...");
                 }
                 catch (Exception e)
                 {
-                    if (!IsConnected)
-                    {
-                        ClientPipe.Logger.LogError(
-                            "!!!!!!!!!!!!!!!!!!!! ClientPipeImpl.OpenNamedPipe could NOT connect to Pipe Stream...");
-                        throw;
-                    }
+                    ClientPipe.Logger.LogError(e,
+                        $"ClientPipeImpl.OpenNamedPipe: Exception when connecting to Pipe Stream: {e.Message}. Retries left={retries}");
+                    lastThrownException = e;
                 }
+            }
+            if (!IsConnected)
+            {
+                ClientPipe.Logger.LogError("!!!!!!!!!!!!!!!!!!!! ClientPipeImpl.OpenNamedPipe could NOT connect to Pipe Stream...");
+                throw lastThrownException ??
+                      new InvalidOperationException("Could not connect to Named Pipe Stream");
             }
         }
         usingResource = 0;
@@ -168,7 +172,11 @@ public class ClientPipeImpl : IGuardianNPContract
             var testAck = ss.ReadString();
             ClientPipe.Logger.LogInformation($"Client Pipe connected to Service. testAck returned '{testAck}'");
             var pieces = testAck.Split(new char[] { '#' } );
+#if I429FIXED
             whetherPreviouslyConnectedAtSuspend = pieces.Length > 2 && pieces[2].Equals("true", StringComparison.InvariantCultureIgnoreCase);
+#else
+            whetherPreviouslyConnectedAtSuspend = false;
+#endif
         }
         catch (Exception e)
         {
