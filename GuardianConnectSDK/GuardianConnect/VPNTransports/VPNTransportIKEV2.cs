@@ -112,51 +112,46 @@ public class VPNTransportIKEV2 : ITransportProvider
         Logger.LogInformation("VPNTransportIKEV2.StartVPNTunnelWithOptions(): Entry...");
         VpnResumeParameters = options;
 
-        //Task<ErrorResponse> t = new Task<ErrorResponse>(() =>
-        //{
-            Logger.LogInformation("StartVPNTunnelWithOptions: Evaluating vpn connection parameters...");
-            Logger.LogInformation($"EapuserName: {options.EapuserName}");
-            Logger.LogInformation($"Eappassword: {options.Eappassword}");
-            Logger.LogInformation($"EntryNam: {options.EntryName}");
-            Logger.LogInformation($"VpnHostName: {options.VpnHostName}");
-            Logger.LogInformation($"VpnHostDisplay: {options.VpnHostDisplay}");
+        Logger.LogInformation("StartVPNTunnelWithOptions: Evaluating vpn connection parameters...");
+        Logger.LogInformation($"EapuserName: {options.EapuserName}");
+        Logger.LogInformation($"Eappassword: {options.Eappassword}");
+        Logger.LogInformation($"EntryNam: {options.EntryName}");
+        Logger.LogInformation($"VpnHostName: {options.VpnHostName}");
+        Logger.LogInformation($"VpnHostDisplay: {options.VpnHostDisplay}");
 
-            NetworkCredential creds = new NetworkCredential();
+        NetworkCredential creds = new NetworkCredential();
 
-            creds.UserName = options.EapuserName;
-            creds.Password = options.Eappassword;
+        creds.UserName = options.EapuserName;
+        creds.Password = options.Eappassword;
 
-            string entryName = options.EntryName;
-            string hostName = options.VpnHostName;
-            string hostDisplayName = options.VpnHostDisplay;
+        string entryName = options.EntryName;
+        string hostName = options.VpnHostName;
+        string hostDisplayName = options.VpnHostDisplay;
 
-            // :CALL POINT:
-            var result = ConnectionRoutines.CreateOrUpdateEntry(entryName, hostName, creds.UserName, creds.Password);
+        // :CALL POINT:
+        var result = ConnectionRoutines.CreateOrUpdateEntry(entryName, hostName, creds.UserName, creds.Password);
 
-            if (result.IsError) return result;
+        if (result.IsError) return result;
 
-            ErrorResponse connectionCallResult = ConnectToVpnLongRunning(entryName, creds.UserName, creds.Password);
+        ErrorResponse connectionCallResult = ConnectToVpnLongRunning(entryName, creds.UserName, creds.Password);
 
-            if (connectionCallResult.IsError) return connectionCallResult;
+        if (connectionCallResult.IsError) return connectionCallResult;
 
-            NotificationHandler.WasDisconnectPlanned = false;
-            Logger.LogInformation(
-                $"StartVPNTunnelWithOptions: WasDisconnectPlanned now equals {NotificationHandler.WasDisconnectPlanned}");
-            SetVPNStateAtSuspend(); // CHECK THIS - moving to here - makes sense after non-error Connect command return
-            Logger.LogInformation(
-                $"StartVPNTunnelWithOptions: (CHECK#2) WasDisconnectPlanned now equals {NotificationHandler.WasDisconnectPlanned}");
+        NotificationHandler.WasDisconnectPlanned = false;
+        Logger.LogInformation(
+            $"StartVPNTunnelWithOptions: WasDisconnectPlanned now equals {NotificationHandler.WasDisconnectPlanned}");
+        SetVPNStateAtSuspend(); // CHECK THIS - moving to here - makes sense after non-error Connect command return
+        Logger.LogInformation(
+            $"StartVPNTunnelWithOptions: (CHECK#2) WasDisconnectPlanned now equals {NotificationHandler.WasDisconnectPlanned}");
 
-            // Save off the calling parameters in case we reboot while connected
-            var vpnResumeParameters = JsonSerializer.Serialize(VpnResumeParameters,
-                VPNCallParametersJsonContext.Default.VPNCallParameters);
-            RegistrySettings.UpdateGuardianUserSettings(Common.kVpnCallParametersForReboot, vpnResumeParameters);
+        // Save off the calling parameters in case we reboot while connected
+        var vpnResumeParameters = JsonSerializer.Serialize(VpnResumeParameters,
+            VPNCallParametersJsonContext.Default.VPNCallParameters);
+        RegistrySettings.UpdateGuardianUserSettings(Common.kVpnCallParametersForReboot, vpnResumeParameters);
 
-            ActiveEntryName = entryName;
+        ActiveEntryName = entryName;
 
-            return new ErrorResponse();
-        //});
-        //t.Start();
-        //return t;
+        return new ErrorResponse();
     }
 
     // Called from the ClientPipe Service when a Disconnect command is received
@@ -287,7 +282,7 @@ public class VPNTransportIKEV2 : ITransportProvider
                     _vpnStatus = ITransportProvider.VPNProviderStatus.VPNStatusDisconnected;
                     if (!NotificationHandler.WasDisconnectPlanned)
                     {
-#if NOTREADYYET
+#if true
                         Logger.LogInformation(
                             "PollConnectionState: ****************** UNPLANNED DISCONNECT. Setting VPNStateAtSuspend to CONNECTED for when resuming...");
                         SetVPNStateAtSuspend();
