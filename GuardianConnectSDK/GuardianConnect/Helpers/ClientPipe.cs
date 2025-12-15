@@ -15,6 +15,8 @@ namespace GuardianConnect.Helpers;
 
 public static class ClientPipe
 {
+    internal static int SecondsToWaitForServiceConnect = 10;
+
     private static readonly ClientPipeImpl Instance = new ClientPipeImpl();
     private static Microsoft.Extensions.Logging.ILogger _logger = NullLogger.Instance;
     public static Microsoft.Extensions.Logging.ILogger Logger
@@ -131,7 +133,7 @@ public class ClientPipeImpl : IGuardianNPContract
             {
                 try
                 {
-                    _clientStream.Connect(2 * 1000);
+                    _clientStream.Connect(ClientPipe.SecondsToWaitForServiceConnect * 1000);
                     ClientPipe.Logger.LogInformation(
                         $"ClientPipeImpl.OpenNamedPipe: {retries} left to attempt opening of Client Pipe Stream...");
                 }

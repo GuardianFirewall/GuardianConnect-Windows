@@ -14,7 +14,7 @@ namespace GuardianConnect.Services;
 
 public class ClientPipeService : BackgroundService
 {
-    private static int numThreads = 4;
+    private static int numThreads = 32;
     private static Thread?[] servers = new Thread[numThreads];
     private static CancellationToken _cancellationToken;
     private static bool AdministrativeShutdownRequested = false;
@@ -165,7 +165,7 @@ public class ClientPipeService : BackgroundService
 
             //NamedPipeServerStream pipeServer = new NamedPipeServerStream("GuardianFirewallService", PipeDirection.InOut, numThreads);
             NamedPipeServerStream pipeServer = NamedPipeServerStreamAcl.Create("GuardianFirewallService",
-                PipeDirection.InOut, 8, PipeTransmissionMode.Byte, PipeOptions.Asynchronous,
+                PipeDirection.InOut, numThreads, PipeTransmissionMode.Byte, PipeOptions.Asynchronous,
                 65536, 65536, pipeSecurity);
 
             // Wait for a client to connect
