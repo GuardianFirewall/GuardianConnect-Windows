@@ -83,19 +83,21 @@ public class VPNTransportIKEV2 : ITransportProvider
         return errorResponse;
     }
 
-    public static void PowerSuspendVPNConnection()
+    public static void PowerSuspendVPNConnection(bool wasDisconectPlanned = true)
     {
-        string entryName = VpnResumeParameters.EntryName;
         var vpnTransportIkev2 = new VPNTransportIKEV2();
-        vpnTransportIkev2.StopVPNTunnel();
+        vpnTransportIkev2.StopVPNTunnel(wasDisconectPlanned);
     }
 
     public static ErrorResponse PowerResumeVPNConnection()
     {
         Logger.LogInformation("*************** PowerResumeVPNConnection **************** - Entry...");
         var vpnTransportIkev2 = new VPNTransportIKEV2();
-// TJE - don't do this - we already have phonebook entry created. Just MakeTheCall
-//        var result = vpnTransportIkev2.StartVPNTunnelWithOptions(VpnResumeParameters).Result;
+#if true
+        Logger.LogInformation(
+            "*************** PowerResumeVPNConnection **************** - Calling StartVPNTunnelWithOptions to re-establish connection...");
+        var result = vpnTransportIkev2.StartVPNTunnelWithOptions(VpnResumeParameters).Result;
+#else
         var userName = VpnResumeParameters.EapuserName;
         var password = VpnResumeParameters.Eappassword;
 
@@ -103,6 +105,7 @@ public class VPNTransportIKEV2 : ITransportProvider
         Logger.LogInformation(
             "*************** PowerResumeVPNConnection **************** - Calling ConnectToVPNLongRunning to re-establish connection...");
         var result = vpnTransportIkev2.ConnectToVpnLongRunning(entryName, userName, password);
+#endif
 
         return result;
     }
@@ -138,15 +141,12 @@ public class VPNTransportIKEV2 : ITransportProvider
         if (connectionCallResult.IsError) return connectionCallResult;
 
         NotificationHandler.WasDisconnectPlanned = false;
-        Logger.LogInformation(
-            $"StartVPNTunnelWithOptions: WasDisconnectPlanned now equals {NotificationHandler.WasDisconnectPlanned}");
+        Logger.LogInformation( $"StartVPNTunnelWithOptions: WasDisconnectPlanned now equals {NotificationHandler.WasDisconnectPlanned}");
         SetVPNStateAtSuspend(); // CHECK THIS - moving to here - makes sense after non-error Connect command return
-        Logger.LogInformation(
-            $"StartVPNTunnelWithOptions: (CHECK#2) WasDisconnectPlanned now equals {NotificationHandler.WasDisconnectPlanned}");
+        Logger.LogInformation( $"StartVPNTunnelWithOptions: (CHECK#2) WasDisconnectPlanned now equals {NotificationHandler.WasDisconnectPlanned}");
 
         // Save off the calling parameters in case we reboot while connected
-        var vpnResumeParameters = JsonSerializer.Serialize(VpnResumeParameters,
-            VPNCallParametersJsonContext.Default.VPNCallParameters);
+        var vpnResumeParameters = JsonSerializer.Serialize(VpnResumeParameters, VPNCallParametersJsonContext.Default.VPNCallParameters);
         RegistrySettings.UpdateGuardianUserSettings(Common.kVpnCallParametersForReboot, vpnResumeParameters);
 
         ActiveEntryName = entryName;
@@ -155,17 +155,18 @@ public class VPNTransportIKEV2 : ITransportProvider
     }
 
     // Called from the ClientPipe Service when a Disconnect command is received
-    public virtual ErrorResponse StopVPNTunnel()
+    public virtual ErrorResponse StopVPNTunnel(bool wasDisconnectPlanned = true)
     {
-        Logger.LogInformation(
-            $"VPNTransportIKEV2.StopVPNTunnel(): Disconnecting entry '{ConnectionRoutines.ActiveConnectionEntryName}' ...");
-        NotificationHandler.WasDisconnectPlanned = true;
-        Logger.LogInformation(
-            $"StopVPNTunnel: WasDisconnectPlanned now equals {NotificationHandler.WasDisconnectPlanned}");
+        Logger.LogInformation( $"VPNTransportIKEV2.StopVPNTunnel(): Disconnecting entry '{ConnectionRoutines.ActiveConnectionEntryName}' ...");
+        NotificationHandler.WasDisconnectPlanned = wasDisconnectPlanned;
+        Logger.LogInformation( $"StopVPNTunnel: WasDisconnectPlanned now equals {NotificationHandler.WasDisconnectPlanned}");
         try
         {
+            if (wasDisconnectPlanned)
+            {
+                ResetVPNStateAtSuspend();
+            }
 
-            ResetVPNStateAtSuspend(); // CHECK THIS - moving to here - makes sense after non-error Disconnect command return
             ConnectionRoutines.DisconnectEntryAndRemove();
             return new ErrorResponse();
         }

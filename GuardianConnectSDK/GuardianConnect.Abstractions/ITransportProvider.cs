@@ -134,7 +134,7 @@ public interface ITransportProvider
 	 * @method stopVPNTunnel:
 	 * @discussion This function is used to stop the VPN tunnel. The VPN tunnel disconnect process is started and this function returns immediately.
 	 */
-    ErrorResponse StopVPNTunnel();
+    ErrorResponse StopVPNTunnel(bool wasDisconnectPlanned = true);
 
     /*!
 	 * @method fetchLastDisconnectErrorWithCompletionHandler:

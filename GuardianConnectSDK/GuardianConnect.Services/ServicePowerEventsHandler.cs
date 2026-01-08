@@ -63,7 +63,36 @@ public static class ServicePowerEventsHandler
 
     public static void NetworkChangeOnNetworkAddressChanged(object? sender, EventArgs e)
     {
-        Logger.LogInformation($"{at20} Network address changed! GetIsNetworkAvailable returned {NetworkInterface.GetIsNetworkAvailable()}");
+        Logger.LogInformation($"{at20} ServicePowerEventsHandler. NetworkChangeOnNetworkAddressChanged: Network address changed. GetIsNetworkAvailable = {NetworkInterface.GetIsNetworkAvailable()}");
+        NetworkInterface[] adapters = NetworkInterface.GetAllNetworkInterfaces();
+        List<string> logLines = new List<string>();
+        SortedDictionary<string, List<string>> byType = new SortedDictionary<string, List<string>>();
+        foreach(NetworkInterface n in adapters)
+        {
+            // Let's skip some we don't care about
+            if (n.Description.Contains("Microsoft Wi-Fi Direct Virtual Adapter")) continue;
+            if (n.Description.Contains("Microsoft Kernel Debug Network Adapter")) continue;
+            if (n.Description.Contains("Bluetooth")) continue;
+            if (n.Description.Contains("Teredo")) continue;
+            if (n.Description.Contains("6to4")) continue;
+            if (n.Description.Contains("IP-HTTPS")) continue;
+            if (n.Description.Contains("Software Loopback Interface")) continue;
+            if (n.Description.Contains("Network Monitor")) continue;
+            var nit = n.NetworkInterfaceType.ToString();
+            if (!byType.Keys.Contains(nit)) byType.Add(nit, new List<string>());
+            var line = $"{n.OperationalStatus} - '{n.Name}' [Desc: '{n.Description}']";
+            byType[nit].Add($"\t{line}");
+        }
+
+        logLines.Add(Environment.NewLine);
+        foreach (var item in byType)
+        {
+            logLines.Add($"{item.Key}:");
+            item.Value.Sort();
+            logLines.AddRange(item.Value);
+        }
+
+        Logger.LogInformation(string.Join(Environment.NewLine, logLines));
     }
 
     public static void NetworkChangeOnNetworkAvailabilityChanged(object? sender, NetworkAvailabilityEventArgs e)
@@ -171,14 +200,17 @@ public static class ServicePowerEventsHandler
     private static void PerformSuspendActions()
     {
         Logger.LogInformation("*************** PerformSuspendActions ...");
-        // If VPN connected - it will disconnect when network stack collapses - we'll get it on the way up
-        VPNStatusAtSuspendTime = VPNTransportIKEV2.GetCurrentVPNState();
         if (VPNStatusAtSuspendTime == ITransportProvider.VPNProviderStatus.VPNStatusConnected)
         {
-            // We need to do a clean disconnect now - filters too ugly - messes up reconnect
-            Logger.LogInformation(
-                "************** PowerChangeNotifyCallbackRoutine - Calling VPNTransportIKEV1.PowerSuspendVPNConnection...");
-            VPNTransportIKEV2.PowerSuspendVPNConnection();
+            // If VPN connected - it will disconnect when network stack collapses - we'll get it on the way up
+            var vpnStatusRightNow = VPNTransportIKEV2.GetCurrentVPNState();
+            if (vpnStatusRightNow == ITransportProvider.VPNProviderStatus.VPNStatusConnected)
+            {
+                // We need to do a clean disconnect now - filters too ugly - messes up reconnect
+                Logger.LogInformation(
+                    "************** PowerChangeNotifyCallbackRoutine - Calling VPNTransportIKEV1.PowerSuspendVPNConnection...");
+                VPNTransportIKEV2.PowerSuspendVPNConnection(VPNStatusAtSuspendTime == ITransportProvider.VPNProviderStatus.VPNStatusDisconnected);
+            }
         }
     }
 
@@ -189,21 +221,16 @@ public static class ServicePowerEventsHandler
         // We don't care if user brought us out or not - we are resuming
         // IF we were connected, then reconnect now
         Logger.LogInformation($"*************** PerformResumeActions: VPNStatusAtSuspendTime was '{VPNStatusAtSuspendTime}'");
-//#if DEBUG
         if (VPNStatusAtSuspendTime == ITransportProvider.VPNProviderStatus.VPNStatusConnected)
         {
             ErrorResponse errorResponse;
             var defaultRetries = Common.DefaultPowerResumeReconnectAttempts;
-            var SavedResumeParemeters =
-                RegistrySettings.RetrieveGuardianUserSettings(Common.kVpnCallParametersForReboot);
-            var VpnResumeParameters =
-                JsonSerializer.Deserialize(SavedResumeParemeters, typeof(Dictionary<string, object>)) as
-                    Dictionary<string, object>;
+            var SavedResumeParemeters = RegistrySettings.RetrieveGuardianUserSettings(Common.kVpnCallParametersForReboot);
+            var vpnResumeParameters = JsonSerializer.Deserialize<VPNCallParameters>(SavedResumeParemeters, VPNCallParametersJsonContext.Default.VPNCallParameters);
 
-            var host = (string)VpnResumeParameters["hostName"];
+            var host = vpnResumeParameters.VpnHostName;
             Logger.LogInformation("************** PerformResumeActions - VPN WAS CONNECTED AT SUSPENSION.");
-            Logger.LogInformation(
-                $"************** Check network stack readiness by attempting a status check of the vpn host '{host}");
+            Logger.LogInformation($"************** Check network stack readiness by attempting a status check of the vpn host '{host}");
             var countValue = RegistrySettings.RetrieveGuardianUserSettings(Common.kServicePowerResumeReconnectAttempts);
             if (string.IsNullOrEmpty(countValue)) countValue = defaultRetries;
             int maxRetriesCount = int.Parse(countValue);
@@ -212,8 +239,7 @@ public static class ServicePowerEventsHandler
             var header = "PerformResumeActions (waiting for host availability): GetServerStatus returned:";
             do
             {
-                Logger.LogInformation(
-                    $"Calling status of host '{host}' to verify if network is ready - retry # {maxRetriesCount - --readinessCheckCount}");
+                Logger.LogInformation( $"Calling status of host '{host}' to verify if network is ready - retry # {maxRetriesCount - --readinessCheckCount}");
                 errorResponse = GRDGateway.GetServerStatus(host).Result;
                 Logger.LogInformation($"{header}: errorResponse from GetServerStatus: {errorResponse}");
                 if (!errorResponse.IsError)
@@ -231,8 +257,7 @@ public static class ServicePowerEventsHandler
             int connectionAttemptCount = maxRetriesCount;
             do
             {
-                Logger.LogInformation(
-                    $" Calling VPNTransportIKEV2.PowerResumeVPNConnection... attempt #{maxRetriesCount - --connectionAttemptCount}");
+                Logger.LogInformation($" Calling VPNTransportIKEV2.PowerResumeVPNConnection... attempt #{maxRetriesCount - --connectionAttemptCount}");
                 errorResponse = VPNTransportIKEV2.PowerResumeVPNConnection();
                 if (errorResponse.IsError) Task.Delay(5000).Wait();
             } while (connectionAttemptCount != 0 && errorResponse.IsError);
@@ -241,11 +266,6 @@ public static class ServicePowerEventsHandler
                 ? "**************** PerformResumeActions failed!"
                 : "**************** PerformResumeActions successful!");
         }
-//#else
-//        Logger.LogInformation("PerformResumeActions: RELEASE BUILD - skipping reconnect logic.");
-//        ResetVpnStatusAtSuspendTime();
-//#endif
-
         CurrentPowerTransitionState = Common.PowerTransitionStates.Running;
     }
 }
