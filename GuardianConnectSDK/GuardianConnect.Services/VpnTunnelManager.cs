@@ -45,7 +45,7 @@ public class VpnTunnelManager : ITransportProvider
         throw new NotImplementedException();
     }
 
-    public ErrorResponse StopVPNTunnel()
+    public ErrorResponse StopVPNTunnel(bool wasDisconnectPlanned = true)
     {
         throw new NotImplementedException();
     }

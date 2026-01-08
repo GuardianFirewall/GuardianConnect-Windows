@@ -10,7 +10,7 @@ using Microsoft.Extensions.Logging.Abstractions;
 
 namespace GuardianConnect.Services;
 
-public static class PowerTransitionHandler
+public static class ServicePowerEventsHandler
 {
     private const string ast20 = "********************";
     private const string at20 = "@@@@@@@@@@@@@@@@@@@@";
@@ -31,7 +31,7 @@ public static class PowerTransitionHandler
         {
             if (_logger == NullLogger.Instance)
             {
-                _logger = StaticLoggerFactory.CreateLogger("PowerTransitionHandler");
+                _logger = StaticLoggerFactory.CreateLogger("ServicePowerEventsHandler");
             }
             return _logger;
         }
@@ -42,57 +42,90 @@ public static class PowerTransitionHandler
     internal static void SetConnectedAtSuspendTime()
     {
         VPNStatusAtSuspendTime = ITransportProvider.VPNProviderStatus.VPNStatusConnected;
-        _logger.LogInformation($"SetVPNStateAtSuspendTime() called from Poller... VPNStatusAtSuspendTime now set to {VPNStatusAtSuspendTime}");
+        Logger.LogInformation($"SetVPNStateAtSuspendTime() called from Poller... VPNStatusAtSuspendTime now set to {VPNStatusAtSuspendTime}");
     }
 
     internal static void ResetVpnStatusAtSuspendTime() =>
         VPNStatusAtSuspendTime = ITransportProvider.VPNProviderStatus.VPNStatusInvalid;
 
-    public static void SetupPowerTransitionHandler()
+    public static void SetupServicePowerEventsHandler()
     {
-        _logger.LogInformation("PowerTransitionHandler.SetupPowerTransitionHandler: TESTING LOG!");
+        Logger.LogInformation("ServicePowerEventsHandler.SetupServicePowerEventsHandler: TESTING LOG!");
         SystemEvents.PowerModeChanged += SystemEventsOnPowerModeChanged;
+        NetworkChange.NetworkAddressChanged += NetworkChangeOnNetworkAddressChanged;
         NetworkChange.NetworkAvailabilityChanged += NetworkChangeOnNetworkAvailabilityChanged;
         PowerTransitionMonitor.RegisterForPowerNotifications(PowerChangeNotifyCallbackRoutine);
         // Add Resume function to VPNTransportIKEV2 delegate for sake of Disconnect recovery
         VPNTransportIKEV2.PowerResumeActions = PerformResumeActions;
         VPNTransportIKEV2.SetVPNStateAtSuspend = SetConnectedAtSuspendTime;
         VPNTransportIKEV2.ResetVPNStateAtSuspend = ResetVpnStatusAtSuspendTime;
-        //InitPowerEvents();
-
     }
 
-    private static void NetworkChangeOnNetworkAvailabilityChanged(object? sender, NetworkAvailabilityEventArgs e)
+    public static void NetworkChangeOnNetworkAddressChanged(object? sender, EventArgs e)
+    {
+        Logger.LogInformation($"{at20} ServicePowerEventsHandler. NetworkChangeOnNetworkAddressChanged: Network address changed. GetIsNetworkAvailable = {NetworkInterface.GetIsNetworkAvailable()}");
+        NetworkInterface[] adapters = NetworkInterface.GetAllNetworkInterfaces();
+        List<string> logLines = new List<string>();
+        SortedDictionary<string, List<string>> byType = new SortedDictionary<string, List<string>>();
+        foreach(NetworkInterface n in adapters)
+        {
+            // Let's skip some we don't care about
+            if (n.Description.Contains("Microsoft Wi-Fi Direct Virtual Adapter")) continue;
+            if (n.Description.Contains("Microsoft Kernel Debug Network Adapter")) continue;
+            if (n.Description.Contains("Bluetooth")) continue;
+            if (n.Description.Contains("Teredo")) continue;
+            if (n.Description.Contains("6to4")) continue;
+            if (n.Description.Contains("IP-HTTPS")) continue;
+            if (n.Description.Contains("Software Loopback Interface")) continue;
+            if (n.Description.Contains("Network Monitor")) continue;
+            var nit = n.NetworkInterfaceType.ToString();
+            if (!byType.Keys.Contains(nit)) byType.Add(nit, new List<string>());
+            var line = $"{n.OperationalStatus} - '{n.Name}' [Desc: '{n.Description}']";
+            byType[nit].Add($"\t{line}");
+        }
+
+        logLines.Add(Environment.NewLine);
+        foreach (var item in byType)
+        {
+            logLines.Add($"{item.Key}:");
+            item.Value.Sort();
+            logLines.AddRange(item.Value);
+        }
+
+        Logger.LogInformation(string.Join(Environment.NewLine, logLines));
+    }
+
+    public static void NetworkChangeOnNetworkAvailabilityChanged(object? sender, NetworkAvailabilityEventArgs e)
     {
         // Check network availability.
         // If unavailable and we've already set Suspend mode (handled), then ignore, else set Suspend and do PerformSuspend...
         // If available and we were already in Resume or Running, then ignore, else set Resume and do PerformResume...
 
-        _logger.LogInformation($"{at20} Network availability changed to {e.IsAvailable} {at20}");
+        Logger.LogInformation($"{at20} Network availability changed to {e.IsAvailable} {at20}");
         if (e.IsAvailable)
         {
             if (CurrentPowerTransitionState == Common.PowerTransitionStates.Running
                 || CurrentPowerTransitionState == Common.PowerTransitionStates.Resume)
             {
-                _logger.LogInformation($"{at20} CurentPowerTransitionState is already {CurrentPowerTransitionState} so ignoring NC... {at20}");
+                Logger.LogInformation($"{at20} CurentPowerTransitionState is already {CurrentPowerTransitionState} so ignoring NC... {at20}");
                 return;
             }
 
             CurrentPowerTransitionState = Common.PowerTransitionStates.Resume;
-            _logger.LogInformation($"{at20} CurrentPowerTransitionState set to 'Resume' - calling PerformResumeActions... {at20}");
+            Logger.LogInformation($"{at20} CurrentPowerTransitionState set to 'Resume' - calling PerformResumeActions... {at20}");
             PerformResumeActions();    
         }
         else
         {
             if (CurrentPowerTransitionState == Common.PowerTransitionStates.Suspend)
             {
-                _logger.LogInformation(
+                Logger.LogInformation(
                     $"{at20} Ignoring Network UNAVAILABLE event since we already have CurrentPowerTransitionState set to 'Suspend' {at20}");
                 return;
             }
 
             CurrentPowerTransitionState = Common.PowerTransitionStates.Suspend;
-            _logger.LogInformation($"{at20} CurrentPowerTransitionState set to 'Suspend' - calling PerformSuspendActions... {at20}");
+            Logger.LogInformation($"{at20} CurrentPowerTransitionState set to 'Suspend' - calling PerformSuspendActions... {at20}");
             PerformSuspendActions();
         }
     }
@@ -103,7 +136,7 @@ public static class PowerTransitionHandler
         int contextValue = Context.ToInt32();
         Common.PowerNotificationTypes incomingPowerNotificationType =
             (Common.PowerNotificationTypes)Enum.ToObject(typeof(Common.PowerNotificationTypes), powerNotificationType);
-        _logger.LogInformation(
+        Logger.LogInformation(
             $"************** PowerChangeNotifyCallbackRoutine - powerNotificationType = {incomingPowerNotificationType}, Context={contextValue}, Setting={settingValue}");
 
         // Do something per notification
@@ -136,7 +169,7 @@ public static class PowerTransitionHandler
         switch (e.Mode)
         {
             case PowerModes.Suspend:
-                _logger.LogInformation(
+                Logger.LogInformation(
                     "*************** SystemEventsOnPowerModeChanged: SYSTEM IS SUSPENDING! - WE WILL SUSPEND ANY BACKGROUND TASKS.");
                 if (CurrentPowerTransitionState == Common.PowerTransitionStates.Running)
                 {
@@ -146,7 +179,7 @@ public static class PowerTransitionHandler
 
                 break;
             case PowerModes.Resume:
-                _logger.LogInformation(
+                Logger.LogInformation(
                     "*************** SystemEventsOnPowerModeChanged: SYSTEM IS RESUMING! - WE WILL RESUME ANY BACKGROUND TASKS.");
                 if (CurrentPowerTransitionState == Common.PowerTransitionStates.Suspend)
                 {
@@ -158,7 +191,7 @@ public static class PowerTransitionHandler
 // TJE 082025: This is a Battery/AC state change - not going to log this for now - too noisy on laptops
 //#if TRACKINGTHIS
             case PowerModes.StatusChange:
-                _logger.LogInformation("*************** SystemEventsOnPowerModeChanged: SYSTEM HAS POWER STATUS CHANGE!!");
+                Logger.LogInformation("*************** SystemEventsOnPowerModeChanged: SYSTEM HAS POWER STATUS CHANGE!!");
                 break;
 //#endif
         }
@@ -166,40 +199,38 @@ public static class PowerTransitionHandler
 
     private static void PerformSuspendActions()
     {
-        _logger.LogInformation("*************** PerformSuspendActions ...");
-        // If VPN connected - it will disconnect when network stack collapses - we'll get it on the way up
-        VPNStatusAtSuspendTime = VPNTransportIKEV2.GetCurrentVPNState();
+        Logger.LogInformation("*************** PerformSuspendActions ...");
         if (VPNStatusAtSuspendTime == ITransportProvider.VPNProviderStatus.VPNStatusConnected)
         {
-            // We need to do a clean disconnect now - filters too ugly - messes up reconnect
-            _logger.LogInformation(
-                "************** PowerChangeNotifyCallbackRoutine - Calling VPNTransportIKEV1.PowerSuspendVPNConnection...");
-            VPNTransportIKEV2.PowerSuspendVPNConnection();
+            // If VPN connected - it will disconnect when network stack collapses - we'll get it on the way up
+            var vpnStatusRightNow = VPNTransportIKEV2.GetCurrentVPNState();
+            if (vpnStatusRightNow == ITransportProvider.VPNProviderStatus.VPNStatusConnected)
+            {
+                // We need to do a clean disconnect now - filters too ugly - messes up reconnect
+                Logger.LogInformation(
+                    "************** PowerChangeNotifyCallbackRoutine - Calling VPNTransportIKEV1.PowerSuspendVPNConnection...");
+                VPNTransportIKEV2.PowerSuspendVPNConnection(VPNStatusAtSuspendTime == ITransportProvider.VPNProviderStatus.VPNStatusDisconnected);
+            }
         }
     }
 
     internal static void PerformResumeActions()
     {
         var successful = false;
-        _logger.LogInformation("*************** PerformResumeActions ...");
+        Logger.LogInformation("*************** PerformResumeActions ...");
         // We don't care if user brought us out or not - we are resuming
         // IF we were connected, then reconnect now
-        _logger.LogInformation($"*************** PerformResumeActions: VPNStatusAtSuspendTime was '{VPNStatusAtSuspendTime}'");
-//#if DEBUG
+        Logger.LogInformation($"*************** PerformResumeActions: VPNStatusAtSuspendTime was '{VPNStatusAtSuspendTime}'");
         if (VPNStatusAtSuspendTime == ITransportProvider.VPNProviderStatus.VPNStatusConnected)
         {
             ErrorResponse errorResponse;
             var defaultRetries = Common.DefaultPowerResumeReconnectAttempts;
-            var SavedResumeParemeters =
-                RegistrySettings.RetrieveGuardianUserSettings(Common.kVpnCallParametersForReboot);
-            var VpnResumeParameters =
-                JsonSerializer.Deserialize(SavedResumeParemeters, typeof(Dictionary<string, object>)) as
-                    Dictionary<string, object>;
+            var SavedResumeParemeters = RegistrySettings.RetrieveGuardianUserSettings(Common.kVpnCallParametersForReboot);
+            var vpnResumeParameters = JsonSerializer.Deserialize<VPNCallParameters>(SavedResumeParemeters, VPNCallParametersJsonContext.Default.VPNCallParameters);
 
-            var host = (string)VpnResumeParameters["hostName"];
-            _logger.LogInformation("************** PerformResumeActions - VPN WAS CONNECTED AT SUSPENSION.");
-            _logger.LogInformation(
-                $"************** Check network stack readiness by attempting a status check of the vpn host '{host}");
+            var host = vpnResumeParameters.VpnHostName;
+            Logger.LogInformation("************** PerformResumeActions - VPN WAS CONNECTED AT SUSPENSION.");
+            Logger.LogInformation($"************** Check network stack readiness by attempting a status check of the vpn host '{host}");
             var countValue = RegistrySettings.RetrieveGuardianUserSettings(Common.kServicePowerResumeReconnectAttempts);
             if (string.IsNullOrEmpty(countValue)) countValue = defaultRetries;
             int maxRetriesCount = int.Parse(countValue);
@@ -208,13 +239,12 @@ public static class PowerTransitionHandler
             var header = "PerformResumeActions (waiting for host availability): GetServerStatus returned:";
             do
             {
-                _logger.LogInformation(
-                    $"Calling status of host '{host}' to verify if network is ready - retry # {maxRetriesCount - --readinessCheckCount}");
+                Logger.LogInformation( $"Calling status of host '{host}' to verify if network is ready - retry # {maxRetriesCount - --readinessCheckCount}");
                 errorResponse = GRDGateway.GetServerStatus(host).Result;
-                _logger.LogInformation($"{header}: errorResponse from GetServerStatus: {errorResponse}");
+                Logger.LogInformation($"{header}: errorResponse from GetServerStatus: {errorResponse}");
                 if (!errorResponse.IsError)
                 {
-                    _logger.LogInformation(
+                    Logger.LogInformation(
                         $"************** PerformResumeActions - NO error returned from GetServerStatus. Response message = '{errorResponse.Message}. StatusCode={errorResponse.HttpResponse.StatusCode}");
                     break; // ok - not an error - so then let's break and try to connect
                 }
@@ -227,21 +257,15 @@ public static class PowerTransitionHandler
             int connectionAttemptCount = maxRetriesCount;
             do
             {
-                _logger.LogInformation(
-                    $" Calling VPNTransportIKEV2.PowerResumeVPNConnection... attempt #{maxRetriesCount - --connectionAttemptCount}");
+                Logger.LogInformation($" Calling VPNTransportIKEV2.PowerResumeVPNConnection... attempt #{maxRetriesCount - --connectionAttemptCount}");
                 errorResponse = VPNTransportIKEV2.PowerResumeVPNConnection();
                 if (errorResponse.IsError) Task.Delay(5000).Wait();
             } while (connectionAttemptCount != 0 && errorResponse.IsError);
 
-            _logger.LogInformation(errorResponse.IsError
+            Logger.LogInformation(errorResponse.IsError
                 ? "**************** PerformResumeActions failed!"
                 : "**************** PerformResumeActions successful!");
         }
-//#else
-//        _logger.LogInformation("PerformResumeActions: RELEASE BUILD - skipping reconnect logic.");
-//        ResetVpnStatusAtSuspendTime();
-//#endif
-
         CurrentPowerTransitionState = Common.PowerTransitionStates.Running;
     }
 }
