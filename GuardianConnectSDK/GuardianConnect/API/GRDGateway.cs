@@ -37,15 +37,6 @@ public class GRDGateway
         [JsonPropertyName("transport-protocol")] public string transportProtocol { get; set; } = string.Empty;
     }
 
-    public class InvalidateCredsPayload
-    {
-        [JsonPropertyName("apitoken")]
-        public string ApiToken { get; set; } = string.Empty;
-        
-        [JsonPropertyName("subscribercredential")]
-        public string SubscriberCredential { get; set; } = string.Empty;
-    }
-
     public static string ApiHostname => GRDCredentialManager.GetMainCredentials()?.HostName ?? string.Empty;
 
     public static string ApiAuthToken => GRDCredentialManager.GetMainCredentials()?.ApiAuthToken ?? string.Empty;
@@ -89,7 +80,7 @@ public class GRDGateway
         var vpnHost = hostOverride;
         ErrorResponse errorResponse = new ErrorResponse();
         HttpResponseMessage response = new HttpResponseMessage();
-        _logger.LogInformation(
+        Logger.LogInformation(
             "In GetServerStatus. Called from Guardian Firewall "
             + (clientCall ? "Client CONN#12" : "Service Power Resume"));
 
@@ -100,7 +91,7 @@ public class GRDGateway
             return errorResponse;
         }
 
-        _logger.LogInformation($"GetServerStatus: Making status call to host {vpnHost} ...");
+        Logger.LogInformation($"GetServerStatus: Making status call to host {vpnHost} ...");
         Uri reqUri = new Uri($"https://{vpnHost}/vpnsrv/api/server-status");
         HttpRequestMessage request = new HttpRequestMessage(HttpMethod.Get, reqUri);
 
@@ -115,13 +106,13 @@ public class GRDGateway
             // to flood the log with Exception stacks when we know we're looping on failure until
             // TCP/IP network stack is settled.
             
-            if (clientCall) _logger.LogError(e, "Exception thrown in GetServerStatus on server status");
+            if (clientCall) Logger.LogError(e, "Exception thrown in GetServerStatus on server status");
             errorResponse.SetException(e);
             return errorResponse;
         }
 
         errorResponse.SetResponse(response);
-        _logger.LogInformation($"GetServerStatus: returning response: {errorResponse.Message}");
+        Logger.LogInformation($"GetServerStatus: returning response: {errorResponse.Message}");
         return errorResponse;
     }
 
@@ -155,7 +146,7 @@ public class GRDGateway
         var credsList = new List<GRDCredential>();
         
         // CONN#10
-        _logger.LogInformation("CONN#10: RegisterDeviceForTransportProtocol()");
+        Logger.LogInformation("CONN#10: RegisterDeviceForTransportProtocol()");
 
         RegisterDevicePayload payload = new RegisterDevicePayload()
         {
@@ -167,7 +158,7 @@ public class GRDGateway
         Uri reqUri = new Uri($"https://{hostname}/api/v1.3/device");
         HttpRequestMessage request = new HttpRequestMessage(HttpMethod.Post, reqUri);
         string payLoadString = JsonSerializer.Serialize(payload, RegisterDevicePayloadJsonContext.Default.RegisterDevicePayload);
-        _logger.LogInformation($"RegisterDeviceForTransportProtocol: payload for call is '{payLoadString}");
+        Logger.LogInformation($"RegisterDeviceForTransportProtocol: payload for call is '{payLoadString}");
         request.Content = new StringContent(payLoadString);
 
         try
@@ -176,7 +167,12 @@ public class GRDGateway
             errorResponse.SetResponse(response).SetData(new List<GRDCredential>());
             string respContent = await response.Content.ReadAsStringAsync();
             var cred = JsonSerializer.Deserialize<GRDCredential>(respContent, GRDCredentialJsonContext.Default.GRDCredential);
-            _logger.LogInformation($"RegisterDeviceForTransportProtocol: resp Status={response.StatusCode}, cred values: ApiAuthToken: {cred.ApiAuthToken}, ClientId: {cred.ClientId}, DevicePrivateKey: {cred.DevicePrivateKey}, DevicePublicKey: {cred.DevicePublicKey}, Ipv4Address: {cred.IPv4Address}");
+            // TJE 0.34.2 - settings ClientId from EapUser if IKEv2
+            if (cred != null && cred.TransportProtocol == ITransportProvider.TransportProtocol.TransportIKEv2)
+            {
+                cred.ClientId = cred.UserName;
+            }
+            Logger.LogInformation($"RegisterDeviceForTransportProtocol: resp Status={response.StatusCode}, cred values: ApiAuthToken: {cred.ApiAuthToken}, ClientId: {cred.ClientId}, DevicePrivateKey: {cred.DevicePrivateKey}, DevicePublicKey: {cred.DevicePublicKey}, Ipv4Address: {cred.IPv4Address}");
             if (cred != null) credsList.Add(cred);
         }
         catch (Exception e)
@@ -196,7 +192,7 @@ public class GRDGateway
         HttpResponseMessage response = new HttpResponseMessage();
         if (string.IsNullOrEmpty(clientId) || string.IsNullOrEmpty(apiToken) || string.IsNullOrEmpty(hostName))
         {
-            _logger.LogInformation("Unable to call hosts to invalidate credentials as identifier portions are null or empty.");
+            Logger.LogInformation("Unable to call hosts to invalidate credentials as identifier portions are null or empty.");
             return new ErrorResponse("EMPTYPARAMS", null, true, null);
         }
 
@@ -204,6 +200,7 @@ public class GRDGateway
 
         Uri reqUri = new Uri($"https://{hostName}/api/v1.3/device/{clientId}/invalidate-credentials");
         HttpRequestMessage request = new HttpRequestMessage(HttpMethod.Post, reqUri);
+        request.Content = new StringContent(JsonSerializer.Serialize(payload, InvalidateCredsPayloadJsonContext.Default.InvalidateCredsPayload));
 
         try
         {
@@ -231,7 +228,7 @@ public class GRDGateway
         if (!GRDVPNHelper.Singleton.IsConnected(out _)) return;
         if (string.IsNullOrEmpty(BaseHostName))
         {
-            _logger.LogError("Cannot set DeviceFilterConfig since BaseHostName is not set!");
+            Logger.LogError("Cannot set DeviceFilterConfig since BaseHostName is not set!");
             return;
         }
         
@@ -239,7 +236,7 @@ public class GRDGateway
         var dfcCurrent = GRDVPNHelper.Singleton.CurrentDeviceBlocklistConfig;
         dfcCurrent.Api_auth_token =  ApiAuthToken;
 
-        _logger.LogInformation("SetDeviceFilterConfigsForDevice: Updating CurrentDeviceBlocklistConfig api_auth_token");
+        Logger.LogInformation("SetDeviceFilterConfigsForDevice: Updating CurrentDeviceBlocklistConfig api_auth_token");
         GRDVPNHelper.Singleton.CurrentDeviceBlocklistConfig.Api_auth_token = ApiAuthToken;
 
         var dfcJson = JsonSerializer.Serialize(dfcCurrent, DeviceFilterConfigJsonContext.Default.DeviceFilterConfig);
@@ -254,11 +251,11 @@ public class GRDGateway
 
         if (!response.IsSuccessStatusCode)
         {
-            _logger.LogError($"SetDeviceFilterConfigsForDeviceId: Error returned when syncing with host: {response.StatusCode}");
+            Logger.LogError($"SetDeviceFilterConfigsForDeviceId: Error returned when syncing with host: {response.StatusCode}");
         }
         else
         {
-            _logger.LogInformation($"SetDeviceFilterConfigsForDeviceId: Syncing with host successful: {response.StatusCode}");
+            Logger.LogInformation($"SetDeviceFilterConfigsForDeviceId: Syncing with host successful: {response.StatusCode}");
         }
     }
 
