@@ -170,10 +170,16 @@ namespace GuardianConnect.Helpers
         {
             ErrorResponse errorResponse;
             var mainCreds = GRDCredentialManager.GetMainCredentials();
-            if (mainCreds != null &&
-                !string.IsNullOrEmpty(mainCreds.ClientId))
+            if (mainCreds != null
+//                &&
+//                !string.IsNullOrEmpty(mainCreds.ClientId)
+                )
             {
-                var clientId = mainCreds.UserName;
+                string clientId = string.Empty;
+                if (mainCreds.TransportProtocol == ITransportProvider.TransportProtocol.TransportIKEv2)
+                {
+                    clientId = mainCreds.UserName;
+                }
                 (GRDSubscriberCredential subCreds, errorResponse) = await GetValidSubscriberCredentialWithCompletion();
                 if (subCreds == null || errorResponse.Message.Equals("PE TOKEN NOT SET"))
                     return; // TJE TODO: CHECK THIS
@@ -340,7 +346,7 @@ namespace GuardianConnect.Helpers
             if (!subCred.IsEmpty && !subCred.IsTokenExpired)
             {
                 GRDHousekeepingAPI.LiveGrdCredential = subCred;
-                return (GRDHousekeepingAPI.LiveGrdCredential, new ErrorResponse(null));
+                return (GRDHousekeepingAPI.LiveGrdCredential, new ErrorResponse(string.Empty));
             }
 
             var peToken = GRDKeychain.GetPasswordStringForAccount(IGRDKeychain.kKeychainStr_PEToken_Itself);
