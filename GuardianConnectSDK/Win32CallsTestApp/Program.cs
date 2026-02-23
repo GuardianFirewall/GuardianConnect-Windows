@@ -31,9 +31,24 @@ var loggerFactory = serviceProvider.GetRequiredService<ILoggerFactory>();
 StaticLoggerFactory.Initialize(loggerFactory);
 
 Log.Information("Hello, World!");
-RegionUtils.LongRunningRefreshTask(new CancellationToken());
+
+#if true
+Log.Information("Calling CreateOrUpdateEntry()...");
+
+var hostName = "newyork-ipsec-14.guardianapp.com";
+var hostDisplay = "New York, NY";
+var eapUser = "e9d538e6b3e3eb43";
+var eapPassword = "iPcozIEKUFRL";
+var entryName = "Guardian Firewall - New York, NY";
+var response = ConnectionRoutines.CreateOrUpdateEntry(entryName, hostName, eapUser, eapPassword, null);
+
+var dialResponse = ConnectionRoutines.ConnectEntry(); 
+
+
+#endif
 
 #if false
+RegionUtils.LongRunningRefreshTask(new CancellationToken());
 TestRegionStuff();
 var subcreds = GRDSubscriberCredential.GetCurrentStoredSubscriberCredential();
 subcreds.Store();

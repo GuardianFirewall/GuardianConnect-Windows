@@ -7,6 +7,7 @@ using GuardianConnect.Shared.Extensions;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Logging.Abstractions;
 using System.Diagnostics;
+using System.Net.Http.Headers;
 using System.Text.Json;
 using System.Text.Json.Serialization;
 
@@ -41,8 +42,7 @@ public static class GRDHousekeepingAPI
         // Validation Method PEToken...
         if (string.IsNullOrEmpty(peToken))
         {
-            Debug.WriteLine("No pe token provided");
-            _logger.LogError("RequestPETokenInformationForToken: PEToken is null or empty");
+            Logger.LogError("RequestPETokenInformationForToken: PEToken is null or empty");
 
             return errorResponse
                 .SetException(new ArgumentNullException("NO PE Token Provided"))
@@ -69,36 +69,31 @@ public static class GRDHousekeepingAPI
                 int statusCode = (int)response.StatusCode;
                 if (statusCode == 500)
                 {
-                    Debug.WriteLine(@"Housekeeping failed to return subscriber credential");
-                    //if (completion) completion(nil, NO, @"Internal server error - couldn't create subscriber credential");
+                    Logger.LogError(@"Housekeeping failed to return subscriber credential");
                     errorResponse.SetResponse(response).SetErrorMessage("500 - Internal Server Error");
                 }
                 if (statusCode == 400)
                 {
-                    Debug.WriteLine(@"Failed to create subscriber credential. Faulty input values");
-                    //if (completion) completion(nil, NO, @"Failed to create subscriber credential. Faulty input values");
+                    Logger.LogError(@"Failed to create subscriber credential. Faulty input values");
                     errorResponse.SetResponse(response).SetErrorMessage("400 - Failed to create subscriber credential. Faulty input values");
                 }
                 if (statusCode == 401)
                 {
-                    Debug.WriteLine(@"No subscription present");
-                    //if (completion) completion(nil, NO, @"No subscription present");
+                    Logger.LogError(@"No subscription present");
                     errorResponse.SetResponse(response).SetErrorMessage("401 - No subscription present");
                 }
                 if (statusCode == 410)
                 {
-                    System.Diagnostics.Debug.WriteLine(@"Subscription expired");
+                    Logger.LogError(@"Subscription expired");
                     // Not sending an error message back so that we're not showing a useless error to the user
                     // The app should transition to free/unpaid if required
-                    //if (completion) completion(nil, NO, nil);
                     errorResponse.SetResponse(response).SetErrorMessage("410 - Subscription expired");
                 }
             }
         }
         catch (Exception ex)
         {
-            Debug.WriteLine(@"\tERROR {0}", ex.Message);
-            _logger.LogError(ex, $"Exception thrown - RequestPETokenInformationForToken: {ex.Message}");
+            Logger.LogError(ex, $"Exception thrown - RequestPETokenInformationForToken: {ex.Message}");
             errorResponse.SetException(ex);
         }
         //
@@ -115,7 +110,7 @@ public static class GRDHousekeepingAPI
     {
         ErrorResponse errorResponse;
         // CONN#9
-        _logger.LogInformation("CONN#9");
+        Logger.LogInformation("CONN#9");
         // TJE: Called by GRDVPNHelper.GetValidSubscriberCredentialWithCompletion()
         
         // set host to use
@@ -124,11 +119,11 @@ public static class GRDHousekeepingAPI
         string peToken = GRDVPNHelper.Singleton.PeToken?.Token;
         if (string.IsNullOrEmpty(peToken))
         {
-            _logger.LogError(@"PEToken Object has empty token. Trying string from keychain...");
+            Logger.LogError(@"PEToken Object has empty token. Trying string from keychain...");
             peToken = GRDKeychain.GetPasswordStringForAccount(IGRDKeychain.kKeychainStr_PEToken_Itself);
             if (string.IsNullOrEmpty(peToken))
             {
-                _logger.LogError(@"Failed to retrieve PEToken from keychain");
+                Logger.LogError(@"Failed to retrieve PEToken from keychain");
                 return new ErrorResponse
                 {
                     Data = null,
@@ -147,7 +142,7 @@ public static class GRDHousekeepingAPI
             var pet = new PeTokenRequest("pe-token", petRequest.PeToken);
             
             string serializedPetReq = JsonSerializer.Serialize(pet, PeTokenRequestJsonContext.Default.PeTokenRequest);
-            _logger.LogInformation($"CreateSubscriberCredentialForBundleId: serializedPetReq = '{serializedPetReq}'");
+            Logger.LogInformation($"CreateSubscriberCredentialForBundleId: serializedPetReq = '{serializedPetReq}'");
             HttpContent content = new StringContent(serializedPetReq);
             content.Headers.Remove("Content-Type");
             content.Headers.Add("Content-Type", "application/json; charset=utf-8");
@@ -158,17 +153,17 @@ public static class GRDHousekeepingAPI
                 var jwt = JsonSerializer.Deserialize<GrdSubscriberCredentialJwt>(result, GRDSubScriberCredentialJwtJsonContext.Default.GrdSubscriberCredentialJwt);
                 LiveGrdCredential = new GRDSubscriberCredential(jwt!.SubscriberCredential!);
                 LiveGrdCredential.Store();
-                _logger.LogInformation("CreateSubscriberCredentialForBundleId(): JWT obtained.");
+                Logger.LogInformation("CreateSubscriberCredentialForBundleId(): JWT obtained.");
             }
             else
             {
-                _logger.LogInformation("CreateSubscriberCredentialForBundleId(): Error occurred.");
+                Logger.LogInformation("CreateSubscriberCredentialForBundleId(): Error occurred.");
                 // ... check response values...
                 int statusCode = (int)response.StatusCode;
                 if (statusCode == 500)
                 {
                     var message = "Housekeeping failed to return subscriber credential";
-                    _logger.LogInformation(message);
+                    Logger.LogInformation(message);
                     errorResponse = new ErrorResponse(message, null, true, response);
                     return errorResponse;
 
@@ -176,14 +171,14 @@ public static class GRDHousekeepingAPI
                 else if (statusCode == 400)
                 {
                     var message = "Failed to create subscriber credential. Faulty input values";
-                    _logger.LogInformation(message);
+                    Logger.LogInformation(message);
                     errorResponse = new ErrorResponse(message, null, true, response);
                     return errorResponse;
                 }
                 else if (statusCode == 401)
                 {
                     var message = "No subscription present";
-                    _logger.LogInformation(message);
+                    Logger.LogInformation(message);
                     errorResponse = new ErrorResponse(message, null, true, response);
                     return errorResponse;
 
@@ -193,7 +188,7 @@ public static class GRDHousekeepingAPI
                     // Not sending an error message back so that we're not showing a useless error to the user
                     // The app should transition to free/unpaid if required
                     var message = "Subscription expired";
-                    _logger.LogInformation(message);
+                    Logger.LogInformation(message);
                     errorResponse = new ErrorResponse(message, null, true, response);
                     return errorResponse;
 
@@ -201,7 +196,7 @@ public static class GRDHousekeepingAPI
                 else if (statusCode == 402) // Payment required
                 {
                     var message = "Payment required";
-                    _logger.LogInformation(message);
+                    Logger.LogInformation(message);
                     errorResponse = new ErrorResponse(message, null, true, response);
                     return errorResponse;
                 }
@@ -209,7 +204,7 @@ public static class GRDHousekeepingAPI
         }
         catch (Exception ex)
         {
-            _logger.LogInformation($"\tERROR {ex.Message}");
+            Logger.LogInformation($"\tERROR {ex.Message}");
             errorResponse = new ErrorResponse(ex.Message, ex, true, null);
             return errorResponse;
         }
@@ -238,14 +233,13 @@ public static class GRDHousekeepingAPI
             else
             {
                 int statusCode = (int)response.StatusCode;
-                _logger.LogError($"RequestLatestTimeZonesForRegions: Call to url '{uri.AbsoluteUri}' failed with status code {statusCode}");
+                Logger.LogError($"RequestLatestTimeZonesForRegions: Call to url '{uri.AbsoluteUri}' failed with status code {statusCode}");
                 errorResponse.SetResponse(response).SetErrorMessage($"Failed with status code {statusCode}");
             }
         }
         catch (Exception ex)
         {
-            Debug.WriteLine(@"\tERROR {0}", ex.Message);
-            _logger.LogError(ex, $"Exception thrown - RequestLatestTimeZonesForRegions: {ex.Message}");
+            Logger.LogError(ex, $"Exception thrown - RequestLatestTimeZonesForRegions: {ex.Message}");
             errorResponse.SetException(ex);
         }
         return errorResponse;
@@ -290,4 +284,134 @@ public static class GRDHousekeepingAPI
 
         return errorResponse;
     }
+    
+    #region GRDConnectionSubscriber/Device calls
+    /// <summary>
+    /// Create a function called allDevices which calls GRDConnectDevice currentDevice in order have a reference to itself as well
+    /// as the API endpoint /api/v1.2/partners/subscriber/devices/list endpoint in order to get the complete list of devices
+    /// associated with the current Connect Subscriber
+    ///
+    /// Upon successful response from the API the JSON response data needs to be parsed in to GRDConnectDevice objects.
+    /// While parsing the JSON response data from the API endpoint the GRDConnectDevice object that is currently being
+    /// processed should be compared to the GRDConnectDevice reference return from the currentDevice function call.
+    /// The current device can be matched by comparing the uuid on both objects and if they match the currentDevice boolean should be set.
+    /// 
+    /// </summary>
+    /// <param name="identifier"></param>
+    /// <param name="secret"></param>
+    /// <returns>List<GRDConnectDevice></returns>
+    internal static async Task<(List<GRDConnectDevice>, ErrorResponse)> RequestAllConnectDevicesForSubscriberAsync(ConnectDeviceRequestData requestParameters)
+    {
+        ErrorResponse errorResponse = new ErrorResponse();
+        
+        var devices = new List<GRDConnectDevice>();
+        const string GetAllDevicesForSubscriberUrl = $"https://{Common.kConnectAPIHostname}/api/v1.2/partners/subscriber/devices/list";
+        Uri uri = new Uri(GetAllDevicesForSubscriberUrl);
+
+        HttpContent content = null;
+        if (requestParameters.PeToken != null)
+        {
+            content = new StringContent(JsonSerializer.Serialize(requestParameters.PeToken,
+                GRDPETokenJsonContext.Default.GRDPEToken));
+        }
+        else
+        {
+            content = new StringContent(JsonSerializer.Serialize(requestParameters, ConnectDeviceRequestDataJsonContext.Default.ConnectDeviceRequestData));
+        }
+
+        content.Headers.Remove("Content-Type");
+        content.Headers.Add("Content-Type", "application/json; charset=utf-8");
+        HttpResponseMessage response = await HttpUtils.Client.PostAsync(uri, content);
+        try
+        {
+            if (response.IsSuccessStatusCode)
+            {
+                string result = await response.Content.ReadAsStringAsync();
+                devices = JsonSerializer.Deserialize<List<GRDConnectDevice>>(result, GRDConnectDeviceJsonContext.Default.ListGRDConnectDevice);
+                errorResponse.SetData(devices).SetResponse(response);
+            }
+            else
+            {
+                int statusCode = (int)response.StatusCode;
+                Logger.LogError($"RequestAllConnectDevicesForSubscriberAsync: Call to url '{uri.AbsoluteUri}' failed with status code {statusCode}");
+                errorResponse.SetResponse(response).SetErrorMessage($"Failed with status code {statusCode}");
+            }
+        }
+        catch (Exception ex)
+        {
+            Logger.LogError(ex, $"Exception thrown - RequestLatestTimeZonesForRegions: {ex.Message}");
+            errorResponse.SetException(ex);
+        }
+
+        return (devices, errorResponse);
+    }
+
+    /// <summary>
+    /// Add a function which accepts the following function parameters
+    /// peToken type: string
+    /// nickname type: string
+    /// acceptedTOS type: string
+    /// The function should start by checking that the function parameters of type string are non-empty strings as well
+    /// as that the parameter acceptedTOS is true.
+    ///
+    /// It should then call the API endpoint /api/v1.2/partners/subscriber/devices/add and parse the response data into
+    /// a GRDConnectDevice object by calling the initiWithDictionary function and finally return the parsed connect
+    /// device object
+    /// </summary>
+    /// <param name="request"></param>
+    /// <returns></returns>
+    /// <exception cref="NotImplementedException"></exception>
+    public static Task<ErrorResponse> CallHostToAddConnectDeviceAsync(ConnectDeviceRequestData request)
+    {
+        var AddConnectDeviceUrl = $"https://{Common.kConnectAPIHostname}/api/v1.2/partners/subscriber/devices/add";
+        var errorResponse = new ErrorResponse();
+        
+        Uri uri = new Uri(AddConnectDeviceUrl);
+        HttpContent content = new StringContent(JsonSerializer.Serialize(request, ConnectDeviceRequestDataJsonContext.Default.ConnectDeviceRequestData));
+        content.Headers.Remove("Content-Type");
+        content.Headers.Add("Content-Type", "application/json; charset=utf-8");
+        HttpResponseMessage response = HttpUtils.Client.PostAsync(uri, content).GetAwaiter().GetResult();
+        errorResponse.SetResponse(response);
+        return Task.FromResult(errorResponse);
+    }
+
+    /// <summary>
+    /// Add a function called updateConnectDevice which accepts the following function parameters
+    ///     peToken type: string
+    ///     nickname type: string
+    /// The function should call the API endpoint /api/v1.2/partners/subscriber/devices/update and parse the response
+    /// data into a GRDConnectDevice object by calling the initFromDictionary function
+    /// </summary>
+    /// <param name="request"></param>
+    /// <returns></returns>
+    public static Task<ErrorResponse> CallHostToUpdateConnectDeviceAsync(ConnectDeviceRequestData request)
+    {
+        var UpdateConnectDeviceUrl = $"https://{Common.kConnectAPIHostname}/api/v1.2/partners/subscriber/devices/add";
+        var errorResponse = new ErrorResponse();
+        
+        Uri uri = new Uri(UpdateConnectDeviceUrl);
+        HttpContent content = new StringContent(JsonSerializer.Serialize(request, ConnectDeviceRequestDataJsonContext.Default.ConnectDeviceRequestData));
+        content.Headers.Remove("Content-Type");
+        content.Headers.Add("Content-Type", "application/json; charset=utf-8");
+        HttpResponseMessage response = HttpUtils.Client.PostAsync(uri, content).GetAwaiter().GetResult();
+        errorResponse.SetResponse(response);
+        return Task.FromResult(errorResponse); 
+    }
+
+    public static Task<ErrorResponse> CallHostToValidateConnectDeviceAsync(string peToken)
+    {
+        var ValidateConnectDeviceUrl = $"https://{Common.kConnectAPIHostname}/api/v1.2/partners/subscriber/device/validate";
+        var errorResponse = new ErrorResponse();
+        
+        Uri uri = new Uri(ValidateConnectDeviceUrl);
+        HttpContent content = new StringContent("{ petoken: " + peToken + " }");
+        content.Headers.Remove("Content-Type");
+        content.Headers.Add("Content-Type", "application/json; charset=utf-8");
+        HttpResponseMessage response = HttpUtils.Client.PostAsync(uri, content).GetAwaiter().GetResult();
+        errorResponse.SetResponse(response);
+        return Task.FromResult(errorResponse); 
+        
+    }
+
+    #endregion GRDConnectionSubscriber/Device calls
 }
