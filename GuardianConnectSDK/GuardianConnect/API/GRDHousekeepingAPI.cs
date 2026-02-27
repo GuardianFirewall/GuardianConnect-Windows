@@ -301,7 +301,7 @@ public static class GRDHousekeepingAPI
     // ----------------
         
     // [#185 called by #169] - DONE
-    public static async Task<(Dictionary<string, object>,  ErrorResponse)> CallHostToAddPartnersNewSubscriberAsync(string identifier, string secret, string nickname, string email, bool acceptedTOS)
+    public static async Task<(Dictionary<string, object>,  ErrorResponse)> AddNewConnectSubscriberAsync(string identifier, string secret, string nickname, string email, bool acceptedTOS)
     {
         var errorResponse = new ErrorResponse();
         
@@ -352,62 +352,85 @@ public static class GRDHousekeepingAPI
         return (new Dictionary<string, object?>(), errorResponse);
     }
 
-    //----------------------------------
-    // [#187]
-    public static Task<ErrorResponse> CallHostToUpdatePartnerSubscriberAsync(ref GRDConnectSubscriber subscriber)
+    // [#187 - called by #171] - DONE
+    public static async Task<(Dictionary<string, object>,  ErrorResponse)> UpdateConnectSubscriberAsync(
+        string identifier, string secret, string nickname, string email, bool acceptedTOS)
     {
         var errorResponse = new ErrorResponse();
-        var suffix = "/api/v1.2/partners/subscribers/update";
-        var UpdateConnectSubscriberUrl = $"https://{Common.kConnectAPIHostname}{suffix}";
         
-        Uri uri = new Uri(UpdateConnectSubscriberUrl);
-        HttpContent content = new StringContent("{ petoken: " + peToken + " }");
-        content.Headers.Remove("Content-Type");
-        content.Headers.Add("Content-Type", "application/json; charset=utf-8");
+        var body = new Dictionary<string, object?>
+        {
+            [Common.kGuardianConnectSubscriberIdentifierKey] = identifier,
+            [Common.kGuardianConnectSubscriberSecretKey] = secret,
+            [Common.kGuardianConnectSubscriberPETNicknameKey] = nickname,
+            [Common.kGuardianConnectSubscriberAcceptedTOS] = acceptedTOS,
+            [Common.kGuardianConnectSubscriberEmailKey] = email
+        };
+
+        using var content = JsonContent.Create(body);
+        content.Headers.TryAddWithoutValidation("GRD-Connect-Publishable-Key", "<partner-app-publishable-key>");
+
+        var uri = MakeUri("/api/v1.3/partners/subscribers/update");
         HttpResponseMessage response = HttpUtils.Client.PostAsync(uri, content).GetAwaiter().GetResult();
-        errorResponse.IsError = (response.IsSuccessStatusCode);
-        errorResponse.SetResponse(response);
-        return Task.FromResult(errorResponse); 
-        
+        string data = response.Content.ReadAsStringAsync().GetAwaiter().GetResult();
+        if (response.StatusCode == HttpStatusCode.InternalServerError) data = string.Empty;
+        var dict = JsonSerializer.Deserialize<Dictionary<string, object>>(data);
+        if (response.IsSuccessStatusCode) return (dict, errorResponse);
+        errorResponse.SetGrdApiError(dict, response.StatusCode);
+        return (new Dictionary<string, object?>(), errorResponse);
     }
 
-    // [#188]
-    public static Task<ErrorResponse> CallHostToValidatePartnerSubscriberAsync(ref GRDConnectSubscriber subscriber)
+    // [#188 - called by #172] - DONE
+    public static async Task<(Dictionary<string, object>,  ErrorResponse)> ValidateConnectSubscriberAsync(
+        string identifier, string secret, string nickname, string email, bool acceptedTOS)
     {
         var errorResponse = new ErrorResponse();
-        var suffix = "/api/v1.2/partners/subscribers/validate";
-        var ValidateConnectDeviceUrl = $"https://{Common.kConnectAPIHostname}{suffix}";
         
-        Uri uri = new Uri(ValidateConnectDeviceUrl);
-        HttpContent content = new StringContent("{ petoken: " + peToken + " }");
-        content.Headers.Remove("Content-Type");
-        content.Headers.Add("Content-Type", "application/json; charset=utf-8");
+        var body = new Dictionary<string, object?>
+        {
+            [Common.kGuardianConnectSubscriberIdentifierKey] = identifier,
+            [Common.kGuardianConnectSubscriberSecretKey] = secret,
+            [Common.kGuardianConnectSubscriberPETNicknameKey] = nickname,
+            [Common.kGuardianConnectSubscriberAcceptedTOS] = acceptedTOS,
+            [Common.kGuardianConnectSubscriberEmailKey] = email
+        };
+
+        using var content = JsonContent.Create(body);
+        content.Headers.TryAddWithoutValidation("GRD-Connect-Publishable-Key", "<partner-app-publishable-key>");
+
+        var uri = MakeUri("/api/v1.3/partners/subscribers/validate");
         HttpResponseMessage response = HttpUtils.Client.PostAsync(uri, content).GetAwaiter().GetResult();
-        errorResponse.IsError = (response.IsSuccessStatusCode);
-        errorResponse.SetResponse(response);
-        return Task.FromResult(errorResponse); 
-        
+        string data = response.Content.ReadAsStringAsync().GetAwaiter().GetResult();
+        if (response.StatusCode == HttpStatusCode.InternalServerError) data = string.Empty;
+        var dict = JsonSerializer.Deserialize<Dictionary<string, object>>(data);
+        if (response.IsSuccessStatusCode) return (dict, errorResponse);
+        errorResponse.SetGrdApiError(dict, response.StatusCode);
+        return (new Dictionary<string, object?>(), errorResponse);
     }
 
-    // [#189]
-    public static Task<ErrorResponse> CallHostToLogoutPartnerSubscriberAsync(ref GRDConnectSubscriber subscriber)
+    // [#189 - called by #173] - DONE
+    public static async Task<ErrorResponse> LogOutConnectSubscriberAsync(string peToken)
     {
         var errorResponse = new ErrorResponse();
-        var suffix = "/api/v1.2/partners/subscribers/logout";
-        var LogoutUrl = $"https://{Common.kConnectAPIHostname}{suffix}";
-        
-        Uri uri = new Uri(LogoutUrl);
-        HttpContent content = new StringContent("{ petoken: " + peToken + " }");
-        content.Headers.Remove("Content-Type");
-        content.Headers.Add("Content-Type", "application/json; charset=utf-8");
+        var body = new Dictionary<string, object>
+        {
+            [Common.kPETokenKey] = peToken
+        };
+
+        using var content = JsonContent.Create(body);
+        content.Headers.TryAddWithoutValidation("GRD-Connect-Publishable-Key", "<partner-app-publishable-key>");
+
+        var uri = MakeUri("/api/v1.2/partners/subscribers/devices/logout");
         HttpResponseMessage response = HttpUtils.Client.PostAsync(uri, content).GetAwaiter().GetResult();
-        errorResponse.IsError = (response.IsSuccessStatusCode);
-        errorResponse.SetResponse(response);
-        return Task.FromResult(errorResponse); 
-        
+        if (response.IsSuccessStatusCode) return errorResponse;
+        var data = string.Empty;
+        if (response.StatusCode == HttpStatusCode.InternalServerError) data = string.Empty;
+        var errorDict = JsonSerializer.Deserialize<Dictionary<string, object>>(data);
+        errorResponse.SetGrdApiError(errorDict, response.StatusCode);
+
+        return errorResponse;
     }
-    
-    // ---------------- 
+
     // [#190 - called by #170] - DONE
     public static async Task<ErrorResponse> AccountCreationStateAsync(string identifier, string secret)
     {
