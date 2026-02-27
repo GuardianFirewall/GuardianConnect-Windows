@@ -298,7 +298,37 @@ public static class GRDHousekeepingAPI
         @"/api/v1.2/partners/subscriber/validate"];
         @"/api/v1.2/partners/subscriber/logout"];
      */
+    // ----------------
+        
+    // [#185 called by #169]
+    public static async Task<(Dictionary<string, object>,  ErrorResponse)> CallHostToAddPartnersNewSubscriberAsync(string identifier, string secret, string nickname, string email, bool acceptedTOS)
+    {
+        var errorResponse = new ErrorResponse();
+        
+        var body = new Dictionary<string, object?>
+        {
+            [GRDConnectSubscriber.kGuardianConnectSubscriberIdentifierKey] = identifier,
+            [GRDConnectSubscriber.kGuardianConnectSubscriberSecretKey] = secret,
+            [GRDConnectSubscriber.kGuardianConnectSubscriberPETNicknameKey] = nickname,
+            [GRDConnectSubscriber.kGuardianConnectSubscriberAcceptedTOS] = acceptedTOS,
+            [GRDConnectSubscriber.kGuardianConnectSubscriberEmailKey] = email
+        };
+
+        using var content = JsonContent.Create(body);
+        content.Headers.TryAddWithoutValidation("GRD-Connect-Publishable-Key", "<partner-app-publishable-key>");
+
+        var uri = MakeUri("/api/v1.3/partners/subscribers/new");
+        HttpResponseMessage response = HttpUtils.Client.PostAsync(uri, content).GetAwaiter().GetResult();
+        string data = response.Content.ReadAsStringAsync().GetAwaiter().GetResult();
+        if (response.StatusCode == HttpStatusCode.InternalServerError) data = string.Empty;
+        var dict = JsonSerializer.Deserialize<Dictionary<string, object>>(data);
+        if (response.IsSuccessStatusCode) return (dict, errorResponse);
+        errorResponse.SetGrdApiError(dict, response.StatusCode);
+        return (new Dictionary<string, object?>(), errorResponse);
+    }
+
     
+    // ---------------- 
     // [#190 - called by #170] - DONE
     public static async Task<ErrorResponse> AccountCreationStateAsync(string identifier, string secret)
     {
@@ -454,49 +484,6 @@ public static class GRDHousekeepingAPI
     }
     
     //----------------------------------
-    
-    // [#185 called by #169]
-    public static async Task<(Dictionary<string, object>,  ErrorResponse)> CallHostToAddPartnersNewSubscriberAsync(ref GRDConnectSubscriber subscriber)
-    {
-        var errorResponse = new ErrorResponse();
-
-        using var request = new HttpRequestMessage(HttpMethod.Post, uri)
-        {
-            Content = JsonContent.Create(body)
-        };
-
-        request.Headers.TryAddWithoutValidation("GRD-Connect-Publishable-Key", "<partner-app-publishable-key>");
-
-        var response = await httpClient.SendAsync(request);
-        
-        
-        
-        var suffix = "/api/v1.3/partners/subscribers/new #185";
-        var ValidateConnectDeviceUrl = $"https://{Common.kConnectAPIHostname}{suffix}";
-        
-        
-        var body = new Dictionary<string, object?>
-        {
-            [GRDConnectDevice.kGuardianConnectDevicePETokenKey] = peToken,
-            [GRDConnectDevice.kGuardianConnectDeviceNicknameKey] = nickname,
-            [GRDConnectDevice.kGuardianConnectDeviceAcceptedTOSKey] = true
-        };
-
-        using var content = JsonContent.Create(body);
-        
-        var uri = MakeUri("/api/v1.2/partners/subscriber/devices/add");
-        HttpResponseMessage response = HttpUtils.Client.PostAsync(uri, content).GetAwaiter().GetResult();
-        string data = response.Content.ReadAsStringAsync().GetAwaiter().GetResult();
-        if (response.StatusCode == HttpStatusCode.InternalServerError) data = string.Empty;
-        var dict = JsonSerializer.Deserialize<Dictionary<string, object>>(data);
-        if (! response.IsSuccessStatusCode)
-        {
-            errorResponse.SetGrdApiError(dict, response.StatusCode);
-            return (new Dictionary<string, object?>(), errorResponse);
-        }
-        return (dict, errorResponse);
-    }
-
 
     // [#186]
     public static Task<ErrorResponse> CallHostToGetPartnersSubscriberDeviceReferenceAsync(ref GRDConnectSubscriber subscriber)
