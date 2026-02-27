@@ -291,15 +291,6 @@ public static class GRDHousekeepingAPI
     }
     
     #region GRDConnectionSubscriber/Device calls
-    /* Api calls:
-        @"/api/v1.2/partners/subscribers/new"];
-        @"/api/v1.2/partners/subscriber/device-reference"];
-        @"/api/v1.2/partners/subscriber/update"];
-        @"/api/v1.2/partners/subscriber/validate"];
-        @"/api/v1.2/partners/subscriber/logout"];
-     */
-    // ----------------
-        
     // [#185 called by #169] - DONE
     public static async Task<(Dictionary<string, object>,  ErrorResponse)> AddNewConnectSubscriberAsync(string identifier, string secret, string nickname, string email, bool acceptedTOS)
     {
@@ -314,13 +305,7 @@ public static class GRDHousekeepingAPI
             [Common.kGuardianConnectSubscriberEmailKey] = email
         };
 
-        var response = HttpUtils.Client.SendAsync(CreateConnectAPIRequest("/api/v1.3/partners/subscribers/new", body)).GetAwaiter().GetResult();
-        string data = response.Content.ReadAsStringAsync().GetAwaiter().GetResult();
-        if (response.StatusCode == HttpStatusCode.InternalServerError) data = string.Empty;
-        var dict = JsonSerializer.Deserialize<Dictionary<string, object>>(data);
-        if (response.IsSuccessStatusCode) return (dict, errorResponse);
-        errorResponse.SetGrdApiError(dict, response.StatusCode);
-        return (new Dictionary<string, object?>(), errorResponse);
+        return MakeAPICallAndReturnDict("/api/v1.2/partners/subscribers/new", body).GetAwaiter().GetResult();
     }
 
     // [#186 - called by #168] - DONE
@@ -335,17 +320,7 @@ public static class GRDHousekeepingAPI
             [Common.kPETokenKey] = peToken,
         };
 
-        using var content = JsonContent.Create(body);
-        content.Headers.TryAddWithoutValidation("GRD-Connect-Publishable-Key", "<partner-app-publishable-key>");
-
-        var uri = MakeUri("/api/v1.3/partners/subscribers/device-reference");
-        HttpResponseMessage response = HttpUtils.Client.PostAsync(uri, content).GetAwaiter().GetResult();
-        string data = response.Content.ReadAsStringAsync().GetAwaiter().GetResult();
-        if (response.StatusCode == HttpStatusCode.InternalServerError) data = string.Empty;
-        var dict = JsonSerializer.Deserialize<Dictionary<string, object>>(data);
-        if (response.IsSuccessStatusCode) return (dict, errorResponse);
-        errorResponse.SetGrdApiError(dict, response.StatusCode);
-        return (new Dictionary<string, object?>(), errorResponse);
+        return MakeAPICallAndReturnDict("/api/v1.2/partners/subscribers/device-reference", body).GetAwaiter().GetResult();
     }
 
     // [#187 - called by #171] - DONE
@@ -363,17 +338,7 @@ public static class GRDHousekeepingAPI
             [Common.kGuardianConnectSubscriberEmailKey] = email
         };
 
-        using var content = JsonContent.Create(body);
-        content.Headers.TryAddWithoutValidation("GRD-Connect-Publishable-Key", "<partner-app-publishable-key>");
-
-        var uri = MakeUri("/api/v1.3/partners/subscribers/update");
-        HttpResponseMessage response = HttpUtils.Client.PostAsync(uri, content).GetAwaiter().GetResult();
-        string data = response.Content.ReadAsStringAsync().GetAwaiter().GetResult();
-        if (response.StatusCode == HttpStatusCode.InternalServerError) data = string.Empty;
-        var dict = JsonSerializer.Deserialize<Dictionary<string, object>>(data);
-        if (response.IsSuccessStatusCode) return (dict, errorResponse);
-        errorResponse.SetGrdApiError(dict, response.StatusCode);
-        return (new Dictionary<string, object?>(), errorResponse);
+        return MakeAPICallAndReturnDict("/api/v1.2/partners/subscribers/update", body).GetAwaiter().GetResult();
     }
 
     // [#188 - called by #172] - DONE
@@ -390,18 +355,8 @@ public static class GRDHousekeepingAPI
             [Common.kGuardianConnectSubscriberAcceptedTOS] = acceptedTOS,
             [Common.kGuardianConnectSubscriberEmailKey] = email
         };
-
-        using var content = JsonContent.Create(body);
-        content.Headers.TryAddWithoutValidation("GRD-Connect-Publishable-Key", "<partner-app-publishable-key>");
-
-        var uri = MakeUri("/api/v1.3/partners/subscribers/validate");
-        HttpResponseMessage response = HttpUtils.Client.PostAsync(uri, content).GetAwaiter().GetResult();
-        string data = response.Content.ReadAsStringAsync().GetAwaiter().GetResult();
-        if (response.StatusCode == HttpStatusCode.InternalServerError) data = string.Empty;
-        var dict = JsonSerializer.Deserialize<Dictionary<string, object>>(data);
-        if (response.IsSuccessStatusCode) return (dict, errorResponse);
-        errorResponse.SetGrdApiError(dict, response.StatusCode);
-        return (new Dictionary<string, object?>(), errorResponse);
+        
+        return MakeAPICallAndReturnDict("/api/v1.2/partners/subscribers/validate", body).GetAwaiter().GetResult();
     }
 
     // [#189 - called by #173] - DONE
@@ -413,18 +368,7 @@ public static class GRDHousekeepingAPI
             [Common.kPETokenKey] = peToken
         };
 
-        using var content = JsonContent.Create(body);
-        content.Headers.TryAddWithoutValidation("GRD-Connect-Publishable-Key", "<partner-app-publishable-key>");
-
-        var uri = MakeUri("/api/v1.2/partners/subscribers/devices/logout");
-        HttpResponseMessage response = HttpUtils.Client.PostAsync(uri, content).GetAwaiter().GetResult();
-        if (response.IsSuccessStatusCode) return errorResponse;
-        var data = string.Empty;
-        if (response.StatusCode == HttpStatusCode.InternalServerError) data = string.Empty;
-        var errorDict = JsonSerializer.Deserialize<Dictionary<string, object>>(data);
-        errorResponse.SetGrdApiError(errorDict, response.StatusCode);
-
-        return errorResponse;
+        return MakeAPICallAndReturnErrorResponse("/api/v1.2/partners/subscribers/logout", body).GetAwaiter().GetResult();
     }
 
     // [#190 - called by #170] - DONE
@@ -437,23 +381,12 @@ public static class GRDHousekeepingAPI
             [Common.kGuardianDeviceSubscriberSecretKey] = secret
         };
         
-        using var content = JsonContent.Create(body);
-        content.Headers.TryAddWithoutValidation("GRD-Connect-Publishable-Key", "<partner-app-publishable-key>");
-        
-        var uri = MakeUri("/api/v1.2/partners/subscriber/devices/delete");
-        HttpResponseMessage response = HttpUtils.Client.PostAsync(uri, content).GetAwaiter().GetResult();
-        var data = String.Empty;
-        var dict = JsonSerializer.Deserialize<Dictionary<string, object>>(data);
-        if (response.IsSuccessStatusCode) return errorResponse;
-        errorResponse.SetGrdApiError(dict, response.StatusCode);
-        return errorResponse;
+        return MakeAPICallAndReturnErrorResponse("/api/v1.2/partners/subscribers/account-creation-state", body).GetAwaiter().GetResult();
     }
 
     //  [#191 called by #179] - DONE
     public static async Task<(Dictionary<string, object>, ErrorResponse)> AddConnectDeviceAsync(string peToken, string nickname, string acceptedTOS)
     {
-        var errorResponse = new ErrorResponse();
-        
         var body = new Dictionary<string, object?>
         {
             [Common.kGuardianConnectDevicePETokenKey] = peToken,
@@ -461,25 +394,13 @@ public static class GRDHousekeepingAPI
             [Common.kGuardianConnectDeviceAcceptedTOSKey] = true
         };
 
-        using var content = JsonContent.Create(body);
-        content.Headers.TryAddWithoutValidation("GRD-Connect-Publishable-Key", "<partner-app-publishable-key>");
-        
-        var uri = MakeUri("/api/v1.2/partners/subscriber/devices/add");
-        HttpResponseMessage response = HttpUtils.Client.PostAsync(uri, content).GetAwaiter().GetResult();
-        string data = response.Content.ReadAsStringAsync().GetAwaiter().GetResult();
-        if (response.StatusCode == HttpStatusCode.InternalServerError) data = string.Empty;
-        var dict = JsonSerializer.Deserialize<Dictionary<string, object>>(data);
-        if (response.IsSuccessStatusCode) return (dict, errorResponse);
-        errorResponse.SetGrdApiError(dict, response.StatusCode);
-        return (new Dictionary<string, object?>(), errorResponse);
+        return MakeAPICallAndReturnDict("/api/v1.2/partners/subscriber/devices/add", body).GetAwaiter().GetResult();
     }
     
     // [#192 used by #180] - DONE
     public static async Task<(Dictionary<string, object>, ErrorResponse)> UpdateConnectDeviceAsync(string peToken,
         string nickname, string uuid)
     {
-        var errorResponse = new ErrorResponse();
-
         var body = new Dictionary<string, object?>
         {
             [Common.kGuardianConnectDevicePETokenKey] = peToken,
@@ -487,17 +408,7 @@ public static class GRDHousekeepingAPI
             [Common.kGuardianConnectDeviceUUIDKey] = uuid
         };
 
-        using var content = JsonContent.Create(body);
-        content.Headers.TryAddWithoutValidation("GRD-Connect-Publishable-Key", "<partner-app-publishable-key>");
-
-        var uri = MakeUri("/api/v1.2/partners/subscriber/devices/update");
-        HttpResponseMessage response = HttpUtils.Client.PostAsync(uri, content).GetAwaiter().GetResult();
-        string data = response.Content.ReadAsStringAsync().GetAwaiter().GetResult();
-        if (response.StatusCode == HttpStatusCode.InternalServerError) data = string.Empty;
-        var dict = JsonSerializer.Deserialize<Dictionary<string, object>>(data);
-        if (response.IsSuccessStatusCode) return (dict, errorResponse);
-        errorResponse.SetGrdApiError(dict, response.StatusCode);
-        return (new Dictionary<string, object?>(), errorResponse);
+        return MakeAPICallAndReturnDict("/api/v1.2/partners/subscriber/devices/update", body).GetAwaiter().GetResult();
     }
 
     // [#193] - called from [#167] - indentifier/secret or [#181] - peToken - DONE
@@ -514,11 +425,7 @@ public static class GRDHousekeepingAPI
             body.Add(Common.kGuardianDeviceSubscriberSecretKey, secret);
         }
         
-        using var content = JsonContent.Create(body);
-        content.Headers.TryAddWithoutValidation("GRD-Connect-Publishable-Key", "<partner-app-publishable-key>");
-        
-        var uri = MakeUri("/api/v1.2/partners/subscriber/devices/list");
-        HttpResponseMessage response = HttpUtils.Client.PostAsync(uri, content).GetAwaiter().GetResult();
+        var response = HttpUtils.Client.SendAsync(CreateConnectAPIRequest("/api/v1.3/partners/subscribers/devices/list", body)).GetAwaiter().GetResult();
         string data = response.Content.ReadAsStringAsync().GetAwaiter().GetResult();
         if (response.StatusCode == HttpStatusCode.InternalServerError) data = string.Empty;
         if (! response.IsSuccessStatusCode)
@@ -535,7 +442,6 @@ public static class GRDHousekeepingAPI
     // [#194] Delete Device - sub-issue of [#179] - DONE
     public static async Task<ErrorResponse> DeleteConnectDeviceAsync(string peToken, string identifier, string secret)
     {
-        var errorResponse = new ErrorResponse();
         var body = new Dictionary<string, object>();
         
         if (peToken != null) body.Add(Common.kGuardianConnectDevicePETokenKey, peToken);
@@ -545,18 +451,7 @@ public static class GRDHousekeepingAPI
             body.Add(Common.kGuardianDeviceSubscriberSecretKey, secret);
         }
         
-        using var content = JsonContent.Create(body);
-        content.Headers.TryAddWithoutValidation("GRD-Connect-Publishable-Key", "<partner-app-publishable-key>");
-        
-        var uri = MakeUri("/api/v1.2/partners/subscriber/devices/delete");
-        HttpResponseMessage response = HttpUtils.Client.PostAsync(uri, content).GetAwaiter().GetResult();
-        if (response.IsSuccessStatusCode) return errorResponse;
-        var data = string.Empty;
-        if (response.StatusCode == HttpStatusCode.InternalServerError) data = string.Empty;
-        var errorDict = JsonSerializer.Deserialize<Dictionary<string, object>>(data);
-        errorResponse.SetGrdApiError(errorDict, response.StatusCode);
-
-        return errorResponse;
+        return MakeAPICallAndReturnErrorResponse("/api/v1.2/partners/subscriber/devices/delete", body).GetAwaiter().GetResult();
     }
     
     // [#195] Validate Device - sub-issue of [#183] - DONE
@@ -568,17 +463,7 @@ public static class GRDHousekeepingAPI
             [Common.kGuardianConnectDevicePETokenKey] = peToken
         };
         
-        using var content = JsonContent.Create(body);
-        content.Headers.TryAddWithoutValidation("GRD-Connect-Publishable-Key", "<partner-app-publishable-key>");
-
-        var uri = MakeUri("/api/v1.2/partners/subscriber/devices/validate");
-        HttpResponseMessage response = HttpUtils.Client.PostAsync(uri, content).GetAwaiter().GetResult();
-        string data = response.Content.ReadAsStringAsync().GetAwaiter().GetResult();
-        if (response.StatusCode == HttpStatusCode.InternalServerError) data = string.Empty;
-        if (response.IsSuccessStatusCode) return errorResponse;
-        var errorDict = JsonSerializer.Deserialize<Dictionary<string, object>>(data);
-        errorResponse.SetGrdApiError(errorDict, response.StatusCode);
-        return errorResponse;
+        return MakeAPICallAndReturnErrorResponse("/api/v1.2/partners/subscriber/devices/validate", body).GetAwaiter().GetResult();
     }
     
     #endregion GRDConnectionSubscriber/Device calls
@@ -595,6 +480,33 @@ public static class GRDHousekeepingAPI
         {
             Content = JsonContent.Create(body)
         };
+        
+        request.Content.Headers.TryAddWithoutValidation("GRD-Connect-Publishable-Key", "<partner-app-publishable-key>");
         return request;
+    }
+
+    private static async Task<ErrorResponse> MakeAPICallAndReturnErrorResponse(string endpoint, Dictionary<string, object> body)
+    {
+        var errorResponse = new ErrorResponse();
+        
+        var response = HttpUtils.Client.SendAsync(CreateConnectAPIRequest(endpoint, body)).GetAwaiter().GetResult();
+        string data = response.Content.ReadAsStringAsync().GetAwaiter().GetResult();
+        if (response.StatusCode == HttpStatusCode.InternalServerError) data = string.Empty;
+        if (response.IsSuccessStatusCode) return errorResponse;
+        var errorDict = JsonSerializer.Deserialize<Dictionary<string, object>>(data);
+        errorResponse.SetGrdApiError(errorDict, response.StatusCode);
+        return errorResponse;
+    }
+    
+    private static async Task<(Dictionary<string, object>, ErrorResponse)> MakeAPICallAndReturnDict(string endpoint, Dictionary<string, object> body)
+    {
+        var errorResponse = new ErrorResponse();
+        var response = HttpUtils.Client.SendAsync(CreateConnectAPIRequest(endpoint, body)).GetAwaiter().GetResult();
+        var data = response.Content.ReadAsStringAsync().GetAwaiter().GetResult();
+        if (response.StatusCode == HttpStatusCode.InternalServerError) data = string.Empty;
+        var dict = JsonSerializer.Deserialize<Dictionary<string, object>>(data);
+        if (response.IsSuccessStatusCode) return (dict, errorResponse);
+        errorResponse.SetGrdApiError(dict, response.StatusCode);
+        return (new Dictionary<string, object?>(), errorResponse);
     }
 }
