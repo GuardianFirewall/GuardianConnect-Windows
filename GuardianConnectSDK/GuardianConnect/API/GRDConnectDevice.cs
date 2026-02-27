@@ -9,15 +9,6 @@ namespace GuardianConnect.API
 {
     public class GRDConnectDevice
     {
-        // Constants
-        public const string kGuardianConnectDeviceKey = "ep-grd-device";
-        public const string kGuardianConnectDeviceNicknameKey = "ep-grd-device-nickname";
-        public const string kGuardianConnectDeviceUUIDKey = "ep-grd-device-uuid";
-        public const string kGuardianConnectDeviceCreatedAtKey = "ep-grd-device-created-at";
-        public const string kGuardianConnectDevicePETokenKey = "pe-token";
-        public const string kGuardianConnectDevicePETExpiresKey = "pet-expires";
-        public const string kGuardianConnectDevice = "kGuardianConnectDevice";
-
         // Properties
         public string Nickname { get; set; }
         public string UUID { get; set; }
@@ -31,11 +22,11 @@ namespace GuardianConnect.API
         {
             var device = new GRDConnectDevice
             {
-                Nickname = (string)deviceDictionary[kGuardianConnectDeviceNicknameKey],
-                UUID = (string)deviceDictionary[kGuardianConnectDeviceUUIDKey],
-                PEToken = (string)deviceDictionary[kGuardianConnectDevicePETokenKey],
-                PETExpires = DateTime.Parse((string)deviceDictionary[kGuardianConnectDevicePETExpiresKey], CultureInfo.InvariantCulture, DateTimeStyles.RoundtripKind),
-                CreatedAt = DateTime.Parse((string)deviceDictionary[kGuardianConnectDeviceCreatedAtKey], CultureInfo.InvariantCulture, DateTimeStyles.RoundtripKind),
+                Nickname = (string)deviceDictionary[Common.kGuardianConnectDeviceNicknameKey],
+                UUID = (string)deviceDictionary[Common.kGuardianConnectDeviceUUIDKey],
+                PEToken = (string)deviceDictionary[Common.kGuardianConnectDevicePETokenKey],
+                PETExpires = DateTime.Parse((string)deviceDictionary[Common.kGuardianConnectDevicePETExpiresKey], CultureInfo.InvariantCulture, DateTimeStyles.RoundtripKind),
+                CreatedAt = DateTime.Parse((string)deviceDictionary[Common.kGuardianConnectDeviceCreatedAtKey], CultureInfo.InvariantCulture, DateTimeStyles.RoundtripKind),
                 IsCurrentDevice = deviceDictionary.TryGetValue("currentDevice", out var currentDevice) && currentDevice is bool b && b
             };
 
@@ -47,16 +38,16 @@ namespace GuardianConnect.API
         {
             try
             {
-                int retVal = GRDKeychain.ReadDictionaryOfObjects(kGuardianConnectDevice, out var binaryDict);
+                int retVal = GRDKeychain.ReadDictionaryOfObjects(Common.kGuardianConnectDevice, out var binaryDict);
                 if (binaryDict == null || binaryDict.Count == 0 || retVal != 0)
                     return (null, new ErrorResponse("Failed to retrieve ConnectDevice from registry", IsErrorArg:true));
 
                 var objectDict = new Dictionary<string, object>();
-                objectDict.Add(kGuardianConnectDeviceNicknameKey, Encoding.UTF8.GetString(binaryDict[kGuardianConnectDeviceNicknameKey]));
-                objectDict.Add(kGuardianConnectDeviceUUIDKey, Encoding.UTF8.GetString(binaryDict[kGuardianConnectDeviceUUIDKey]));
-                objectDict.Add(kGuardianConnectDeviceCreatedAtKey, Encoding.UTF8.GetString(binaryDict[kGuardianConnectDeviceCreatedAtKey]));
-                objectDict.Add(kGuardianConnectDevicePETokenKey, Encoding.UTF8.GetString(binaryDict[kGuardianConnectDevicePETokenKey]));
-                objectDict.Add(kGuardianConnectDevicePETExpiresKey, DateTime.Parse(Encoding.UTF8.GetString(binaryDict[kGuardianConnectDevicePETExpiresKey])));
+                objectDict.Add(Common.kGuardianConnectDeviceNicknameKey, Encoding.UTF8.GetString(binaryDict[Common.kGuardianConnectDeviceNicknameKey]));
+                objectDict.Add(Common.kGuardianConnectDeviceUUIDKey, Encoding.UTF8.GetString(binaryDict[Common.kGuardianConnectDeviceUUIDKey]));
+                objectDict.Add(Common.kGuardianConnectDeviceCreatedAtKey, Encoding.UTF8.GetString(binaryDict[Common.kGuardianConnectDeviceCreatedAtKey]));
+                objectDict.Add(Common.kGuardianConnectDevicePETokenKey, Encoding.UTF8.GetString(binaryDict[Common.kGuardianConnectDevicePETokenKey]));
+                objectDict.Add(Common.kGuardianConnectDevicePETExpiresKey, DateTime.Parse(Encoding.UTF8.GetString(binaryDict[Common.kGuardianConnectDevicePETExpiresKey])));
                 
                 var device = InitFromDictionary(objectDict);
                 return (device, new ErrorResponse());
@@ -73,16 +64,16 @@ namespace GuardianConnect.API
             {
                 var deviceDict = new Dictionary<string, byte[]>
                 {
-                    [kGuardianConnectDeviceNicknameKey] = Encoding.UTF8.GetBytes(Nickname),
-                    [kGuardianConnectDeviceUUIDKey] = Encoding.UTF8.GetBytes(UUID),
-                    [kGuardianConnectDevicePETokenKey] = Encoding.UTF8.GetBytes(PEToken ?? ""),
-                    [kGuardianConnectDeviceCreatedAtKey] = Encoding.UTF8.GetBytes(CreatedAt.ToString("O")),
-                    [kGuardianConnectDevicePETExpiresKey] = PETExpires.HasValue
+                    [Common.kGuardianConnectDeviceNicknameKey] = Encoding.UTF8.GetBytes(Nickname),
+                    [Common.kGuardianConnectDeviceUUIDKey] = Encoding.UTF8.GetBytes(UUID),
+                    [Common.kGuardianConnectDevicePETokenKey] = Encoding.UTF8.GetBytes(PEToken ?? ""),
+                    [Common.kGuardianConnectDeviceCreatedAtKey] = Encoding.UTF8.GetBytes(CreatedAt.ToString("O")),
+                    [Common.kGuardianConnectDevicePETExpiresKey] = PETExpires.HasValue
                         ? Encoding.UTF8.GetBytes(PETExpires.Value.ToString("O"))
                         : new byte[0],
                     ["currentDevice"] = Encoding.UTF8.GetBytes(IsCurrentDevice.ToString())
                 };
-                GRDKeychain.StoreDictionaryOfObjects(kGuardianConnectDeviceKey, deviceDict);
+                GRDKeychain.StoreDictionaryOfObjects(Common.kGuardianConnectDeviceKey, deviceDict);
                 return new ErrorResponse();
             }
             catch (Exception ex)
@@ -96,7 +87,7 @@ namespace GuardianConnect.API
         {
             try
             {
-                GRDKeychain.RemoveSubKeyAndValues(kGuardianConnectDeviceKey);
+                GRDKeychain.RemoveSubKeyAndValues(Common.kGuardianConnectDeviceKey);
                 return null;
             }
             catch (Exception ex)
@@ -186,7 +177,7 @@ namespace GuardianConnect.API
         {
             try
             {
-                var retVal = GRDKeychain.RemoveKeychainItemForAccount(kGuardianConnectDeviceKey);
+                var retVal = GRDKeychain.RemoveKeychainItemForAccount(Common.kGuardianConnectDeviceKey);
                 return retVal == 0
                     ? new ErrorResponse()
                     : new ErrorResponse("Failed to remove ConnectDevice from registry");

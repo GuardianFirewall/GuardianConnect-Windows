@@ -9,13 +9,15 @@ public record ErrorResponse(
     bool IsErrorArg = false,
     object? ResponseArg = null,
     object? DataArg = null,
-    HttpResponseMessage? HttpResponse = null)
+    HttpResponseMessage? HttpResponse = null,
+    GRDAPIError? GrdapiErrorArg = null)
 {
     public bool IsError { get; set; } = IsErrorArg;
 
     public string Message { get; set; } = MessageArg;
     public object? ThrownException { get; set; } = ThrownExceptionArg;
     public object? Response { get; set; } = ResponseArg;
+    public object? GRDApiError { get; set; } = GrdapiErrorArg;
     public object? Data { get; set; } = DataArg;
     [JsonIgnore]
     public HttpResponseMessage HttpResponse { get; set; } = (HttpResponse ?? null) ?? new HttpResponseMessage();
@@ -33,6 +35,12 @@ public record ErrorResponse(
     public ErrorResponse WithException(Exception exception)
     {
         this.SetException(exception);
+        return this;
+    }
+
+    public ErrorResponse WithApiError(GRDAPIError error)
+    {
+        GRDApiError = error;
         return this;
     }
     

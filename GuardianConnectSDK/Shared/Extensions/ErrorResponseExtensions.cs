@@ -1,3 +1,5 @@
+using System.Net;
+
 namespace GuardianConnect.Shared.Extensions;
 
 public static class ErrorResponseExtensions
@@ -37,4 +39,13 @@ public static class ErrorResponseExtensions
         var text = $"{response.ReasonPhrase}, IsSuccess: {response.IsSuccessStatusCode}, StatusCode: {response.StatusCode}";
         return text;
     }
+    
+    public static ErrorResponse SetGrdApiError(this ErrorResponse er, Dictionary<string, object> data, HttpStatusCode statusCode)
+    {
+        er.IsError = true;
+        er.GRDApiError = new GRDAPIError(data, statusCode);
+        return er;
+    }
+    
+    public static ErrorResponse SetGrdApiError(this ErrorResponse er, GRDAPIError error) => er.SetGrdApiError(error);
 }

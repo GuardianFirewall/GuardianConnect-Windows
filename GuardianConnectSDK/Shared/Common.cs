@@ -186,6 +186,38 @@ public class Common
     public const string kGRDDeviceFilterConfigUsePredictiveBlocking = @"kGRDDeviceFilterConfigUsePredictiveBlocking";
 
     public const int FortyEightHoursInSeconds = 172800;
+    
+    // 2026-02-27 - GRDConnectSubscriber and GRDConnectDevice key constants
+    
+    public const string kPETokenKey = "pe-token";
+    
+    // - GRDConnectSubscriber:
+    // Constants
+    public const string kGuardianConnectSubscriber = "kGuardianConnectSubscriber";
+    public const string kGuardianConnectSubscriberIdentifierKey = "ep-grd-subscriber-identifier";
+    public const string kGuardianConnectSubscriberSecretKey = "ep-grd-subscriber-secret";
+    public const string kGuardianConnectSubscriberEmailKey = "ep-grd-subscriber-email";
+    public const string kGuardianConnectSubscriberPETNicknameKey = "ep-grd-subscriber-pet-nickname";
+    public const string kGuardianConnectSubscriberSubscriptionSKUKey = "ep-grd-subscription-sku";
+    public const string kGuardianConnectSubscriberSubscriptionNameFormattedKey = "ep-grd-subscription-name-formatted";
+    public const string kGuardianConnectSubscriberSubscriptionExpirationDateKey = "ep-grd-subscription-expiration-date";
+    public const string kGuardianConnectSubscriberCreatedAtKey = "ep-grd-subscriber-created-at";
+        
+    public const string kGuardianConnectSubscriberAcceptedTOS = "ep-grd-subscriber-accepted-tos";
+    
+    // GRDConnectDevice:
+    public const string kGuardianConnectDeviceKey = "ep-grd-device";
+    public const string kGuardianConnectDeviceNicknameKey = "ep-grd-device-nickname";
+    public const string kGuardianConnectDeviceUUIDKey = "ep-grd-device-uuid";
+    public const string kGuardianConnectDeviceCreatedAtKey = "ep-grd-device-created-at";
+    public const string kGuardianConnectDevicePETokenKey = "pe-token";
+    public const string kGuardianConnectDevicePETExpiresKey = "pet-expires";
+    public const string kGuardianConnectDevice = "kGuardianConnectDevice";
+    public const string kGuardianConnectDeviceAcceptedTOSKey = "ep-grd-device-accepted-tos";
+    public const string kGuardianDeviceSubscriberPetKey = "ep-grd-device-subscriber-pet";
+    public const string kGuardianDeviceSubscriberIdentifierKey = "ep-grd-device-subscriber-identifier";
+    public const string kGuardianDeviceSubscriberSecretKey = "ep-grd-device-subscriber-secret";
+
 
     // Error Text Here?? (TJE TODO)
     public const string kPETOKENNOTSET = "PE TOKEN IS NOT SET";
