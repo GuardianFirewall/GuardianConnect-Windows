@@ -314,11 +314,7 @@ public static class GRDHousekeepingAPI
             [Common.kGuardianConnectSubscriberEmailKey] = email
         };
 
-        using var content = JsonContent.Create(body);
-        content.Headers.TryAddWithoutValidation("GRD-Connect-Publishable-Key", "<partner-app-publishable-key>");
-
-        var uri = MakeUri("/api/v1.3/partners/subscribers/new");
-        HttpResponseMessage response = HttpUtils.Client.PostAsync(uri, content).GetAwaiter().GetResult();
+        var response = HttpUtils.Client.SendAsync(CreateConnectAPIRequest("/api/v1.3/partners/subscribers/new", body)).GetAwaiter().GetResult();
         string data = response.Content.ReadAsStringAsync().GetAwaiter().GetResult();
         if (response.StatusCode == HttpStatusCode.InternalServerError) data = string.Empty;
         var dict = JsonSerializer.Deserialize<Dictionary<string, object>>(data);
@@ -590,5 +586,15 @@ public static class GRDHousekeepingAPI
     private static Uri MakeUri(string path)
     {
         return new Uri($"https://{Common.kConnectAPIHostname}{path}");
+    }
+    
+    private static HttpRequestMessage CreateConnectAPIRequest(string endpoint, Dictionary<string, object> body)
+    {
+        var uri = new Uri(endpoint, UriKind.RelativeOrAbsolute); // build this however you do today
+        var request = new HttpRequestMessage(HttpMethod.Post, uri)
+        {
+            Content = JsonContent.Create(body)
+        };
+        return request;
     }
 }
