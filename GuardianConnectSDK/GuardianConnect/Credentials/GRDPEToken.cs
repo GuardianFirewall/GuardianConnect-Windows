@@ -40,11 +40,14 @@ namespace GuardianConnect.Credentials
             return peToken;
         }
 
-        public GRDPEToken InitFromDictionary(Dictionary<string, object> dict)
+        public static GRDPEToken InitFromDictionary(Dictionary<string, object> dict)
         {
             if (dict.Count == 0) return new GRDPEToken();
             GRDPEToken peToken = new GRDPEToken();
             if (dict.ContainsKey("Token")) peToken.Token = dict["Token"].ToString() ?? throw new InvalidOperationException();
+            if (dict.ContainsKey(Common.kPETokenKey)) peToken.Token = dict[Common.kPETokenKey].ToString() ?? throw new InvalidOperationException();
+            
+            if (dict.ContainsKey(Common.kGuardianConnectDevicePETExpiresKey)) peToken.ExpirationDateUnix = (long)dict[Common.kGuardianConnectDevicePETExpiresKey];
             if (dict.ContainsKey("expirationDateUnix")) peToken.ExpirationDateUnix = (long)dict["ExpirationDateUnix"];
             if (dict.ContainsKey("ExpirationDate")) peToken.ExpirationDate = DateTime.Parse(dict["ExpirationDate"].ToString() ?? throw new InvalidOperationException());
             if (dict.ContainsKey("ConnectAPIEnv")) peToken.ConnectAPIEnv = dict["ConnectAPIEnv"]?.ToString() ?? Common.kConnectAPIHostname;

@@ -1,8 +1,10 @@
 
 using System.Globalization;
+using System.Runtime.InteropServices.JavaScript;
 using System.Text;
 using System.Text.Json.Serialization;
 using GuardianConnect.Credentials;
+using GuardianConnect.Helpers;
 using GuardianConnect.Shared;
 
 namespace GuardianConnect.API
@@ -96,7 +98,7 @@ namespace GuardianConnect.API
         }
 
         // Store subscriber securely
-        public async Task<ErrorResponse> StoreAsync()
+        public ErrorResponse Store()
         {
             try
             {
@@ -121,7 +123,7 @@ namespace GuardianConnect.API
 
                 if (Device != null)
                 {
-                    var deviceErr = await Device.StoreAsync();
+                    var deviceErr = Device.Store();
                     if (! deviceErr.IsError)
                         return deviceErr;
                 }
@@ -151,19 +153,22 @@ namespace GuardianConnect.API
         }
 
         // List all devices for this subscriber
+        // [#167 - calls #193] - DONE
         public async Task<(List<GRDConnectDevice>? Devices, ErrorResponse Error)> AllDevicesAsync()
         {
+            var devices = new List<GRDConnectDevice>();
             try
             {
                 var (currentDevice, deviceError) = await GRDConnectDevice.GetCurrentDeviceAsync();
                 if (deviceError.IsError)
                     return (null, deviceError);
 
-                (var devices, var response) = await GRDHousekeepingAPI.RequestAllConnectDevicesForSubscriberAsync(Identifier, Secret);
+                (var listOfDevicesDict, var response) =
+                    await GRDHousekeepingAPI.RequestAllConnectDevicesForSubscriberAsync(GRDVPNHelper.Singleton.PeToken.Token, Identifier , Secret);
                 if (response.IsError)
                     return (new List<GRDConnectDevice>(), response);
 
-                foreach (var dict in devices)
+                foreach (var dict in listOfDevicesDict)
                 {
                     var device = GRDConnectDevice.InitFromDictionary(dict);
                     if (currentDevice != null && device.UUID == currentDevice.UUID)
@@ -178,88 +183,95 @@ namespace GuardianConnect.API
             }
         }
 
-        // Get device reference for current PET [ #168 ]
-        public async Task<(GRDConnectDevice? Device, string? Error)> ConnectDeviceReferenceAsync()
+        // Get device reference for current PET [ #168  - calls #186] - DONE
+        public async Task<(GRDConnectDevice? Device, ErrorResponse errorResponse)> ConnectDeviceReferenceAsync()
         {
             try
             {
                 var peToken = GRDPEToken.GetCurrentPEToken();
                 if (peToken == null)
-                    return (null, "No PE-Token present on device");
+                    return (null, new ErrorResponse("No PE-Token present on device"));
 
-                var (deviceDetails, error) = await GRDHousekeepingAPI.ConnectDeviceReferenceForSubscriberAsync(Identifier, Secret, peToken.Token);
+                var (deviceDetails, error) =
+                    await GRDHousekeepingAPI.GetDeviceReferenceForConnectSubscriberAsync(Identifier, Secret, peToken.Token);
+                
                 if (error != null)
-                    return (null, $"Failed to obtain Connect Device reference: {error}");
+                    return (null,
+                        new ErrorResponse($"Failed to obtain Connect Device reference: {error}"));
 
                 var device = GRDConnectDevice.InitFromDictionary(deviceDetails);
                 device.PEToken = peToken.Token;
                 device.PETExpires = peToken.ExpirationDate;
                 device.IsCurrentDevice = true;
-                return (device, null);
+                return (device, new ErrorResponse());
             }
             catch (Exception ex)
             {
-                return (null, ex.Message);
+                return (null, ErrorResponse.FromException(ex));
             }
         }
 
-        // Register new subscriber [ #169 ]
-        public async Task<(GRDConnectSubscriber? Subscriber, string? Error)> RegisterNewConnectSubscriberAsync(bool acceptedTOS, string deviceNickname)
+        // Register new subscriber [ #169 - calls #185 ]
+        public async Task<(GRDConnectSubscriber? Subscriber, ErrorResponse)> RegisterNewConnectSubscriberAsync(bool acceptedTOS, string deviceNickname)
         {
             if (string.IsNullOrEmpty(Identifier) || string.IsNullOrEmpty(Secret))
-                return (null, "Unable to register new Connect subscriber. Either the Connect identifier or secret is missing");
+                return (null,
+                    new ErrorResponse("Unable to register new Connect subscriber. Either the Connect identifier or secret is missing"));
 
             if (Email == null)
                 Email = "";
 
-            var (subscriberDetails, errorMessage) = await GRDHousekeepingAPI.NewConnectSubscriberAsync(Identifier, Secret, deviceNickname, acceptedTOS, Email);
-            if (errorMessage != null)
-                return (null, errorMessage);
+            var (subscriberDetailsDict, errorResponse) =
+                await GRDHousekeepingAPI.AddNewConnectSubscriberAsync(Identifier, Secret, deviceNickname, Email,
+                    acceptedTOS);
+            if (errorResponse.IsError)
+                return (null, errorResponse);
 
-            var newSubscriber = FromDictionary(subscriberDetails);
+            var newSubscriber = InitFromDictionary(subscriberDetailsDict);
 
-            var pet = subscriberDetails.TryGetValue("pe-token", out var petObj) ? petObj?.ToString() : null;
+            var pet = subscriberDetailsDict.TryGetValue("pe-token", out var petObj) ? petObj?.ToString() : null;
             if (string.IsNullOrEmpty(pet))
-                return (null, "Failed to register new Connect Subscriber. No PE-Token was returned");
+                return (null, new ErrorResponse("Failed to register new Connect Subscriber. No PE-Token was returned"));
 
-            var petExpires = subscriberDetails.TryGetValue("pet-expires", out var petExpObj) && long.TryParse(petExpObj?.ToString(), out var petExpUnix)
+            var petExpires = subscriberDetailsDict.TryGetValue("pet-expires", out var petExpObj) && long.TryParse(petExpObj?.ToString(), out var petExpUnix)
                 ? DateTimeOffset.FromUnixTimeSeconds(petExpUnix).DateTime
                 : (DateTime?)null;
 
             // Store PET and expiration date
-            GRDKeychain.SetPasswordStringForAccount(pet, "kKeychainStr_PEToken");
-            if (petExpires.HasValue)
-                GRDKeychain.SetPasswordStringForAccount(petExpires.Value.ToString("o"), "kGuardianPETokenExpirationDate");
-
+            GRDPEToken petFromConnectSubscriber = GRDPEToken.InitFromDictionary(subscriberDetailsDict);
+            if (petFromConnectSubscriber != null && petFromConnectSubscriber.Token != null)
+                petFromConnectSubscriber.Store();
+            
             newSubscriber.Secret = Secret;
-            var storeErr = await newSubscriber.StoreAsync();
-            if (storeErr != null)
-                return (null, $"Failed to store persistent local data of new Connect Subscriber: {storeErr}");
+            newSubscriber.Store();
 
             return (newSubscriber, null);
         }
 
         // Check Guardian account setup state
-        public async Task<string?> CheckGuardianAccountSetupStateAsync()
+        // [#170 - calls #190]
+        public async Task<ErrorResponse> CheckGuardianAccountSetupStateAsync()
         {
-            var error = await GRDHousekeepingAPI.CheckConnectSubscriberGuardianAccountCreationStateAsync(Identifier, Secret);
-            return error;
+            var errorResponse = await GRDHousekeepingAPI.CheckAccountCreationStateAsync(Identifier, Secret);
+            return errorResponse;
         }
 
         // Update subscriber email [ #171 ]
-        public async Task<(GRDConnectSubscriber? Subscriber, string? Error)> UpdateConnectSubscriberWithEmailAddressAsync(string email)
+        public async Task<(GRDConnectSubscriber? Subscriber, ErrorResponse errorResponse)> UpdateConnectSubscriberWithEmailAddressAsync(string email)
         {
             if (string.IsNullOrEmpty(email))
-                return (null, "New E-Mail is either nil or an empty string. Neither are valid");
+                return (null, new ErrorResponse("New E-Mail is either nil or an empty string. Neither are valid"));
 
-            var (subscriberDetails, errorMessage) = await GRDHousekeepingAPI.UpdateConnectSubscriberEmailAsync(email, Identifier, Secret);
-            if (errorMessage != null)
-                return (null, errorMessage);
+            var (subscriberDetails, errorResponse) =
+                await GRDHousekeepingAPI.UpdateConnectSubscriberWithEmailAsync(
+                    Identifier, Secret, email, AcceptedTOS, Secret);
+            if (errorResponse.IsError)
+                return (null, errorResponse);
 
-            var subscriber = FromDictionary(subscriberDetails);
-            var updateErr = await subscriber.StoreAsync();
-            if (updateErr != null)
-                return (null, $"Failed to store persistent local data of updated Connect Subscriber: {updateErr}");
+            var subscriber = InitFromDictionary(subscriberDetails);
+            var updateErr = subscriber.Store();
+            if (updateErr.IsError)
+                return (null, updateErr);
 
             return (subscriber, null);
         }

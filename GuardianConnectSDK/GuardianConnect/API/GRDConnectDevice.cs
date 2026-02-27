@@ -58,7 +58,7 @@ namespace GuardianConnect.API
             }
         }
 
-        public async Task<ErrorResponse> StoreAsync()
+        public ErrorResponse Store()
         {
             try
             {
@@ -83,19 +83,18 @@ namespace GuardianConnect.API
         }
 
         // Destroy current device
-        public static async Task<string?> DestroyAsync()
+        public static ErrorResponse Destroy()
         {
             try
             {
                 GRDKeychain.RemoveSubKeyAndValues(Common.kGuardianConnectDeviceKey);
-                return null;
+                return new ErrorResponse();
             }
             catch (Exception ex)
             {
-                return ex.Message;
+                return ErrorResponse.FromException(ex);
             }
         }
-
 
         // API Wrappers
 
@@ -107,7 +106,7 @@ namespace GuardianConnect.API
             {
                 var ConnectDeviceRequest = ConnectDeviceRequestData.ForNickName(peToken, nickname);
                 ConnectDeviceRequest.AcceptedTOS = acceptedTOS.ToString();
-                var response = await GRDHousekeepingAPI.CallHostToAddConnectDeviceAsync(ConnectDeviceRequest);
+                var response = await GRDHousekeepingAPI.AddConnectDeviceAsync(ConnectDeviceRequest);
                 if (response.IsError)
                     return (null, new ErrorResponse(response.Message));
 

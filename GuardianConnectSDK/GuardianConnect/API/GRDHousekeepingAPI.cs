@@ -292,7 +292,8 @@ public static class GRDHousekeepingAPI
     
     #region GRDConnectionSubscriber/Device calls
     // [#185 called by #169] - DONE
-    public static async Task<(Dictionary<string, object>,  ErrorResponse)> AddNewConnectSubscriberAsync(string identifier, string secret, string nickname, string email, bool acceptedTOS)
+    public static async Task<(Dictionary<string, object>,  ErrorResponse)>
+        AddNewConnectSubscriberAsync(string identifier, string secret, string nickname, string email, bool acceptedTOS)
     {
         var errorResponse = new ErrorResponse();
         
@@ -324,8 +325,8 @@ public static class GRDHousekeepingAPI
     }
 
     // [#187 - called by #171] - DONE
-    public static async Task<(Dictionary<string, object>,  ErrorResponse)> UpdateConnectSubscriberAsync(
-        string identifier, string secret, string nickname, string email, bool acceptedTOS)
+    public static async Task<(Dictionary<string, object>,  ErrorResponse)> UpdateConnectSubscriberWithEmailAsync(
+        string identifier, string secret, string nickname, bool acceptedTOS, string email)
     {
         var errorResponse = new ErrorResponse();
         
@@ -372,7 +373,7 @@ public static class GRDHousekeepingAPI
     }
 
     // [#190 - called by #170] - DONE
-    public static async Task<ErrorResponse> AccountCreationStateAsync(string identifier, string secret)
+    public static async Task<ErrorResponse> CheckAccountCreationStateAsync(string identifier, string secret)
     {
         var errorResponse = new ErrorResponse();
         var body = new Dictionary<string, object>
