@@ -99,6 +99,7 @@ namespace GuardianConnect.API
         // API Wrappers
 
         // Register a new device
+        // [#179 - calls #191]
         public static async Task<(GRDConnectDevice? Device, ErrorResponse Error)>
             AddConnectDeviceAsync(string peToken, string nickname, bool acceptedTOS)
         {
@@ -106,11 +107,10 @@ namespace GuardianConnect.API
             {
                 var ConnectDeviceRequest = ConnectDeviceRequestData.ForNickName(peToken, nickname);
                 ConnectDeviceRequest.AcceptedTOS = acceptedTOS.ToString();
-                var response = await GRDHousekeepingAPI.AddConnectDeviceAsync(ConnectDeviceRequest);
+                var (deviceDict, response) = await GRDHousekeepingAPI.AddConnectDeviceAsync(peToken, nickname, acceptedTOS);
                 if (response.IsError)
                     return (null, new ErrorResponse(response.Message));
 
-                var deviceDict = response.Data as Dictionary<string, object>;
                 if (deviceDict == null)
                     return (null, new ErrorResponse("Invalid device data from API"));
 
@@ -125,18 +125,20 @@ namespace GuardianConnect.API
 
 
         // Update device nickname
+        // [#180 - calls #192]
         public async Task<(GRDConnectDevice? Device, ErrorResponse)> UpdateConnectDeviceNicknameAsync(string peToken, string newNickname)
         {
             try
             {
                 var updateRequest = ConnectDeviceRequestData.ForNickName(peToken, newNickname);
-                var response = await GRDHousekeepingAPI.CallHostToUpdateConnectDeviceAsync(updateRequest);
-                if (response.IsError)
-                    return (null, response);
+                var (deviceDict, errorResponse) = await GRDHousekeepingAPI.UpdateConnectDeviceAsync(
+                if (errorResponse.IsError)
+                    return (null, errorResponse);
 
-                var device = response.Data as GRDConnectDevice;
-                if (device == null)
+                if (deviceDict == null)
                     return (null, new ErrorResponse("Invalid device data from API"));
+                
+                var device = InitFromDictionary(deviceDict);
                 return (device, new ErrorResponse());
             }
             catch (Exception ex)
@@ -146,16 +148,17 @@ namespace GuardianConnect.API
         }
 
         // List devices for PEToken
+        // TODO FINISH 
+        // [#181 - calls #193] (#167 also calls #193)
         public static async Task<(List<GRDConnectDevice>? Devices, string? Error)> ListConnectDevicesForPETokenAsync(string peToken)
         {
             try
             {
-                ConnectDeviceRequestData request = ConnectDeviceRequestData.WithPeToken(peToken);
-                var (devices, errorResponse) = await GRDHousekeepingAPI.RequestAllConnectDevicesForSubscriberAsync(request);
+                var (devicesList, errorResponse) =
+                    await GRDHousekeepingAPI.RequestAllConnectDevicesForSubscriberAsync(peToken, null, null);
                 if (errorResponse.IsError)
                     return (null, errorResponse.Message);
 
-                var deviceList = devices;
                 var currentDevice = await GetCurrentDeviceAsync();
                 if (currentDevice.Device != null)
                 {

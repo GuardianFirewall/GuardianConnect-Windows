@@ -1,11 +1,10 @@
-
 using System.Globalization;
-using System.Runtime.InteropServices.JavaScript;
 using System.Text;
 using System.Text.Json.Serialization;
 using GuardianConnect.Credentials;
 using GuardianConnect.Helpers;
 using GuardianConnect.Shared;
+using GuardianConnect.Shared.Extensions;
 
 namespace GuardianConnect.API
 {
@@ -37,6 +36,10 @@ namespace GuardianConnect.API
         [JsonPropertyName("ep-grd-device")]
         [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
         public GRDConnectDevice? Device { get; set; }
+        
+        // CHECK WITH CJ ON THIS
+        public bool AcceptedTOS { get; set; }
+        //
 
         // Convenience: Create from dictionary
         public static GRDConnectSubscriber InitFromDictionary(Dictionary<string, object> dict)
@@ -211,7 +214,7 @@ namespace GuardianConnect.API
             }
         }
 
-        // Register new subscriber [ #169 - calls #185 ]
+        // Register new subscriber [ #169 - calls #185 ] - DONE ??
         public async Task<(GRDConnectSubscriber? Subscriber, ErrorResponse)> RegisterNewConnectSubscriberAsync(bool acceptedTOS, string deviceNickname)
         {
             if (string.IsNullOrEmpty(Identifier) || string.IsNullOrEmpty(Secret))
@@ -241,15 +244,23 @@ namespace GuardianConnect.API
             GRDPEToken petFromConnectSubscriber = GRDPEToken.InitFromDictionary(subscriberDetailsDict);
             if (petFromConnectSubscriber != null && petFromConnectSubscriber.Token != null)
                 petFromConnectSubscriber.Store();
+            else
+            {
+                errorResponse = new ErrorResponse("Failed to register new Connect Subscriber. No PEToken was returned.");
+                return (null, errorResponse);
+            }
             
             newSubscriber.Secret = Secret;
             newSubscriber.Store();
 
+            // CHECK WITH CJ ON THIS
+            AcceptedTOS = acceptedTOS; // save it since we were successful
+            //
             return (newSubscriber, null);
         }
 
         // Check Guardian account setup state
-        // [#170 - calls #190]
+        // [#170 - calls #190] - DONE (? nothing returned from API call so if no GRDApiError set, then all is good)
         public async Task<ErrorResponse> CheckGuardianAccountSetupStateAsync()
         {
             var errorResponse = await GRDHousekeepingAPI.CheckAccountCreationStateAsync(Identifier, Secret);
@@ -263,8 +274,7 @@ namespace GuardianConnect.API
                 return (null, new ErrorResponse("New E-Mail is either nil or an empty string. Neither are valid"));
 
             var (subscriberDetails, errorResponse) =
-                await GRDHousekeepingAPI.UpdateConnectSubscriberWithEmailAsync(
-                    Identifier, Secret, email, AcceptedTOS, Secret);
+                await GRDHousekeepingAPI.UpdateConnectSubscriberWithEmailAsync( Identifier, Secret, email, AcceptedTOS, Secret);
             if (errorResponse.IsError)
                 return (null, errorResponse);
 
@@ -277,15 +287,18 @@ namespace GuardianConnect.API
         }
 
         // Validate subscriber subscription [ #172 ]
-        public async Task<(GRDConnectSubscriber? Subscriber, string? Error)> ValidateConnectSubscriberAsync()
+        public async Task<(GRDConnectSubscriber? Subscriber, ErrorResponse errorResponse)> ValidateConnectSubscriberAsync()
         {
             var oldPET = GRDKeychain.GetPasswordStringForAccount("kKeychainStr_PEToken");
             if (string.IsNullOrEmpty(oldPET))
-                return (null, "Failed to validate Connect subscriber. No PE-Token present on device");
+                return (null, new ErrorResponse("Failed to validate Connect subscriber. No PE-Token present on device"));
 
-            var (details, errorMessage) = await GRDHousekeepingAPI.ValidateConnectSubscriberAsync(Identifier, Secret, oldPET);
-            if (errorMessage != null)
-                return (null, errorMessage);
+            // CHECK THIS WITH CJ - use old(existing) PET for 'nickname??
+            var (details, errorResponse) =
+                await GRDHousekeepingAPI.ValidateConnectSubscriberAsync(Identifier, Secret, oldPET, Email, AcceptedTOS);
+            
+            if (errorResponse.IsError)
+                return (null, errorResponse);
 
             var newSubscriber = InitFromDictionary(details);
             newSubscriber.SubscriptionSKU = details.TryGetValue(Common.kGuardianConnectSubscriberSubscriptionSKUKey, out var sku) ? sku?.ToString() ?? "" : "";
@@ -296,7 +309,7 @@ namespace GuardianConnect.API
 
             var pet = details.TryGetValue("pe-token", out var petObj) ? petObj?.ToString() : null;
             if (string.IsNullOrEmpty(pet))
-                return (null, "Failed to validate Connect Subscriber. No new PE-Token was returned");
+                return (null, new ErrorResponse("Failed to validate Connect Subscriber. No new PE-Token was returned"));
 
             var petExpires = details.TryGetValue("pet-expires", out var petExpObj) && long.TryParse(petExpObj?.ToString(), out var petExpUnix)
                 ? DateTimeOffset.FromUnixTimeSeconds(petExpUnix).DateTime
@@ -306,22 +319,22 @@ namespace GuardianConnect.API
             if (petExpires.HasValue)
                 GRDKeychain.StorePassword(petExpires.Value.ToString("O"), "kGuardianPETokenExpirationDate");
 
-            var updateErr = await newSubscriber.StoreAsync();
-            if (updateErr != null)
-                return (null, $"Failed to store persistent local data of validated Connect Subscriber: {updateErr}");
+            var updateErr = newSubscriber.Store();
+            if (updateErr.IsError)
+                return (null, updateErr.SetErrorMessage($"Failed to store persistent local data of validated Connect Subscriber: {updateErr.Message}"));
 
             return (newSubscriber, null);
         }
 
         // Logout subscriber [ #173 ]
-        public async Task<string?> LogoutConnectSubscriberAsync()
+        public async Task<ErrorResponse> LogoutConnectSubscriberAsync()
         {
             var pet = GRDKeychain.GetPasswordStringForAccount("kKeychainStr_PEToken");
             if (string.IsNullOrEmpty(pet))
-                return "Failed to validate Connect subscriber. No PE-Token present on device";
+                return new ErrorResponse("Failed to validate Connect subscriber. No PE-Token present on device");
 
-            var error = await GRDHousekeepingAPI.LogoutConnectSubscriberAsync(pet);
-            return error;
+            var errorResponse = await GRDHousekeepingAPI.LogOutConnectSubscriberAsync(pet);
+            return errorResponse;
         }
     }
 }

@@ -386,13 +386,13 @@ public static class GRDHousekeepingAPI
     }
 
     //  [#191 called by #179] - DONE
-    public static async Task<(Dictionary<string, object>, ErrorResponse)> AddConnectDeviceAsync(string peToken, string nickname, string acceptedTOS)
+    public static async Task<(Dictionary<string, object>, ErrorResponse)> AddConnectDeviceAsync(string peToken, string nickname, bool acceptedTOS)
     {
         var body = new Dictionary<string, object?>
         {
             [Common.kGuardianConnectDevicePETokenKey] = peToken,
             [Common.kGuardianConnectDeviceNicknameKey] = nickname,
-            [Common.kGuardianConnectDeviceAcceptedTOSKey] = true
+            [Common.kGuardianConnectDeviceAcceptedTOSKey] = acceptedTOS
         };
 
         return MakeAPICallAndReturnDict("/api/v1.2/partners/subscriber/devices/add", body).GetAwaiter().GetResult();
