@@ -152,10 +152,11 @@ namespace GuardianConnect.API
         // [#181 - calls #193] (#167 also calls #193)
         public static async Task<(List<GRDConnectDevice>? Devices, string? Error)> ListConnectDevicesForPETokenAsync(string peToken)
         {
+            // CHECK - if/when take GRDVPNHelper PEToken instead of parameter of this call
             try
             {
                 var (deviceDictsList, errorResponse) =
-                    await GRDHousekeepingAPI.RequestAllConnectDevicesForSubscriberAsync(peToken, null, null);
+                    await GRDHousekeepingAPI.RequestAllConnectDevicesForSubscriberAsync(peToken);
                 if (errorResponse.IsError)
                     return (null, errorResponse.Message);
                 

@@ -414,7 +414,7 @@ public static class GRDHousekeepingAPI
 
     // [#193] - called from [#167] - indentifier/secret or [#181] - peToken - DONE
     internal static async Task<(List<Dictionary<string, object>>, ErrorResponse)>
-        RequestAllConnectDevicesForSubscriberAsync(string peToken, string identifier, string secret)
+        RequestAllConnectDevicesForSubscriberAsync(string peToken = null, string identifier = null, string secret = null)
     {
         var errorResponse = new ErrorResponse();
         var body = new Dictionary<string, object>();
