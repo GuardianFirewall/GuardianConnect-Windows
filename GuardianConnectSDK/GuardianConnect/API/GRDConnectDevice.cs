@@ -131,7 +131,8 @@ namespace GuardianConnect.API
             try
             {
                 var updateRequest = ConnectDeviceRequestData.ForNickName(peToken, newNickname);
-                var (deviceDict, errorResponse) = await GRDHousekeepingAPI.UpdateConnectDeviceAsync(
+                var (deviceDict, errorResponse) =
+                    await GRDHousekeepingAPI.UpdateConnectDeviceAsync(peToken, newNickname, UUID);
                 if (errorResponse.IsError)
                     return (null, errorResponse);
 
@@ -148,16 +149,17 @@ namespace GuardianConnect.API
         }
 
         // List devices for PEToken
-        // TODO FINISH 
         // [#181 - calls #193] (#167 also calls #193)
         public static async Task<(List<GRDConnectDevice>? Devices, string? Error)> ListConnectDevicesForPETokenAsync(string peToken)
         {
             try
             {
-                var (devicesList, errorResponse) =
+                var (deviceDictsList, errorResponse) =
                     await GRDHousekeepingAPI.RequestAllConnectDevicesForSubscriberAsync(peToken, null, null);
                 if (errorResponse.IsError)
                     return (null, errorResponse.Message);
+                
+                var deviceList = deviceDictsList.Select(InitFromDictionary).ToList();
 
                 var currentDevice = await GetCurrentDeviceAsync();
                 if (currentDevice.Device != null)
@@ -190,22 +192,14 @@ namespace GuardianConnect.API
             }
         }
 
-        // Validate device PEToken
-        /// <summary>
-        /// /Add a function called validateConnectDeviceWithDevicePEToken which accepts the function parameter
-        /// peToken type: string
-        /// The function should call the API endpoint /api/v1.2/partners/subscriber/device/validate and parse the response
-        /// data into a GRDConnectDevice object by calling the initFromDictionary function. It should finally return the
-        /// parse connect device object
-        /// </summary>
-        /// <param name="peToken"></param>
-        /// <returns></returns>
+ 
+        // [#183 - calls #195]
         public async Task<(GRDConnectDevice? Device, ErrorResponse)> ValidateConnectDeviceAsync(string peToken)
         {
             // TJE: TODO
             try
             {
-                var response = await GRDHousekeepingAPI.CallHostToValidateConnectDeviceAsync(peToken);
+                var response = await GRDHousekeepingAPI.ValidateConnectDeviceAsync(peToken);
                 if (response.IsError)
                     return (null, new ErrorResponse(response.Message));
 
@@ -213,7 +207,7 @@ namespace GuardianConnect.API
                 if (deviceDict == null)
                     return (null, new ErrorResponse("Invalid device data from API"));
 
-                var device = response.Data as GRDConnectDevice;
+                var device = InitFromDictionary(deviceDict);
                 return (device, new ErrorResponse());
             }
             catch (Exception ex)
