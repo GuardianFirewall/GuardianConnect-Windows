@@ -321,7 +321,8 @@ public static class GRDHousekeepingAPI
             [Common.kPETokenKey] = peToken,
         };
 
-        return MakeAPICallAndReturnDict("/api/v1.2/partners/subscribers/device-reference", body).GetAwaiter().GetResult();
+        var ep = "/api/v1.2/partners/subscriber/device-reference";
+        return MakeAPICallAndReturnDict(ep, body).GetAwaiter().GetResult();
     }
 
     // [#187 - called by #171] - DONE
@@ -339,7 +340,8 @@ public static class GRDHousekeepingAPI
             [Common.kGuardianConnectSubscriberEmailKey] = email
         };
 
-        return MakeAPICallAndReturnDict("/api/v1.2/partners/subscribers/update", body).GetAwaiter().GetResult();
+        var ep = "/api/v1.2/partners/subscriber/update";
+        return MakeAPICallAndReturnDict(ep, body).GetAwaiter().GetResult();
     }
 
     // [#188 - called by #172] - DONE
@@ -357,7 +359,8 @@ public static class GRDHousekeepingAPI
             [Common.kGuardianConnectSubscriberEmailKey] = email
         };
         
-        return MakeAPICallAndReturnDict("/api/v1.2/partners/subscribers/validate", body).GetAwaiter().GetResult();
+        var ep = "/api/v1.2/partners/subscriber/validate";
+        return MakeAPICallAndReturnDict(ep, body).GetAwaiter().GetResult();
     }
 
     // [#189 - called by #173] - DONE
@@ -369,7 +372,8 @@ public static class GRDHousekeepingAPI
             [Common.kPETokenKey] = peToken
         };
 
-        return MakeAPICallAndReturnErrorResponse("/api/v1.2/partners/subscribers/logout", body).GetAwaiter().GetResult();
+        var ep = "/api/v1.2/partners/subscriber/logout";
+        return MakeAPICallAndReturnErrorResponse(ep, body).GetAwaiter().GetResult();
     }
 
     // [#190 - called by #170] - DONE
@@ -381,8 +385,9 @@ public static class GRDHousekeepingAPI
             [Common.kGuardianDeviceSubscriberIdentifierKey] = identifier,
             [Common.kGuardianDeviceSubscriberSecretKey] = secret
         };
-        
-        return MakeAPICallAndReturnErrorResponse("/api/v1.2/partners/subscribers/account-creation-state", body).GetAwaiter().GetResult();
+
+        var ep = "/api/v1.2/partners/subscriber/account-creation-state";
+        return MakeAPICallAndReturnErrorResponse(ep, body).GetAwaiter().GetResult();
     }
 
     //  [#191 called by #179] - DONE
@@ -409,7 +414,8 @@ public static class GRDHousekeepingAPI
             [Common.kGuardianConnectDeviceUUIDKey] = uuid
         };
 
-        return MakeAPICallAndReturnDict("/api/v1.2/partners/subscriber/devices/update", body).GetAwaiter().GetResult();
+        var ep = "/api/v1.2/partners/subscriber/device/update";
+        return MakeAPICallAndReturnDict(ep,  body).GetAwaiter().GetResult();
     }
 
     // [#193] - called from [#167] - indentifier/secret or [#181] - peToken - DONE
@@ -463,8 +469,9 @@ public static class GRDHousekeepingAPI
         {
             [Common.kGuardianConnectDevicePETokenKey] = peToken
         };
-        
-        return MakeAPICallAndReturnErrorResponse("/api/v1.2/partners/subscriber/devices/validate", body).GetAwaiter().GetResult();
+
+        var ep = "/api/v1.2/partners/subscriber/device/validate";
+        return MakeAPICallAndReturnErrorResponse(ep, body).GetAwaiter().GetResult();
     }
     
     #endregion GRDConnectionSubscriber/Device calls
