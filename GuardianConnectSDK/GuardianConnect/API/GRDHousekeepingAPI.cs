@@ -32,6 +32,16 @@ public static class GRDHousekeepingAPI
         }
     }
 
+    private static string ConnectAPIHostname =>
+        GRDKeychain.GetPasswordStringForAccount(Common.kConnectAPIHostname)
+        ?? Common.DefaultConnectAPIHostname;
+
+    private static string HousekeepingAPIHostname =>
+        GRDKeychain.GetPasswordStringForAccount(Common.kHousekeepingAPIHostname)
+        ?? Common.DefaultHousekeepingAPIHostname;
+
+    public static string PublishableKey => GRDKeychain.ReadRegistryData("TESTVALUE_CS_PublishableKey");
+
     public static GrdUserLoginResponse LoginResponse { get; set; } = new GrdUserLoginResponse();
     public static GRDSubscriberCredential? LiveGrdCredential { get; set; }
 
@@ -52,7 +62,8 @@ public static class GRDHousekeepingAPI
                 .SetErrorMessage("No pe token provided");
         }
 
-        Uri uri = new Uri($"https://{Common.kConnectAPIHostname}/api/v1/users/info-for-pe-token");
+        // TJE - TODO - CLEAN THIS UP TO MATCH CONCISE CODE IN CONNECTSUBSCRIBER/DEVICE METHODS
+        Uri uri = new Uri($"https://{Common.DefaultConnectAPIHostname}/api/v1/users/info-for-pe-token");
         try
         {
             var pet = new PeTokenRequest("pe-token", peToken);
@@ -117,7 +128,7 @@ public static class GRDHousekeepingAPI
         // TJE: Called by GRDVPNHelper.GetValidSubscriberCredentialWithCompletion()
         
         // set host to use
-        string connectHost = GRDVPNHelper.Singleton.PeToken?.ConnectAPIEnv ?? Common.kConnectAPIHostname;
+        string connectHost = GRDVPNHelper.Singleton.PeToken?.ConnectAPIEnv ?? Common.DefaultConnectAPIHostname;
         // Validation Method PEToken...
         string peToken = GRDVPNHelper.Singleton.PeToken?.Token;
         if (string.IsNullOrEmpty(peToken))
@@ -223,7 +234,7 @@ public static class GRDHousekeepingAPI
 
     internal static async Task<ErrorResponse> RequestLatestTimeZonesForRegions()
     {
-        const string GetTimeZonesForRegionsUrl = $"https://{Common.kConnectAPIHostname}/api/v1.1/servers/timezones-for-regions";
+        const string GetTimeZonesForRegionsUrl = $"https://{Common.DefaultConnectAPIHostname}/api/v1.1/servers/timezones-for-regions";
 
         ErrorResponse errorResponse = new ErrorResponse();
         Uri uri = new Uri(GetTimeZonesForRegionsUrl);
@@ -252,7 +263,7 @@ public static class GRDHousekeepingAPI
 
     internal static async Task<ErrorResponse> RequestServerRegions()
     {
-        string GetAllRegionsUrl = $"https://{Common.kConnectAPIHostname}/api/v1/servers/all-server-regions";
+        string GetAllRegionsUrl = $"https://{Common.DefaultConnectAPIHostname}/api/v1/servers/all-server-regions";
         ErrorResponse errorResponse = new ErrorResponse();
         Uri uri = new Uri(GetAllRegionsUrl);
         try
@@ -478,43 +489,62 @@ public static class GRDHousekeepingAPI
     
     private static Uri MakeUri(string path)
     {
-        return new Uri($"https://{Common.kConnectAPIHostname}{path}");
+        
+        string connectHost = GRDVPNHelper.Singleton.PeToken?.ConnectAPIEnv ?? Common.DefaultConnectAPIHostname;
+        return new Uri($"https://{connectHost}{path}", UriKind.RelativeOrAbsolute);
     }
     
     private static HttpRequestMessage CreateConnectAPIRequest(string endpoint, Dictionary<string, object> body)
     {
-        var uri = new Uri(endpoint, UriKind.RelativeOrAbsolute); // build this however you do today
+        var uri = MakeUri(endpoint);
         var request = new HttpRequestMessage(HttpMethod.Post, uri)
         {
             Content = JsonContent.Create(body)
         };
         
-        request.Content.Headers.TryAddWithoutValidation("GRD-Connect-Publishable-Key", "<partner-app-publishable-key>");
+        request.Headers.TryAddWithoutValidation("GRD-Connect-Publishable-Key", PublishableKey);
         return request;
     }
 
     private static async Task<ErrorResponse> MakeAPICallAndReturnErrorResponse(string endpoint, Dictionary<string, object> body)
     {
         var errorResponse = new ErrorResponse();
-        
-        var response = HttpUtils.Client.SendAsync(CreateConnectAPIRequest(endpoint, body)).GetAwaiter().GetResult();
-        string data = response.Content.ReadAsStringAsync().GetAwaiter().GetResult();
-        if (response.StatusCode == HttpStatusCode.InternalServerError) data = string.Empty;
-        if (response.IsSuccessStatusCode) return errorResponse;
-        var errorDict = JsonSerializer.Deserialize<Dictionary<string, object>>(data);
-        errorResponse.SetGrdApiError(errorDict, response.StatusCode);
+
+        try
+        {
+            var request = CreateConnectAPIRequest(endpoint, body);
+            var response = await HttpUtils.Client.SendAsync(request);
+            string data = await response.Content.ReadAsStringAsync();
+            if (response.StatusCode == HttpStatusCode.InternalServerError) data = string.Empty;
+            if (response.IsSuccessStatusCode) return errorResponse;
+            var errorDict = JsonSerializer.Deserialize<Dictionary<string, object>>(data);
+            errorResponse.SetGrdApiError(errorDict, response.StatusCode);
+        }
+        catch (Exception e)
+        {
+            Logger.LogError(e, $"Error making API call to {endpoint}");
+        }
+
         return errorResponse;
     }
     
     private static async Task<(Dictionary<string, object>, ErrorResponse)> MakeAPICallAndReturnDict(string endpoint, Dictionary<string, object> body)
     {
         var errorResponse = new ErrorResponse();
-        var response = HttpUtils.Client.SendAsync(CreateConnectAPIRequest(endpoint, body)).GetAwaiter().GetResult();
-        var data = response.Content.ReadAsStringAsync().GetAwaiter().GetResult();
-        if (response.StatusCode == HttpStatusCode.InternalServerError) data = string.Empty;
-        var dict = JsonSerializer.Deserialize<Dictionary<string, object>>(data);
-        if (response.IsSuccessStatusCode) return (dict, errorResponse);
-        errorResponse.SetGrdApiError(dict, response.StatusCode);
+        try
+        {
+            var request = CreateConnectAPIRequest(endpoint, body);
+            var response = await HttpUtils.Client.SendAsync(request);
+            var data = await response.Content.ReadAsStringAsync();
+            if (response.StatusCode == HttpStatusCode.InternalServerError) data = string.Empty;
+            var dict = JsonSerializer.Deserialize<Dictionary<string, object>>(data);
+            if (response.IsSuccessStatusCode) return (dict, errorResponse);
+            errorResponse.SetGrdApiError(dict, response.StatusCode).SetResponse(response);
+        }
+        catch (Exception e)
+        {
+            Logger.LogError(e, $"Error making API call to {endpoint}");
+        }
         return (new Dictionary<string, object?>(), errorResponse);
     }
 }

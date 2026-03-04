@@ -342,7 +342,7 @@ public class GRDServerManager
         Logger.LogInformation($"GetHostsForRegion: Calling GetHostsForRegionKey with key = '{regionKey}");
 
         HttpResponseMessage response = new HttpResponseMessage();
-        string getHostsForRegionUrl = $"https://{Common.kConnectAPIHostname}/api/v1/servers/hostnames-for-region";
+        string getHostsForRegionUrl = $"https://{Common.DefaultConnectAPIHostname}/api/v1/servers/hostnames-for-region";
         Uri uri = new Uri(getHostsForRegionUrl);
         try
         {

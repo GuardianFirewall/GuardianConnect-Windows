@@ -10,7 +10,7 @@ namespace GuardianConnect.Credentials
 {
     public class GRDKeychain : IGRDKeychain
     {
-        private static Microsoft.Extensions.Logging.ILogger _logger = NullLogger.Instance;
+        public static Microsoft.Extensions.Logging.ILogger _logger = NullLogger.Instance;
         public static Microsoft.Extensions.Logging.ILogger Logger
         {
             get
@@ -24,13 +24,13 @@ namespace GuardianConnect.Credentials
         }
 
 
-        private const string GRDKeyPath = @"Software\GuardianVPN";
-        private static string _entropyData = @"Быстрая, коричневая лиса, перепрыгнула через ленивого пса";
+        public const string GRDKeyPath = @"Software\GuardianVPN";
+        public static string _entropyData = @"Быстрая, коричневая лиса, перепрыгнула через ленивого пса";
 
-        private static RegistryKey? GRDKey;
+        public static RegistryKey? GRDKey;
 
         // TODO: Check callers
-        private static void WriteRegistryData(byte[] encryptedData, string key)
+        public static void WriteRegistryData(byte[] encryptedData, string key)
         {
             try
             {
@@ -44,7 +44,7 @@ namespace GuardianConnect.Credentials
             }
         }
         
-        private static void WriteRegistryData(string encryptedDataAsString, string key)
+        public static void WriteRegistryData(string encryptedDataAsString, string key)
         {
             try
             {
@@ -58,7 +58,7 @@ namespace GuardianConnect.Credentials
             }
         } 
         
-        private static void WriteRegistryData(byte[] encryptedData, RegistryKey registrySubKey, string ValueName)
+        public static void WriteRegistryData(byte[] encryptedData, RegistryKey registrySubKey, string ValueName)
         {
             try
             {
@@ -71,7 +71,7 @@ namespace GuardianConnect.Credentials
             }
         } 
         
-        private static string ReadRegistryData(string key)
+        public static string ReadRegistryData(string key)
         {
             var defaultValue = string.Empty;
             var encryptedDataString = defaultValue;
@@ -87,7 +87,7 @@ namespace GuardianConnect.Credentials
             return encryptedDataString;
         }
 
-        private static byte[] ReadRegistryByteData(string key)
+        public static byte[] ReadRegistryByteData(string key)
         {
             var defaultValue = new byte[0];
             var encryptedDataBytes = defaultValue;
@@ -124,7 +124,7 @@ namespace GuardianConnect.Credentials
             return encryptedDataBytes;
         }
 
-        private static byte[] ReadRegistryByteData(RegistryKey registrySubKey, string ValueName)
+        public static byte[] ReadRegistryByteData(RegistryKey registrySubKey, string ValueName)
         {
             var defaultValue = new byte[0];
             var encryptedDataBytes = defaultValue;
@@ -168,28 +168,18 @@ namespace GuardianConnect.Credentials
             return data;
         }
 
-        public static string GetPasswordStringForAccount(string accountKey)
+        public static string? GetPasswordStringForAccount(string accountKey)
         {
             string encryptedPassword;
             string password;
-            try
+            encryptedPassword = ReadRegistryData(accountKey);
+            if (string.IsNullOrEmpty(encryptedPassword))
             {
-                encryptedPassword = ReadRegistryData(accountKey);
-                if (string.IsNullOrEmpty(encryptedPassword))
-                {
-                    return "";
-                }
-                // why below throwing exception???
-                //password = DPAPI.Decrypt(encryptedPassword.ToString());
-                password = DPAPI.Decrypt(encryptedPassword);
+                return null;
+            }
+            password = DPAPI.Decrypt(encryptedPassword);
             
-                return password;
-            }
-            catch (Exception e)
-            {
-                System.Diagnostics.Debug.WriteLine(e);
-                throw;
-            }
+            return password;
         }
 
         public static byte[] GetPasswordRefForAccount(string accountKey)

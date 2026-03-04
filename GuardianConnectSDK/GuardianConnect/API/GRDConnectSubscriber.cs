@@ -139,7 +139,7 @@ namespace GuardianConnect.API
         }
 
         // Destroy subscriber and related secrets
-        public static async Task<ErrorResponse> DestroySubscriberAsync()
+        public static async Task<ErrorResponse> DestroySubscriber()
         {
             try
             {

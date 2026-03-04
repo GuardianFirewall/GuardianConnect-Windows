@@ -11,6 +11,7 @@ using Newtonsoft.Json.Linq;
 using Serilog;
 using System;
 using System.Text.Json;
+using GuardianConnect.API;
 using Win32Calls;
 using Win32Calls.WFP;
 
@@ -34,12 +35,51 @@ Log.Information("Hello, World!");
 
 #if true
 Log.Information("Calling CreateOrUpdateEntry()...");
+// Logging is done - let's get going
 
+// - let's get the subscriber credentials and then call the GRDConnectSubscriber Create and Register methods
+/*
+    Connect API server: wifi-api-staging.dev.guardianapp.com
+    Identifier: eero1.user.cSDRlZj56acSQ8waulkwbtm9isHAJpNYWE6Z6Q5jkUXKgv9GQYg
+    Secret: frWFwtG4XWou3Knw7yKbBoq4qXSRjtkHcblUxGkHNvI=
+
+ */
+//Console.Write("Enter Connect API Server:");
+//var connAPiServer = Console.ReadLine();
+//Console.Write("Enter Identifier:");
+//var identifier = Console.ReadLine();
+//Console.Write("Enter Secret:");
+//var secret = Console.ReadLine();
+Console.WriteLine("Setting values and calling RegisterNewConnectSubscrxiberAsync()...");
+var connAPiServer = "wifi-api-staging.dev.guardianapp.com";
+var identifier = GRDKeychain.ReadRegistryData("TESTVALUE_CS_Identifier");
+var secret = GRDKeychain.ReadRegistryData("TESTVALUE_CS_Secret");
+GRDVPNHelper.CreateSingleton();
+GRDVPNHelper.Singleton.ConnectAPIHostname = connAPiServer;
+
+GRDConnectSubscriber connectSubscriber = new GRDConnectSubscriber();
+connectSubscriber.Identifier = identifier;
+connectSubscriber.Secret = secret;
+var ( cs, errorResponse) = connectSubscriber.RegisterNewConnectSubscriberAsync(true, "TimDevBox").Result;
+if (errorResponse.IsError)
+{
+    Log.Error(errorResponse.Message);
+}
+else
+{
+    Log.Information($"Connect Subscriber registered successfully with ID: {cs.CreatedAt}");
+}
+
+#else
+// Set some variables used for calls
 var hostName = "newyork-ipsec-14.guardianapp.com";
 var hostDisplay = "New York, NY";
 var eapUser = "e9d538e6b3e3eb43";
 var eapPassword = "iPcozIEKUFRL";
 var entryName = "Guardian Firewall - New York, NY";
+
+
+// Test calls
 var response = ConnectionRoutines.CreateOrUpdateEntry(entryName, hostName, eapUser, eapPassword, null);
 
 var dialResponse = ConnectionRoutines.ConnectEntry(); 

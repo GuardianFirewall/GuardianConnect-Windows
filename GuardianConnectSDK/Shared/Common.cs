@@ -62,7 +62,10 @@ public class Common
     public const string kVpnCallParametersForReboot = "VPNCallParametersForReboot";
 
     /// Public production Connect API environment
-    public const string kConnectAPIHostname = @"connect-api.guardianapp.com";
+    public const string DefaultConnectAPIHostname = @"connect-api.guardianapp.com";
+    public const string DefaultHousekeepingAPIHostname = @"connect-api.guardianapp.com";
+    public const string kConnectAPIHostname = "ConnectAPIHostname";
+    public const string kHousekeepingAPIHostname = "HousekeepingAPIHostname";
 
     public const string kGuardianNetworkHealthStatusNotification = @"networkHealthStatusNotification";
     public const string kGuardianSuccessfulSubscription = @"successfullySubscribedToGuardian";
