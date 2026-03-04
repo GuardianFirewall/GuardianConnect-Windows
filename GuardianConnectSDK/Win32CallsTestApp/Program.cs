@@ -38,12 +38,7 @@ Log.Information("Calling CreateOrUpdateEntry()...");
 // Logging is done - let's get going
 
 // - let's get the subscriber credentials and then call the GRDConnectSubscriber Create and Register methods
-/*
-    Connect API server: wifi-api-staging.dev.guardianapp.com
-    Identifier: eero1.user.cSDRlZj56acSQ8waulkwbtm9isHAJpNYWE6Z6Q5jkUXKgv9GQYg
-    Secret: frWFwtG4XWou3Knw7yKbBoq4qXSRjtkHcblUxGkHNvI=
 
- */
 //Console.Write("Enter Connect API Server:");
 //var connAPiServer = Console.ReadLine();
 //Console.Write("Enter Identifier:");
