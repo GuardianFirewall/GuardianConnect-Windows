@@ -6,7 +6,6 @@ using GuardianConnect.Shared;
 using GuardianConnect.Shared.Extensions;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Logging.Abstractions;
-using System.Diagnostics;
 using System.Net;
 using System.Net.Http.Headers;
 using System.Net.Http.Json;
@@ -33,11 +32,11 @@ public static class GRDHousekeepingAPI
     }
 
     private static string ConnectAPIHostname =>
-        GRDKeychain.GetPasswordStringForAccount(Common.kConnectAPIHostname)
+        GRDKeychain.ReadRegistryData(Common.kConnectAPIHostname)
         ?? Common.DefaultConnectAPIHostname;
 
     private static string HousekeepingAPIHostname =>
-        GRDKeychain.GetPasswordStringForAccount(Common.kHousekeepingAPIHostname)
+        GRDKeychain.ReadRegistryData(Common.kHousekeepingAPIHostname)
         ?? Common.DefaultHousekeepingAPIHostname;
 
     public static string PublishableKey => GRDKeychain.ReadRegistryData("TESTVALUE_CS_PublishableKey");
@@ -317,7 +316,7 @@ public static class GRDHousekeepingAPI
             [Common.kGuardianConnectSubscriberEmailKey] = email
         };
 
-        return MakeAPICallAndReturnDict("/api/v1.2/partners/subscribers/new", body).GetAwaiter().GetResult();
+        return MakeAPICallAndReturnDict("/api/v1.3/partners/subscribers/new", body).GetAwaiter().GetResult();
     }
 
     // [#186 - called by #168] - DONE
@@ -443,7 +442,7 @@ public static class GRDHousekeepingAPI
             body.Add(Common.kGuardianDeviceSubscriberSecretKey, secret);
         }
         
-        var response = HttpUtils.Client.SendAsync(CreateConnectAPIRequest("/api/v1.3/partners/subscribers/devices/list", body)).GetAwaiter().GetResult();
+        var response = HttpUtils.Client.SendAsync(CreateConnectAPIRequest("/api/v1.2/partners/subscribers/devices/list", body)).GetAwaiter().GetResult();
         string data = response.Content.ReadAsStringAsync().GetAwaiter().GetResult();
         if (response.StatusCode == HttpStatusCode.InternalServerError) data = string.Empty;
         if (! response.IsSuccessStatusCode)
@@ -490,8 +489,7 @@ public static class GRDHousekeepingAPI
     private static Uri MakeUri(string path)
     {
         
-        string connectHost = GRDVPNHelper.Singleton.PeToken?.ConnectAPIEnv ?? Common.DefaultConnectAPIHostname;
-        return new Uri($"https://{connectHost}{path}", UriKind.RelativeOrAbsolute);
+        return new Uri($"https://{ConnectAPIHostname}{path}", UriKind.RelativeOrAbsolute);
     }
     
     private static HttpRequestMessage CreateConnectAPIRequest(string endpoint, Dictionary<string, object> body)
