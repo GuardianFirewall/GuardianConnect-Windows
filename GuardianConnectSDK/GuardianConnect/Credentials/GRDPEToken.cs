@@ -5,7 +5,7 @@ using System.Text.Json.Serialization;
 
 namespace GuardianConnect.Credentials
 {
-    public class GRDPEToken : IGRDPEToken
+    public class GRDPEToken //: IGRDPEToken
     {
         public GRDPEToken()
         {

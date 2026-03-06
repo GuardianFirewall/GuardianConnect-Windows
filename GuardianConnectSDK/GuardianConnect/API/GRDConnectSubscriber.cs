@@ -48,10 +48,8 @@ namespace GuardianConnect.API
             subscriber.Identifier = (string)dict[Common.kGuardianConnectSubscriberIdentifierKey];
             subscriber.Email = (string)dict[Common.kGuardianConnectSubscriberEmailKey];
             subscriber.SubscriptionSKU = (string)dict[Common.kGuardianConnectSubscriberSubscriptionSKUKey];
-            subscriber.SubscriptionNameFormatted =
-                (string)dict[Common.kGuardianConnectSubscriberSubscriptionNameFormattedKey];
-            subscriber.SubscriptionExpirationDate =
-                (long)dict[Common.kGuardianConnectSubscriberSubscriptionExpirationDateKey];
+            subscriber.SubscriptionNameFormatted = (string)dict[Common.kGuardianConnectSubscriberSubscriptionNameFormattedKey];
+            subscriber.SubscriptionExpirationDate = (long)dict[Common.kGuardianConnectSubscriberSubscriptionExpirationDateKey];
             subscriber.CreatedAt = (long)dict[Common.kGuardianConnectSubscriberCreatedAtKey];
             var device = GRDConnectDevice.InitFromDictionary(dict[Common.kGuardianConnectDevice] as Dictionary<string, object>);
             subscriber.Device = device;
@@ -241,30 +239,7 @@ namespace GuardianConnect.API
                 Email = "";
 
 #if true
-            var subscriberDetailsDict =
-                new Dictionary<string, object?>
-                {
-                    {
-                        "ep-grd-device", new Dictionary<string, object?>
-                        {
-                            { "ep-grd-device-nickname", "TimDevBox" },
-                            { "ep-grd-device-uuid", "DA8475DA-5272-7979-B4BC-2A66DAA6BF68" },
-                            { "ep-grd-device-created-at", 1772723912 },
-                            { "ep-grd-device-subscriber-pet", true }
-                        }
-                    },
-                    { "ep-grd-subscriber-created-at", 1681927973 },
-                    {
-                        "ep-grd-subscriber-identifier", "eero1.user.cSDRlZj56acSQ8waulkwbtm9isHAJpNYWE6Z6Q5jkUXKgv9GQYg"
-                    },
-                    { "ep-grd-subscription-expiration-date", 1780759111 },
-                    { "ep-grd-subscription-name-formatted", "eero Plus" },
-                    { "ep-grd-subscription-sku", "eero-plus" },
-                    { "pe-token", "wlaR6yAFSFvTPYD5PW7GtYUsnsCX1THc" },
-                    { "pet-expires", 1788621511 }
-                };
-            ErrorResponse errorResponse;
-#else
+
             var (subscriberDetailsDict, errorResponse) =
                 await GRDHousekeepingAPI.AddNewConnectSubscriberAsync(Identifier, Secret, deviceNickname, Email, acceptedTOS);
             if (errorResponse.IsError) return (null, errorResponse);
@@ -281,24 +256,8 @@ namespace GuardianConnect.API
                 : (DateTime?)null;
 
             // Store PET and expiration date
-            GRDPEToken petFromConnectSubscriber =
-#if true
-                new GRDPEToken
-                {
-                    ExpirationDate = (DateTime)newSubscriber.Device.PETExpires,
-                    Token = newSubscriber.Device.PEToken
-                };
+            GRDPEToken petFromConnectSubscriber = GRDPEToken.InitFromDictionary(subscriberDetailsDict);
             petFromConnectSubscriber.Store();
-                #else
-                GRDPEToken.InitFromDictionary(subscriberDetailsDict);
-            if (petFromConnectSubscriber != null && petFromConnectSubscriber.Token != null)
-                petFromConnectSubscriber.Store();
-            else
-            {
-                errorResponse = new ErrorResponse("Failed to register new Connect Subscriber. No PEToken was returned.");
-                return (null, errorResponse);
-            }
-            #endif
             
             newSubscriber.Secret = Secret;
             newSubscriber.Device = newSubscriber.Device;

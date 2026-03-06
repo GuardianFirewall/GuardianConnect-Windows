@@ -1,4 +1,5 @@
-﻿using GuardianConnect.Shared;
+﻿#if __DELETE_THIS_FILE__
+using GuardianConnect.Shared;
 
 namespace GuardianConnect.Credentials
 {
@@ -57,3 +58,5 @@ namespace GuardianConnect.Credentials
         }
     }
 }
+
+#endif
