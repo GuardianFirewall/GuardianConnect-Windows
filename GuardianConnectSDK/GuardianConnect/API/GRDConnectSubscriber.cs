@@ -240,35 +240,10 @@ namespace GuardianConnect.API
             if (Email == null)
                 Email = "";
 
-#if true
-            var subscriberDetailsDict =
-                new Dictionary<string, object?>
-                {
-                    {
-                        "ep-grd-device", new Dictionary<string, object?>
-                        {
-                            { "ep-grd-device-nickname", "TimDevBox" },
-                            { "ep-grd-device-uuid", "DA8475DA-5272-7979-B4BC-2A66DAA6BF68" },
-                            { "ep-grd-device-created-at", 1772723912 },
-                            { "ep-grd-device-subscriber-pet", true }
-                        }
-                    },
-                    { "ep-grd-subscriber-created-at", 1681927973 },
-                    {
-                        "ep-grd-subscriber-identifier", "eero1.user.cSDRlZj56acSQ8waulkwbtm9isHAJpNYWE6Z6Q5jkUXKgv9GQYg"
-                    },
-                    { "ep-grd-subscription-expiration-date", 1780759111 },
-                    { "ep-grd-subscription-name-formatted", "eero Plus" },
-                    { "ep-grd-subscription-sku", "eero-plus" },
-                    { "pe-token", "wlaR6yAFSFvTPYD5PW7GtYUsnsCX1THc" },
-                    { "pet-expires", 1788621511 }
-                };
-            ErrorResponse errorResponse;
-#else
+
             var (subscriberDetailsDict, errorResponse) =
                 await GRDHousekeepingAPI.AddNewConnectSubscriberAsync(Identifier, Secret, deviceNickname, Email, acceptedTOS);
             if (errorResponse.IsError) return (null, errorResponse);
-#endif
 
             var newSubscriber = InitFromDictionary(subscriberDetailsDict);
 
@@ -289,7 +264,7 @@ namespace GuardianConnect.API
                     Token = newSubscriber.Device.PEToken
                 };
             petFromConnectSubscriber.Store();
-                #else
+#else
                 GRDPEToken.InitFromDictionary(subscriberDetailsDict);
             if (petFromConnectSubscriber != null && petFromConnectSubscriber.Token != null)
                 petFromConnectSubscriber.Store();
@@ -298,7 +273,7 @@ namespace GuardianConnect.API
                 errorResponse = new ErrorResponse("Failed to register new Connect Subscriber. No PEToken was returned.");
                 return (null, errorResponse);
             }
-            #endif
+#endif
             
             newSubscriber.Secret = Secret;
             newSubscriber.Device = newSubscriber.Device;
