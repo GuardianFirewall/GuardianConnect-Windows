@@ -5,6 +5,7 @@ using GuardianConnect.Credentials;
 using GuardianConnect.Helpers;
 using GuardianConnect.Shared;
 using GuardianConnect.Shared.Extensions;
+using Microsoft.Win32.SafeHandles;
 
 namespace GuardianConnect.API
 {
@@ -49,9 +50,13 @@ namespace GuardianConnect.API
             subscriber.Email = (string)dict[Common.kGuardianConnectSubscriberEmailKey];
             subscriber.SubscriptionSKU = (string)dict[Common.kGuardianConnectSubscriberSubscriptionSKUKey];
             subscriber.SubscriptionNameFormatted = (string)dict[Common.kGuardianConnectSubscriberSubscriptionNameFormattedKey];
-            subscriber.SubscriptionExpirationDate = (long)dict[Common.kGuardianConnectSubscriberSubscriptionExpirationDateKey];
-            subscriber.CreatedAt = (long)dict[Common.kGuardianConnectSubscriberCreatedAtKey];
-            var device = GRDConnectDevice.InitFromDictionary(dict[Common.kGuardianConnectDevice] as Dictionary<string, object>);
+            subscriber.SubscriptionExpirationDate = long.Parse((string)dict[Common.kGuardianConnectSubscriberSubscriptionExpirationDateKey].ToString());
+            subscriber.CreatedAt = long.Parse((string)dict[Common.kGuardianConnectSubscriberCreatedAtKey].ToString());
+
+            var devDict = dict[Common.kGuardianConnectDeviceDictKey] as Dictionary<string, object>;
+            devDict[Common.kGuardianConnectDevicePETokenKey] = (string)dict[Common.kGuardianConnectDevicePETokenKey];
+            devDict[Common.kGuardianPETokenExpirationDate] = long.Parse((string)dict[Common.kGuardianConnectDevicePETExpiresKey].ToString());
+            var device = GRDConnectDevice.InitFromDictionary(dict[Common.kGuardianConnectDeviceDictKey] as Dictionary<string, object>);
             subscriber.Device = device;
 
             // NOTE - Secret is set by the caller of this function
@@ -64,7 +69,7 @@ namespace GuardianConnect.API
         {
             try
             {
-                int retVal = GRDKeychain.ReadDictionaryOfObjects(Common.kGuardianConnectSubscriber, out var binaryDict);
+                int retVal = GRDKeychain.ReadDictionaryOfObjects(Common.kGuardianConnectSubscriberStoreKey, out var binaryDict);
 
                 if (binaryDict == null || binaryDict.Count == 0 || retVal != 0)
                     return (null,
@@ -124,13 +129,12 @@ namespace GuardianConnect.API
                     [Common.kGuardianConnectSubscriberSubscriptionSKUKey] = Encoding.UTF8.GetBytes(SubscriptionSKU),
                     [Common.kGuardianConnectSubscriberSubscriptionNameFormattedKey] =
                         Encoding.UTF8.GetBytes(SubscriptionNameFormatted),
-                    [Common.kGuardianConnectSubscriberSubscriptionExpirationDateKey] =
-                        Encoding.UTF8.GetBytes(SubscriptionExpirationDate.ToString("O")),
-                    [Common.kGuardianConnectSubscriberCreatedAtKey] = Encoding.UTF8.GetBytes(CreatedAt.ToString("O")),
-                    [Common.kGuardianConnectDevice] = new byte[] { 0xDE, 0xAD, 0xBE, 0xEF },
+                    [Common.kGuardianConnectSubscriberSubscriptionExpirationDateKey] = BitConverter.GetBytes(SubscriptionExpirationDate),
+                    [Common.kGuardianConnectSubscriberCreatedAtKey] = BitConverter.GetBytes(CreatedAt),
+                    [Common.kGuardianConnectDeviceStoreKey] = new byte[] { 0xDE, 0xAD, 0xBE, 0xEF },
                 };
 
-                GRDKeychain.StoreDictionaryOfObjects(Common.kGuardianConnectSubscriber, dict);
+                GRDKeychain.StoreDictionaryOfObjects(Common.kGuardianConnectSubscriberStoreKey, dict);
 
                 if (Device != null)
                 {
@@ -153,9 +157,9 @@ namespace GuardianConnect.API
             try
             {
                 GRDKeychain.RemoveKeychainItemForAccount(Common.kGuardianConnectSubscriberSecretKey);
-                GRDKeychain.RemoveKeychainItemForAccount("kKeychainStr_PEToken");
-                GRDKeychain.RemoveKeychainItemForAccount("kGuardianPETokenExpirationDate");
-                GRDKeychain.RemoveSubKeyAndValues(Common.kGuardianConnectSubscriber);
+                GRDKeychain.RemoveKeychainItemForAccount(Common.kKeychainStr_PEToken);
+                GRDKeychain.RemoveKeychainItemForAccount(Common.kGuardianPETokenExpirationDate);
+                GRDKeychain.RemoveSubKeyAndValues(Common.kGuardianConnectSubscriberStoreKey);
                 return new ErrorResponse(null);
             }
             catch (Exception ex)
@@ -216,7 +220,7 @@ namespace GuardianConnect.API
 
                 var device = GRDConnectDevice.InitFromDictionary(deviceDetails);
                 device.PEToken = peToken.Token;
-                device.PETExpires = peToken.ExpirationDate;
+                device.PETExpires = new DateTimeOffset(peToken.ExpirationDate).ToUnixTimeSeconds();
                 device.IsCurrentDevice = true;
                 return (device, new ErrorResponse());
             }
@@ -245,15 +249,18 @@ namespace GuardianConnect.API
             if (errorResponse.IsError) return (null, errorResponse);
 #endif
 
+            // Fill in the things we were provided to the API
+            if (!subscriberDetailsDict.ContainsKey(Common.kGuardianConnectSubscriberEmailKey))
+                subscriberDetailsDict.Add(Common.kGuardianConnectSubscriberEmailKey, Email);
+            
             var newSubscriber = InitFromDictionary(subscriberDetailsDict);
 
-            var pet = subscriberDetailsDict.TryGetValue("pe-token", out var petObj) ? petObj?.ToString() : null;
-            if (string.IsNullOrEmpty(pet))
+
+            var petExists = subscriberDetailsDict.TryGetValue(Common.kGuardianConnectDevicePETokenKey, out _);
+            if (! petExists)
                 return (null, new ErrorResponse("Failed to register new Connect Subscriber. No PE-Token was returned"));
 
-            var petExpires = subscriberDetailsDict.TryGetValue("pet-expires", out var petExpObj) && long.TryParse(petExpObj?.ToString(), out var petExpUnix)
-                ? DateTimeOffset.FromUnixTimeSeconds(petExpUnix).DateTime
-                : (DateTime?)null;
+            var petExpires = long.Parse(subscriberDetailsDict[Common.kGuardianConnectDevicePETExpiresKey].ToString());
 
             // Store PET and expiration date
             GRDPEToken petFromConnectSubscriber = GRDPEToken.InitFromDictionary(subscriberDetailsDict);
@@ -262,11 +269,11 @@ namespace GuardianConnect.API
             newSubscriber.Secret = Secret;
             newSubscriber.Device = newSubscriber.Device;
             newSubscriber.AcceptedTOS = acceptedTOS;
-            newSubscriber.Store();
 
-            // CHECK WITH CJ ON THIS
-            AcceptedTOS = acceptedTOS; // save it since we were successful
-            //
+            var createErr = newSubscriber.Store();
+            if (createErr.IsError)
+                return (null, createErr);
+            
             return (newSubscriber, new ErrorResponse());
         }
 
@@ -312,9 +319,6 @@ namespace GuardianConnect.API
                 return (null, errorResponse);
 
             var newSubscriber = InitFromDictionary(details);
-            //newSubscriber.SubscriptionSKU = details.TryGetValue(Common.kGuardianConnectSubscriberSubscriptionSKUKey, out var sku) ? sku?.ToString() ?? "" : "";
-            //newSubscriber.SubscriptionNameFormatted = details.TryGetValue(Common.kGuardianConnectSubscriberSubscriptionNameFormattedKey, out var name) ? name?.ToString() ?? "" : "";
-            //newSubscriber.SubscriptionExpirationDate = details.Common.kGuardianConnectSubscriberSubscriptionExpirationDateKey];
 
             var pet = details.TryGetValue("pe-token", out var petObj) ? petObj?.ToString() : null;
             if (string.IsNullOrEmpty(pet))
@@ -323,10 +327,10 @@ namespace GuardianConnect.API
             var petExpires = details.TryGetValue("pet-expires", out var petExpObj) && long.TryParse(petExpObj?.ToString(), out var petExpUnix)
                 ? DateTimeOffset.FromUnixTimeSeconds(petExpUnix).DateTime
                 : (DateTime?)null;
-
+            // TODO: Change to actual GRDPEToken and use its Store();
             GRDKeychain.StorePassword(pet, "kKeychainStr_PEToken");
             if (petExpires.HasValue)
-                GRDKeychain.StorePassword(petExpires.Value.ToString("O"), "kGuardianPETokenExpirationDate");
+                GRDKeychain.StorePassword(petExpires.Value.ToString("O"), Common.kGuardianPETokenExpirationDate);
 
             var updateErr = newSubscriber.Store();
             if (updateErr.IsError)
