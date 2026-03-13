@@ -282,7 +282,7 @@ namespace GuardianConnect.Credentials
             }
             catch (Exception e)
             {
-                Logger.LogError(e, "Exception thrown when writing to registry key: ", $"{DictOfObjectsSubKeyName}/{objectKeyName}");
+                Logger.LogError(e, $"Exception thrown when writing to registry key: {DictOfObjectsSubKeyName}/{objectKeyName}");
                 throw;
             }
 

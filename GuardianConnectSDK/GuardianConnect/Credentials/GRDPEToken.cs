@@ -47,8 +47,7 @@ namespace GuardianConnect.Credentials
             if (dict.ContainsKey("Token")) peToken.Token = dict["Token"].ToString() ?? throw new InvalidOperationException();
             if (dict.ContainsKey(Common.kPETokenKey)) peToken.Token = dict[Common.kPETokenKey].ToString() ?? throw new InvalidOperationException();
             
-            if (dict.ContainsKey(Common.kGuardianConnectDevicePETExpiresKey))
-                peToken.ExpirationDateUnix = long.Parse(dict[Common.kGuardianConnectDevicePETExpiresKey].ToString());
+            if (dict.ContainsKey(Common.kGuardianConnectDevicePETExpiresKey)) peToken.ExpirationDateUnix = long.Parse(dict[Common.kGuardianConnectDevicePETExpiresKey].ToString());
             if (dict.ContainsKey("ExpirationDate")) peToken.ExpirationDate = DateTime.Parse(dict["ExpirationDate"].ToString() ?? throw new InvalidOperationException());
             if (dict.ContainsKey("ConnectAPIEnv")) peToken.ConnectAPIEnv = dict["ConnectAPIEnv"]?.ToString() ?? Common.DefaultConnectAPIHostname;
             if (dict.ContainsKey("SubscriptionType")) peToken.SubscriptionType = dict["SubscriptionType"].ToString() ?? throw new InvalidOperationException();

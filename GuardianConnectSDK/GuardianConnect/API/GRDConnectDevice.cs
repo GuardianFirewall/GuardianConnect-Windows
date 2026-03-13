@@ -21,9 +21,9 @@ namespace GuardianConnect.API
         public static GRDConnectDevice InitFromDictionary(IDictionary<string, object> deviceDictionary)
         {
             var device = new GRDConnectDevice();
-            device.Nickname = (string)deviceDictionary[Common.kGuardianConnectDeviceNicknameKey];
-            device.UUID = (string)deviceDictionary[Common.kGuardianConnectDeviceUUIDKey];
-            device.PEToken = (string)deviceDictionary[Common.kGuardianConnectDevicePETokenKey];
+            device.Nickname = deviceDictionary[Common.kGuardianConnectDeviceNicknameKey].ToString() ?? "";
+            device.UUID = deviceDictionary[Common.kGuardianConnectDeviceUUIDKey].ToString() ?? "";
+            device.PEToken = deviceDictionary[Common.kGuardianConnectDevicePETokenKey].ToString();
             device.PETExpires = long.Parse(deviceDictionary[Common.kGuardianConnectDevicePETExpiresKey].ToString() ?? "0");
             device.CreatedAt = long.Parse(deviceDictionary[Common.kGuardianConnectDeviceCreatedAtKey].ToString() ?? "0");
             device.IsCurrentDevice = deviceDictionary.TryGetValue("currentDevice", out var currentDevice) &&
@@ -32,8 +32,7 @@ namespace GuardianConnect.API
             return device;
         }
 
-        // Async method to get current device (simulate completion block)
-        public static async Task<(GRDConnectDevice? Device, ErrorResponse Error)> GetCurrentDeviceAsync()
+        public static (GRDConnectDevice? Device, ErrorResponse Error) GetCurrentDevice()
         {
             try
             {
@@ -159,7 +158,7 @@ namespace GuardianConnect.API
                 
                 var deviceList = deviceDictsList.Select(InitFromDictionary).ToList();
 
-                var currentDevice = await GetCurrentDeviceAsync();
+                var currentDevice = GetCurrentDevice();
                 if (currentDevice.Device != null)
                 {
                     deviceList.Find(device => device.UUID == currentDevice.Device.UUID).IsCurrentDevice = true;

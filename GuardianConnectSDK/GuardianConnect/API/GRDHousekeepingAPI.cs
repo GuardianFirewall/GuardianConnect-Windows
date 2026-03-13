@@ -301,7 +301,7 @@ public static class GRDHousekeepingAPI
     }
     
     #region GRDConnectionSubscriber/Device calls
-    // [#185 called by #169] - DONE
+    // [#185 called by #169] - TESTED
     public static async Task<(Dictionary<string, object>,  ErrorResponse)>
         AddNewConnectSubscriberAsync(string identifier, string secret, string nickname, string email, bool acceptedTOS)
     {
@@ -316,14 +316,26 @@ public static class GRDHousekeepingAPI
             [Common.kGuardianConnectSubscriberEmailKey] = email
         };
 
+        /* return shoud be:
+            ep-grd-subscriber-identifier <string>
+            ep-grd-subscription-sku <string>
+            ep-grd-subscription-name-formatted <string>
+            ep-grd-subscription-expiration-date <int>
+            ep-grd-subscriber-created-at <int>
+            pe-token <string>
+            pet-expires <int>
+            ep-grd-device <dict> {
+              ep-grd-device-nickname <string>
+              ep-grd-device-uuid <string>
+              ep-grd-device-created-at <int>
+              ep-grd-device-subscriber-pet <boolean>
+}*/
         return MakeAPICallAndReturnDict("/api/v1.3/partners/subscribers/new", body).GetAwaiter().GetResult();
     }
 
-    // [#186 - called by #168] - DONE
+    // [#186 - called by #168] - TESTED
     public static async Task<(Dictionary<string, object>, ErrorResponse)> GetDeviceReferenceForConnectSubscriberAsync(string identifier, string secret, string peToken)
     {
-        var errorResponse = new ErrorResponse();
-        
         var body = new Dictionary<string, object?>
         {
             [Common.kGuardianConnectSubscriberIdentifierKey] = identifier,
@@ -332,15 +344,14 @@ public static class GRDHousekeepingAPI
         };
 
         var ep = "/api/v1.2/partners/subscriber/device-reference";
-        return MakeAPICallAndReturnDict(ep, body).GetAwaiter().GetResult();
+        var (jsonResult, errorResponse) = MakeAPICallAndReturnDict(ep, body).GetAwaiter().GetResult();
+        return (jsonResult, errorResponse);
     }
 
     // [#187 - called by #171] - DONE
     public static async Task<(Dictionary<string, object>,  ErrorResponse)> UpdateConnectSubscriberWithEmailAsync(
         string identifier, string secret, string nickname, bool acceptedTOS, string email)
     {
-        var errorResponse = new ErrorResponse();
-        
         var body = new Dictionary<string, object?>
         {
             [Common.kGuardianConnectSubscriberIdentifierKey] = identifier,
@@ -351,26 +362,24 @@ public static class GRDHousekeepingAPI
         };
 
         var ep = "/api/v1.2/partners/subscriber/update";
-        return MakeAPICallAndReturnDict(ep, body).GetAwaiter().GetResult();
+        var (dict, errorResponse) = MakeAPICallAndReturnDict(ep, body).GetAwaiter().GetResult();
+        return (dict, errorResponse);
     }
 
     // [#188 - called by #172] - DONE
     public static async Task<(Dictionary<string, object>,  ErrorResponse)> ValidateConnectSubscriberAsync(
-        string identifier, string secret, string nickname, string email, bool acceptedTOS)
+        string identifier, string secret, string peToken)
     {
-        var errorResponse = new ErrorResponse();
-        
         var body = new Dictionary<string, object?>
         {
             [Common.kGuardianConnectSubscriberIdentifierKey] = identifier,
             [Common.kGuardianConnectSubscriberSecretKey] = secret,
-            [Common.kGuardianConnectSubscriberPETNicknameKey] = nickname,
-            [Common.kGuardianConnectSubscriberAcceptedTOS] = acceptedTOS,
-            [Common.kGuardianConnectSubscriberEmailKey] = email
+            [Common.kPETokenKey] = peToken
         };
         
         var ep = "/api/v1.2/partners/subscriber/validate";
-        return MakeAPICallAndReturnDict(ep, body).GetAwaiter().GetResult();
+        var (dict, errorResponse) = MakeAPICallAndReturnDict(ep, body).GetAwaiter().GetResult();
+        return (dict, errorResponse);
     }
 
     // [#189 - called by #173] - DONE
@@ -392,12 +401,13 @@ public static class GRDHousekeepingAPI
         var errorResponse = new ErrorResponse();
         var body = new Dictionary<string, object>
         {
-            [Common.kGuardianDeviceSubscriberIdentifierKey] = identifier,
-            [Common.kGuardianDeviceSubscriberSecretKey] = secret
+            [Common.kGuardianConnectSubscriberIdentifierKey] = identifier,
+            [Common.kGuardianConnectSubscriberSecretKey] = secret
         };
 
         var ep = "/api/v1.2/partners/subscriber/account-creation-state";
-        return MakeAPICallAndReturnErrorResponse(ep, body).GetAwaiter().GetResult();
+        errorResponse = MakeAPICallAndReturnErrorResponse(ep, body).ConfigureAwait(false).GetAwaiter().GetResult();
+        return errorResponse;
     }
 
     //  [#191 called by #179] - DONE
@@ -516,7 +526,7 @@ public static class GRDHousekeepingAPI
             if (response.StatusCode == HttpStatusCode.InternalServerError) data = string.Empty;
             if (response.IsSuccessStatusCode) return errorResponse;
             var errorDict = JsonSerializer.Deserialize<Dictionary<string, object>>(data);
-            errorResponse.SetGrdApiError(errorDict, response.StatusCode);
+            errorResponse = errorResponse.SetGrdApiError(errorDict, response.StatusCode);
         }
         catch (Exception e)
         {
@@ -533,11 +543,12 @@ public static class GRDHousekeepingAPI
         {
             var request = CreateConnectAPIRequest(endpoint, body);
             var response = await HttpUtils.Client.SendAsync(request);
+            //var response = await HttpUtils.Client.PutAsync(request);
             var data = await response.Content.ReadAsStringAsync();
             if (response.StatusCode == HttpStatusCode.InternalServerError) data = string.Empty;
             var dict = JsonSerializer.Deserialize<Dictionary<string, object>>(data);
             if (response.IsSuccessStatusCode) return (dict, errorResponse);
-            errorResponse.SetGrdApiError(dict, response.StatusCode).SetResponse(response);
+            errorResponse = errorResponse.SetGrdApiError(dict, response.StatusCode).SetResponse(response);
         }
         catch (Exception e)
         {
