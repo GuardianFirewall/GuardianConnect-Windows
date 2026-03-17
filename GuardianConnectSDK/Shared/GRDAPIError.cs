@@ -11,9 +11,9 @@ public class GRDAPIError
     public string Message { get; set; }
     public int StatusCode { get; set; }
 
-    public GRDAPIError (Dictionary<string, object> data, HttpStatusCode statusCode)
+    public GRDAPIError (Dictionary<string, object>? dict, HttpStatusCode statusCode)
     {
-        if (data == null)
+        if (dict == null)
         {
  			Title 		= @"Failed to parse error";
  			Message 	= @"Failed to parse the API error message returned by the server";
@@ -21,8 +21,8 @@ public class GRDAPIError
         else
         {
 
-            Title = data.ContainsKey("error-title") ? data["error-title"].ToString() : string.Empty;
-            Message = data.ContainsKey("error-message") ? data["error-message"].ToString() : string.Empty;
+            Title = dict.ContainsKey("error-title") ? dict["error-title"].ToString() : string.Empty;
+            Message = dict.ContainsKey("error-message") ? dict["error-message"].ToString() : string.Empty;
             StatusCode = (int)statusCode;
         }
     }

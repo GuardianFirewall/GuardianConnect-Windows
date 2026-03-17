@@ -10,6 +10,7 @@ using System.Net;
 using System.Net.Http.Headers;
 using System.Net.Http.Json;
 using System.Text.Json;
+using System.Text.Json.Nodes;
 using System.Text.Json.Serialization;
 using Windows.Win32.System.Power;
 
@@ -439,19 +440,22 @@ public static class GRDHousekeepingAPI
     }
 
     // [#193] - called from [#167] - indentifier/secret or [#181] - peToken - DONE
-    internal static async Task<(List<Dictionary<string, object>>, ErrorResponse)>
-        RequestAllConnectDevicesForSubscriberAsync(string peToken = null, string identifier = null, string secret = null)
+    internal static async Task<(List<object>, ErrorResponse)>
+        RequestAllConnectDevicesForSubscriberAsync(string? peToken = null, string identifier = null, string secret = null)
     {
-        var errorResponse = new ErrorResponse();
         var body = new Dictionary<string, object>();
         
         if (peToken != null) body.Add(Common.kGuardianConnectDevicePETokenKey, peToken);
         else
         {
-            body.Add(Common.kGuardianDeviceSubscriberIdentifierKey, identifier);
-            body.Add(Common.kGuardianDeviceSubscriberSecretKey, secret);
+            body.Add(Common.kGuardianConnectSubscriberIdentifierKey, identifier);
+            body.Add(Common.kGuardianConnectSubscriberSecretKey, secret);
         }
+
+        var ep = "/api/v1.2/partners/subscriber/devices/list";
+        var (list, errorResponse) = MakeAPICallAndReturnList(ep,  body).GetAwaiter().GetResult();
         
+#if EXPLICITCALLWITHLISTRETURN
         var response = HttpUtils.Client.SendAsync(CreateConnectAPIRequest("/api/v1.2/partners/subscribers/devices/list", body)).GetAwaiter().GetResult();
         string data = response.Content.ReadAsStringAsync().GetAwaiter().GetResult();
         if (response.StatusCode == HttpStatusCode.InternalServerError) data = string.Empty;
@@ -463,7 +467,10 @@ public static class GRDHousekeepingAPI
         }
         
         var list = JsonSerializer.Deserialize<List<Dictionary<string, object>>>(data);
+#else
         return (list, errorResponse);
+        //return (dict, errorResponse);
+#endif
     }
 
     // [#194] Delete Device - sub-issue of [#179] - DONE
@@ -545,8 +552,14 @@ public static class GRDHousekeepingAPI
             var response = await HttpUtils.Client.SendAsync(request);
             //var response = await HttpUtils.Client.PutAsync(request);
             var data = await response.Content.ReadAsStringAsync();
-            if (response.StatusCode == HttpStatusCode.InternalServerError) data = string.Empty;
-            var dict = JsonSerializer.Deserialize<Dictionary<string, object>>(data);
+            if (response.StatusCode == HttpStatusCode.InternalServerError)
+            {
+                if (string.IsNullOrEmpty(data)) data = "{}";
+            }
+            var node = JsonNode.Parse(data)?.AsObject();
+            var dict = node?.ToDictionary(kvp => kvp.Key, kvp => (object?)kvp.Value);
+
+            //var dict = JsonSerializer.Deserialize<Dictionary<string, object>>(data);
             if (response.IsSuccessStatusCode) return (dict, errorResponse);
             errorResponse = errorResponse.SetGrdApiError(dict, response.StatusCode).SetResponse(response);
         }
@@ -555,5 +568,36 @@ public static class GRDHousekeepingAPI
             Logger.LogError(e, $"Error making API call to {endpoint}");
         }
         return (new Dictionary<string, object?>(), errorResponse);
+    }
+    
+    private static async Task<(List<object?>, ErrorResponse)> MakeAPICallAndReturnList(string endpoint, Dictionary<string, object> body)
+    {
+        var errorResponse = new ErrorResponse();
+        try
+        {
+            var request = CreateConnectAPIRequest(endpoint, body);
+            var response = await HttpUtils.Client.SendAsync(request);
+            var data = await response.Content.ReadAsStringAsync();
+            if (response.StatusCode == HttpStatusCode.InternalServerError)
+            {
+                if (string.IsNullOrEmpty(data)) data = "[]";
+            }
+
+            if (response.IsSuccessStatusCode)
+            {
+                var array = JsonNode.Parse(data)?.AsArray();
+                var list = array?.Select(item => (object?)item).ToList();
+                return (list, errorResponse);
+            }
+
+            var errorDict = JsonNode.Parse(data)?.AsObject()
+                ?.ToDictionary(kvp => kvp.Key, kvp => (object?)kvp.Value);
+            errorResponse = errorResponse.SetGrdApiError(errorDict, response.StatusCode).SetResponse(response);
+        }
+        catch (Exception e)
+        {
+            Logger.LogError(e, $"Error making API call to {endpoint}");
+        }
+        return (new List<object?>(), errorResponse);
     }
 }

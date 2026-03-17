@@ -34,6 +34,10 @@ StaticLoggerFactory.Initialize(loggerFactory);
 Log.Information("Hello, World!");
 
 #if true
+
+var connAPiServer = "wifi-api-staging.dev.guardianapp.com";
+var identifier = "eero1.user.cSDRlZj56acSQ8waulkwbtm9isHAJpNYWE6Z6Q5jkUXKgv9GQYg";
+var secret = "frWFwtG4XWou3Knw7yKbBoq4qXSRjtkHcblUxGkHNvI=";
 #if false
 // - let's get the subscriber credentials and then call the GRDConnectSubscriber Create and Register methods
 
@@ -46,42 +50,46 @@ Log.Information("Hello, World!");
 #endif
 GRDVPNHelper.CreateSingleton();
 
-// Test #168
 ErrorResponse er;
 GRDConnectSubscriber? cs;
 GRDConnectDevice? device;
+// Test #168
+#if true
 
 // Setup
 (cs, er) = GRDConnectSubscriber.GetCurrentSubscriber();
 DisplayError(er, $"Connect Subscriber retrieved successfully");
+#endif
 
 // TESTS
-// TESTED - (device, er) = cs.ConnectDeviceReferenceAsync().GetAwaiter().GetResult();
-// TESTED - DisplayError(er, $"Connect Device retrieved successfully");
+(device, er) = cs.ConnectDeviceReferenceAsync().GetAwaiter().GetResult();
+DisplayError(er, $"Connect Device retrieved successfully");
 
 // #170/#190
-// TESTED - er = cs.CheckGuardianAccountSetupStateAsync().GetAwaiter().GetResult();
-// TESTED - DisplayError(er, $"Check on Guardian account state returned: '{er.Message}'");
+//er = cs.CheckGuardianAccountStateAsync().GetAwaiter().GetResult();
+//DisplayError(er, $"Check on Guardian account state returned: '{er.Message}'");
 
 // #171/#187 - NOT WORKING
 // er = cs.UpdateConnectSubscriberWithEmailAddressAsync("terdies@foo.com").GetAwaiter().GetResult().errorResponse;
 // DisplayError(er, $"Check on Guardian account state returned: '{er.Message}'");
 
 // #172/#188
-er = cs.ValidateConnectSubscriberAsync().GetAwaiter().GetResult().errorResponse;
-DisplayError(er, $"Validate subscriber returned: '{er.Message}'");
-#if TEST169
+//er = cs.ValidateConnectSubscriberAsync().GetAwaiter().GetResult().errorResponse;
+//DisplayError(er, $"Validate subscriber returned: '{er.Message}'");
+
+// TEST169
+#if false
 Console.WriteLine("Setting values and calling RegisterNewConnectSubscriberAsync()...");
-var connAPiServer = "wifi-api-staging.dev.guardianapp.com";
+connAPiServer = "wifi-api-staging.dev.guardianapp.com";
 GRDVPNHelper.Singleton.ConnectAPIHostname = connAPiServer;
-var identifier = GRDKeychain.ReadRegistryData("TESTVALUE_CS_Identifier");
-var secret = GRDKeychain.ReadRegistryData("TESTVALUE_CS_Secret");
+identifier = GRDKeychain.ReadRegistryData("TESTVALUE_CS_Identifier");
+secret = GRDKeychain.ReadRegistryData("TESTVALUE_CS_Secret");
 
 GRDConnectSubscriber connectSubscriber = new GRDConnectSubscriber();
 connectSubscriber.Identifier = identifier;
 connectSubscriber.Secret = secret;
-var ( cs, errorResponse) = connectSubscriber.RegisterNewConnectSubscriberAsync(true, "TimDevBox").Result;
-DisplayError(errorResponse, $"Connect Subscriber registered successfully with ID: {cs.CreatedAt}");
+var ( csnew, errorResponse) = connectSubscriber.RegisterNewConnectSubscriberAsync(true, "TimDevBox").Result;
+DisplayError(errorResponse, $"Connect Subscriber registered successfully with ID: {csnew.CreatedAt}");
 #endif
 
 #else

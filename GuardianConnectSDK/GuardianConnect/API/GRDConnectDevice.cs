@@ -1,5 +1,7 @@
 using System.Globalization;
 using System.Text;
+using System.Text.Json;
+using System.Text.Json.Nodes;
 using GuardianConnect.API.Model;
 using GuardianConnect.Credentials;
 using GuardianConnect.API.Model;
@@ -21,11 +23,14 @@ namespace GuardianConnect.API
         public static GRDConnectDevice InitFromDictionary(IDictionary<string, object> deviceDictionary)
         {
             var device = new GRDConnectDevice();
-            device.Nickname = deviceDictionary[Common.kGuardianConnectDeviceNicknameKey].ToString() ?? "";
+            device.Nickname = (deviceDictionary[Common.kGuardianConnectDeviceNicknameKey] is JsonElement
+                ? JsonSerializer.Deserialize<string>(deviceDictionary[Common.kGuardianConnectDeviceNicknameKey].ToString())
+                : deviceDictionary[Common.kGuardianConnectDeviceNicknameKey].ToString()) ?? string.Empty;
             device.UUID = deviceDictionary[Common.kGuardianConnectDeviceUUIDKey].ToString() ?? "";
+            
             device.PEToken = deviceDictionary[Common.kGuardianConnectDevicePETokenKey].ToString();
             device.PETExpires = long.Parse(deviceDictionary[Common.kGuardianConnectDevicePETExpiresKey].ToString() ?? "0");
-            device.CreatedAt = long.Parse(deviceDictionary[Common.kGuardianConnectDeviceCreatedAtKey].ToString() ?? "0");
+            device.CreatedAt = long.Parse(deviceDictionary[Common.kGuardianConnecjtDeviceCreatedAtKey].ToString() ?? "0");
             device.IsCurrentDevice = deviceDictionary.TryGetValue("currentDevice", out var currentDevice) &&
                                      currentDevice is bool b && b;
 
@@ -146,28 +151,33 @@ namespace GuardianConnect.API
 
         // List devices for PEToken
         // [#181 - calls #193] (#167 also calls #193)
-        public static async Task<(List<GRDConnectDevice>? Devices, string? Error)> ListConnectDevicesForPETokenAsync(string peToken)
+        public static async Task<(List<GRDConnectDevice> Devices, ErrorResponse errorResponse)> ListConnectDevicesForPETokenAsync(string peToken)
         {
-            // CHECK - if/when take GRDVPNHelper PEToken instead of parameter of this call
+            var (currentDevice, deviceError) = GRDConnectDevice.GetCurrentDevice();
+            if (deviceError.IsError)
+                return (null, deviceError);
+
             try
             {
-                var (deviceDictsList, errorResponse) =
+                var (listOfDevices, errorResponse) =
                     await GRDHousekeepingAPI.RequestAllConnectDevicesForSubscriberAsync(peToken);
                 if (errorResponse.IsError)
-                    return (null, errorResponse.Message);
-                
-                var deviceList = deviceDictsList.Select(InitFromDictionary).ToList();
+                    return (null, errorResponse);
 
-                var currentDevice = GetCurrentDevice();
-                if (currentDevice.Device != null)
+                var devices = new List<GRDConnectDevice>();
+                foreach (var item in listOfDevices.OfType<JsonObject>())
                 {
-                    deviceList.Find(device => device.UUID == currentDevice.Device.UUID).IsCurrentDevice = true;
+                    var dict   = item.ToDictionary(kvp => kvp.Key, kvp => (object?)kvp.Value);
+                    var device = InitFromDictionary(dict);
+                    if (currentDevice != null && device.UUID == currentDevice.UUID)
+                        device.IsCurrentDevice = true;
+                    devices.Add(device);
                 }
-                return (deviceList, null);
+                return (devices, new ErrorResponse());
             }
             catch (Exception ex)
             {
-                return (null, ex.Message);
+                return (null, new ErrorResponse(ex.Message).WithException(ex));
             }
         }
 
