@@ -12,7 +12,7 @@ namespace GuardianConnect.Services;
 
 public class VpnManagerService : BackgroundService
 {
-    private static ILogger _logger;
+    private static ILogger _logger = NullLogger.Instance;
     public VpnManagerService(ILogger<VpnManagerService> logger)
     {
         _logger = logger;

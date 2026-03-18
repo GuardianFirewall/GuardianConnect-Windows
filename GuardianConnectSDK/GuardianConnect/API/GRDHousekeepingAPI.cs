@@ -303,44 +303,28 @@ public static class GRDHousekeepingAPI
     
     #region GRDConnectionSubscriber/Device calls
     // [#185 called by #169] - TESTED
-    public static async Task<(Dictionary<string, object>,  ErrorResponse)>
+    public static async Task<(Dictionary<string, JsonElement>, ErrorResponse)>
         AddNewConnectSubscriberAsync(string identifier, string secret, string nickname, string email, bool acceptedTOS)
     {
-        var errorResponse = new ErrorResponse();
-        
         var body = new Dictionary<string, object?>
         {
-            [Common.kGuardianConnectSubscriberIdentifierKey] = identifier,
-            [Common.kGuardianConnectSubscriberSecretKey] = secret,
-            [Common.kGuardianConnectSubscriberPETNicknameKey] = nickname,
+            [Common.kGuardianConnectSubscriberIdentifier] = identifier,
+            [Common.kGuardianConnectSubscriberSecret] = secret,
+            [Common.kGuardianConnectSubscriberPETNickname] = nickname,
             [Common.kGuardianConnectSubscriberAcceptedTOS] = acceptedTOS,
-            [Common.kGuardianConnectSubscriberEmailKey] = email
+            [Common.kGuardianConnectSubscriberEmail] = email
         };
 
-        /* return shoud be:
-            ep-grd-subscriber-identifier <string>
-            ep-grd-subscription-sku <string>
-            ep-grd-subscription-name-formatted <string>
-            ep-grd-subscription-expiration-date <int>
-            ep-grd-subscriber-created-at <int>
-            pe-token <string>
-            pet-expires <int>
-            ep-grd-device <dict> {
-              ep-grd-device-nickname <string>
-              ep-grd-device-uuid <string>
-              ep-grd-device-created-at <int>
-              ep-grd-device-subscriber-pet <boolean>
-}*/
         return MakeAPICallAndReturnDict("/api/v1.3/partners/subscribers/new", body).GetAwaiter().GetResult();
     }
-
+    
     // [#186 - called by #168] - TESTED
-    public static async Task<(Dictionary<string, object>, ErrorResponse)> GetDeviceReferenceForConnectSubscriberAsync(string identifier, string secret, string peToken)
+    public static async Task<(Dictionary<string, JsonElement>, ErrorResponse)> GetDeviceReferenceForConnectSubscriberAsync(string identifier, string secret, string peToken)
     {
         var body = new Dictionary<string, object?>
         {
-            [Common.kGuardianConnectSubscriberIdentifierKey] = identifier,
-            [Common.kGuardianConnectSubscriberSecretKey] = secret,
+            [Common.kGuardianConnectSubscriberIdentifier] = identifier,
+            [Common.kGuardianConnectSubscriberSecret] = secret,
             [Common.kPETokenKey] = peToken,
         };
 
@@ -348,36 +332,36 @@ public static class GRDHousekeepingAPI
         var (jsonResult, errorResponse) = MakeAPICallAndReturnDict(ep, body).GetAwaiter().GetResult();
         return (jsonResult, errorResponse);
     }
-
+    
     // [#187 - called by #171] - DONE
-    public static async Task<(Dictionary<string, object>,  ErrorResponse)> UpdateConnectSubscriberWithEmailAsync(
+    public static async Task<(Dictionary<string, JsonElement>, ErrorResponse)> UpdateConnectSubscriberWithEmailAsync(
         string identifier, string secret, string nickname, bool acceptedTOS, string email)
     {
         var body = new Dictionary<string, object?>
         {
-            [Common.kGuardianConnectSubscriberIdentifierKey] = identifier,
-            [Common.kGuardianConnectSubscriberSecretKey] = secret,
-            [Common.kGuardianConnectSubscriberPETNicknameKey] = nickname,
+            [Common.kGuardianConnectSubscriberIdentifier] = identifier,
+            [Common.kGuardianConnectSubscriberSecret] = secret,
+            [Common.kGuardianConnectSubscriberPETNickname] = nickname,
             [Common.kGuardianConnectSubscriberAcceptedTOS] = acceptedTOS,
-            [Common.kGuardianConnectSubscriberEmailKey] = email
+            [Common.kGuardianConnectSubscriberEmail] = email
         };
 
         var ep = "/api/v1.2/partners/subscriber/update";
-        var (dict, errorResponse) = MakeAPICallAndReturnDict(ep, body).GetAwaiter().GetResult();
+        var (dict, errorResponse) = MakeAPICallAndReturnDict(ep, body, "PUT").GetAwaiter().GetResult();
         return (dict, errorResponse);
     }
 
     // [#188 - called by #172] - DONE
-    public static async Task<(Dictionary<string, object>,  ErrorResponse)> ValidateConnectSubscriberAsync(
+    public static async Task<(Dictionary<string, JsonElement>, ErrorResponse)> ValidateConnectSubscriberAsync(
         string identifier, string secret, string peToken)
     {
         var body = new Dictionary<string, object?>
         {
-            [Common.kGuardianConnectSubscriberIdentifierKey] = identifier,
-            [Common.kGuardianConnectSubscriberSecretKey] = secret,
+            [Common.kGuardianConnectSubscriberIdentifier] = identifier,
+            [Common.kGuardianConnectSubscriberSecret] = secret,
             [Common.kPETokenKey] = peToken
         };
-        
+
         var ep = "/api/v1.2/partners/subscriber/validate";
         var (dict, errorResponse) = MakeAPICallAndReturnDict(ep, body).GetAwaiter().GetResult();
         return (dict, errorResponse);
@@ -402,8 +386,8 @@ public static class GRDHousekeepingAPI
         var errorResponse = new ErrorResponse();
         var body = new Dictionary<string, object>
         {
-            [Common.kGuardianConnectSubscriberIdentifierKey] = identifier,
-            [Common.kGuardianConnectSubscriberSecretKey] = secret
+            [Common.kGuardianConnectSubscriberIdentifier] = identifier,
+            [Common.kGuardianConnectSubscriberSecret] = secret
         };
 
         var ep = "/api/v1.2/partners/subscriber/account-creation-state";
@@ -411,66 +395,51 @@ public static class GRDHousekeepingAPI
         return errorResponse;
     }
 
-    //  [#191 called by #179] - DONE
-    public static async Task<(Dictionary<string, object>, ErrorResponse)> AddConnectDeviceAsync(string peToken, string nickname, bool acceptedTOS)
+    // [#191 called by #179] - DONE
+    public static async Task<(Dictionary<string, JsonElement>, ErrorResponse)> AddConnectDeviceAsync(string peToken, string nickname, bool acceptedTOS)
     {
         var body = new Dictionary<string, object?>
         {
-            [Common.kGuardianConnectDevicePETokenKey] = peToken,
-            [Common.kGuardianConnectDeviceNicknameKey] = nickname,
-            [Common.kGuardianConnectDeviceAcceptedTOSKey] = acceptedTOS
+            [Common.kGuardianConnectDevicePEToken] = peToken,
+            [Common.kGuardianConnectDeviceNickname] = nickname,
+            [Common.kGuardianConnectDeviceAcceptedTOS] = acceptedTOS
         };
 
         return MakeAPICallAndReturnDict("/api/v1.2/partners/subscriber/devices/add", body).GetAwaiter().GetResult();
     }
     
     // [#192 used by #180] - DONE
-    public static async Task<(Dictionary<string, object>, ErrorResponse)> UpdateConnectDeviceAsync(string peToken,
+    public static async Task<(Dictionary<string, JsonElement>, ErrorResponse)> UpdateConnectDeviceAsync(string peToken,
         string nickname, string uuid)
     {
         var body = new Dictionary<string, object?>
         {
-            [Common.kGuardianConnectDevicePETokenKey] = peToken,
-            [Common.kGuardianConnectDeviceNicknameKey] = nickname,
-            [Common.kGuardianConnectDeviceUUIDKey] = uuid
+            [Common.kGuardianConnectDevicePEToken] = peToken,
+            [Common.kGuardianConnectDeviceNickname] = nickname,
+            [Common.kGuardianConnectDeviceUUID] = uuid
         };
 
         var ep = "/api/v1.2/partners/subscriber/device/update";
-        return MakeAPICallAndReturnDict(ep,  body).GetAwaiter().GetResult();
+        var (dict, er) = MakeAPICallAndReturnDict(ep, body, "PUT").GetAwaiter().GetResult();
+        return (dict, er);
     }
 
     // [#193] - called from [#167] - indentifier/secret or [#181] - peToken - DONE
-    internal static async Task<(List<object>, ErrorResponse)>
-        RequestAllConnectDevicesForSubscriberAsync(string? peToken = null, string identifier = null, string secret = null)
+    internal static async Task<(List<JsonElement>, ErrorResponse)>
+        RequestAllConnectDevicesForSubscriberAsync(string? peToken = "", string identifier = "", string secret = "")
     {
         var body = new Dictionary<string, object>();
-        
-        if (peToken != null) body.Add(Common.kGuardianConnectDevicePETokenKey, peToken);
-        else
+
+        if (string.IsNullOrEmpty(peToken))
         {
-            body.Add(Common.kGuardianConnectSubscriberIdentifierKey, identifier);
-            body.Add(Common.kGuardianConnectSubscriberSecretKey, secret);
+            body.Add(Common.kGuardianConnectSubscriberIdentifier, identifier);
+            body.Add(Common.kGuardianConnectSubscriberSecret, secret);
         }
+        else body.Add(Common.kGuardianConnectDevicePEToken, peToken);
 
         var ep = "/api/v1.2/partners/subscriber/devices/list";
-        var (list, errorResponse) = MakeAPICallAndReturnList(ep,  body).GetAwaiter().GetResult();
-        
-#if EXPLICITCALLWITHLISTRETURN
-        var response = HttpUtils.Client.SendAsync(CreateConnectAPIRequest("/api/v1.2/partners/subscribers/devices/list", body)).GetAwaiter().GetResult();
-        string data = response.Content.ReadAsStringAsync().GetAwaiter().GetResult();
-        if (response.StatusCode == HttpStatusCode.InternalServerError) data = string.Empty;
-        if (! response.IsSuccessStatusCode)
-        {
-            var errorDict = JsonSerializer.Deserialize<Dictionary<string, object>>(data);
-            errorResponse.SetGrdApiError(errorDict, response.StatusCode);
-            return (new List<Dictionary<string, object>>() , errorResponse);
-        }
-        
-        var list = JsonSerializer.Deserialize<List<Dictionary<string, object>>>(data);
-#else
+        var (list, errorResponse) = MakeAPICallAndReturnList(ep, body).GetAwaiter().GetResult();
         return (list, errorResponse);
-        //return (dict, errorResponse);
-#endif
     }
 
     // [#194] Delete Device - sub-issue of [#179] - DONE
@@ -478,11 +447,11 @@ public static class GRDHousekeepingAPI
     {
         var body = new Dictionary<string, object>();
         
-        if (peToken != null) body.Add(Common.kGuardianConnectDevicePETokenKey, peToken);
+        if (peToken != null) body.Add(Common.kGuardianConnectDevicePEToken, peToken);
         else
         {
-            body.Add(Common.kGuardianDeviceSubscriberIdentifierKey, identifier);
-            body.Add(Common.kGuardianDeviceSubscriberSecretKey, secret);
+            body.Add(Common.kGuardianDeviceSubscriberIdentifier, identifier);
+            body.Add(Common.kGuardianDeviceSubscriberSecret, secret);
         }
         
         return MakeAPICallAndReturnErrorResponse("/api/v1.2/partners/subscriber/devices/delete", body).GetAwaiter().GetResult();
@@ -491,14 +460,12 @@ public static class GRDHousekeepingAPI
     // [#195] Validate Device - sub-issue of [#183] - DONE
     public static async Task<ErrorResponse> ValidateConnectDeviceAsync(string peToken)
     {
-        var errorResponse = new ErrorResponse();
         var body = new Dictionary<string, object>
         {
-            [Common.kGuardianConnectDevicePETokenKey] = peToken
+            [Common.kGuardianConnectDevicePEToken] = peToken
         };
 
-        var ep = "/api/v1.2/partners/subscriber/device/validate";
-        return MakeAPICallAndReturnErrorResponse(ep, body).GetAwaiter().GetResult();
+        return await MakeAPICallAndReturnErrorResponse("/api/v1.2/partners/subscriber/device/validate", body);
     }
     
     #endregion GRDConnectionSubscriber/Device calls
@@ -509,10 +476,15 @@ public static class GRDHousekeepingAPI
         return new Uri($"https://{ConnectAPIHostname}{path}", UriKind.RelativeOrAbsolute);
     }
     
-    private static HttpRequestMessage CreateConnectAPIRequest(string endpoint, Dictionary<string, object> body)
+    private static HttpRequestMessage CreateConnectAPIRequest(string endpoint, Dictionary<string, object> body, string method = "POST")
     {
         var uri = MakeUri(endpoint);
-        var request = new HttpRequestMessage(HttpMethod.Post, uri)
+        HttpMethod httpMethod = HttpMethod.Post;
+        switch (method)
+        {
+           case "PUT": httpMethod = HttpMethod.Put; break;
+        }
+        var request = new HttpRequestMessage(httpMethod, uri)
         {
             Content = JsonContent.Create(body)
         };
@@ -543,34 +515,44 @@ public static class GRDHousekeepingAPI
         return errorResponse;
     }
     
-    private static async Task<(Dictionary<string, object>, ErrorResponse)> MakeAPICallAndReturnDict(string endpoint, Dictionary<string, object> body)
+    private static async Task<(Dictionary<string, JsonElement>, ErrorResponse)> MakeAPICallAndReturnDict(string endpoint, Dictionary<string, object> body, string method = "POST")
     {
         var errorResponse = new ErrorResponse();
         try
         {
-            var request = CreateConnectAPIRequest(endpoint, body);
+            var request = CreateConnectAPIRequest(endpoint, body, method);
             var response = await HttpUtils.Client.SendAsync(request);
             //var response = await HttpUtils.Client.PutAsync(request);
             var data = await response.Content.ReadAsStringAsync();
-            if (response.StatusCode == HttpStatusCode.InternalServerError)
-            {
-                if (string.IsNullOrEmpty(data)) data = "{}";
-            }
-            var node = JsonNode.Parse(data)?.AsObject();
-            var dict = node?.ToDictionary(kvp => kvp.Key, kvp => (object?)kvp.Value);
 
-            //var dict = JsonSerializer.Deserialize<Dictionary<string, object>>(data);
-            if (response.IsSuccessStatusCode) return (dict, errorResponse);
-            errorResponse = errorResponse.SetGrdApiError(dict, response.StatusCode).SetResponse(response);
+            if (response.StatusCode == HttpStatusCode.InternalServerError && string.IsNullOrEmpty(data))
+                data = "{}";
+
+            var dict = new Dictionary<string, JsonElement>();
+            using var doc = JsonDocument.Parse(string.IsNullOrWhiteSpace(data) ? "{}" : data);
+
+            if (doc.RootElement.ValueKind == JsonValueKind.Object)
+            {
+                foreach (var prop in doc.RootElement.EnumerateObject())
+                    dict[prop.Name] = prop.Value.Clone();
+            }
+
+            if (response.IsSuccessStatusCode)
+                return (dict, errorResponse);
+
+            errorResponse = errorResponse.SetGrdApiError(
+                dict.ToDictionary(kvp => kvp.Key, kvp => (object?)kvp.Value),
+                response.StatusCode).SetResponse(response);
         }
         catch (Exception e)
         {
             Logger.LogError(e, $"Error making API call to {endpoint}");
         }
-        return (new Dictionary<string, object?>(), errorResponse);
+
+        return (new Dictionary<string, JsonElement>(), errorResponse);
     }
     
-    private static async Task<(List<object?>, ErrorResponse)> MakeAPICallAndReturnList(string endpoint, Dictionary<string, object> body)
+    private static async Task<(List<JsonElement>, ErrorResponse)> MakeAPICallAndReturnList(string endpoint, Dictionary<string, object> body)
     {
         var errorResponse = new ErrorResponse();
         try
@@ -578,26 +560,34 @@ public static class GRDHousekeepingAPI
             var request = CreateConnectAPIRequest(endpoint, body);
             var response = await HttpUtils.Client.SendAsync(request);
             var data = await response.Content.ReadAsStringAsync();
-            if (response.StatusCode == HttpStatusCode.InternalServerError)
-            {
-                if (string.IsNullOrEmpty(data)) data = "[]";
-            }
+
+            if (response.StatusCode == HttpStatusCode.InternalServerError && string.IsNullOrEmpty(data))
+                data = "[]";
+
+            using var doc = JsonDocument.Parse(string.IsNullOrWhiteSpace(data) ? "[]" : data);
 
             if (response.IsSuccessStatusCode)
             {
-                var array = JsonNode.Parse(data)?.AsArray();
-                var list = array?.Select(item => (object?)item).ToList();
+                var list = new List<JsonElement>();
+                if (doc.RootElement.ValueKind == JsonValueKind.Array)
+                {
+                    foreach (var item in doc.RootElement.EnumerateArray())
+                        list.Add(item.Clone());
+                }
                 return (list, errorResponse);
             }
 
-            var errorDict = JsonNode.Parse(data)?.AsObject()
-                ?.ToDictionary(kvp => kvp.Key, kvp => (object?)kvp.Value);
+            var errorDict = doc.RootElement.ValueKind == JsonValueKind.Object
+                ? doc.RootElement.EnumerateObject().ToDictionary(p => p.Name, p => (object?)p.Value.Clone())
+                : new Dictionary<string, object?>();
+
             errorResponse = errorResponse.SetGrdApiError(errorDict, response.StatusCode).SetResponse(response);
         }
         catch (Exception e)
         {
             Logger.LogError(e, $"Error making API call to {endpoint}");
         }
-        return (new List<object?>(), errorResponse);
+
+        return (new List<JsonElement>(), errorResponse);
     }
 }

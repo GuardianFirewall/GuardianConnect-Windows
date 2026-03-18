@@ -152,7 +152,7 @@ public class ClientPipeService : BackgroundService
     public async void ServerThread(object? data)
     {
         GuardianNPCommandDispatcher cmdDispatcher = new GuardianNPCommandDispatcher();
-        cmdDispatcher._logger = _logger;
+        //cmdDispatcher.Logger = _logger;
 
         int threadId = Thread.CurrentThread.ManagedThreadId;
 

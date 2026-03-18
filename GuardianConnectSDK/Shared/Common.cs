@@ -156,8 +156,6 @@ public class Common
         kGuardianCredentialsList,
     };
 
-    public const string kGuardianConnectSubscriberSecret = @"kGuardianConnectSubscriberSecret";
-
     // Used to hard to code IAP receipts and create Subscriber Credentials
     public const string kGuardianEncodedAppStoreReceipt = @"kGuardianEncodedAppStoreReceipt";
 
@@ -196,31 +194,31 @@ public class Common
     
     // - GRDConnectSubscriber:
     // Constants
-    public const string kGuardianConnectSubscriberStoreKey = "GuardianConnectSubscriber";
-    public const string kGuardianConnectSubscriberDictKey = "ep-grd-subscriber";
-    public const string kGuardianConnectSubscriberIdentifierKey = "ep-grd-subscriber-identifier";
-    public const string kGuardianConnectSubscriberSecretKey = "ep-grd-subscriber-secret";
-    public const string kGuardianConnectSubscriberEmailKey = "ep-grd-subscriber-email";
-    public const string kGuardianConnectSubscriberPETNicknameKey = "ep-grd-subscriber-pet-nickname";
-    public const string kGuardianConnectSubscriberSubscriptionSKUKey = "ep-grd-subscription-sku";
-    public const string kGuardianConnectSubscriberSubscriptionNameFormattedKey = "ep-grd-subscription-name-formatted";
-    public const string kGuardianConnectSubscriberSubscriptionExpirationDateKey = "ep-grd-subscription-expiration-date";
-    public const string kGuardianConnectSubscriberCreatedAtKey = "ep-grd-subscriber-created-at";
+    public const string kGuardianConnectSubscriberStore = "GuardianConnectSubscriber";
+    public const string kGuardianConnectSubscriberDict = "ep-grd-subscriber";
+    public const string kGuardianConnectSubscriberIdentifier = "ep-grd-subscriber-identifier";
+    public const string kGuardianConnectSubscriberSecret = "ep-grd-subscriber-secret";
+    public const string kGuardianConnectSubscriberEmail = "ep-grd-subscriber-email";
+    public const string kGuardianConnectSubscriberPETNickname = "ep-grd-subscriber-pet-nickname";
+    public const string kGuardianConnectSubscriberSubscriptionSKU = "ep-grd-subscription-sku";
+    public const string kGuardianConnectSubscriberSubscriptionNameFormatted = "ep-grd-subscription-name-formatted";
+    public const string kGuardianConnectSubscriberSubscriptionExpirationDate = "ep-grd-subscription-expiration-date";
+    public const string kGuardianConnectSubscriberCreatedAt = "ep-grd-subscriber-created-at";
         
     public const string kGuardianConnectSubscriberAcceptedTOS = "ep-grd-subscriber-accepted-tos";
     
     // GRDConnectDevice:
-    public const string kGuardianConnectDeviceStoreKey = "GuardianConnectDevice";
-    public const string kGuardianConnectDeviceDictKey = "ep-grd-device";
-    public const string kGuardianConnectDeviceNicknameKey = "ep-grd-device-nickname";
-    public const string kGuardianConnectDeviceUUIDKey = "ep-grd-device-uuid";
-    public const string kGuardianConnectDeviceCreatedAtKey = "ep-grd-device-created-at";
-    public const string kGuardianConnectDevicePETokenKey = "pe-token";
-    public const string kGuardianConnectDevicePETExpiresKey = kGuardianPETokenExpirationDate;
-    public const string kGuardianConnectDeviceAcceptedTOSKey = "ep-grd-device-accepted-tos";
-    public const string kGuardianDeviceSubscriberPetKey = "ep-grd-device-subscriber-pet";
-    public const string kGuardianDeviceSubscriberIdentifierKey = "ep-grd-device-subscriber-identifier";
-    public const string kGuardianDeviceSubscriberSecretKey = "ep-grd-device-subscriber-secret";
+    public const string kGuardianConnectDeviceStore = "GuardianConnectDevice";
+    public const string kGuardianConnectDeviceDict = "ep-grd-device";
+    public const string kGuardianConnectDeviceNickname = "ep-grd-device-nickname";
+    public const string kGuardianConnectDeviceUUID = "ep-grd-device-uuid";
+    public const string kGuardianConnectDeviceCreatedAt = "ep-grd-device-created-at";
+    public const string kGuardianConnectDevicePEToken = "pe-token";
+    public const string kGuardianConnectDevicePETExpires = kGuardianPETokenExpirationDate;
+    public const string kGuardianConnectDeviceAcceptedTOS = "ep-grd-device-accepted-tos";
+    public const string kGuardianDeviceSubscriberPet = "ep-grd-device-subscriber-pet";
+    public const string kGuardianDeviceSubscriberIdentifier = "ep-grd-device-subscriber-identifier";
+    public const string kGuardianDeviceSubscriberSecret = "ep-grd-device-subscriber-secret";
 
 
     // Error Text Here?? (TJE TODO)

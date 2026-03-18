@@ -13,6 +13,8 @@ public class GRDAPIError
 
     public GRDAPIError (Dictionary<string, object>? dict, HttpStatusCode statusCode)
     {
+        Title = "";
+        Message = "";
         if (dict == null)
         {
  			Title 		= @"Failed to parse error";
@@ -21,8 +23,8 @@ public class GRDAPIError
         else
         {
 
-            Title = dict.ContainsKey("error-title") ? dict["error-title"].ToString() : string.Empty;
-            Message = dict.ContainsKey("error-message") ? dict["error-message"].ToString() : string.Empty;
+            Title = (dict.ContainsKey("error-title") ? dict["error-title"].ToString() : "") ?? "";
+            Message = (dict.ContainsKey("error-message") ? dict["error-message"].ToString() : "") ?? "";
             StatusCode = (int)statusCode;
         }
     }

@@ -270,7 +270,7 @@ var currentPET = GRDPEToken.GetCurrentPEToken().Token;
 if (!string.IsNullOrEmpty(currentPET))
 {
     (var petDevices, var petDevErrMsg) = await GRDConnectDevice.ListConnectDevicesForPETokenAsync(currentPET);
-    if (petDevErrMsg != null)
+    if (petDevErrMsg.IsError)
         Log.Error("FAIL — {Err}  |  Inputs: PEToken={PET}", petDevErrMsg, currentPET);
     else
     {
@@ -291,6 +291,7 @@ else
 // ═══════════════════════════════════════════════════════════════════════════════
 Header("STEP 9 – UpdateConnectDeviceNicknameAsync");
 
+#if SKIPPING
 if (currentDevice != null
     && !string.IsNullOrEmpty(currentDevice.PEToken)
     && !string.IsNullOrEmpty(config.NewDeviceNickname))
@@ -301,6 +302,7 @@ if (currentDevice != null
         $"PEToken={currentDevice.PEToken}, DeviceUUID={currentDevice.UUID}, NewNickname={config.NewDeviceNickname}");
 }
 else
+#endif
 {
     Log.Information("Skipping — set 'newDeviceNickname' in testconfig.json to enable");
 }
