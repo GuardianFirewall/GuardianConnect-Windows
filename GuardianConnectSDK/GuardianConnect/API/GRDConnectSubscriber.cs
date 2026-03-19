@@ -101,6 +101,7 @@ namespace GuardianConnect.API
                     JsonSerializer.SerializeToElement(BitConverter.ToInt64(binaryCSDict[kGuardianConnectSubscriberSubscriptionExpirationDate], 0));
 
                 var subscriber = InitFromDictionary(objectDict);
+                string mySecret = GRDKeychain.GetPasswordStringForAccount(kGuardianConnectSubscriberSecret);
                 subscriber.Secret = GRDKeychain.GetPasswordStringForAccount(kGuardianConnectSubscriberSecret);
 
                 var (device, deviceError) = GRDConnectDevice.GetCurrentDevice();
@@ -121,22 +122,15 @@ namespace GuardianConnect.API
         {
             try
             {
-                var secret = Secret;
-                Secret = ""; // Do not store secret in user defaults
-
                 // Store secret in keychain
-                GRDKeychain.StorePassword(secret, kGuardianConnectSubscriberSecret);
+                GRDKeychain.StorePassword(Secret, kGuardianConnectSubscriberSecret);
 
                 var dict = new Dictionary<string, byte[]>
                 {
-                    [kGuardianConnectSubscriberIdentifier] =
-                        Encoding.UTF8
-                            .GetBytes(
-                                Identifier), // round trip: string original = Encoding.UTF8.GetString(byteArray);   
+                    [kGuardianConnectSubscriberIdentifier] = Encoding.UTF8 .GetBytes( Identifier),
                     [kGuardianConnectSubscriberEmail] = Encoding.UTF8.GetBytes(Email ?? ""),
                     [kGuardianConnectSubscriberSubscriptionSKU] = Encoding.UTF8.GetBytes(SubscriptionSKU),
-                    [kGuardianConnectSubscriberSubscriptionNameFormatted] =
-                        Encoding.UTF8.GetBytes(SubscriptionNameFormatted),
+                    [kGuardianConnectSubscriberSubscriptionNameFormatted] = Encoding.UTF8.GetBytes(SubscriptionNameFormatted),
                     [kGuardianConnectSubscriberSubscriptionExpirationDate] = BitConverter.GetBytes(SubscriptionExpirationDate),
                     [kGuardianConnectSubscriberCreatedAt] = BitConverter.GetBytes(CreatedAt),
                     [kGuardianConnectDeviceStore] = new byte[] { 0xDE, 0xAD, 0xBE, 0xEF },
@@ -230,9 +224,15 @@ namespace GuardianConnect.API
                 var peToken = GRDPEToken.GetCurrentPEToken();
                 if (string.IsNullOrEmpty(peToken.Token))
                     return (null, new ErrorResponse("No PE-Token present on device"));
+                
+                // Let's try to use current device's pe token to obtain device reference
+                var currentDevice = GRDConnectDevice.GetCurrentDevice().Device;
+                var devicePetoken = currentDevice?.PEToken;
 
                 var (deviceDetails, error) =
-                    await GRDHousekeepingAPI.GetDeviceReferenceForConnectSubscriberAsync(Identifier, Secret, peToken.Token);
+                    await GRDHousekeepingAPI.GetDeviceReferenceForConnectSubscriberAsync(Identifier, Secret,
+                        devicePetoken);
+//                await GRDHousekeepingAPI.GetDeviceReferenceForConnectSubscriberAsync(Identifier, Secret, peToken.Token);
 
                 if (error.IsError)
                     return (null, new ErrorResponse($"Failed to obtain Connect Device reference: {error}"));
@@ -315,14 +315,16 @@ namespace GuardianConnect.API
             if (string.IsNullOrEmpty(email))
                 return (null, new ErrorResponse("New E-Mail is either nil or an empty string. Neither are valid"));
             var currentSubscriber = GetCurrentSubscriber();
+            var (currentDevice, deverrorResponse) = GRDConnectDevice.GetCurrentDevice();
 
             var (subscriberDetails, errorResponse) =
-                await GRDHousekeepingAPI.UpdateConnectSubscriberWithEmailAsync( Identifier, Secret, email, AcceptedTOS, Secret);
+                await GRDHousekeepingAPI.UpdateConnectSubscriberWithEmailAsync( Identifier, Secret, currentDevice.Nickname, AcceptedTOS, email);
             if (errorResponse.IsError)
                 return (null, errorResponse);
 
             // FIX THIS: The given key 'ep-grd-subscriber-identifier' was not present in the dictionary.
             var subscriber = InitFromDictionary(subscriberDetails);
+            subscriber.Secret = Secret;
             var updateErr = subscriber.Store();
             if (updateErr.IsError)
                 return (null, updateErr);
@@ -361,17 +363,19 @@ namespace GuardianConnect.API
             petFromConnectSubscriber.Token = pet;
             petFromConnectSubscriber.Store();
 
+            newSubscriber.Secret = Secret;
             var updateErr = newSubscriber.Store();
             if (updateErr.IsError)
                 return (null, updateErr.SetErrorMessage($"Failed to store persistent local data of validated Connect Subscriber: {updateErr.Message}"));
 
-            return (newSubscriber, null);
+            return (newSubscriber, updateErr);
         }
 
         // Logout subscriber [ #173 ]
         public async Task<ErrorResponse> LogoutConnectSubscriberAsync()
         {
-            var pet = GRDKeychain.GetPasswordStringForAccount("kKeychainStr_PEToken");
+            // TJE: FIX/CHECK/TODO var pet = GRDPEToken.GetCurrentPEToken().Token;
+            var pet = GRDConnectDevice.GetCurrentDevice().Device?.PEToken;
             if (string.IsNullOrEmpty(pet))
                 return new ErrorResponse("Failed to validate Connect subscriber. No PE-Token present on device");
 

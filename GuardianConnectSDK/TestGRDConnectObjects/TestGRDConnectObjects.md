@@ -27,33 +27,29 @@ underlying `GRDHousekeepingAPI` methods in a fixed sequence. All inputs come fro
 
 ## Test sequence
 
-### Step 1 — `GetCurrentSubscriber` → `CheckGuardianAccountStateAsync` → `RegisterNewConnectSubscriberAsync`
+### Step 1 — `GetCurrentSubscriber` → `RegisterNewConnectSubscriberAsync` → `CheckGuardianAccountStateAsync`
 
-Tries to load a previously stored `GRDConnectSubscriber` from the registry. The branch
-taken depends on what is found:
+Tries to load a previously stored `GRDConnectSubscriber` from the registry, then
+registers a new subscriber if none is found, and finally runs `CheckGuardianAccountStateAsync`
+in both cases to confirm the account is known to the backend.
 
-- **Stored subscriber found:** loads it, re-applies `subscriberSecret` from config.
-  `GetCurrentSubscriber` also calls `GetCurrentDevice` internally, so `subscriber.Device`
-  is already populated — the `device` variable is captured from it here and is available
-  to all subsequent device steps without needing a backend call.
-- **No stored subscriber — account check succeeds:** builds a stub subscriber from
-  `subscriberIdentifier` / `subscriberSecret` in config and calls
-  `CheckGuardianAccountStateAsync`. If the backend confirms the account exists, that stub
-  subscriber is adopted. `device` is not set in this path — Step 3
-  (ConnectDeviceReferenceAsync) will populate it.
-- **No stored subscriber — account check fails:** calls
-  `RegisterNewConnectSubscriberAsync(acceptedTOS, deviceNickname)` to create the account
-  from scratch. On success the subscriber, first device, and PE-Token are stored. If the
-  registration response includes a device, `device` is captured from `subscriber.Device`
-  immediately. If registration fails the run stops.
+- **Stored subscriber found:** loads it, captures `device` from `subscriber.Device`
+  (populated internally by `GetCurrentSubscriber`). Re-applies `subscriberSecret` from
+  config before calling `CheckGuardianAccountStateAsync`.
+- **No stored subscriber:** builds a stub from `subscriberIdentifier` / `subscriberSecret`
+  / `subscriberEmail` in config and calls `RegisterNewConnectSubscriberAsync(acceptedTOS,
+  deviceNickname)`. On success the subscriber, first device, and PE-Token are stored. If
+  the registration response includes a device, `device` is captured from
+  `subscriber.Device`. If registration fails the run stops.
 
-The `subscriber` produced by whichever branch succeeds is used by Step 2 and all
-subsequent steps. The `subscriberSecret` from config is always kept live on the
-subscriber object because `Store()` clears it and `InitFromDictionary` does not restore it.
+After whichever branch succeeds, `CheckGuardianAccountStateAsync` is called on the
+resulting subscriber. The `subscriberSecret` from config is re-applied before the call
+because `Store()` clears it.
 
-SDK methods: `GRDConnectSubscriber.CheckGuardianAccountStateAsync`,
-`GRDConnectSubscriber.RegisterNewConnectSubscriberAsync`
-Housekeeping API: `CheckAccountCreationStateAsync` (#190), `AddNewConnectSubscriberAsync` (#185)
+SDK methods: `GRDConnectSubscriber.GetCurrentSubscriber`,
+`GRDConnectSubscriber.RegisterNewConnectSubscriberAsync`,
+`GRDConnectSubscriber.CheckGuardianAccountStateAsync`
+Housekeeping API: `AddNewConnectSubscriberAsync` (#185), `CheckAccountCreationStateAsync` (#190)
 
 ---
 
@@ -76,7 +72,21 @@ Housekeeping API: `AddNewConnectSubscriberAsync` (#185)
 
 ---
 
-### Step 3 — `ConnectDeviceReferenceAsync`
+### Step 3 — `ValidateConnectSubscriberAsync`
+
+Uses the subscriber confirmed/created in Step 2 to validate the subscription against
+the backend using the current PE-Token. On success a fresh PE-Token is stored and the
+updated `subscriber` (with populated SKU, expiry, etc.) replaces the Step 2 instance.
+The `subscriberSecret` from config is immediately re-applied because `Store()` clears it
+and `InitFromDictionary` does not restore it.
+**The run stops here if this step fails** — subsequent steps depend on a valid PE-Token.
+
+SDK method: `GRDConnectSubscriber.ValidateConnectSubscriberAsync`
+Housekeeping API: `ValidateConnectSubscriberAsync` (#188)
+
+---
+
+### Step 4 — `ConnectDeviceReferenceAsync`
 
 Retrieves the device record associated with the current PE-Token from the backend.
 The returned `GRDConnectDevice` (UUID, Nickname) is kept in the `device` variable used
