@@ -93,7 +93,6 @@ if (getErr.IsError)
         return;
     }
 
-    // Registration may have returned a device in the response — capture it
     if (subscriber?.Device != null)
     {
         device = subscriber.Device;
@@ -105,7 +104,6 @@ else
     Log.Information("Stored subscriber loaded — Identifier={Id}, SKU={SKU}, Secret={Secret}, PEToken={PEToken}",
         subscriber!.Identifier, subscriber.SubscriptionSKU, subscriber.Secret, subscriber.Device.PEToken);
 
-    // GetCurrentSubscriber also loaded the device from the registry — capture it now
     if (subscriber.Device != null)
     {
         device = subscriber.Device;
@@ -177,22 +175,21 @@ else
 // STEP 3 – ValidateConnectSubscriberAsync
 // ═══════════════════════════════════════════════════════════════════════════════
 Header("STEP 3 – ValidateConnectSubscriberAsync");
-#if true
+
 var step3Identifier = subscriber!.Identifier;
-var storedPET        = GRDPEToken.GetCurrentPEToken();
-var step3PET        = subscriber.Device.PEToken;
 (subscriber, var validateErr) = await subscriber.ValidateConnectSubscriberAsync();
 // Re-apply secret — Store() clears it and InitFromDictionary does not restore it
+if (subscriber != null && !string.IsNullOrEmpty(config.SubscriberSecret))
+    subscriber.Secret = config.SubscriberSecret;
 PrintResult(validateErr,
     $"Subscriber validated — SKU={subscriber?.SubscriptionSKU}, Expires={DateTimeOffset.FromUnixTimeSeconds(subscriber.SubscriptionExpirationDate)}",
-    $"Identifier={step3Identifier}, PEToken={step3PET}, Stored={storedPET.Token}, StoredExpires={storedPET.ExpirationDate}, AcceptedTOS={config.AcceptedTOS}");
+    $"Identifier={step3Identifier}, AcceptedTOS={config.AcceptedTOS}");
 
 if (validateErr != null && validateErr.IsError)
 {
     PressEnter();
     return;
 }
-#endif
 
 // ═══════════════════════════════════════════════════════════════════════════════
 // STEP 4 – ConnectDeviceReferenceAsync
@@ -280,7 +277,6 @@ else
 Header("STEP 9 – GRDConnectDevice.ListConnectDevicesForPETokenAsync");
 
 GRDConnectDevice? alternateDevice = null;
-//var currentPET = GRDPEToken.GetCurrentPEToken().Token;
 var currentDevicePeToken = currentDevice?.PEToken;
 if (!string.IsNullOrEmpty(currentDevicePeToken))
 {

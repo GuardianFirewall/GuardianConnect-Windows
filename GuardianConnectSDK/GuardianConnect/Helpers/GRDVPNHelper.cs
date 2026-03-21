@@ -349,7 +349,7 @@ namespace GuardianConnect.Helpers
                 return (GRDHousekeepingAPI.LiveGrdCredential, new ErrorResponse(string.Empty));
             }
 
-            var peToken = GRDKeychain.GetPasswordStringForAccount(IGRDKeychain.kKeychainStr_PEToken_Itself);
+            var peToken = GRDKeychain.GetPasswordStringForAccount(Common.kKeychainStr_PEToken_Itself);
             if (string.IsNullOrEmpty(peToken))
             {
                 errorResponse = new ErrorResponse(Common.kPETOKENNOTSET, null, true);

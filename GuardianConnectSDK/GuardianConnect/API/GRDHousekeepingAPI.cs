@@ -134,7 +134,7 @@ public static class GRDHousekeepingAPI
         if (string.IsNullOrEmpty(peToken))
         {
             Logger.LogError(@"PEToken Object has empty token. Trying string from keychain...");
-            peToken = GRDKeychain.GetPasswordStringForAccount(IGRDKeychain.kKeychainStr_PEToken_Itself);
+            peToken = GRDKeychain.GetPasswordStringForAccount(Common.kKeychainStr_PEToken_Itself);
             if (string.IsNullOrEmpty(peToken))
             {
                 Logger.LogError(@"Failed to retrieve PEToken from keychain");

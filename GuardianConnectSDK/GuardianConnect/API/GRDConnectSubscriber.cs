@@ -1,12 +1,12 @@
-using System.Globalization;
+using System.Diagnostics;
 using System.Text;
 using System.Text.Json;
-using System.Text.Json.Nodes;
 using System.Text.Json.Serialization;
 using GuardianConnect.Credentials;
 using GuardianConnect.Shared;
 using static GuardianConnect.Shared.Common;
 using GuardianConnect.Shared.Extensions;
+using Serilog;
 
 namespace GuardianConnect.API
 {
@@ -322,7 +322,6 @@ namespace GuardianConnect.API
             if (errorResponse.IsError)
                 return (null, errorResponse);
 
-            // FIX THIS: The given key 'ep-grd-subscriber-identifier' was not present in the dictionary.
             var subscriber = InitFromDictionary(subscriberDetails);
             subscriber.Secret = Secret;
             var updateErr = subscriber.Store();
@@ -335,12 +334,14 @@ namespace GuardianConnect.API
         // Validate subscriber subscription [ #172 ] - NOT WORKING
         public async Task<(GRDConnectSubscriber? Subscriber, ErrorResponse errorResponse)> ValidateConnectSubscriberAsync()
         {
-            var currentPET = GRDPEToken.GetCurrentPEToken().Token;
-            if (string.IsNullOrEmpty(currentPET))
+            var currentPET = GRDPEToken.GetCurrentPEToken();
+            var tokenBefore = currentPET.Token;
+            var deviceTokenBefore = GRDConnectDevice.GetCurrentDevice().Device.PEToken;
+            if (string.IsNullOrEmpty(currentPET.Token))
                 return (null, new ErrorResponse("Failed to validate Connect subscriber. No PE-Token present on device"));
 
             var (details, errorResponse) =
-                await GRDHousekeepingAPI.ValidateConnectSubscriberAsync(Identifier, Secret, currentPET);
+                await GRDHousekeepingAPI.ValidateConnectSubscriberAsync(Identifier, Secret, currentPET.Token);
             
             if (errorResponse.IsError)
                 return (null, errorResponse);
@@ -353,21 +354,23 @@ namespace GuardianConnect.API
             details[kGuardianConnectSubscriberSecret]        = JsonSerializer.SerializeToElement(Secret);
             details[kGuardianConnectSubscriberEmail]      = JsonSerializer.SerializeToElement(Email);
             var newSubscriber = InitFromDictionary(details);
+            
+            var currentDevice = GRDConnectDevice.GetCurrentDevice().Device;
+            currentDevice.UpdateFromDictionary(details);
+            currentDevice.Store();
+            var newDevice = GRDConnectDevice.GetCurrentDevice().Device;
+            if (currentDevice.PEToken != newDevice.PEToken) Debugger.Break();
 
-            var petExpires = details[kGuardianPETokenExpirationDate];
-            // TODO: Change to actual GRDPEToken and use its Store();
-            GRDPEToken petFromConnectSubscriber = new GRDPEToken()
-            {
-                ExpirationDateUnix = long.Parse(petExpires.ToString())
-            };
-            petFromConnectSubscriber.Token = pet;
-            petFromConnectSubscriber.Store();
+            currentPET.UpdateFromDict(details);
+            currentPET.Store();
 
             newSubscriber.Secret = Secret;
             var updateErr = newSubscriber.Store();
             if (updateErr.IsError)
                 return (null, updateErr.SetErrorMessage($"Failed to store persistent local data of validated Connect Subscriber: {updateErr.Message}"));
 
+            Log.Debug($"END OF VALIDATE: PRIOR PETOKEN IS {tokenBefore}, DEVICE PET IS {deviceTokenBefore}");
+            Log.Debug($"END OF VALIDATE: PETOKEN IS {currentPET.Token}, DEVICE PET IS {newDevice.PEToken}");
             return (newSubscriber, updateErr);
         }
 

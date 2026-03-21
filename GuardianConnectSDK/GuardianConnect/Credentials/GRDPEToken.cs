@@ -1,7 +1,6 @@
 ﻿using System.Text;
 using System.Text.Json;
-using GuardianConnect.Shared;
-using System.Text.Json.Serialization;
+using static GuardianConnect.Shared.Common;
 
 namespace GuardianConnect.Credentials
 {
@@ -10,7 +9,7 @@ namespace GuardianConnect.Credentials
         public GRDPEToken()
         {
             Token = "";
-            ConnectAPIEnv = Common.DefaultConnectAPIHostname;
+            ConnectAPIEnv = DefaultConnectAPIHostname;
         }
 
         public string Token { get; set; }
@@ -28,7 +27,7 @@ namespace GuardianConnect.Credentials
         public static GRDPEToken GetCurrentPEToken()
         {
             GRDPEToken peToken = new GRDPEToken();
-            var petObjectAsText = GRDKeychain.GetPasswordStringForAccount(IGRDKeychain.kKeychainStr_PEToken_Object);
+            var petObjectAsText = GRDKeychain.GetPasswordStringForAccount(kKeychainStr_PEToken_Object);
             if (string.IsNullOrEmpty(petObjectAsText))
             {
                 return peToken;
@@ -45,16 +44,45 @@ namespace GuardianConnect.Credentials
             if (dict.Count == 0) return new GRDPEToken();
             GRDPEToken peToken = new GRDPEToken();
             if (dict.ContainsKey("Token")) peToken.Token = dict["Token"].ToString() ?? throw new InvalidOperationException();
-            if (dict.ContainsKey(Common.kPETokenKey)) peToken.Token = dict[Common.kPETokenKey].ToString() ?? throw new InvalidOperationException();
+            if (dict.ContainsKey(kPETokenKey)) peToken.Token = dict[kPETokenKey].ToString() ?? throw new InvalidOperationException();
+            if (dict.ContainsKey(kGuardianConnectDevicePETExpires)) peToken.ExpirationDateUnix = long.Parse(dict[kGuardianConnectDevicePETExpires].ToString());
+            if (dict.ContainsKey("ExpirationDate"))
+            {
+                var expirationText = dict["ExpirationDate"].ToString();
+                peToken.ExpirationDate = string.IsNullOrWhiteSpace(expirationText)
+                    ? DateTimeOffset.FromUnixTimeSeconds(peToken.ExpirationDateUnix).DateTime
+                    : DateTime.Parse(expirationText);
+            }
+            else
+            {
+                peToken.ExpirationDate = DateTimeOffset.FromUnixTimeSeconds(peToken.ExpirationDateUnix).DateTime;
+            }
             
-            if (dict.ContainsKey(Common.kGuardianConnectDevicePETExpires)) peToken.ExpirationDateUnix = long.Parse(dict[Common.kGuardianConnectDevicePETExpires].ToString());
-            if (dict.ContainsKey("ExpirationDate")) peToken.ExpirationDate = DateTime.Parse(dict["ExpirationDate"].ToString() ?? throw new InvalidOperationException());
-            if (dict.ContainsKey("ConnectAPIEnv")) peToken.ConnectAPIEnv = dict["ConnectAPIEnv"]?.ToString() ?? Common.DefaultConnectAPIHostname;
+            if (dict.ContainsKey("ConnectAPIEnv")) peToken.ConnectAPIEnv = dict["ConnectAPIEnv"]?.ToString() ?? DefaultConnectAPIHostname;
             if (dict.ContainsKey("SubscriptionType")) peToken.SubscriptionType = dict["SubscriptionType"].ToString() ?? throw new InvalidOperationException();
             if (dict.ContainsKey("SubscriptionTypePretty")) peToken.SubscriptionTypePretty = dict["SubscriptionTypePretty"].ToString() ?? throw new InvalidOperationException();
             return peToken;
         }
 
+        // Useful function to update Current PEToken with fields
+        public void UpdateFromDict(Dictionary<string, JsonElement> dict)
+        {
+            if (dict.ContainsKey(kPETokenKey)) Token = dict[kPETokenKey].GetString();
+            if (dict.ContainsKey(kGuardianConnectDevicePETExpires))
+                ExpirationDateUnix = dict[kGuardianConnectDevicePETExpires].GetInt64();
+            if (dict.ContainsKey("ExpirationDate"))
+            {
+                var expirationText = dict["ExpirationDate"].ToString();
+                ExpirationDate = string.IsNullOrWhiteSpace(expirationText)
+                    ? DateTimeOffset.FromUnixTimeSeconds(ExpirationDateUnix).DateTime
+                    : DateTime.Parse(expirationText);
+            }
+            else
+            {
+                ExpirationDate = DateTimeOffset.FromUnixTimeSeconds(ExpirationDateUnix).DateTime;
+            }
+        }
+        
         public bool IsExpired()
         {
             return ExpirationDate < DateTime.Now;
@@ -76,7 +104,7 @@ namespace GuardianConnect.Credentials
             // temp for test cases
 
             //GRDKeychain.StoreData(IGRDKeychain.kKeychainStr_PEToken_Object, plainTextData);
-            GRDKeychain.StorePassword(jsonOut, IGRDKeychain.kKeychainStr_PEToken_Object);
+            GRDKeychain.StorePassword(jsonOut, kKeychainStr_PEToken_Object);
         }
     }
 }

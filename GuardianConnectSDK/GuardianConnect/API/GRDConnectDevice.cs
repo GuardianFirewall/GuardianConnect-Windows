@@ -1,9 +1,9 @@
 using System.Text;
 using System.Text.Json;
-using System.Text.Json.Nodes;
 using GuardianConnect.API.Model;
 using GuardianConnect.Credentials;
 using GuardianConnect.Shared;
+using static GuardianConnect.Shared.Common;
 
 namespace GuardianConnect.API
 {
@@ -22,22 +22,22 @@ namespace GuardianConnect.API
         {
             var device = new GRDConnectDevice();
 
-            device.Nickname = deviceDictionary[Common.kGuardianConnectDeviceNickname].GetString() ?? "";
-            device.UUID = deviceDictionary[Common.kGuardianConnectDeviceUUID].GetString() ?? "";
+            device.Nickname = deviceDictionary[kGuardianConnectDeviceNickname].GetString() ?? "";
+            device.UUID = deviceDictionary[kGuardianConnectDeviceUUID].GetString() ?? "";
 
-            if (deviceDictionary.TryGetValue(Common.kGuardianConnectDevicePEToken, out var petTokenEl) &&
+            if (deviceDictionary.TryGetValue(kGuardianConnectDevicePEToken, out var petTokenEl) &&
                 petTokenEl.ValueKind is JsonValueKind.String or JsonValueKind.Null)
             {
                 device.PEToken = petTokenEl.GetString();
             }
 
-            if (deviceDictionary.TryGetValue(Common.kGuardianConnectDevicePETExpires, out var petExpiresEl) &&
+            if (deviceDictionary.TryGetValue(kGuardianConnectDevicePETExpires, out var petExpiresEl) &&
                 petExpiresEl.ValueKind == JsonValueKind.Number)
             {
                 device.PETExpires = petExpiresEl.GetInt64();
             }
 
-            device.CreatedAt = deviceDictionary[Common.kGuardianConnectDeviceCreatedAt].GetInt64();
+            device.CreatedAt = deviceDictionary[kGuardianConnectDeviceCreatedAt].GetInt64();
 
             if (deviceDictionary.TryGetValue("CurrentDevice", out var currentDeviceEl))
                 device.IsCurrentDevice = currentDeviceEl.GetBoolean();
@@ -46,27 +46,41 @@ namespace GuardianConnect.API
 
             return device;
         }
+        
+        public void UpdateFromDictionary(IDictionary<string, JsonElement> deviceDictionary)
+        {
+            if (deviceDictionary == null)
+                throw new ArgumentNullException(nameof(deviceDictionary), "Device dictionary cannot be null");
+
+            if (deviceDictionary.Count == 0)
+                throw new ArgumentException("Device dictionary cannot be empty", nameof(deviceDictionary));
+            if (deviceDictionary.ContainsKey(kPETokenKey))
+                PEToken = deviceDictionary[kPETokenKey].GetString();
+            if (deviceDictionary.ContainsKey(kGuardianConnectDevicePETExpires))
+                PETExpires = deviceDictionary[kGuardianConnectDevicePETExpires].GetInt64();
+
+        }
 
 
         public static (GRDConnectDevice? Device, ErrorResponse Error) GetCurrentDevice()
         {
             try
             {
-                int retVal = GRDKeychain.ReadDictionaryOfObjects(Common.kGuardianConnectDeviceStore, out var binaryDict);
+                int retVal = GRDKeychain.ReadDictionaryOfObjects(kGuardianConnectDeviceStore, out var binaryDict);
                 if (binaryDict.Count == 0 || retVal != 0)
                     return (null, new ErrorResponse("Failed to retrieve ConnectDevice from registry", IsErrorArg:true));
 
                 var objectDict = new Dictionary<string, JsonElement>();
-                objectDict[Common.kGuardianConnectDeviceNickname] =
-                    JsonSerializer.SerializeToElement(Encoding.UTF8.GetString(binaryDict[Common.kGuardianConnectDeviceNickname]));
-                objectDict[Common.kGuardianConnectDeviceUUID] =
-                    JsonSerializer.SerializeToElement(Encoding.UTF8.GetString(binaryDict[Common.kGuardianConnectDeviceUUID]));
-                objectDict[Common.kGuardianConnectDeviceCreatedAt] =
-                    JsonSerializer.SerializeToElement(long.Parse(Encoding.UTF8.GetString(binaryDict[Common.kGuardianConnectDeviceCreatedAt])));
-                objectDict[Common.kGuardianConnectDevicePEToken] =
-                    JsonSerializer.SerializeToElement(Encoding.UTF8.GetString(binaryDict[Common.kGuardianConnectDevicePEToken]));
-                objectDict[Common.kGuardianConnectDevicePETExpires] =
-                    JsonSerializer.SerializeToElement(long.Parse(Encoding.UTF8.GetString(binaryDict[Common.kGuardianConnectDevicePETExpires])));
+                objectDict[kGuardianConnectDeviceNickname] =
+                    JsonSerializer.SerializeToElement(Encoding.UTF8.GetString(binaryDict[kGuardianConnectDeviceNickname]));
+                objectDict[kGuardianConnectDeviceUUID] =
+                    JsonSerializer.SerializeToElement(Encoding.UTF8.GetString(binaryDict[kGuardianConnectDeviceUUID]));
+                objectDict[kGuardianConnectDeviceCreatedAt] =
+                    JsonSerializer.SerializeToElement(long.Parse(Encoding.UTF8.GetString(binaryDict[kGuardianConnectDeviceCreatedAt])));
+                objectDict[kGuardianConnectDevicePEToken] =
+                    JsonSerializer.SerializeToElement(Encoding.UTF8.GetString(binaryDict[kGuardianConnectDevicePEToken]));
+                objectDict[kGuardianConnectDevicePETExpires] =
+                    JsonSerializer.SerializeToElement(long.Parse(Encoding.UTF8.GetString(binaryDict[kGuardianConnectDevicePETExpires])));
                 objectDict["CurrentDevice"] =
                     JsonSerializer.SerializeToElement(bool.Parse(Encoding.UTF8.GetString(binaryDict["CurrentDevice"])));
 
@@ -85,14 +99,24 @@ namespace GuardianConnect.API
             {
                 var deviceDict = new Dictionary<string, byte[]>
                 {
-                    [Common.kGuardianConnectDeviceNickname] = Encoding.UTF8.GetBytes(Nickname),
-                    [Common.kGuardianConnectDeviceUUID] = Encoding.UTF8.GetBytes(UUID),
-                    [Common.kGuardianConnectDevicePEToken] = Encoding.UTF8.GetBytes(PEToken ?? ""),
-                    [Common.kGuardianConnectDeviceCreatedAt] = Encoding.UTF8.GetBytes(CreatedAt.ToString()),
-                    [Common.kGuardianConnectDevicePETExpires] = Encoding.UTF8.GetBytes(PETExpires.ToString()),
+                    [kGuardianConnectDeviceNickname] = Encoding.UTF8.GetBytes(Nickname),
+                    [kGuardianConnectDeviceUUID] = Encoding.UTF8.GetBytes(UUID),
+                    [kGuardianConnectDevicePEToken] = Encoding.UTF8.GetBytes(PEToken ?? ""),
+                    [kGuardianConnectDeviceCreatedAt] = Encoding.UTF8.GetBytes(CreatedAt.ToString()),
+                    [kGuardianConnectDevicePETExpires] = Encoding.UTF8.GetBytes(PETExpires.ToString()),
                     ["CurrentDevice"] = Encoding.UTF8.GetBytes(IsCurrentDevice.ToString())
                 };
-                GRDKeychain.StoreDictionaryOfObjects(Common.kGuardianConnectDeviceStore, deviceDict);
+                GRDKeychain.StoreDictionaryOfObjects(kGuardianConnectDeviceStore, deviceDict);
+                
+                // TJE - per CJ talk - going to replicate storing GRDPEToken here if given in the device so we stay consistent
+                if (!string.IsNullOrEmpty(PEToken))
+                {
+                    GRDPEToken updatedPet = GRDPEToken.GetCurrentPEToken();
+                    updatedPet.Token = PEToken;
+                    updatedPet.ExpirationDateUnix = PETExpires;
+                    updatedPet.ExpirationDate = DateTimeOffset.FromUnixTimeSeconds(PETExpires).DateTime;
+                    updatedPet.Store();
+                }
                 return new ErrorResponse();
             }
             catch (Exception ex)
@@ -106,7 +130,7 @@ namespace GuardianConnect.API
         {
             try
             {
-                GRDKeychain.RemoveSubKeyAndValues(Common.kGuardianConnectDeviceStore);
+                GRDKeychain.RemoveSubKeyAndValues(kGuardianConnectDeviceStore);
                 return new ErrorResponse();
             }
             catch (Exception ex)
@@ -209,7 +233,7 @@ namespace GuardianConnect.API
         {
             try
             {
-                var retVal = GRDKeychain.RemoveSubKeyAndValues(Common.kGuardianConnectDeviceStore);
+                var retVal = GRDKeychain.RemoveSubKeyAndValues(kGuardianConnectDeviceStore);
                 return retVal == 0
                     ? new ErrorResponse()
                     : new ErrorResponse("Failed to remove ConnectDevice from registry");
