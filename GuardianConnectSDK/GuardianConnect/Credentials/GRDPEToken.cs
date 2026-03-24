@@ -106,5 +106,10 @@ namespace GuardianConnect.Credentials
             //GRDKeychain.StoreData(IGRDKeychain.kKeychainStr_PEToken_Object, plainTextData);
             GRDKeychain.StorePassword(jsonOut, kKeychainStr_PEToken_Object);
         }
+        
+        public void Remove()
+        {
+            GRDKeychain.RemoveKeychainItemForAccount(kKeychainStr_PEToken_Object);
+        }
     }
 }

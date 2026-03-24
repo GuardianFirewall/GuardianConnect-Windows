@@ -159,9 +159,11 @@ namespace GuardianConnect.API
             try
             {
                 GRDKeychain.RemoveKeychainItemForAccount(kGuardianConnectSubscriberSecret);
-                GRDKeychain.RemoveKeychainItemForAccount(kKeychainStr_PEToken);
-                GRDKeychain.RemoveKeychainItemForAccount(kGuardianPETokenExpirationDate);
                 GRDKeychain.RemoveSubKeyAndValues(kGuardianConnectSubscriberStore);
+                GRDKeychain.RemoveSubKeyAndValues(kGuardianConnectDeviceStore);
+                var currentPet = GRDPEToken.GetCurrentPEToken();
+                currentPet.Remove();
+                
                 return new ErrorResponse(null);
             }
             catch (Exception ex)
