@@ -3,6 +3,7 @@ using System.Text.Json;
 using GuardianConnect.API.Model;
 using GuardianConnect.Credentials;
 using GuardianConnect.Shared;
+using GuardianConnect.Shared.Extensions;
 using static GuardianConnect.Shared.Common;
 
 namespace GuardianConnect.API
@@ -227,16 +228,14 @@ namespace GuardianConnect.API
             }
         }
 
-        // Delete device
+        // [#178 - calls #194] Delete device
         // TJE - CHECK THIS - Delete a singular device from the registry as the only one?
-        public async Task<ErrorResponse> DeleteDeviceAsync()
+        public async Task<ErrorResponse> DeleteDeviceAsync(string peToken, string identifier, string secret)
         {
             try
             {
-                var retVal = GRDKeychain.RemoveSubKeyAndValues(kGuardianConnectDeviceStore);
-                return retVal == 0
-                    ? new ErrorResponse()
-                    : new ErrorResponse("Failed to remove ConnectDevice from registry");
+                var errorResponse = await GRDHousekeepingAPI.DeleteConnectDeviceAsync(peToken, identifier, secret);
+                return errorResponse;
             }
             catch (Exception ex)
             {
@@ -250,12 +249,18 @@ namespace GuardianConnect.API
         {
             try
             {
-                var response = await GRDHousekeepingAPI.ValidateConnectDeviceAsync(peToken);
+                var (dict, response) = await GRDHousekeepingAPI.ValidateConnectDeviceAsync(peToken);
                 if (response.IsError)
                     return (null, new ErrorResponse(response.Message));
 
                 if (response.Data is not Dictionary<string, JsonElement> deviceDict)
-                    return (null, new ErrorResponse("Invalid device data from API"));
+                {
+                    ErrorResponse errorResponse =
+                        new ErrorResponse("Invalid device data from API");
+                        errorResponse = response;
+                        errorResponse.HttpResponse = response.HttpResponse;
+                    return (null, errorResponse);
+                }
 
                 var device = InitFromDictionary(deviceDict);
                 return (device, new ErrorResponse());

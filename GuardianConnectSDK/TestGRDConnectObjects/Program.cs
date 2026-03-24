@@ -27,7 +27,7 @@ StaticLoggerFactory.Initialize(loggerFactory);
 var configPath = Path.Combine(AppContext.BaseDirectory, "testconfig.json");
 if (!File.Exists(configPath))
 {
-    Log.Error("testconfig.json not found at {Path}", configPath);
+    Log.Error($"testconfig.json not found at {configPath}");
     PressEnter();
     return;
 }
@@ -47,26 +47,27 @@ catch (Exception ex)
     return;
 }
 
-Log.Information("Config loaded — host={Host}, identifier={Id}",
-    config.ConnectApiHostname, config.SubscriberIdentifier);
+Log.Information($"Config loaded — host={config.ConnectApiHostname}, identifier={config.SubscriberIdentifier}");
 
 // ── SDK bootstrap ──────────────────────────────────────────────────────────────
 GRDVPNHelper.CreateSingleton();
 GRDVPNHelper.Singleton.ConnectAPIHostname = config.ConnectApiHostname;
 
 // ── Working state ──────────────────────────────────────────────────────────────
-GRDConnectSubscriber? subscriber = null;
-GRDConnectDevice?     device     = null;
+GRDConnectSubscriber? subscriber    = null;
+GRDConnectDevice?     device        = null;
+GRDConnectDevice?     currentDevice = null;
+GRDConnectDevice?     alternateDevice = null;
 
 // ═══════════════════════════════════════════════════════════════════════════════
-// STEP 1 – GetCurrentSubscriber  →  RegisterNewConnectSubscriberAsync  →  CheckGuardianAccountStateAsync
+// GetCurrentSubscriber / RegisterNewConnectSubscriberAsync / CheckGuardianAccountStateAsync
 // ═══════════════════════════════════════════════════════════════════════════════
-Header("STEP 1 – GetCurrentSubscriber / RegisterNewConnectSubscriberAsync / CheckGuardianAccountStateAsync");
+Header("GetCurrentSubscriber / RegisterNewConnectSubscriberAsync / CheckGuardianAccountStateAsync");
 
 (subscriber, var getErr) = GRDConnectSubscriber.GetCurrentSubscriber();
 if (getErr.IsError)
 {
-    Log.Warning("No stored subscriber ({Msg}). Registering new subscriber...", getErr.Message);
+    Log.Warning($"No stored subscriber ({getErr.Message}). Registering new subscriber...");
 
     if (string.IsNullOrEmpty(config.SubscriberIdentifier) || string.IsNullOrEmpty(config.SubscriberSecret))
     {
@@ -96,18 +97,17 @@ if (getErr.IsError)
     if (subscriber?.Device != null)
     {
         device = subscriber.Device;
-        Log.Information("Device from registration — UUID={UUID}, Nickname={Nick}", device.UUID, device.Nickname);
+        Log.Information($"Device from registration — UUID={device.UUID}, Nickname={device.Nickname}");
     }
 }
 else
 {
-    Log.Information("Stored subscriber loaded — Identifier={Id}, SKU={SKU}, Secret={Secret}, PEToken={PEToken}",
-        subscriber!.Identifier, subscriber.SubscriptionSKU, subscriber.Secret, subscriber.Device.PEToken);
+    Log.Information($"Stored subscriber loaded — Identifier={subscriber!.Identifier}, SKU={subscriber.SubscriptionSKU}, Secret={subscriber.Secret}, PEToken={subscriber.Device?.PEToken}");
 
     if (subscriber.Device != null)
     {
         device = subscriber.Device;
-        Log.Information("Device loaded from registry — UUID={UUID}, Nickname={Nick}", device.UUID, device.Nickname);
+        Log.Information($"Device loaded from registry — UUID={device.UUID}, Nickname={device.Nickname}");
     }
 }
 
@@ -119,14 +119,14 @@ PrintResult(accountStateErr, "Account state confirmed on backend",
     $"Identifier={subscriber.Identifier}, SecretSet={!string.IsNullOrEmpty(subscriber.Secret)}");
 
 // ═══════════════════════════════════════════════════════════════════════════════
-// STEP 2 – GetCurrentSubscriber / RegisterNewConnectSubscriberAsync
+// GetCurrentSubscriber / RegisterNewConnectSubscriberAsync
 // ═══════════════════════════════════════════════════════════════════════════════
-Header("STEP 2 – GetCurrentSubscriber / RegisterNewConnectSubscriberAsync");
+Header("GetCurrentSubscriber / RegisterNewConnectSubscriberAsync");
 
 (subscriber, var step2Err) = GRDConnectSubscriber.GetCurrentSubscriber();
 if (step2Err.IsError)
 {
-    Log.Warning("Subscriber not in registry ({Msg}). Registering...", step2Err.Message);
+    Log.Warning($"Subscriber not in registry ({step2Err.Message}). Registering...");
 
     if (string.IsNullOrEmpty(config.SubscriberIdentifier) || string.IsNullOrEmpty(config.SubscriberSecret))
     {
@@ -156,34 +156,124 @@ if (step2Err.IsError)
     if (subscriber?.Device != null)
     {
         device = subscriber.Device;
-        Log.Information("Device from registration — UUID={UUID}, Nickname={Nick}", device.UUID, device.Nickname);
+        Log.Information($"Device from registration — UUID={device.UUID}, Nickname={device.Nickname}");
     }
 }
 else
 {
-    Log.Information("Subscriber confirmed in registry — Identifier={Id}, SKU={SKU}",
-        subscriber!.Identifier, subscriber.SubscriptionSKU);
+    Log.Information($"Subscriber confirmed in registry — Identifier={subscriber!.Identifier}, SKU={subscriber.SubscriptionSKU}");
 
     if (subscriber.Device != null)
     {
         device = subscriber.Device;
-        Log.Information("Device confirmed in registry — UUID={UUID}, Nickname={Nick}", device.UUID, device.Nickname);
+        Log.Information($"Device confirmed in registry — UUID={device.UUID}, Nickname={device.Nickname}");
     }
 }
 
 // ═══════════════════════════════════════════════════════════════════════════════
-// STEP 3 – ValidateConnectSubscriberAsync
+// ConnectDeviceReferenceAsync  (pre-validate)
 // ═══════════════════════════════════════════════════════════════════════════════
-Header("STEP 3 – ValidateConnectSubscriberAsync");
+Header("ConnectDeviceReferenceAsync (pre-validate)");
 
-var step3Identifier = subscriber!.Identifier;
+var preStoredPet = GRDPEToken.GetCurrentPEToken().Token;
+(device, var preDevRefErr) = await subscriber!.ConnectDeviceReferenceAsync();
+PrintResult(preDevRefErr, $"Device reference — UUID={device?.UUID}, Nickname={device?.Nickname}",
+    $"Identifier={subscriber.Identifier}, Device PEToken={device?.PEToken}, Stored PEToken={preStoredPet}");
+
+// ═══════════════════════════════════════════════════════════════════════════════
+// AllDevicesAsync  (pre-validate)
+// ═══════════════════════════════════════════════════════════════════════════════
+Header("AllDevicesAsync (pre-validate)");
+
+(var preAllDevices, var preAllDevErr) = await subscriber.AllDevicesAsync();
+PrintResult(preAllDevErr, $"AllDevicesAsync returned {preAllDevices?.Count ?? 0} device(s)",
+    $"Identifier={subscriber.Identifier}, SecretSet={!string.IsNullOrEmpty(subscriber.Secret)}");
+if (preAllDevices != null && !preAllDevErr.IsError)
+{
+    foreach (var d in preAllDevices)
+        Log.Information($"  Device — UUID={d.UUID}, Nickname={d.Nickname}, IsCurrent={d.IsCurrentDevice}");
+
+    foreach (var d in preAllDevices)
+    {
+        if (d.IsCurrentDevice)
+        {
+            Log.Information($"  Skipping current device — UUID={d.UUID}, Nickname={d.Nickname}");
+            continue;
+        }
+        Log.Information($"  Deleting device — UUID={d.UUID}, Nickname={d.Nickname}");
+        var delErr = await d.DeleteDeviceAsync(preStoredPet, subscriber.Identifier, subscriber.Secret);
+        PrintResult(delErr, $"Deleted device UUID={d.UUID}, Nickname={d.Nickname}",
+            $"PEToken={preStoredPet}, Identifier={subscriber.Identifier}");
+    }
+}
+
+// ═══════════════════════════════════════════════════════════════════════════════
+// GRDConnectDevice.GetCurrentDevice  (pre-validate)
+// ═══════════════════════════════════════════════════════════════════════════════
+Header("GRDConnectDevice.GetCurrentDevice (pre-validate)");
+
+(currentDevice, var preGetDevErr) = GRDConnectDevice.GetCurrentDevice();
+PrintResult(preGetDevErr, $"Current device — UUID={currentDevice?.UUID}, Nickname={currentDevice?.Nickname}, PETExpires={currentDevice?.PETExpires}",
+    "(reads from registry — no call parameters)");
+
+// ═══════════════════════════════════════════════════════════════════════════════
+// GRDConnectDevice.ListConnectDevicesForPETokenAsync  (pre-validate)
+// ═══════════════════════════════════════════════════════════════════════════════
+Header("GRDConnectDevice.ListConnectDevicesForPETokenAsync (pre-validate)");
+
+var preDevPet = currentDevice?.PEToken;
+if (!string.IsNullOrEmpty(preDevPet))
+{
+    (var preListDevices, var preListErr) = await GRDConnectDevice.ListConnectDevicesForPETokenAsync(preDevPet);
+    if (preListErr.IsError)
+        Log.Error($"FAIL — {preListErr}  |  Inputs: PEToken={preDevPet}");
+    else
+    {
+        Log.Information($"OK   — {preListDevices?.Count ?? 0} device(s) returned");
+        if (preListDevices != null)
+            foreach (var d in preListDevices)
+            {
+                Log.Information($"  Device — UUID={d.UUID}, Nickname={d.Nickname}, IsCurrent={d.IsCurrentDevice}");
+                if (!d.IsCurrentDevice) alternateDevice = d;
+            }
+    }
+}
+else
+{
+    Log.Warning("Skipping ListConnectDevicesForPETokenAsync — no PE-Token on current device");
+}
+
+// ═══════════════════════════════════════════════════════════════════════════════
+// GRDConnectDevice.ValidateConnectDeviceAsync  (pre-validate)
+// ═══════════════════════════════════════════════════════════════════════════════
+Header("GRDConnectDevice.ValidateConnectDeviceAsync (pre-validate) - SKIPPING");
+
+#if false
+if (currentDevice != null && !string.IsNullOrEmpty(currentDevice.PEToken))
+{
+    (var preValidatedDevice, var preDevValErr) = await currentDevice.ValidateConnectDeviceAsync(currentDevice.PEToken);
+    PrintResult(preDevValErr, $"Device validated — UUID={preValidatedDevice?.UUID}",
+        $"PEToken={currentDevice.PEToken}, DeviceUUID={currentDevice.UUID}");
+}
+else
+{
+    Log.Warning("Skipping ValidateConnectDeviceAsync — no current device or missing PEToken");
+}
+#endif
+
+// ═══════════════════════════════════════════════════════════════════════════════
+// ValidateConnectSubscriberAsync
+// ═══════════════════════════════════════════════════════════════════════════════
+Header("ValidateConnectSubscriberAsync");
+
+var validateIdentifier = subscriber.Identifier;
 (subscriber, var validateErr) = await subscriber.ValidateConnectSubscriberAsync();
 // Re-apply secret — Store() clears it and InitFromDictionary does not restore it
 if (subscriber != null && !string.IsNullOrEmpty(config.SubscriberSecret))
     subscriber.Secret = config.SubscriberSecret;
 PrintResult(validateErr,
-    $"Subscriber validated — SKU={subscriber?.SubscriptionSKU}, Expires={DateTimeOffset.FromUnixTimeSeconds(subscriber.SubscriptionExpirationDate)}",
-    $"Identifier={step3Identifier}, AcceptedTOS={config.AcceptedTOS}");
+    $"Subscriber validated — SKU={subscriber?.SubscriptionSKU}, Expires={DateTimeOffset.FromUnixTimeSeconds(subscriber!.SubscriptionExpirationDate)}",
+    $"Identifier={validateIdentifier}, AcceptedTOS={config.AcceptedTOS}");
 
 if (validateErr != null && validateErr.IsError)
 {
@@ -192,26 +282,101 @@ if (validateErr != null && validateErr.IsError)
 }
 
 // ═══════════════════════════════════════════════════════════════════════════════
-// STEP 4 – ConnectDeviceReferenceAsync
+// GRDConnectDevice.ValidateConnectDeviceAsync  (post-validate)
 // ═══════════════════════════════════════════════════════════════════════════════
-Header("STEP 4 – ConnectDeviceReferenceAsync");
+Header("GRDConnectDevice.ValidateConnectDeviceAsync (post-validate - SKIPPING)");
 
-var step4StoredPET = GRDPEToken.GetCurrentPEToken().Token;
-(device, var devRefErr) = await subscriber!.ConnectDeviceReferenceAsync();
-PrintResult(devRefErr, $"Device reference — UUID={device?.UUID}, Nickname={device?.Nickname}",
-    $"Identifier={subscriber.Identifier}, Device PEToken={device.PEToken}, Stored PEToken={step4StoredPET}");
+#if false
+(currentDevice, var postGetDevErr) = GRDConnectDevice.GetCurrentDevice();
+if (currentDevice != null && !string.IsNullOrEmpty(currentDevice.PEToken))
+{
+    (var postValidatedDevice, var postDevValErr) = await currentDevice.ValidateConnectDeviceAsync(currentDevice.PEToken);
+    PrintResult(postDevValErr, $"Device validated — UUID={postValidatedDevice?.UUID}",
+        $"PEToken={currentDevice.PEToken}, DeviceUUID={currentDevice.UUID}");
+}
+else
+{
+    Log.Warning("Skipping ValidateConnectDeviceAsync — no current device or missing PEToken");
+}
+#endif
 
 // ═══════════════════════════════════════════════════════════════════════════════
-// STEP 5 – GRDConnectDevice.AddConnectDeviceAsync  (set 'countOfAdditionalDevicesToCreate' > 0)
+// ConnectDeviceReferenceAsync  (post-validate)
 // ═══════════════════════════════════════════════════════════════════════════════
-Header("STEP 5 – GRDConnectDevice.AddConnectDeviceAsync (additional devices)");
+Header("ConnectDeviceReferenceAsync (post-validate)");
 
-var addDevicePET = GRDPEToken.GetCurrentPEToken().Token;
+var postStoredPet = GRDPEToken.GetCurrentPEToken().Token;
+(device, var postDevRefErr) = await subscriber.ConnectDeviceReferenceAsync();
+PrintResult(postDevRefErr, $"Device reference — UUID={device?.UUID}, Nickname={device?.Nickname}",
+    $"Identifier={subscriber.Identifier}, Device PEToken={device?.PEToken}, Stored PEToken={postStoredPet}");
+
+// ═══════════════════════════════════════════════════════════════════════════════
+// AllDevicesAsync  (post-validate)
+// ═══════════════════════════════════════════════════════════════════════════════
+Header("GRDConnectSubscriber.AllDevicesAsync (post-validate)");
+
+(var postAllDevices, var postAllDevErr) = await subscriber.AllDevicesAsync();
+PrintResult(postAllDevErr, $"AllDevicesAsync returned {postAllDevices?.Count ?? 0} device(s)",
+    $"Identifier={subscriber.Identifier}, SecretSet={!string.IsNullOrEmpty(subscriber.Secret)}");
+if (postAllDevices != null)
+    foreach (var d in postAllDevices)
+        Log.Information($"  Device — UUID={d.UUID}, Nickname={d.Nickname}, IsCurrent={d.IsCurrentDevice}");
+
+// ═══════════════════════════════════════════════════════════════════════════════
+// GRDConnectDevice.ListConnectDevicesForPETokenAsync  (post-validate)
+// ═══════════════════════════════════════════════════════════════════════════════
+Header("GRDConnectDevice.ListConnectDevicesForPETokenAsync (post-validate)");
+
+var postDevPet = currentDevice?.PEToken;
+if (!string.IsNullOrEmpty(postDevPet))
+{
+    (var postListDevices, var postListErr) = await GRDConnectDevice.ListConnectDevicesForPETokenAsync(postDevPet);
+    if (postListErr.IsError)
+        Log.Error($"FAIL — {postListErr}  |  Inputs: PEToken={postDevPet}");
+    else
+    {
+        Log.Information($"OK   — {postListDevices?.Count ?? 0} device(s) returned");
+        if (postListDevices != null)
+        {
+            foreach (var d in postListDevices)
+            {
+                Log.Information($"  Device — UUID={d.UUID}, Nickname={d.Nickname}, IsCurrent={d.IsCurrentDevice}");
+                if (!d.IsCurrentDevice) alternateDevice = d;
+            }
+
+            // Delete the added (non-current) devices, passing each device's PEToken
+            foreach (var d in postListDevices)
+            {
+                if (d.IsCurrentDevice)
+                {
+                    Log.Information($"  Skipping current device — UUID={d.UUID}, Nickname={d.Nickname}");
+                    continue;
+                }
+                var delPet = d.PEToken ?? postDevPet;
+                Log.Information($"  Deleting added device — UUID={d.UUID}, Nickname={d.Nickname}");
+                var delErr = await d.DeleteDeviceAsync(delPet, subscriber.Identifier, subscriber.Secret);
+                PrintResult(delErr, $"Deleted device UUID={d.UUID}, Nickname={d.Nickname}",
+                    $"PEToken={delPet}, Identifier={subscriber.Identifier}");
+            }
+        }
+    }
+}
+else
+{
+    Log.Warning("Skipping ListConnectDevicesForPETokenAsync — no PE-Token on current device");
+}
+
+// ═══════════════════════════════════════════════════════════════════════════════
+// GRDConnectDevice.AddConnectDeviceAsync  (set 'countOfAdditionalDevicesToCreate' > 0)
+// ═══════════════════════════════════════════════════════════════════════════════
+Header("GRDConnectDevice.AddConnectDeviceAsync");
+
+var addDevicePet = GRDPEToken.GetCurrentPEToken().Token;
 var baseNickname = device?.Nickname ?? config.DeviceNickname;
 
 if (config.CountOfAdditionalDevicesToCreate > 0)
 {
-    if (string.IsNullOrEmpty(addDevicePET))
+    if (string.IsNullOrEmpty(addDevicePet))
     {
         Log.Warning("Skipping AddConnectDeviceAsync — no current PE-Token");
     }
@@ -220,11 +385,11 @@ if (config.CountOfAdditionalDevicesToCreate > 0)
         for (int i = 2; i <= config.CountOfAdditionalDevicesToCreate + 1; i++)
         {
             var extraNickname = $"{baseNickname}-Extra-{i}";
-            Log.Information("Creating extra device {N} with nickname '{Nickname}'", i, extraNickname);
+            Log.Information($"Creating extra device {i} with nickname '{extraNickname}'");
             (var extraDevice, var addErr) =
-                await GRDConnectDevice.AddConnectDeviceAsync(addDevicePET, extraNickname, config.AcceptedTOS);
+                await GRDConnectDevice.AddConnectDeviceAsync(addDevicePet, extraNickname, config.AcceptedTOS);
             PrintResult(addErr, $"Extra device {i} created — UUID={extraDevice?.UUID}, Nickname={extraDevice?.Nickname}",
-                $"PEToken={addDevicePET}, Nickname={extraNickname}, AcceptedTOS={config.AcceptedTOS}");
+                $"PEToken={addDevicePet}, Nickname={extraNickname}, AcceptedTOS={config.AcceptedTOS}");
         }
     }
 }
@@ -234,83 +399,49 @@ else
 }
 
 // ═══════════════════════════════════════════════════════════════════════════════
-// STEP 6 – Subscriber AllDevicesAsync (using Identifier, Secret)
+// GRDConnectSubscriber.AllDevicesAsync + GRDConnectDevice.DeleteDeviceAsync
+// (runs after add — lists all devices via subscriber, deletes each via identifier/secret)
 // ═══════════════════════════════════════════════════════════════════════════════
-Header("STEP 6 – AllDevicesAsync");
+Header("GRDConnectSubscriber.AllDevicesAsync + DeleteDeviceAsync (post-add, via identifier/secret)");
 
-(var allDevices, var allDevErr) = await subscriber!.AllDevicesAsync();
-PrintResult(allDevErr, $"AllDevicesAsync returned {allDevices?.Count ?? 0} device(s)",
-    $"Identifier={subscriber.Identifier}, SecretSet={!string.IsNullOrEmpty(subscriber.Secret)}");
-if (allDevices != null)
-    foreach (var d in allDevices)
-        Log.Information("  Device — UUID={UUID}, Nickname={Nick}, IsCurrent={Current}",
-            d.UUID, d.Nickname, d.IsCurrentDevice);
-
-// ═══════════════════════════════════════════════════════════════════════════════
-// STEP 7 – GRDConnectDevice.GetCurrentDevice
-// ═══════════════════════════════════════════════════════════════════════════════
-Header("STEP 7 – GRDConnectDevice.GetCurrentDevice");
-
-(var currentDevice, var currentDevErr) = GRDConnectDevice.GetCurrentDevice();
-PrintResult(currentDevErr, $"Current device — UUID={currentDevice?.UUID}, Nickname={currentDevice?.Nickname}, PETExpires={currentDevice?.PETExpires}",
-    "(reads from registry — no call parameters)");
-
-// ═══════════════════════════════════════════════════════════════════════════════
-// STEP 8 – ValidateConnectDeviceAsync
-// ═══════════════════════════════════════════════════════════════════════════════
-Header("STEP 8 – ValidateConnectDeviceAsync");
-
-if (currentDevice != null && !string.IsNullOrEmpty(currentDevice.PEToken))
+if (config.CountOfAdditionalDevicesToCreate > 0 && !string.IsNullOrEmpty(addDevicePet))
 {
-    (var validatedDevice, var devValErr) = await currentDevice.ValidateConnectDeviceAsync(currentDevice.PEToken!);
-    PrintResult(devValErr, $"Device validated — UUID={validatedDevice?.UUID}",
-        $"PEToken={currentDevice.PEToken}, DeviceUUID={currentDevice.UUID}");
-}
-else
-{
-    Log.Warning("Skipping ValidateConnectDeviceAsync — no current device or missing PEToken");
-}
+    (var postAddAllDevices, var postAddAllDevErr) = await subscriber.AllDevicesAsync();
+    PrintResult(postAddAllDevErr, $"AllDevicesAsync returned {postAddAllDevices?.Count ?? 0} device(s)",
+        $"Identifier={subscriber.Identifier}, SecretSet={!string.IsNullOrEmpty(subscriber.Secret)}");
 
-// ═══════════════════════════════════════════════════════════════════════════════
-// STEP 9 – GRDConnectDevice.ListConnectDevicesForPETokenAsync
-// ═══════════════════════════════════════════════════════════════════════════════
-Header("STEP 9 – GRDConnectDevice.ListConnectDevicesForPETokenAsync");
-
-GRDConnectDevice? alternateDevice = null;
-var currentDevicePeToken = currentDevice?.PEToken;
-if (!string.IsNullOrEmpty(currentDevicePeToken))
-{
-    (var petDevices, var petDevErrMsg) = await GRDConnectDevice.ListConnectDevicesForPETokenAsync(currentDevicePeToken);
-    if (petDevErrMsg.IsError)
-        Log.Error("FAIL — {Err}  |  Inputs: PEToken={PET}", petDevErrMsg, currentDevicePeToken);
-    else
+    if (postAddAllDevices != null && !postAddAllDevErr.IsError)
     {
-        Log.Information("OK   — {Count} device(s) returned", petDevices?.Count ?? 0);
-        if (petDevices != null)
-            foreach (var d in petDevices)
+        foreach (var d in postAddAllDevices)
+        {
+            if (d.IsCurrentDevice)
             {
-                Log.Information("  Device — UUID={UUID}, Nickname={Nick}, IsCurrent={Current}",
-                    d.UUID, d.Nickname, d.IsCurrentDevice);
-                if (!d.IsCurrentDevice) alternateDevice = d;
+                Log.Information($"  Skipping current device — UUID={d.UUID}, Nickname={d.Nickname}");
+                continue;
             }
+            Log.Information($"  Deleting device — UUID={d.UUID}, Nickname={d.Nickname}");
+            var delErr = await d.DeleteDeviceAsync(addDevicePet, subscriber.Identifier, subscriber.Secret);
+            PrintResult(delErr, $"Deleted device UUID={d.UUID}, Nickname={d.Nickname}",
+                $"PEToken={addDevicePet}, Identifier={subscriber.Identifier}");
+        }
     }
 }
 else
 {
-    Log.Warning("Skipping ListConnectDevicesForPETokenAsync — no current PE-Token");
+    Log.Information("Skipping — no additional devices were created");
 }
 
 // ═══════════════════════════════════════════════════════════════════════════════
-// STEP 10 – UpdateConnectDeviceNicknameAsync  (set 'newDeviceNickname' in testconfig.json to enable)
+// GRDConnectDevice.UpdateConnectDeviceNicknameAsync  (set 'newDeviceNickname' in testconfig.json to enable)
 // ═══════════════════════════════════════════════════════════════════════════════
-Header("STEP 10 – UpdateConnectDeviceNicknameAsync");
+Header("GRDConnectDevice.UpdateConnectDeviceNicknameAsync");
 
 if (alternateDevice != null && currentDevice != null
     && !string.IsNullOrEmpty(currentDevice.PEToken)
     && !string.IsNullOrEmpty(config.NewDeviceNickname))
 {
     (var updatedDevice, var updateDevErr) =
-        await alternateDevice.UpdateConnectDeviceNicknameAsync(currentDevice.PEToken!, config.NewDeviceNickname);
+        await alternateDevice.UpdateConnectDeviceNicknameAsync(currentDevice.PEToken, config.NewDeviceNickname);
     PrintResult(updateDevErr, $"Nickname updated — '{updatedDevice?.Nickname}'",
         $"PEToken={currentDevice.PEToken}, DeviceUUID={alternateDevice.UUID}, NewNickname={config.NewDeviceNickname}");
 }
@@ -320,14 +451,14 @@ else
 }
 
 // ═══════════════════════════════════════════════════════════════════════════════
-// STEP 11 – UpdateConnectSubscriberWithEmailAddressAsync  (set 'newEmail' in testconfig.json to enable)
+// UpdateConnectSubscriberWithEmailAddressAsync  (set 'newEmail' in testconfig.json to enable)
 // ═══════════════════════════════════════════════════════════════════════════════
-Header("STEP 11 – UpdateConnectSubscriberWithEmailAddressAsync");
+Header("UpdateConnectSubscriberWithEmailAddressAsync");
 
 if (!string.IsNullOrEmpty(config.NewEmail))
 {
     (var updatedSubscriber, var updateEmailErr) =
-        await subscriber!.UpdateConnectSubscriberWithEmailAddressAsync(config.NewEmail);
+        await subscriber.UpdateConnectSubscriberWithEmailAddressAsync(config.NewEmail);
     PrintResult(updateEmailErr, $"Email updated — '{updatedSubscriber?.Email}'",
         $"Identifier={subscriber.Identifier}, NewEmail={config.NewEmail}");
     if (updatedSubscriber != null)
@@ -339,13 +470,13 @@ else
 }
 
 // ═══════════════════════════════════════════════════════════════════════════════
-// OPTIONAL – LogoutConnectSubscriberAsync  (set 'runLogout: true' in testconfig.json to enable)
+// LogoutConnectSubscriberAsync  (set 'runLogout: true' in testconfig.json to enable)
 // ═══════════════════════════════════════════════════════════════════════════════
-Header("OPTIONAL – LogoutConnectSubscriberAsync");
+Header("LogoutConnectSubscriberAsync");
 
 if (config.RunLogout)
 {
-    var logoutErr = await subscriber!.LogoutConnectSubscriberAsync();
+    var logoutErr = await subscriber.LogoutConnectSubscriberAsync();
     PrintResult(logoutErr, "Subscriber logged out",
         $"Identifier={subscriber.Identifier}");
 }
@@ -355,9 +486,9 @@ else
 }
 
 // ═══════════════════════════════════════════════════════════════════════════════
-// OPTIONAL – DestroySubscriber  (set 'runDestroy: true' in testconfig.json to enable)
+// DestroySubscriber  (set 'runDestroy: true' in testconfig.json to enable)
 // ═══════════════════════════════════════════════════════════════════════════════
-Header("OPTIONAL – DestroySubscriber");
+Header("DestroySubscriber");
 
 if (config.RunDestroy)
 {
@@ -377,7 +508,7 @@ void Header(string title)
 {
     Log.Information("");
     Log.Information("══════════════════════════════════════════════════════");
-    Log.Information("{Title}", title);
+    Log.Information($"{title}");
     Log.Information("══════════════════════════════════════════════════════");
 }
 
@@ -386,19 +517,18 @@ void PrintResult(ErrorResponse? err, string successMessage, string? inputs = nul
     if (err != null && err.IsError)
     {
         if (inputs != null)
-            Log.Error("       Inputs: {Inputs}", inputs);
+            Log.Error($"       Inputs: {inputs}");
         var apiErr = err.GRDApiError as GRDAPIError;
         if (apiErr != null)
-            Log.Error("FAIL — {Msg}  |  ApiError [{Status}] {Title}: {ApiMsg}",
-                err.Message, apiErr.StatusCode, apiErr.Title, apiErr.Message);
+            Log.Error($"FAIL — {err.Message}  |  ApiError [{apiErr.StatusCode}] {apiErr.Title}: {apiErr.Message}");
         else if (err.GRDApiError != null)
-            Log.Error("FAIL — {Msg}  |  GRDApiError (raw): {Raw}", err.Message, err.GRDApiError.ToString());
+            Log.Error($"FAIL — {err.Message}  |  GRDApiError (raw): {err.GRDApiError}");
         else
-            Log.Error("FAIL — {Msg}  |  (no GRDApiError)", err.Message);
+            Log.Error($"FAIL — {err.Message}  |  (no GRDApiError)");
     }
     else
     {
-        Log.Information("OK   — {Msg}", successMessage);
+        Log.Information($"OK   — {successMessage}");
     }
 }
 
@@ -412,15 +542,15 @@ void PressEnter()
 
 public class TestConfig
 {
-    public string  ConnectApiHostname  { get; set; } = "connect-api.guardianapp.com";
-    public string  SubscriberIdentifier { get; set; } = "";
-    public string  SubscriberSecret     { get; set; } = "";
-    public string? SubscriberEmail      { get; set; }
-    public string  DeviceNickname                  { get; set; } = "TestDevice";
-    public bool    AcceptedTOS                     { get; set; } = true;
+    public string  ConnectApiHostname            { get; set; } = "connect-api.guardianapp.com";
+    public string  SubscriberIdentifier          { get; set; } = "";
+    public string  SubscriberSecret              { get; set; } = "";
+    public string? SubscriberEmail               { get; set; }
+    public string  DeviceNickname                { get; set; } = "TestDevice";
+    public bool    AcceptedTOS                   { get; set; } = true;
     public int     CountOfAdditionalDevicesToCreate { get; set; } = 0;
-    public string? NewEmail             { get; set; }
-    public string? NewDeviceNickname    { get; set; }
-    public bool    RunLogout            { get; set; } = false;
-    public bool    RunDestroy           { get; set; } = false;
+    public string? NewEmail                      { get; set; }
+    public string? NewDeviceNickname             { get; set; }
+    public bool    RunLogout                     { get; set; } = false;
+    public bool    RunDestroy                    { get; set; } = false;
 }

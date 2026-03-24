@@ -442,12 +442,12 @@ public static class GRDHousekeepingAPI
         return (list, errorResponse);
     }
 
-    // [#194] Delete Device - sub-issue of [#179] - DONE
+    // [#194] Delete Device - sub-issue of [#178] - DONE
     public static async Task<ErrorResponse> DeleteConnectDeviceAsync(string peToken, string identifier, string secret)
     {
         var body = new Dictionary<string, object>();
         
-        if (peToken != null) body.Add(Common.kGuardianConnectDevicePEToken, peToken);
+        if (!string.IsNullOrEmpty(peToken)) body.Add(Common.kGuardianConnectDevicePEToken, peToken);
         else
         {
             body.Add(Common.kGuardianDeviceSubscriberIdentifier, identifier);
@@ -458,14 +458,16 @@ public static class GRDHousekeepingAPI
     }
     
     // [#195] Validate Device - sub-issue of [#183] - DONE
-    public static async Task<ErrorResponse> ValidateConnectDeviceAsync(string peToken)
+    public static async Task<(Dictionary<string, JsonElement>, ErrorResponse)> ValidateConnectDeviceAsync(string peToken)
     {
         var body = new Dictionary<string, object>
         {
             [Common.kGuardianConnectDevicePEToken] = peToken
         };
 
-        return await MakeAPICallAndReturnErrorResponse("/api/v1.2/partners/subscriber/device/validate", body);
+        
+        var (dict, er) = await MakeAPICallAndReturnDict("/api/v1.2/partners/subscriber/device/validate", body);
+        return (dict, er);
     }
     
     #endregion GRDConnectionSubscriber/Device calls
@@ -502,7 +504,9 @@ public static class GRDHousekeepingAPI
             var request = CreateConnectAPIRequest(endpoint, body);
             var response = await HttpUtils.Client.SendAsync(request);
             string data = await response.Content.ReadAsStringAsync();
-            if (response.StatusCode == HttpStatusCode.InternalServerError) data = string.Empty;
+            if (response.StatusCode == HttpStatusCode.InternalServerError && string.IsNullOrEmpty(data))
+                data = "{}";
+            
             if (response.IsSuccessStatusCode) return errorResponse;
             var errorDict = JsonSerializer.Deserialize<Dictionary<string, object>>(data);
             errorResponse = errorResponse.SetGrdApiError(errorDict, response.StatusCode);
