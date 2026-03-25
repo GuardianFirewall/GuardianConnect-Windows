@@ -10,7 +10,7 @@ namespace GuardianConnect.Credentials
 {
     public class GRDKeychain : IGRDKeychain
     {
-        private static Microsoft.Extensions.Logging.ILogger _logger = NullLogger.Instance;
+        public static Microsoft.Extensions.Logging.ILogger _logger = NullLogger.Instance;
         public static Microsoft.Extensions.Logging.ILogger Logger
         {
             get
@@ -24,13 +24,13 @@ namespace GuardianConnect.Credentials
         }
 
 
-        private const string GRDKeyPath = @"Software\GuardianVPN";
-        private static string _entropyData = @"Быстрая, коричневая лиса, перепрыгнула через ленивого пса";
+        public const string GRDKeyPath = @"Software\GuardianVPN";
+        public static string _entropyData = @"Быстрая, коричневая лиса, перепрыгнула через ленивого пса";
 
-        private static RegistryKey? GRDKey;
+        public static RegistryKey? GRDKey;
 
         // TODO: Check callers
-        private static void WriteRegistryData(byte[] encryptedData, string key)
+        public static void WriteRegistryData(byte[] encryptedData, string key)
         {
             try
             {
@@ -44,7 +44,7 @@ namespace GuardianConnect.Credentials
             }
         }
         
-        private static void WriteRegistryData(string encryptedDataAsString, string key)
+        public static void WriteRegistryData(string encryptedDataAsString, string key)
         {
             try
             {
@@ -57,7 +57,21 @@ namespace GuardianConnect.Credentials
                 throw;
             }
         } 
-        private static string ReadRegistryData(string key)
+        
+        public static void WriteRegistryData(byte[] encryptedData, RegistryKey registrySubKey, string ValueName)
+        {
+            try
+            {
+                registrySubKey.SetValue(ValueName, encryptedData, RegistryValueKind.Binary);
+            }
+            catch (Exception e)
+            {
+                Logger.LogError(e, "Exception thrown when writing to registry key: ", registrySubKey.Name);
+                throw;
+            }
+        } 
+        
+        public static string ReadRegistryData(string key)
         {
             var defaultValue = string.Empty;
             var encryptedDataString = defaultValue;
@@ -73,7 +87,7 @@ namespace GuardianConnect.Credentials
             return encryptedDataString;
         }
 
-        private static byte[] ReadRegistryByteData(string key)
+        public static byte[] ReadRegistryByteData(string key)
         {
             var defaultValue = new byte[0];
             var encryptedDataBytes = defaultValue;
@@ -109,6 +123,29 @@ namespace GuardianConnect.Credentials
             
             return encryptedDataBytes;
         }
+
+        public static byte[] ReadRegistryByteData(RegistryKey registrySubKey, string ValueName)
+        {
+            var defaultValue = new byte[0];
+            var encryptedDataBytes = defaultValue;
+            
+            try
+            {
+                
+                // Stored as ASCII string representing a byte array.
+                // So let's retrieve first the string
+                var o = registrySubKey.GetValue(ValueName, encryptedDataBytes);
+                if (o == null) return defaultValue;
+                
+                encryptedDataBytes = (byte[])o;
+            }
+            catch (Exception e)
+            {
+                Logger.LogError(e, "Exception thrown when reading from registry key: ", ValueName);
+            }            
+            
+            return encryptedDataBytes;        
+        }
         
         public static string GetDataForAccount(string accountKey)
         {
@@ -131,28 +168,18 @@ namespace GuardianConnect.Credentials
             return data;
         }
 
-        public static string GetPasswordStringForAccount(string accountKey)
+        public static string? GetPasswordStringForAccount(string accountKey)
         {
             string encryptedPassword;
             string password;
-            try
+            encryptedPassword = ReadRegistryData(accountKey);
+            if (string.IsNullOrEmpty(encryptedPassword))
             {
-                encryptedPassword = ReadRegistryData(accountKey);
-                if (string.IsNullOrEmpty(encryptedPassword))
-                {
-                    return "";
-                }
-                // why below throwing exception???
-                //password = DPAPI.Decrypt(encryptedPassword.ToString());
-                password = DPAPI.Decrypt(encryptedPassword);
+                return null;
+            }
+            password = DPAPI.Decrypt(encryptedPassword);
             
-                return password;
-            }
-            catch (Exception e)
-            {
-                System.Diagnostics.Debug.WriteLine(e);
-                throw;
-            }
+            return password;
         }
 
         public static byte[] GetPasswordRefForAccount(string accountKey)
@@ -216,10 +243,10 @@ namespace GuardianConnect.Credentials
             return 0;
         }
 
-        public static int StoreData(string accountKey, byte[] plainTextData)
+        public static int StoreData(string regKeyName, byte[] plainTextData)
         {
             var encryptedData = DPAPI.Encrypt(DPAPI.KeyType.UserKey, plainTextData, Encoding.UTF8.GetBytes(_entropyData), "User's Data");
-            WriteRegistryData(encryptedData, accountKey);
+            WriteRegistryData(encryptedData, regKeyName);
 
             return 0;
         }
@@ -230,6 +257,54 @@ namespace GuardianConnect.Credentials
             
             WriteRegistryData(encryptedPassword, accountKey);
             
+            return 0;
+        }
+
+        public static int RemoveSubKeyAndValues(string regKeyName)
+        {
+            GRDKey = Registry.CurrentUser.CreateSubKey(GRDKeyPath);
+            GRDKey.DeleteSubKeyTree(regKeyName, false);
+
+            return 0;
+        }
+
+        public static int StoreDictionaryOfObjects(string DictOfObjectsSubKeyName, Dictionary<string, byte[]> dictOfObjects)
+        {
+            RegistryKey grdRootKey = Registry.CurrentUser.CreateSubKey(GRDKeyPath);
+            RegistryKey dictKey = grdRootKey.CreateSubKey(DictOfObjectsSubKeyName);
+            
+            foreach (var objectKeyName in dictOfObjects.Keys)
+            try
+            {
+                var plainBytes = dictOfObjects[objectKeyName];
+                var encryptedData = DPAPI.Encrypt(DPAPI.KeyType.UserKey, plainBytes, Encoding.UTF8.GetBytes(_entropyData), "User's Data");
+                WriteRegistryData(encryptedData, dictKey, objectKeyName);
+            }
+            catch (Exception e)
+            {
+                Logger.LogError(e, $"Exception thrown when writing to registry key: {DictOfObjectsSubKeyName}/{objectKeyName}");
+                throw;
+            }
+
+            return 0;
+        }
+
+        public static int ReadDictionaryOfObjects(string DictOfObjectsSubKeyName,
+            out Dictionary<string, byte[]> dictOfObjects)
+        {
+            dictOfObjects = new Dictionary<string, byte[]>();
+            RegistryKey grdRootKey = Registry.CurrentUser.CreateSubKey(GRDKeyPath);
+            RegistryKey? dictKey = grdRootKey.OpenSubKey(DictOfObjectsSubKeyName);
+            if (dictKey == null) return -1;
+            
+            var listOfValueNames = dictKey.GetValueNames();
+            foreach (var valueName in listOfValueNames)
+            {
+                var encryptedBytes = ReadRegistryByteData(dictKey,  valueName);
+                var plainBytes = DPAPI.Decrypt(encryptedBytes, Encoding.UTF8.GetBytes(_entropyData), out string description);
+                dictOfObjects.Add(valueName, plainBytes);
+            }
+
             return 0;
         }
     }

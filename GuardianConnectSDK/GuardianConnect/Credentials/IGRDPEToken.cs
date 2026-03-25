@@ -1,4 +1,7 @@
-﻿namespace GuardianConnect.Credentials
+﻿#if __DELETE_THIS_FILE__
+using GuardianConnect.Shared;
+
+namespace GuardianConnect.Credentials
 {
     public interface IGRDPEToken
     {
@@ -21,7 +24,18 @@
 
         /// Convenience init function to pickup PETs from data returned by the Connect API
         /// - Parameter dict: a dictionary containing key/value pairs that can be parsed to create a GRDPEToken object
-        GRDPEToken InitFromDictionary(Dictionary<string, object> dict);
+        static GRDPEToken InitFromDictionary(Dictionary<string, object> dict)
+        {
+            if (dict.Count == 0) return new GRDPEToken();
+            GRDPEToken peToken = new GRDPEToken();
+            if (dict.ContainsKey("Token")) peToken.Token = dict["Token"].ToString() ?? throw new InvalidOperationException();
+            if (dict.ContainsKey("expirationDateUnix")) peToken.ExpirationDateUnix = (long)dict["ExpirationDateUnix"];
+            if (dict.ContainsKey("ExpirationDate")) peToken.ExpirationDate = DateTime.Parse(dict["ExpirationDate"].ToString() ?? throw new InvalidOperationException());
+            if (dict.ContainsKey("ConnectAPIEnv")) peToken.ConnectAPIEnv = dict["ConnectAPIEnv"]?.ToString() ?? Common.DefaultConnectAPIHostname;
+            if (dict.ContainsKey("SubscriptionType")) peToken.SubscriptionType = dict["SubscriptionType"].ToString() ?? throw new InvalidOperationException();
+            if (dict.ContainsKey("SubscriptionTypePretty")) peToken.SubscriptionTypePretty = dict["SubscriptionTypePretty"].ToString() ?? throw new InvalidOperationException();
+            return peToken;
+        }
 
         /// Convenience method to retrieve a reference to the current on device PET. Returns nil if no PET is present
         static abstract GRDPEToken GetCurrentPEToken();
@@ -44,3 +58,5 @@
         }
     }
 }
+
+#endif

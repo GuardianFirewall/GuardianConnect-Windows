@@ -1,0 +1,17 @@
+{
+  "connectApiHostname": "wifi-api-staging.dev.guardianapp.com",
+
+  "subscriberIdentifier": "",
+  "subscriberSecret": "",
+  "subscriberEmail": "terdies@dnsfilter.com",
+
+  "deviceNickname": "TestDevice",
+  "acceptedTOS": true,
+  "countOfAdditionalDevicesToCreate": 3,
+
+  "newEmail": "terdies1@dnsfilter.com",
+  "newDeviceNickname": "TestDevice-Extra-1",
+
+  "runLogout": true,
+  "runDestroy": true
+}

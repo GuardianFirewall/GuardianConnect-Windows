@@ -62,7 +62,10 @@ public class Common
     public const string kVpnCallParametersForReboot = "VPNCallParametersForReboot";
 
     /// Public production Connect API environment
-    public const string kConnectAPIHostname = @"connect-api.guardianapp.com";
+    public const string DefaultConnectAPIHostname = @"connect-api.guardianapp.com";
+    public const string DefaultHousekeepingAPIHostname = @"connect-api.guardianapp.com";
+    public const string kConnectAPIHostname = "ConnectAPIHostname";
+    public const string kHousekeepingAPIHostname = "HousekeepingAPIHostname";
 
     public const string kGuardianNetworkHealthStatusNotification = @"networkHealthStatusNotification";
     public const string kGuardianSuccessfulSubscription = @"successfullySubscribedToGuardian";
@@ -125,12 +128,12 @@ public class Common
     public const string kGuardianSubscriptionTypeProfessionalYearly = @"grd_pro_yearly";
     public const string kGuardianSubscriptionTypeProfessionalBrave = @"bravevpn.yearly-pro";
 
-    public const string kGuardianFreeTrialPeTokenSet = @"kGRDFreeTrialPETokenSet";
+    public const string kGuardianFreeTrialPeTokenSet = @"GRDFreeTrialPETokenSet";
     public const string kGuardianDayPassExpirationDate = @"GuardianDayPassExpirationDate";
-    public const string kGuardianPETokenExpirationDate = @"kGuardianPETokenExpirationDate";
-    public const string kGuardianPETConnectAPIEnv = @"kGuardianPETConnectAPIEnv";
+    public const string kGuardianPETokenExpirationDate = @"pet-expires";
+    public const string kGuardianPETConnectAPIEnv = @"GuardianPETConnectAPIEnv";
 
-    public const string kGuardianSubscriptionProductIds = @"kGuardianSubscriptionProductIds";
+    public const string kGuardianSubscriptionProductIds = @"GuardianSubscriptionProductIds";
 
     // Registry Key Names for each Guardian User on Windows
     public const string kKeychainStr_EapUsername = @"eap-username";
@@ -152,8 +155,6 @@ public class Common
         kKeychainStr_SubscriberCredential,
         kGuardianCredentialsList,
     };
-
-    public const string kGuardianConnectSubscriberSecret = @"kGuardianConnectSubscriberSecret";
 
     // Used to hard to code IAP receipts and create Subscriber Credentials
     public const string kGuardianEncodedAppStoreReceipt = @"kGuardianEncodedAppStoreReceipt";
@@ -186,6 +187,39 @@ public class Common
     public const string kGRDDeviceFilterConfigUsePredictiveBlocking = @"kGRDDeviceFilterConfigUsePredictiveBlocking";
 
     public const int FortyEightHoursInSeconds = 172800;
+    
+    // 2026-02-27 - GRDConnectSubscriber and GRDConnectDevice key constants
+    
+    public const string kPETokenKey = "pe-token";
+    
+    // - GRDConnectSubscriber:
+    // Constants
+    public const string kGuardianConnectSubscriberStore = "GuardianConnectSubscriber";
+    public const string kGuardianConnectSubscriberDict = "ep-grd-subscriber";
+    public const string kGuardianConnectSubscriberIdentifier = "ep-grd-subscriber-identifier";
+    public const string kGuardianConnectSubscriberSecret = "ep-grd-subscriber-secret";
+    public const string kGuardianConnectSubscriberEmail = "ep-grd-subscriber-email";
+    public const string kGuardianConnectSubscriberPETNickname = "ep-grd-subscriber-pet-nickname";
+    public const string kGuardianConnectSubscriberSubscriptionSKU = "ep-grd-subscription-sku";
+    public const string kGuardianConnectSubscriberSubscriptionNameFormatted = "ep-grd-subscription-name-formatted";
+    public const string kGuardianConnectSubscriberSubscriptionExpirationDate = "ep-grd-subscription-expiration-date";
+    public const string kGuardianConnectSubscriberCreatedAt = "ep-grd-subscriber-created-at";
+        
+    public const string kGuardianConnectSubscriberAcceptedTOS = "ep-grd-subscriber-accepted-tos";
+    
+    // GRDConnectDevice:
+    public const string kGuardianConnectDeviceStore = "GuardianConnectDevice";
+    public const string kGuardianConnectDeviceDict = "ep-grd-device";
+    public const string kGuardianConnectDeviceNickname = "ep-grd-device-nickname";
+    public const string kGuardianConnectDeviceUUID = "ep-grd-device-uuid";
+    public const string kGuardianConnectDeviceCreatedAt = "ep-grd-device-created-at";
+    public const string kGuardianConnectDevicePEToken = "pe-token";
+    public const string kGuardianConnectDevicePETExpires = kGuardianPETokenExpirationDate;
+    public const string kGuardianConnectDeviceAcceptedTOS = "ep-grd-device-accepted-tos";
+    public const string kGuardianDeviceSubscriberPet = "ep-grd-device-subscriber-pet";
+    public const string kGuardianDeviceSubscriberIdentifier = "ep-grd-device-subscriber-identifier";
+    public const string kGuardianDeviceSubscriberSecret = "ep-grd-device-subscriber-secret";
+
 
     // Error Text Here?? (TJE TODO)
     public const string kPETOKENNOTSET = "PE TOKEN IS NOT SET";

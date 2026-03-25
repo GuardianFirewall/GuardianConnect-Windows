@@ -210,7 +210,7 @@ public class ClientPipeImpl : IGuardianNPContract
         return value;
     }
 
-    public async Task<ErrorResponse> StartVPNConnection(VPNCallParameters? protocolRequest)
+    public async Task<ErrorResponse> StartVPNConnection(VPNCallParameters protocolRequest)
     {
         ClientPipe.Logger.LogInformation("ClientPipeImpl.StartVPNConnection: Sending StartVPNConnection command to service...");
         ErrorResponse startedErrorResponse = new ErrorResponse();

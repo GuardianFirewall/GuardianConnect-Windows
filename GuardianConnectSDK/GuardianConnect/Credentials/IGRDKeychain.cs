@@ -7,13 +7,11 @@
         static readonly string kKeychainStr_AuthToken				= @"auth-token";
         static readonly string kKeychainStr_APIAuthToken 			= @"api-auth-token";
         static readonly string kKeychainStr_SubscriberCredential 	= @"subscriber-credential";
-        static readonly string kKeychainStr_PEToken_Object			= @"pe-token-object";
-        static readonly string kKeychainStr_PEToken_Itself			= @"pe-token-tokenitself";
-        static readonly string kKeychainStr_WireGuardConfig 		= @"kGuardianWireGuardConfig";
-        static readonly string kKeychainStr_DayPassAccountingToken = @"kGuardianDayPassAccountingToken";
+        static readonly string kKeychainStr_WireGuardConfig 		= @"GuardianWireGuardConfig";
+        static readonly string kKeychainStr_DayPassAccountingToken = @"DayPassAccountingToken";
         static readonly string kGuardianCredentialsList 			= @"GuardianCredentialsList";
 
-        static readonly string kGuardianConnectSubscriberSecret 	= @"kGuardianConnectSubscriberSecret";
+        static readonly string kGuardianConnectSubscriberSecret 	= @"GuardianConnectSubscriberSecret";
 
         static abstract int StorePassword(string password, string accountKey);
         static abstract int StoreData(string accountKey, byte[] data);
