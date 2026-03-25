@@ -46,7 +46,7 @@ public class GRDServerManager
 
     public GRDVPNHelper.GRDServerFeatureEnvironment FeatureEnv;
     public bool BetaCapable { get; set; }
-    private static GRDRegion SelectedRegion { get; set; }
+    private static GRDRegion? SelectedRegion { get; set; }
 
     public GRDServerManager()
     {
@@ -150,7 +150,7 @@ public class GRDServerManager
         myRegionKey = "us-east"; // default
 
         Logger.LogInformation($"LookUpRegionIndexForMyTimeZone:  Our time zone ID = '{ourTimeZoneId}'");
-        var ourKey = "us-east";
+        _ = "us-east"; // placeholder (formerly ourKey)
         Logger.LogInformation($"timezonesLookup.Keys.Count = {Live.timezonesLookup.Keys.Count}.");
 
         try
@@ -227,7 +227,7 @@ public class GRDServerManager
             if (response.IsSuccessStatusCode)
             {
                 Logger.LogInformation($"RefreshStandbyRegionsLists: Return from RequestServerRegions: Response statusCode = {response.StatusCode}");
-                string content = errorResponse.Data.ToString();
+                string content = errorResponse.Data?.ToString() ?? string.Empty;
                 if (string.IsNullOrEmpty(content))
                 {
                     Logger.LogInformation("RefreshStandbyRegionsLists: content returned for regions is empty");
@@ -243,7 +243,7 @@ public class GRDServerManager
                         DefaultIgnoreCondition = JsonIgnoreCondition.Never,
                     };
                     regionsList = JsonSerializer.Deserialize<List<GRDRegion>>(content, GRDRegionJsonContext.Default.ListGRDRegion);
-                    Logger.LogInformation($"RefreshStandbyRegionsLists: Regions Collection loaded with (ACTUAL) {regionsList.Count} items");
+                    Logger.LogInformation($"RefreshStandbyRegionsLists: Regions Collection loaded with (ACTUAL) {regionsList?.Count} items");
                 }
 
                 responseCode = (int)response.StatusCode;
@@ -274,7 +274,7 @@ public class GRDServerManager
         Logger.LogInformation($"RefreshStandbyRegionsLists: regionLookup pre-load has {Alternate.regionLookup.Count} items.");
         var rluKeys = String.Join(',', Alternate.regionLookup.Keys);
         Logger.LogDebug($"regionLookup dictionary keys are: '{rluKeys}");
-        foreach (var regionRec in regionsList.OrderBy(region => region.DisplayName))
+        foreach (var regionRec in (regionsList ?? GRDRegion.StaticRegions).OrderBy(region => region.DisplayName))
         {
             if (!Alternate.regionLookup.TryAdd(regionRec.RegionName, regionRec))
             {
@@ -294,7 +294,7 @@ public class GRDServerManager
             Alternate.RegionKeysByDisplay.TryAdd(regionRec.DisplayName, regionRec.RegionName);
         }
 
-        return regionsList;
+        return regionsList ?? GRDRegion.StaticRegions;
     }
 
     private static async Task GetLatestTimeZonesForRegions()
@@ -314,15 +314,15 @@ public class GRDServerManager
         else
         {
             Logger.LogInformation("GetLatestTimeZonesForRegions: Successfully retrieved latest timezones for regions from backend.");
-            string content = response.Data.ToString();
+            string content = response.Data?.ToString() ?? string.Empty;
             Alternate.contentstrings.Add(content);
             geoDataCollection = JsonSerializer.Deserialize<List<GeoData>>(content, GeoDataJsonContext.Default.ListGeoData);
-            Logger.LogInformation($"GetLatestTimeZonesForRegions: Timezones Collection loaded with (ACTUAL) {geoDataCollection.Count} items");
+            Logger.LogInformation($"GetLatestTimeZonesForRegions: Timezones Collection loaded with (ACTUAL) {geoDataCollection?.Count} items");
         }
 
-        Logger.LogInformation($"GetLatestTimeZonesForRegions: now populating timezonesLookup dictionary with {geoDataCollection.Count} entries...");
+        Logger.LogInformation($"GetLatestTimeZonesForRegions: now populating timezonesLookup dictionary with {geoDataCollection?.Count} entries...");
         Alternate.timezonesLookup = new Dictionary<string, List<string>>();
-        foreach (var geoRec in geoDataCollection)
+        foreach (var geoRec in geoDataCollection ?? GeoData.StaticGeoDataCollection)
         {
             Logger.LogDebug($"GetLatestTimeZonesForRegions: Adding '{geoRec.KeyName}' with {geoRec.Timezones.Count} timezones");
             if (Alternate.timezonesLookup.TryAdd(geoRec.KeyName, geoRec.Timezones) == false)
@@ -373,13 +373,13 @@ public class GRDServerManager
             if (response.IsSuccessStatusCode)
             {
                 string respContent = await response.Content.ReadAsStringAsync();
-                List<RegionalHostRecord> regionHosts = JsonSerializer.Deserialize<List<RegionalHostRecord>>(respContent, RegionalHostRecordJsonContext.Default.ListRegionalHostRecord);
+                List<RegionalHostRecord>? regionHosts = JsonSerializer.Deserialize<List<RegionalHostRecord>>(respContent, RegionalHostRecordJsonContext.Default.ListRegionalHostRecord);
                 if (!Live._hostLookup.ContainsKey(regionKey))
                 {
-                    Live._hostLookup.Add(regionKey, null);
+                    Live._hostLookup.Add(regionKey, null!);
                 }
-                Live._hostLookup[regionKey] = regionHosts;
-                message = $"GRDServerManager.GetHostForRegion: Added {regionHosts.Count} hosts for region '{regionKey}'";
+                Live._hostLookup[regionKey] = regionHosts ?? new List<RegionalHostRecord>();
+                message = $"GRDServerManager.GetHostForRegion: Added {regionHosts?.Count} hosts for region '{regionKey}'";
                 Logger.LogInformation(message);
             }
             else
@@ -407,9 +407,9 @@ public class GRDServerManager
         if (!Live._hostLookup.ContainsKey(regionKey) || Live._hostLookup[regionKey].Count == 0)
         {
             Logger.LogInformation($"GRDServerManager.SelectBestHostInRegion: Region '{regionKey}' needs host list refresh... calling GetHostsForRegion to update now");
-            Task.Factory.StartNew(async () =>
+            _ = Task.Factory.StartNew(async () =>
             {
-                GetHostsForRegion(regionKey);
+                await GetHostsForRegion(regionKey);
             });
             Logger.LogInformation("RegionUtil.SelectBestHostInRegion: Waiting for GetHostsForRegion to return results...");
             RegionHostsRetrievalWaiter.Wait(5 * 1000);
@@ -442,10 +442,10 @@ public class GRDServerManager
     {
         // Get some time and timezone stuff
         var localTimeZoneInfo = TimeZoneInfo.Local;
-        var inanaId = TimeZoneInfo.TryConvertWindowsIdToIanaId(localTimeZoneInfo.Id, out string otzID);
+        var converted = TimeZoneInfo.TryConvertWindowsIdToIanaId(localTimeZoneInfo.Id, out string? otzID);
         Logger.LogInformation($"GetLocalTimeZone(): Local time zone is {TimeZoneInfo.Local}. Our Time Zone ID: '{otzID}'");
 
-        return otzID;
+        return otzID ?? string.Empty;
     }
 
     private static string GetRegionForOurTimeZone()

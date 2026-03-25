@@ -33,8 +33,7 @@ namespace GuardianConnect.Credentials
                 return peToken;
             }
 
-            peToken = JsonSerializer.Deserialize<GRDPEToken>(petObjectAsText, GRDPETokenJsonContext.Default.GRDPEToken);
-
+            peToken = JsonSerializer.Deserialize<GRDPEToken>(petObjectAsText, GRDPETokenJsonContext.Default.GRDPEToken) ?? new GRDPEToken();
 
             return peToken;
         }
@@ -45,7 +44,7 @@ namespace GuardianConnect.Credentials
             GRDPEToken peToken = new GRDPEToken();
             if (dict.ContainsKey("Token")) peToken.Token = dict["Token"].ToString() ?? throw new InvalidOperationException();
             if (dict.ContainsKey(kPETokenKey)) peToken.Token = dict[kPETokenKey].ToString() ?? throw new InvalidOperationException();
-            if (dict.ContainsKey(kGuardianConnectDevicePETExpires)) peToken.ExpirationDateUnix = long.Parse(dict[kGuardianConnectDevicePETExpires].ToString());
+            if (dict.ContainsKey(kGuardianConnectDevicePETExpires)) peToken.ExpirationDateUnix = long.Parse(dict[kGuardianConnectDevicePETExpires].ToString() ?? "0");
             if (dict.ContainsKey("ExpirationDate"))
             {
                 var expirationText = dict["ExpirationDate"].ToString();
@@ -67,7 +66,7 @@ namespace GuardianConnect.Credentials
         // Useful function to update Current PEToken with fields
         public void UpdateFromDict(Dictionary<string, JsonElement> dict)
         {
-            if (dict.ContainsKey(kPETokenKey)) Token = dict[kPETokenKey].GetString();
+            if (dict.ContainsKey(kPETokenKey)) Token = dict[kPETokenKey].GetString() ?? string.Empty;
             if (dict.ContainsKey(kGuardianConnectDevicePETExpires))
                 ExpirationDateUnix = dict[kGuardianConnectDevicePETExpires].GetInt64();
             if (dict.ContainsKey("ExpirationDate"))

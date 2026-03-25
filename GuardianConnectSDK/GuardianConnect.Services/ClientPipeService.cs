@@ -209,7 +209,7 @@ public class ClientPipeService : BackgroundService
                             var vpnCallParameters = JsonSerializer.Deserialize<VPNCallParameters>(serializedVpnParameters, VPNCallParametersJsonContext.Default.VPNCallParameters);
                             try
                             {
-                                var didItStart = await cmdDispatcher.StartVPNConnection(vpnCallParameters);
+                                var didItStart = await cmdDispatcher.StartVPNConnection(vpnCallParameters!);
                                 _logger.Log(LogLevel.Information, $"ClientPipeService.StartVPNConnection - response IsError: {didItStart.IsError}");
                                 var startResponseJson = JsonSerializer.Serialize(didItStart, ErrorResponseJsonContext.Default.ErrorResponse);
                                 _logger.Log(LogLevel.Information, $"ClientPipeService.StartVPNConnection - writing response to pipe, string is '{startResponseJson}'");

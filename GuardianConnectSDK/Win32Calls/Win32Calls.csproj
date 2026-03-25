@@ -7,6 +7,8 @@
 	    <AllowUnsafeBlocks>true</AllowUnsafeBlocks>
 	    <Configurations>Debug;Release</Configurations>
 	    <Platforms>x64;ARM64</Platforms>
+        <!-- CS0436: CsWin32 generates PInvoke in both Win32Calls and Win32Calls.WFP; type conflict is expected -->
+        <NoWarn>$(NoWarn);CS0436</NoWarn>
     </PropertyGroup>
 
     <ItemGroup>

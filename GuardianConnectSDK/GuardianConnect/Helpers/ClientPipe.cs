@@ -109,7 +109,7 @@ public static class ClientPipe
 public class ClientPipeImpl : IGuardianNPContract
 {
     private static NamedPipeClientStream _clientStream = new NamedPipeClientStream("NULL");
-    private static StreamString ss;
+    private static StreamString ss = new StreamString(new NamedPipeClientStream("NULL"));
     private static int usingResource = 0;
 
     internal ClientPipeImpl()
@@ -120,7 +120,7 @@ public class ClientPipeImpl : IGuardianNPContract
 
     internal void OpenNamedPipe(string servicePipeName = Common.kGRDServicePipeName)
     {
-        Exception lastThrownException = null;
+        Exception? lastThrownException = null;
         ClientPipe.Logger.LogInformation($"ClientPipeImpl.OpenNamedPipe: Entered...[{usingResource}]");
         if (0 == Interlocked.Exchange(ref usingResource, 1))
         {
@@ -194,6 +194,8 @@ public class ClientPipeImpl : IGuardianNPContract
         throw new NotImplementedException();
     }
 
+    [System.Diagnostics.CodeAnalysis.UnconditionalSuppressMessage("Trimming", "IL2026", Justification = "CompositeType is a legacy test type not used in production AOT paths")]
+    [System.Diagnostics.CodeAnalysis.UnconditionalSuppressMessage("AOT", "IL3050", Justification = "CompositeType is a legacy test type not used in production AOT paths")]
     public CompositeType GetDataUsingDataContract(CompositeType composite)
     {
         var cmdPayload = JsonSerializer.Serialize(composite);
@@ -224,7 +226,7 @@ public class ClientPipeImpl : IGuardianNPContract
             startedJson = await ss.ReadStringAsync();
             ClientPipe.Logger.LogInformation("ClientPipeImpl.StartVPNConnection: Received response from service.");
 
-            startedErrorResponse = JsonSerializer.Deserialize<ErrorResponse>(startedJson, ErrorResponseJsonContext.Default.ErrorResponse);
+            startedErrorResponse = JsonSerializer.Deserialize<ErrorResponse>(startedJson, ErrorResponseJsonContext.Default.ErrorResponse) ?? new ErrorResponse();
             if (startedErrorResponse.IsError)
             {
                 ClientPipe.Logger.LogError($"ClientPipe.StartVPNConnection - error response from service: is '{startedJson}'");
@@ -277,7 +279,8 @@ public class ClientPipeImpl : IGuardianNPContract
         ClientPipe.Logger.LogInformation("Reading status...");
         //var statusString = ss.ReadStringAsync().Result;
         var statusString = ss.ReadString();
-        var status = JsonSerializer.Deserialize<CurrentVPNStatus>(statusString, CurrentVPNStatusJsonConect.Default.CurrentVPNStatus);
+        var status = JsonSerializer.Deserialize<CurrentVPNStatus>(statusString, CurrentVPNStatusJsonConect.Default.CurrentVPNStatus)
+                     ?? new CurrentVPNStatus();
         ClientPipe.Logger.LogInformation($"status is {status.EntryName}, {status.ConnectionState}...");
 
         return status;

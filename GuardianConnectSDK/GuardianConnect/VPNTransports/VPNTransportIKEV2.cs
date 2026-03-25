@@ -209,8 +209,6 @@ public class VPNTransportIKEV2 : ITransportProvider
                         $"An error occurred when making RASDial VPN Connection call. Return value is  {rasDialRetVal}"
                 };
             }
-
-            return new ErrorResponse();
         });
         t.Start();
 

@@ -130,7 +130,7 @@ public static class GRDHousekeepingAPI
         // set host to use
         string connectHost = GRDVPNHelper.Singleton.PeToken?.ConnectAPIEnv ?? Common.DefaultConnectAPIHostname;
         // Validation Method PEToken...
-        string peToken = GRDVPNHelper.Singleton.PeToken?.Token;
+        string? peToken = GRDVPNHelper.Singleton.PeToken?.Token;
         if (string.IsNullOrEmpty(peToken))
         {
             Logger.LogError(@"PEToken Object has empty token. Trying string from keychain...");
@@ -227,7 +227,7 @@ public static class GRDHousekeepingAPI
         //
         errorResponse = new ErrorResponse(string.Empty, null, false, string.Empty)
         {
-            Data = LiveGrdCredential.Jwt
+            Data = LiveGrdCredential!.Jwt
         };
         return errorResponse;
     }
@@ -278,7 +278,7 @@ public static class GRDHousekeepingAPI
                     if (string.IsNullOrEmpty(content))
                     {
                         Logger.LogInformation("RequestServerRegions: content returned for regions is empty");
-                        errorResponse.SetErrorMessage("Content returned for regions is empty").SetResponse(response).SetData(null).IsError = true;
+                        errorResponse.SetErrorMessage("Content returned for regions is empty").SetResponse(response).SetData(null!).IsError = true;
                     }
                     else
                     {
@@ -288,7 +288,7 @@ public static class GRDHousekeepingAPI
                 else
                 {
                     Logger.LogInformation($"RequestServerRegions: Response from attempting to get latest regions is {response.StatusCode}");
-                    errorResponse.SetErrorMessage("Content returned for regions is empty").SetResponse(response).SetData(null).IsError = true;
+                    errorResponse.SetErrorMessage("Content returned for regions is empty").SetResponse(response).SetData(null!).IsError = true;
                 }
             }
         }
@@ -371,7 +371,7 @@ public static class GRDHousekeepingAPI
     public static async Task<ErrorResponse> LogOutConnectSubscriberAsync(string peToken)
     {
         var errorResponse = new ErrorResponse();
-        var body = new Dictionary<string, object>
+        var body = new Dictionary<string, object?>
         {
             [Common.kPETokenKey] = peToken
         };
@@ -384,7 +384,7 @@ public static class GRDHousekeepingAPI
     public static async Task<ErrorResponse> CheckAccountCreationStateAsync(string identifier, string secret)
     {
         var errorResponse = new ErrorResponse();
-        var body = new Dictionary<string, object>
+        var body = new Dictionary<string, object?>
         {
             [Common.kGuardianConnectSubscriberIdentifier] = identifier,
             [Common.kGuardianConnectSubscriberSecret] = secret
@@ -428,7 +428,7 @@ public static class GRDHousekeepingAPI
     internal static async Task<(List<JsonElement>, ErrorResponse)>
         RequestAllConnectDevicesForSubscriberAsync(string? peToken = "", string identifier = "", string secret = "")
     {
-        var body = new Dictionary<string, object>();
+        var body = new Dictionary<string, object?>();
 
         if (string.IsNullOrEmpty(peToken))
         {
@@ -445,7 +445,7 @@ public static class GRDHousekeepingAPI
     // [#194] Delete Device - sub-issue of [#178] - DONE
     public static async Task<ErrorResponse> DeleteConnectDeviceAsync(string peToken, string identifier, string secret)
     {
-        var body = new Dictionary<string, object>();
+        var body = new Dictionary<string, object?>();
         
         if (!string.IsNullOrEmpty(peToken)) body.Add(Common.kGuardianConnectDevicePEToken, peToken);
         else
@@ -460,7 +460,7 @@ public static class GRDHousekeepingAPI
     // [#195] Validate Device - sub-issue of [#183] - DONE
     public static async Task<(Dictionary<string, JsonElement>, ErrorResponse)> ValidateConnectDeviceAsync(string peToken)
     {
-        var body = new Dictionary<string, object>
+        var body = new Dictionary<string, object?>
         {
             [Common.kGuardianConnectDevicePEToken] = peToken
         };
@@ -478,7 +478,9 @@ public static class GRDHousekeepingAPI
         return new Uri($"https://{ConnectAPIHostname}{path}", UriKind.RelativeOrAbsolute);
     }
     
-    private static HttpRequestMessage CreateConnectAPIRequest(string endpoint, Dictionary<string, object> body, string method = "POST")
+    [System.Diagnostics.CodeAnalysis.UnconditionalSuppressMessage("Trimming", "IL2026", Justification = "Dictionary body uses known types safe for runtime serialization")]
+    [System.Diagnostics.CodeAnalysis.UnconditionalSuppressMessage("AOT", "IL3050", Justification = "Dictionary body uses known types safe for runtime serialization")]
+    private static HttpRequestMessage CreateConnectAPIRequest(string endpoint, Dictionary<string, object?> body, string method = "POST")
     {
         var uri = MakeUri(endpoint);
         HttpMethod httpMethod = HttpMethod.Post;
@@ -495,7 +497,9 @@ public static class GRDHousekeepingAPI
         return request;
     }
 
-    private static async Task<ErrorResponse> MakeAPICallAndReturnErrorResponse(string endpoint, Dictionary<string, object> body)
+    [System.Diagnostics.CodeAnalysis.UnconditionalSuppressMessage("Trimming", "IL2026", Justification = "Error dict uses basic types safe for runtime deserialization")]
+    [System.Diagnostics.CodeAnalysis.UnconditionalSuppressMessage("AOT", "IL3050", Justification = "Error dict uses basic types safe for runtime deserialization")]
+    private static async Task<ErrorResponse> MakeAPICallAndReturnErrorResponse(string endpoint, Dictionary<string, object?> body)
     {
         var errorResponse = new ErrorResponse();
 
@@ -508,7 +512,7 @@ public static class GRDHousekeepingAPI
                 data = "{}";
             
             if (response.IsSuccessStatusCode) return errorResponse;
-            var errorDict = JsonSerializer.Deserialize<Dictionary<string, object>>(data);
+            var errorDict = JsonSerializer.Deserialize<Dictionary<string, object?>>(data);
             errorResponse = errorResponse.SetGrdApiError(errorDict, response.StatusCode);
         }
         catch (Exception e)
@@ -520,7 +524,7 @@ public static class GRDHousekeepingAPI
     }
     
     private static async Task<(Dictionary<string, JsonElement>, ErrorResponse)>
-        MakeAPICallAndReturnDict(string endpoint, Dictionary<string, object> body, string method = "POST")
+        MakeAPICallAndReturnDict(string endpoint, Dictionary<string, object?> body, string method = "POST")
     {
         var errorResponse = new ErrorResponse();
         try
@@ -557,7 +561,7 @@ public static class GRDHousekeepingAPI
         return (new Dictionary<string, JsonElement>(), errorResponse);
     }
     
-    private static async Task<(List<JsonElement>, ErrorResponse)> MakeAPICallAndReturnList(string endpoint, Dictionary<string, object> body)
+    private static async Task<(List<JsonElement>, ErrorResponse)> MakeAPICallAndReturnList(string endpoint, Dictionary<string, object?> body)
     {
         var errorResponse = new ErrorResponse();
         try

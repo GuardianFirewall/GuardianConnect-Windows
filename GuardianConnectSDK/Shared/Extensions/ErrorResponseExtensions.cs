@@ -40,10 +40,10 @@ public static class ErrorResponseExtensions
         return text;
     }
     
-    public static ErrorResponse SetGrdApiError(this ErrorResponse er, Dictionary<string, object> data, HttpStatusCode statusCode)
+    public static ErrorResponse SetGrdApiError(this ErrorResponse er, Dictionary<string, object?>? data, HttpStatusCode statusCode)
     {
         er.IsError = true;
-        er.GRDApiError = new GRDAPIError(data, statusCode);
+        er.GRDApiError = new GRDAPIError(data?.ToDictionary(kvp => kvp.Key, kvp => kvp.Value as object), statusCode);
         return er;
     }
     

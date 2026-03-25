@@ -16,7 +16,7 @@
         static abstract int StorePassword(string password, string accountKey);
         static abstract int StoreData(string accountKey, byte[] data);
 
-        static abstract string GetPasswordStringForAccount(string accountKey);
+        static abstract string? GetPasswordStringForAccount(string accountKey);
         static abstract byte[] GetPasswordRefForAccount(string accountKey);
         static abstract string GetDataForAccount(string accountKey);
         static abstract int RemoveKeychainItemForAccount(string accountKeyStr);
