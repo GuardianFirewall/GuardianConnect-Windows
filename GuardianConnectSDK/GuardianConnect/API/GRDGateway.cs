@@ -167,7 +167,7 @@ public class GRDGateway
             errorResponse.SetResponse(response).SetData(new List<GRDCredential>());
             string respContent = await response.Content.ReadAsStringAsync();
             var cred = JsonSerializer.Deserialize<GRDCredential>(respContent, GRDCredentialJsonContext.Default.GRDCredential);
-            // TJE 0.34.2 - settings ClientId from EapUser if IKEv2
+            // TJE 0.40.1 - settings ClientId from EapUser if IKEv2
             if (cred != null && cred.TransportProtocol == ITransportProvider.TransportProtocol.TransportIKEv2)
             {
                 cred.ClientId = cred.UserName;
