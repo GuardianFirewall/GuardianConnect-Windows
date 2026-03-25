@@ -519,7 +519,8 @@ public static class GRDHousekeepingAPI
         return errorResponse;
     }
     
-    private static async Task<(Dictionary<string, JsonElement>, ErrorResponse)> MakeAPICallAndReturnDict(string endpoint, Dictionary<string, object> body, string method = "POST")
+    private static async Task<(Dictionary<string, JsonElement>, ErrorResponse)>
+        MakeAPICallAndReturnDict(string endpoint, Dictionary<string, object> body, string method = "POST")
     {
         var errorResponse = new ErrorResponse();
         try

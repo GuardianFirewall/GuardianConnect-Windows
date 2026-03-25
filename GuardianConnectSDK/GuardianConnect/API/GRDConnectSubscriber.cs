@@ -154,7 +154,7 @@ namespace GuardianConnect.API
         }
 
         // Destroy subscriber and related secrets
-        public static async Task<ErrorResponse> DestroySubscriber()
+        public static ErrorResponse DestroySubscriber()
         {
             try
             {
@@ -253,8 +253,7 @@ namespace GuardianConnect.API
         }
 
         // Register new subscriber [ #169 - calls #185 ] - DONE ??
-        public async Task<(GRDConnectSubscriber? Subscriber, ErrorResponse)> RegisterNewConnectSubscriberAsync(
-            bool acceptedTOS, string deviceNickname)
+        public async Task<(GRDConnectSubscriber? Subscriber, ErrorResponse)> RegisterNewConnectSubscriberAsync( bool acceptedTOS, string deviceNickname, string Identifier, string Secret, string Email)
         {
             if (string.IsNullOrEmpty(Identifier) || string.IsNullOrEmpty(Secret))
                 return (null,
@@ -330,7 +329,7 @@ namespace GuardianConnect.API
             if (updateErr.IsError)
                 return (null, updateErr);
 
-            return (subscriber, null);
+            return (subscriber, updateErr);
         }
 
         // Validate subscriber subscription [ #172 ] - NOT WORKING
