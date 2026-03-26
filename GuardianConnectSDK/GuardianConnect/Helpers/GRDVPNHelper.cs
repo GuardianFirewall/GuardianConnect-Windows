@@ -128,7 +128,7 @@ namespace GuardianConnect.Helpers
             return isConnected ? activeConnectionName : string.Empty;
         }
 
-        private string? _connectApiHostname;
+        private string? _connectApiHostname = Common.DefaultConnectAPIHostname;
         private readonly string? _connectPublishableKey = null;
 
         /// Used to determine if an active connection is possible, do we have all the necessary credentials (EAPUsername, Password, Host, etc)
