@@ -70,8 +70,7 @@ public class DPAPI
     /// </param>
     private static void InitPrompt(ref CRYPTPROTECT_PROMPTSTRUCT ps)
     {
-        ps.cbSize       = Marshal.SizeOf(
-                                  typeof(CRYPTPROTECT_PROMPTSTRUCT));
+        ps.cbSize       = Marshal.SizeOf<CRYPTPROTECT_PROMPTSTRUCT>();
         ps.dwPromptFlags= 0;
         ps.hwndApp      = NullPtr;
         ps.szPrompt = string.Empty;

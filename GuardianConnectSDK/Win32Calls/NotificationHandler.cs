@@ -51,7 +51,7 @@ namespace Win32Calls
         }
 
         public static bool WasDisconnectPlanned = false;
-        public static string LastKnownConnectedEntry;
+        public static string LastKnownConnectedEntry = string.Empty;
         public static EventWaitHandle? VPNClientNotifierHandle;
         public static EventWaitHandle? VPNServiceNotifierHandle;
 
@@ -109,8 +109,8 @@ namespace Win32Calls
             Log.LogInformation("RasConnChangedWaiterTask spawned for connection events ...");
             Log.LogInformation("RasConnChangedWaiterTask: Setting listener events so that they can react ...");
 
-            VPNServiceNotifierHandle.Set();
-            VPNClientNotifierHandle.Set();
+            VPNServiceNotifierHandle?.Set();
+            VPNClientNotifierHandle?.Set();
 
             Log.LogInformation("RasConnChangedWaiterTask: Waiting for RASConnectionNotification event ...");
             var retVal = PInvoke.WaitForSingleObject(HRasConnState, PInvoke.INFINITE);
@@ -127,8 +127,8 @@ namespace Win32Calls
             Log.LogInformation("RasConnChangedWaiterTask: State after CheckConnection: " +
                             CurrentConnectionState.ToString());
 
-            VPNServiceNotifierHandle.Set();
-            VPNClientNotifierHandle.Set();
+            VPNServiceNotifierHandle?.Set();
+            VPNClientNotifierHandle?.Set();
 
             Log.LogInformation("RasConnChangedWaiterTask: Service and Client listeners notified.");
             Log.LogInformation("RasConnChangedWaiterTask: Now exiting this thread ...");

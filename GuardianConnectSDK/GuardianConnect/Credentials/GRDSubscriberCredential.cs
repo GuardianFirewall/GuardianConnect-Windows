@@ -104,8 +104,8 @@ namespace GuardianConnect.Credentials
 
         private static GRDSubscriberCredential CurrentSubscriberCredential()
         {
-            string subCredString = GRDKeychain.GetPasswordStringForAccount(IGRDKeychain.kKeychainStr_SubscriberCredential);
-            return new GRDSubscriberCredential(subCredString);
+            string? subCredString = GRDKeychain.GetPasswordStringForAccount(IGRDKeychain.kKeychainStr_SubscriberCredential);
+            return new GRDSubscriberCredential(subCredString ?? string.Empty);
         }
 
         public string Description()
@@ -142,7 +142,8 @@ namespace GuardianConnect.Credentials
 
             string payLoad = Common.DecodeFrom64(base64Payload);
             Logger.LogInformation($"ParseSubscriberCredentials: jwt payload = '{payLoad}'");
-            var subCred = JsonSerializer.Deserialize<GRDSubscriberCredential>(payLoad, GRDSubscriberCredentialJsonContext.Default.GRDSubscriberCredential);
+            var subCred = JsonSerializer.Deserialize<GRDSubscriberCredential>(payLoad, GRDSubscriberCredentialJsonContext.Default.GRDSubscriberCredential)
+                          ?? throw new InvalidOperationException("Failed to deserialize subscriber credential payload");
 
             SubscriptionType = subCred.SubscriptionType ?? string.Empty;
             SubscriptionTypePretty = subCred.SubscriptionTypePretty ?? string.Empty;

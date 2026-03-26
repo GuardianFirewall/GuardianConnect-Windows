@@ -1,4 +1,5 @@
 using System.Diagnostics;
+using System.Diagnostics.CodeAnalysis;
 using System.Text;
 using System.Text.Json;
 using System.Text.Json.Serialization;
@@ -13,26 +14,28 @@ namespace GuardianConnect.API
     public class GRDConnectSubscriber
     {
         // REMOVE THIS!! TESTING ONLY  - TODO TODO TODO CHECK
-        private static Dictionary<string, object> _deviceDict;
+#pragma warning disable CS0169
+        private static Dictionary<string, object>? _deviceDict;
+#pragma warning restore CS0169
 
         //
-        
+
         // Properties
         [JsonPropertyName("ep-grd-subscriber-identifier")]
-        public string Identifier { get; set; }
+        public string Identifier { get; set; } = string.Empty;
 
         [JsonIgnore] // Secret is never serialized; stored separately in the keychain
-        public string Secret { get; set; }
+        public string Secret { get; set; } = string.Empty;
 
         [JsonPropertyName("ep-grd-subscriber-email")]
         [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
         public string? Email { get; set; }
 
         [JsonPropertyName("ep-grd-subscription-sku")]
-        public string SubscriptionSKU { get; set; }
+        public string SubscriptionSKU { get; set; } = string.Empty;
 
         [JsonPropertyName("ep-grd-subscription-name-formatted")]
-        public string SubscriptionNameFormatted { get; set; }
+        public string SubscriptionNameFormatted { get; set; } = string.Empty;
 
         [JsonPropertyName("ep-grd-subscription-expiration-date")]
         public long SubscriptionExpirationDate { get; set; }
@@ -77,6 +80,8 @@ namespace GuardianConnect.API
         }
 
         // Retrieve current subscriber from secure storage
+        [System.Diagnostics.CodeAnalysis.UnconditionalSuppressMessage("Trimming", "IL2026", Justification = "Registry-backed dictionary uses known primitive types safe for AOT")]
+        [System.Diagnostics.CodeAnalysis.UnconditionalSuppressMessage("AOT", "IL3050", Justification = "Registry-backed dictionary uses known primitive types safe for AOT")]
         public static (GRDConnectSubscriber? Subscriber, ErrorResponse errorResponse) GetCurrentSubscriber()
         {
             try
@@ -101,8 +106,8 @@ namespace GuardianConnect.API
                     JsonSerializer.SerializeToElement(BitConverter.ToInt64(binaryCSDict[kGuardianConnectSubscriberSubscriptionExpirationDate], 0));
 
                 var subscriber = InitFromDictionary(objectDict);
-                string mySecret = GRDKeychain.GetPasswordStringForAccount(kGuardianConnectSubscriberSecret);
-                subscriber.Secret = GRDKeychain.GetPasswordStringForAccount(kGuardianConnectSubscriberSecret);
+                string? mySecret = GRDKeychain.GetPasswordStringForAccount(kGuardianConnectSubscriberSecret);
+                subscriber.Secret = mySecret ?? string.Empty;
 
                 var (device, deviceError) = GRDConnectDevice.GetCurrentDevice();
                 if (deviceError.IsError)
@@ -145,7 +150,7 @@ namespace GuardianConnect.API
                         return deviceErr;
                 }
 
-                return new ErrorResponse(null);
+                return new ErrorResponse();
             }
             catch (Exception ex)
             {
@@ -164,7 +169,7 @@ namespace GuardianConnect.API
                 var currentPet = GRDPEToken.GetCurrentPEToken();
                 currentPet.Remove();
                 
-                return new ErrorResponse(null);
+                return new ErrorResponse();
             }
             catch (Exception ex)
             {
@@ -219,6 +224,8 @@ namespace GuardianConnect.API
 
         // Get device reference for current PET [ #168 - calls #186] - TESTED
 
+        [UnconditionalSuppressMessage("Trimming", "IL2026")]
+        [UnconditionalSuppressMessage("AOT", "IL3050")]
         public async Task<(GRDConnectDevice? Device, ErrorResponse errorResponse)> ConnectDeviceReferenceAsync()
         {
             try
@@ -233,7 +240,7 @@ namespace GuardianConnect.API
 
                 var (deviceDetails, error) =
                     await GRDHousekeepingAPI.GetDeviceReferenceForConnectSubscriberAsync(Identifier, Secret,
-                        devicePetoken);
+                        devicePetoken ?? string.Empty);
 //                await GRDHousekeepingAPI.GetDeviceReferenceForConnectSubscriberAsync(Identifier, Secret, peToken.Token);
 
                 if (error.IsError)
@@ -253,6 +260,8 @@ namespace GuardianConnect.API
         }
 
         // Register new subscriber [ #169 - calls #185 ] - DONE ??
+        [System.Diagnostics.CodeAnalysis.UnconditionalSuppressMessage("Trimming", "IL2026", Justification = "Uses known primitive types safe for AOT")]
+        [System.Diagnostics.CodeAnalysis.UnconditionalSuppressMessage("AOT", "IL3050", Justification = "Uses known primitive types safe for AOT")]
         public async Task<(GRDConnectSubscriber? Subscriber, ErrorResponse)> RegisterNewConnectSubscriberAsync( bool acceptedTOS, string deviceNickname, string Identifier, string Secret, string Email)
         {
             if (string.IsNullOrEmpty(Identifier) || string.IsNullOrEmpty(Secret))
@@ -319,7 +328,7 @@ namespace GuardianConnect.API
             var (currentDevice, deverrorResponse) = GRDConnectDevice.GetCurrentDevice();
 
             var (subscriberDetails, errorResponse) =
-                await GRDHousekeepingAPI.UpdateConnectSubscriberWithEmailAsync( Identifier, Secret, currentDevice.Nickname, AcceptedTOS, email);
+                await GRDHousekeepingAPI.UpdateConnectSubscriberWithEmailAsync( Identifier, Secret, currentDevice?.Nickname ?? string.Empty, AcceptedTOS, email);
             if (errorResponse.IsError)
                 return (null, errorResponse);
 
@@ -333,11 +342,13 @@ namespace GuardianConnect.API
         }
 
         // Validate subscriber subscription [ #172 ] - NOT WORKING
+        [System.Diagnostics.CodeAnalysis.UnconditionalSuppressMessage("Trimming", "IL2026", Justification = "Uses known primitive types safe for AOT")]
+        [System.Diagnostics.CodeAnalysis.UnconditionalSuppressMessage("AOT", "IL3050", Justification = "Uses known primitive types safe for AOT")]
         public async Task<(GRDConnectSubscriber? Subscriber, ErrorResponse errorResponse)> ValidateConnectSubscriberAsync()
         {
             var currentPET = GRDPEToken.GetCurrentPEToken();
             var tokenBefore = currentPET.Token;
-            var deviceTokenBefore = GRDConnectDevice.GetCurrentDevice().Device.PEToken;
+            var deviceTokenBefore = GRDConnectDevice.GetCurrentDevice().Device?.PEToken;
             if (string.IsNullOrEmpty(currentPET.Token))
                 return (null, new ErrorResponse("Failed to validate Connect subscriber. No PE-Token present on device"));
 
@@ -357,10 +368,10 @@ namespace GuardianConnect.API
             var newSubscriber = InitFromDictionary(details);
             
             var currentDevice = GRDConnectDevice.GetCurrentDevice().Device;
-            currentDevice.UpdateFromDictionary(details);
-            currentDevice.Store();
+            currentDevice?.UpdateFromDictionary(details);
+            currentDevice?.Store();
             var newDevice = GRDConnectDevice.GetCurrentDevice().Device;
-            if (currentDevice.PEToken != newDevice.PEToken) Debugger.Break();
+            if (currentDevice?.PEToken != newDevice?.PEToken) Debugger.Break();
 
             currentPET.UpdateFromDict(details);
             currentPET.Store();
@@ -371,7 +382,7 @@ namespace GuardianConnect.API
                 return (null, updateErr.SetErrorMessage($"Failed to store persistent local data of validated Connect Subscriber: {updateErr.Message}"));
 
             Log.Debug($"END OF VALIDATE: PRIOR PETOKEN IS {tokenBefore}, DEVICE PET IS {deviceTokenBefore}");
-            Log.Debug($"END OF VALIDATE: PETOKEN IS {currentPET.Token}, DEVICE PET IS {newDevice.PEToken}");
+            Log.Debug($"END OF VALIDATE: PETOKEN IS {currentPET.Token}, DEVICE PET IS {newDevice?.PEToken}");
             return (newSubscriber, updateErr);
         }
 

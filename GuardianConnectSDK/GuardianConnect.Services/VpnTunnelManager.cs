@@ -7,10 +7,10 @@ namespace GuardianFirewallService;
 
 public class VpnTunnelManager : ITransportProvider
 {
-    private ITransportProvider.TransportProtocol _protocolType;
-    private ITransportProvider.VPNProviderStatus _vpnStatus;
-    private ITransportProvider.VPNConnectionError _lastVpnError;
-    private DateTime _connectedDate;
+    private ITransportProvider.TransportProtocol _protocolType = ITransportProvider.TransportProtocol.TransportIKEv2;
+    private ITransportProvider.VPNProviderStatus _vpnStatus = ITransportProvider.VPNProviderStatus.VPNStatusDisconnected;
+    private ITransportProvider.VPNConnectionError _lastVpnError = default;
+    private DateTime _connectedDate = DateTime.MinValue;
 
     public ITransportProvider.TransportProtocol ProtocolType => _protocolType;
 

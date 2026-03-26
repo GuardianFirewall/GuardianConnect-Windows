@@ -103,7 +103,7 @@ namespace GuardianConnect.Helpers
             _singleton.CurrentDeviceBlocklistConfig = new DeviceFilterConfig();
 
             GRDServerManager.InitialGeoInformationLoadComplete.Wait(1 * 1000);
-            PreferredRegion = Preferences.Get(Common.kPreferredRegion, null);
+            PreferredRegion = Preferences.Get(Common.kPreferredRegion, null!);
         }
 
         /// Helper function to quickly determine if a VPN tunnel of any kind
@@ -128,8 +128,8 @@ namespace GuardianConnect.Helpers
             return isConnected ? activeConnectionName : string.Empty;
         }
 
-        private string? _connectApiHostname;
-        private readonly string? _connectPublishableKey;
+        private string? _connectApiHostname = Common.DefaultConnectAPIHostname;
+        private readonly string? _connectPublishableKey = null;
 
         /// Used to determine if an active connection is possible, do we have all the necessary credentials (EAPUsername, Password, Host, etc)
         public static bool ActiveConnectionPossible()
@@ -180,16 +180,16 @@ namespace GuardianConnect.Helpers
                 {
                     clientId = mainCreds.UserName;
                 }
-                (GRDSubscriberCredential subCreds, errorResponse) = await GetValidSubscriberCredentialWithCompletion();
+                (GRDSubscriberCredential? subCreds, errorResponse) = await GetValidSubscriberCredentialWithCompletion();
                 if (subCreds == null || errorResponse.Message.Equals("PE TOKEN NOT SET"))
                     return; // TJE TODO: CHECK THIS
 
                 errorResponse = await GRDGateway.InvalidateCredentialsForClientId(clientId, mainCreds.ApiAuthToken, mainCreds.HostName, subCreds.Jwt);
                 if (errorResponse.IsError)
                 {
-                    var responseMessage = (HttpResponseMessage)errorResponse.Response;
+                    var responseMessage = errorResponse.Response as HttpResponseMessage;
                     _logger.LogError(
-                        $"Failed to invalidate VPN credentials: {responseMessage.ReasonPhrase ?? errorResponse.Message})");
+                        $"Failed to invalidate VPN credentials: {responseMessage?.ReasonPhrase ?? errorResponse.Message})");
                 }
             }
         }
@@ -231,7 +231,7 @@ namespace GuardianConnect.Helpers
             errorResponse = await CreateStandaloneCredentialsForTransportProtocol(protocol, 30); // CONN#4-CONN#10
             if (errorResponse.IsError) return errorResponse;
 
-            List<GRDCredential> credentials = (List<GRDCredential>)errorResponse.Data;
+            List<GRDCredential> credentials = (List<GRDCredential>)errorResponse.Data!;
 
             var mainCredential = credentials[0];
             mainCredential.TransportProtocol = protocol;
@@ -269,7 +269,7 @@ namespace GuardianConnect.Helpers
                 return errorResponse;
             }
 
-            if (mainCredentials.TransportProtocol != ITransportProvider.TransportProtocol.TransportIKEv2)
+            if (mainCredentials!.TransportProtocol != ITransportProvider.TransportProtocol.TransportIKEv2)
             {
                 errorResponse.SetException(new InvalidOperationException("MainCredential.TransportProtocol not set!"))
                     .SetErrorMessage("WHY CALLING StartIKEv2Connection WITH PROTOCOL NOT SET??");
@@ -391,7 +391,7 @@ namespace GuardianConnect.Helpers
 
             //string errorMessage = "NONE";
             ErrorResponse errorResponse;
-            (GRDSubscriberCredential subCreds, errorResponse) = await GetValidSubscriberCredentialWithCompletion();
+            (GRDSubscriberCredential? subCreds, errorResponse) = await GetValidSubscriberCredentialWithCompletion();
             if (errorResponse.IsError) return errorResponse;
             // TJE TODO - CHECK IF errorMessage is "PE TOKEN IS NOT SET"
             errorResponse = await GRDGateway.RegisterDeviceForTransportProtocol(protocol, hostname, subCreds!.Jwt, days);

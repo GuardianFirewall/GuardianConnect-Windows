@@ -216,7 +216,6 @@ public static class ServicePowerEventsHandler
 
     internal static void PerformResumeActions()
     {
-        var successful = false;
         Logger.LogInformation("*************** PerformResumeActions ...");
         // We don't care if user brought us out or not - we are resuming
         // IF we were connected, then reconnect now
@@ -228,7 +227,7 @@ public static class ServicePowerEventsHandler
             var SavedResumeParemeters = RegistrySettings.RetrieveGuardianUserSettings(Common.kVpnCallParametersForReboot);
             var vpnResumeParameters = JsonSerializer.Deserialize<VPNCallParameters>(SavedResumeParemeters, VPNCallParametersJsonContext.Default.VPNCallParameters);
 
-            var host = vpnResumeParameters.VpnHostName;
+            var host = vpnResumeParameters?.VpnHostName ?? string.Empty;
             Logger.LogInformation("************** PerformResumeActions - VPN WAS CONNECTED AT SUSPENSION.");
             Logger.LogInformation($"************** Check network stack readiness by attempting a status check of the vpn host '{host}");
             var countValue = RegistrySettings.RetrieveGuardianUserSettings(Common.kServicePowerResumeReconnectAttempts);

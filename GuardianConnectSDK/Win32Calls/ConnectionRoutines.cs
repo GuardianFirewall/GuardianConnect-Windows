@@ -29,7 +29,7 @@ public static class ConnectionRoutines
     internal static HRASCONN ActiveConnectionHandle;
     internal static RASCREDENTIALSW ActiveConnectionCredentials;
 
-    public static string ActiveConnectionEntryName { get; private set; }
+    public static string ActiveConnectionEntryName { get; private set; } = string.Empty;
 
     internal static unsafe RASCONNW[] GetRasConnections(out uint cConnections)
     {
@@ -67,7 +67,7 @@ public static class ConnectionRoutines
         
         for (int i = 0; i < cConnections; i++)
         {
-            connections[i] = (RASCONNW)Marshal.PtrToStructure(arrayPtr, typeof(RASCONNW));
+            connections[i] = (RASCONNW)Marshal.PtrToStructure(arrayPtr, typeof(RASCONNW))!;
             arrayPtr = new IntPtr(arrayPtr.ToInt64() + cb);
         }
 

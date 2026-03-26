@@ -172,8 +172,11 @@ public class GRDGateway
             {
                 cred.ClientId = cred.UserName;
             }
-            Logger.LogInformation($"RegisterDeviceForTransportProtocol: resp Status={response.StatusCode}, cred values: ApiAuthToken: {cred.ApiAuthToken}, ClientId: {cred.ClientId}, DevicePrivateKey: {cred.DevicePrivateKey}, DevicePublicKey: {cred.DevicePublicKey}, Ipv4Address: {cred.IPv4Address}");
-            if (cred != null) credsList.Add(cred);
+            if (cred != null)
+            {
+                Logger.LogInformation($"RegisterDeviceForTransportProtocol: resp Status={response.StatusCode}, cred values: ApiAuthToken: {cred.ApiAuthToken}, ClientId: {cred.ClientId}, DevicePrivateKey: {cred.DevicePrivateKey}, DevicePublicKey: {cred.DevicePublicKey}, Ipv4Address: {cred.IPv4Address}");
+                credsList.Add(cred);
+            }
         }
         catch (Exception e)
         {
@@ -234,10 +237,11 @@ public class GRDGateway
         
         // Get DeviceFilterConfig object
         var dfcCurrent = GRDVPNHelper.Singleton.CurrentDeviceBlocklistConfig;
-        dfcCurrent.Api_auth_token =  ApiAuthToken;
+        if (dfcCurrent != null) dfcCurrent.Api_auth_token = ApiAuthToken;
 
         Logger.LogInformation("SetDeviceFilterConfigsForDevice: Updating CurrentDeviceBlocklistConfig api_auth_token");
-        GRDVPNHelper.Singleton.CurrentDeviceBlocklistConfig.Api_auth_token = ApiAuthToken;
+        if (GRDVPNHelper.Singleton.CurrentDeviceBlocklistConfig != null)
+            GRDVPNHelper.Singleton.CurrentDeviceBlocklistConfig.Api_auth_token = ApiAuthToken;
 
         var dfcJson = JsonSerializer.Serialize(dfcCurrent, DeviceFilterConfigJsonContext.Default.DeviceFilterConfig);
         var clientId = DeviceIdentifier;

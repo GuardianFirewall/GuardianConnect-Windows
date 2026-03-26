@@ -11,8 +11,8 @@ namespace GuardianConnect.API
     public class GRDConnectDevice
     {
         // Properties
-        public string Nickname { get; set; }
-        public string UUID { get; set; }
+        public string Nickname { get; set; } = string.Empty;
+        public string UUID { get; set; } = string.Empty;
         public string? PEToken { get; set; }
         public long PETExpires { get; set; }
         public long CreatedAt { get; set; }
@@ -63,6 +63,8 @@ namespace GuardianConnect.API
         }
 
 
+        [System.Diagnostics.CodeAnalysis.UnconditionalSuppressMessage("Trimming", "IL2026", Justification = "Registry-backed dictionary uses known primitive types safe for AOT")]
+        [System.Diagnostics.CodeAnalysis.UnconditionalSuppressMessage("AOT", "IL3050", Justification = "Registry-backed dictionary uses known primitive types safe for AOT")]
         public static (GRDConnectDevice? Device, ErrorResponse Error) GetCurrentDevice()
         {
             try
@@ -195,7 +197,7 @@ namespace GuardianConnect.API
         // List devices for PEToken
         // [#181 - calls #193] (#167 also calls #193)
 
-        public static async Task<(List<GRDConnectDevice> Devices, ErrorResponse errorResponse)> ListConnectDevicesForPETokenAsync(string peToken)
+        public static async Task<(List<GRDConnectDevice>? Devices, ErrorResponse errorResponse)> ListConnectDevicesForPETokenAsync(string peToken)
         {
             var (currentDevice, deviceError) = GRDConnectDevice.GetCurrentDevice();
             if (deviceError.IsError)

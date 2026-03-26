@@ -28,11 +28,8 @@ namespace GuardianConnect.API.Model
 
         public override string ToString()
         {
-            //var pretty = JsonSerializer.Serialize(this, Formatting.Indented);
-
-            // New (System.Text.Json)
-            var pretty = JsonSerializer.Serialize(this, new System.Text.Json.JsonSerializerOptions { WriteIndented = true });
-            return pretty;
+            // Use the generated JsonContext to avoid AOT/trimming issues
+            return JsonSerializer.Serialize(this, GRDUserLoginResponseJsonContext.Default.GrdUserLoginResponse);
         }
     }
     /*

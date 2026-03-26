@@ -14,8 +14,8 @@ public static class Utility
 
     public struct RasOperationResult
     {
-        bool success;
+        public bool Success;
         // If not success, store user friendly error description.
-        string error_description;
+        public string ErrorDescription;
     }
 }

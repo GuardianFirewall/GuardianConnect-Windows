@@ -39,11 +39,11 @@ namespace GuardianConnect.Credentials
             }
             catch (Exception e)
             {
-                Logger.LogError(e, "Exception thrown when writing to registry key: ", key);
+                Logger.LogError(e, "Exception thrown when writing to registry key: {Key}", key);
                 throw;
             }
         }
-        
+
         public static void WriteRegistryData(string encryptedDataAsString, string key)
         {
             try
@@ -53,11 +53,11 @@ namespace GuardianConnect.Credentials
             }
             catch (Exception e)
             {
-                Logger.LogError(e, "Exception thrown when writing to registry key: ", key);
+                Logger.LogError(e, "Exception thrown when writing to registry key: {Key}", key);
                 throw;
             }
-        } 
-        
+        }
+
         public static void WriteRegistryData(byte[] encryptedData, RegistryKey registrySubKey, string ValueName)
         {
             try
@@ -66,7 +66,7 @@ namespace GuardianConnect.Credentials
             }
             catch (Exception e)
             {
-                Logger.LogError(e, "Exception thrown when writing to registry key: ", registrySubKey.Name);
+                Logger.LogError(e, "Exception thrown when writing to registry key: {KeyName}", registrySubKey.Name);
                 throw;
             }
         } 
@@ -82,7 +82,7 @@ namespace GuardianConnect.Credentials
             }
             catch (Exception e)
             {
-                Logger.LogError(e, "Exception thrown when reading from registry key: ", key);
+                Logger.LogError(e, "Exception thrown when reading from registry key: {Key}", key);
             }
             return encryptedDataString;
         }
@@ -118,7 +118,7 @@ namespace GuardianConnect.Credentials
             }
             catch (Exception e)
             {
-                Logger.LogError(e, "Exception thrown when reading from registry key: ", key);
+                Logger.LogError(e, "Exception thrown when reading from registry key: {Key}", key);
             }            
             
             return encryptedDataBytes;
@@ -141,7 +141,7 @@ namespace GuardianConnect.Credentials
             }
             catch (Exception e)
             {
-                Logger.LogError(e, "Exception thrown when reading from registry key: ", ValueName);
+                Logger.LogError(e, "Exception thrown when reading from registry key: {ValueName}", ValueName);
             }            
             
             return encryptedDataBytes;        

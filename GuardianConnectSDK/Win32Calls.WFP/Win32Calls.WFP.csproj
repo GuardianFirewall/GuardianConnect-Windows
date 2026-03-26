@@ -4,6 +4,8 @@
     <TargetFramework>net9.0-windows</TargetFramework>
     <ImplicitUsings>enable</ImplicitUsings>
     <Nullable>enable</Nullable>
+    <!-- CA1418: CsWin32 generated code uses 'windowsserver' platform name not known to the analyzer -->
+    <NoWarn>$(NoWarn);CA1418</NoWarn>
   </PropertyGroup>
 
   <ItemGroup>
