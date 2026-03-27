@@ -1,11 +1,10 @@
 ﻿using System.Text.Json.Serialization;
 
-namespace GuardianConnect.API
+namespace GuardianConnect.API;
+
+[JsonSourceGenerationOptions(WriteIndented = true)]
+[JsonSerializable(typeof(GRDGateway.RegisterDevicePayload))]
+[JsonSerializable(typeof(List<GRDGateway.RegisterDevicePayload>))]
+public partial class RegisterDevicePayloadJsonContext : JsonSerializerContext
 {
-    [JsonSourceGenerationOptions(WriteIndented = true)]
-    [JsonSerializable(typeof(GRDGateway.RegisterDevicePayload))]
-    [JsonSerializable(typeof(List<GRDGateway.RegisterDevicePayload>))]
-    public partial class RegisterDevicePayloadJsonContext : JsonSerializerContext
-    {
-    }
 }

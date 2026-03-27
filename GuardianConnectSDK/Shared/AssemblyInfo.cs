@@ -1,4 +1,5 @@
 using System.Runtime.InteropServices;
+using System.Runtime.Versioning;
 
 // In SDK-style projects such as this one, several assembly attributes that were historically
 // defined in this file are now automatically added during build and populated with
@@ -15,4 +16,4 @@ using System.Runtime.InteropServices;
 // The following GUID is for the ID of the typelib if this project is exposed to COM.
 
 [assembly: Guid("8b4d5fcc-47cf-4d59-b0d4-e59e1e3d99d0")]
-[assembly: System.Runtime.Versioning.SupportedOSPlatformAttribute("windows")]
+[assembly: SupportedOSPlatform("windows")]

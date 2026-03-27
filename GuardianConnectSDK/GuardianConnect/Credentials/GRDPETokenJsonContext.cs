@@ -1,18 +1,12 @@
-﻿using System;
-using System.Collections.Generic;
-using System.Linq;
-using System.Text;
-using System.Threading.Tasks;
-using System.Text.Json.Serialization;
+﻿using System.Text.Json.Serialization;
 
-namespace GuardianConnect.Credentials
+namespace GuardianConnect.Credentials;
+
+[JsonSourceGenerationOptions(WriteIndented = true)]
+[JsonSerializable(typeof(GRDPEToken))]
+[JsonSerializable(typeof(List<GRDPEToken>))]
+public partial class GRDPETokenJsonContext : JsonSerializerContext
 {
-    [JsonSourceGenerationOptions(WriteIndented = true)]
-    [JsonSerializable(typeof(GRDPEToken))]
-    [JsonSerializable(typeof(List<GRDPEToken>))]
-    public partial class GRDPETokenJsonContext: JsonSerializerContext
-    {
-    }
 }
 /* Usage
 using System.Text.Json;
@@ -32,4 +26,4 @@ var tokenList = JsonSerializer.Deserialize<List<GRDPEToken>>(jsonList, GRDPEToke
 
 // Same for GRDSubscriberCredential and List<GRDSubscriberCredential>
 
- */
+*/

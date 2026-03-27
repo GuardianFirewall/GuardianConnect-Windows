@@ -1,33 +1,33 @@
 ﻿using System.Text.Json;
 
-namespace GuardianConnect.Helpers
+namespace GuardianConnect.Helpers;
+
+public static class HttpUtils
 {
-    public static class HttpUtils
+    private static HttpClient _client = new();
+    private static JsonSerializerOptions? _serializerOptions;
+
+    public static HttpClient Client
     {
-        private static HttpClient _client = new HttpClient();
-        private static JsonSerializerOptions? _serializerOptions;
-        public static HttpClient Client
+        get
         {
-            get
-            {
-                _client ??= new HttpClient();
+            _client ??= new HttpClient();
 
-                return _client;
-            }
+            return _client;
         }
+    }
 
-        public static JsonSerializerOptions SerializerOptions {
-            get
+    public static JsonSerializerOptions SerializerOptions
+    {
+        get
+        {
+            _serializerOptions ??= new JsonSerializerOptions
             {
+                PropertyNamingPolicy = JsonNamingPolicy.CamelCase,
+                WriteIndented = true
+            };
 
-                _serializerOptions ??= new JsonSerializerOptions
-                    {
-                        PropertyNamingPolicy = JsonNamingPolicy.CamelCase,
-                        WriteIndented = true
-                    };
-
-                return _serializerOptions;
-            }
+            return _serializerOptions;
         }
     }
 }

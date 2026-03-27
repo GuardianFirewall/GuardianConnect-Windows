@@ -5,7 +5,7 @@ namespace GuardianConnect.Shared;
 
 public record ErrorResponse(
     string MessageArg = "",
-    Object? ThrownExceptionArg = null,
+    object? ThrownExceptionArg = null,
     bool IsErrorArg = false,
     object? ResponseArg = null,
     object? DataArg = null,
@@ -19,6 +19,7 @@ public record ErrorResponse(
     public object? Response { get; set; } = ResponseArg;
     public object? GRDApiError { get; set; } = GrdapiErrorArg;
     public object? Data { get; set; } = DataArg;
+
     [JsonIgnore]
     public HttpResponseMessage HttpResponse { get; set; } = (HttpResponse ?? null) ?? new HttpResponseMessage();
 
@@ -43,7 +44,7 @@ public record ErrorResponse(
         GRDApiError = error;
         return this;
     }
-    
+
     public string GetReasonPhrase()
     {
         var resp = Response as HttpResponseMessage ?? new HttpResponseMessage();
@@ -52,16 +53,18 @@ public record ErrorResponse(
 
     public override string ToString()
     {
-        string xt = string.Empty;
+        var xt = string.Empty;
         if (ThrownException != null)
         {
-            Exception tx = (Exception) ThrownException;
+            var tx = (Exception)ThrownException;
             var innerX = tx.InnerException != null ? tx.InnerException.ToString() : string.Empty;
             xt = $"Exception: Message = {tx.Message}, StackTrace = {tx.StackTrace}, InnerException = {innerX}";
         }
+
         var message = string.IsNullOrEmpty(Message) ? "" : Message;
         var response = (HttpResponseMessage)Response!;
-        var logText = $"ErrorResponse: IsError: {IsError}, Message: {message}, Exception: {xt}, Response: {response}, Data: {Data ?? string.Empty}, HttpResponse: [{HttpResponse.StatusCode}]{HttpResponse.ReasonPhrase}";
+        var logText =
+            $"ErrorResponse: IsError: {IsError}, Message: {message}, Exception: {xt}, Response: {response}, Data: {Data ?? string.Empty}, HttpResponse: [{HttpResponse.StatusCode}]{HttpResponse.ReasonPhrase}";
         return logText;
     }
 }

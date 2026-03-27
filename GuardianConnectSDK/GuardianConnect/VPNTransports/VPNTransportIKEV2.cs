@@ -1,50 +1,45 @@
-﻿using System.Diagnostics;
-using System.Diagnostics.CodeAnalysis;
+﻿using System.Diagnostics.CodeAnalysis;
 using System.Net;
 using System.Text.Json;
 using Windows.Win32.NetworkManagement.Rras;
-using GuardianConnect.Credentials;
-using GuardianConnect.Helpers;
-using GuardianConnect.Shared;
 using GuardianConnect.Abstractions;
-using GuardianConnect.Shared.Extensions;
-using Win32Calls;
-using System.Text.Json.Serialization;
+using GuardianConnect.Shared;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Logging.Abstractions;
+using Win32Calls;
 
 namespace GuardianConnect.VPNTransports;
 
 [SuppressMessage("Interoperability", "CA1416:Validate platform compatibility")]
 public class VPNTransportIKEV2 : ITransportProvider
 {
-    private static bool shuttingDown = false;
+    public delegate void PowerEventHandlerCallback();
+
+    private static readonly bool shuttingDown = false;
     private static string? ActiveEntryName;
-    private ITransportProvider.TransportProtocol _protocolType = ITransportProvider.TransportProtocol.TransportIKEv2;
-    private ITransportProvider.VPNProviderStatus _vpnStatus;
-    private ITransportProvider.VPNConnectionError _lastVpnError = 0;
-    private DateTime _connectedDate = DateTime.MinValue;
-    private Task? PollingTask;
 
     public static EventWaitHandle? H_VPNStateChangeServiceEvent;
-    public static VPNCallParameters VpnResumeParameters = new VPNCallParameters();
-
-    public delegate void PowerEventHandlerCallback();
+    public static VPNCallParameters VpnResumeParameters = new();
 
     public static PowerEventHandlerCallback PowerResumeActions = () => { };
     public static PowerEventHandlerCallback SetVPNStateAtSuspend = () => { };
     public static PowerEventHandlerCallback ResetVPNStateAtSuspend = () => { };
 
-    private static Microsoft.Extensions.Logging.ILogger _logger = NullLogger.Instance;
+    private static ILogger _logger = NullLogger.Instance;
+    private readonly DateTime _connectedDate = DateTime.MinValue;
+    private readonly ITransportProvider.VPNConnectionError _lastVpnError = 0;
 
-    public static Microsoft.Extensions.Logging.ILogger Logger
+    private readonly ITransportProvider.TransportProtocol _protocolType =
+        ITransportProvider.TransportProtocol.TransportIKEv2;
+
+    private Task? PollingTask;
+    private ITransportProvider.VPNProviderStatus _vpnStatus;
+
+    public static ILogger Logger
     {
         get
         {
-            if (_logger == NullLogger.Instance)
-            {
-                _logger = StaticLoggerFactory.CreateLogger("VPNTransportIKEV2");
-            }
+            if (_logger == NullLogger.Instance) _logger = StaticLoggerFactory.CreateLogger("VPNTransportIKEV2");
 
             return _logger;
         }
@@ -59,19 +54,6 @@ public class VPNTransportIKEV2 : ITransportProvider
 
     public virtual DateTime ConnectedDate => _connectedDate;
 
-    // TJE - revisit this - I don't like scattered and seemingly redundant data and methods
-    public static ITransportProvider.VPNProviderStatus GetCurrentVPNState()
-    {
-        ITransportProvider.VPNProviderStatus status = ITransportProvider.VPNProviderStatus.VPNStatusDisconnected;
-        String activeEntryName = String.Empty;
-        if (ConnectionRoutines.IsAnyConnectionActive(out activeEntryName))
-        {
-            status = ITransportProvider.VPNProviderStatus.VPNStatusConnected;
-        }
-
-        return status;
-    }
-
     public virtual Task<(ErrorResponse, bool)> StartVPNTunnelAndReturnError()
     {
         throw new NotImplementedException();
@@ -81,6 +63,96 @@ public class VPNTransportIKEV2 : ITransportProvider
     {
         var errorResponse = StopVPNTunnel();
         return errorResponse;
+    }
+
+    public virtual async Task<ErrorResponse> StartVPNTunnelWithOptions(VPNCallParameters options)
+    {
+        Logger.LogInformation("VPNTransportIKEV2.StartVPNTunnelWithOptions(): Entry...");
+        VpnResumeParameters = options;
+
+        Logger.LogInformation("StartVPNTunnelWithOptions: Evaluating vpn connection parameters...");
+        Logger.LogInformation($"EapuserName: {options.EapuserName}");
+        Logger.LogInformation($"Eappassword: {options.Eappassword}");
+        Logger.LogInformation($"EntryNam: {options.EntryName}");
+        Logger.LogInformation($"VpnHostName: {options.VpnHostName}");
+        Logger.LogInformation($"VpnHostDisplay: {options.VpnHostDisplay}");
+
+        var creds = new NetworkCredential();
+
+        creds.UserName = options.EapuserName;
+        creds.Password = options.Eappassword;
+
+        var entryName = options.EntryName;
+        var hostName = options.VpnHostName;
+        var hostDisplayName = options.VpnHostDisplay;
+
+        // :CALL POINT:
+        var result = ConnectionRoutines.CreateOrUpdateEntry(entryName, hostName, creds.UserName, creds.Password);
+
+        if (result.IsError) return result;
+
+        var connectionCallResult = ConnectToVpnLongRunning(entryName, creds.UserName, creds.Password);
+
+        if (connectionCallResult.IsError) return connectionCallResult;
+
+        NotificationHandler.WasDisconnectPlanned = false;
+        Logger.LogInformation(
+            $"StartVPNTunnelWithOptions: WasDisconnectPlanned now equals {NotificationHandler.WasDisconnectPlanned}");
+        SetVPNStateAtSuspend(); // CHECK THIS - moving to here - makes sense after non-error Connect command return
+        Logger.LogInformation(
+            $"StartVPNTunnelWithOptions: (CHECK#2) WasDisconnectPlanned now equals {NotificationHandler.WasDisconnectPlanned}");
+
+        // Save off the calling parameters in case we reboot while connected
+        var vpnResumeParameters =
+            JsonSerializer.Serialize(VpnResumeParameters, VPNCallParametersJsonContext.Default.VPNCallParameters);
+        RegistrySettings.UpdateGuardianUserSettings(Common.kVpnCallParametersForReboot, vpnResumeParameters);
+
+        ActiveEntryName = entryName;
+
+        return new ErrorResponse();
+    }
+
+    // Called from the ClientPipe Service when a Disconnect command is received
+    public virtual ErrorResponse StopVPNTunnel(bool wasDisconnectPlanned = true)
+    {
+        Logger.LogInformation(
+            $"VPNTransportIKEV2.StopVPNTunnel(): Disconnecting entry '{ConnectionRoutines.ActiveConnectionEntryName}' ...");
+        NotificationHandler.WasDisconnectPlanned = wasDisconnectPlanned;
+        Logger.LogInformation(
+            $"StopVPNTunnel: WasDisconnectPlanned now equals {NotificationHandler.WasDisconnectPlanned}");
+        try
+        {
+            if (wasDisconnectPlanned) ResetVPNStateAtSuspend();
+
+            ConnectionRoutines.DisconnectEntryAndRemove();
+            return new ErrorResponse();
+        }
+        catch (Exception e)
+        {
+            Logger.LogError(e, $"VPNTransportIKEV2.StopVPNTunnel(): Exception during Disconnect: {e.Message}");
+            return new ErrorResponse
+            {
+                IsError = true,
+                Message = $"Exception during Disconnect: {e.Message}",
+                ThrownException = e
+            };
+        }
+    }
+
+    public virtual ErrorResponse FetchLastDisonnectError()
+    {
+        throw new NotImplementedException();
+    }
+
+    // TJE - revisit this - I don't like scattered and seemingly redundant data and methods
+    public static ITransportProvider.VPNProviderStatus GetCurrentVPNState()
+    {
+        var status = ITransportProvider.VPNProviderStatus.VPNStatusDisconnected;
+        var activeEntryName = string.Empty;
+        if (ConnectionRoutines.IsAnyConnectionActive(out activeEntryName))
+            status = ITransportProvider.VPNProviderStatus.VPNStatusConnected;
+
+        return status;
     }
 
     public static void PowerSuspendVPNConnection(bool wasDisconectPlanned = true)
@@ -110,83 +182,6 @@ public class VPNTransportIKEV2 : ITransportProvider
         return result;
     }
 
-    public async virtual Task<ErrorResponse> StartVPNTunnelWithOptions(VPNCallParameters options)
-    {
-        Logger.LogInformation("VPNTransportIKEV2.StartVPNTunnelWithOptions(): Entry...");
-        VpnResumeParameters = options;
-
-        Logger.LogInformation("StartVPNTunnelWithOptions: Evaluating vpn connection parameters...");
-        Logger.LogInformation($"EapuserName: {options.EapuserName}");
-        Logger.LogInformation($"Eappassword: {options.Eappassword}");
-        Logger.LogInformation($"EntryNam: {options.EntryName}");
-        Logger.LogInformation($"VpnHostName: {options.VpnHostName}");
-        Logger.LogInformation($"VpnHostDisplay: {options.VpnHostDisplay}");
-
-        NetworkCredential creds = new NetworkCredential();
-
-        creds.UserName = options.EapuserName;
-        creds.Password = options.Eappassword;
-
-        string entryName = options.EntryName;
-        string hostName = options.VpnHostName;
-        string hostDisplayName = options.VpnHostDisplay;
-
-        // :CALL POINT:
-        var result = ConnectionRoutines.CreateOrUpdateEntry(entryName, hostName, creds.UserName, creds.Password);
-
-        if (result.IsError) return result;
-
-        ErrorResponse connectionCallResult = ConnectToVpnLongRunning(entryName, creds.UserName, creds.Password);
-
-        if (connectionCallResult.IsError) return connectionCallResult;
-
-        NotificationHandler.WasDisconnectPlanned = false;
-        Logger.LogInformation( $"StartVPNTunnelWithOptions: WasDisconnectPlanned now equals {NotificationHandler.WasDisconnectPlanned}");
-        SetVPNStateAtSuspend(); // CHECK THIS - moving to here - makes sense after non-error Connect command return
-        Logger.LogInformation( $"StartVPNTunnelWithOptions: (CHECK#2) WasDisconnectPlanned now equals {NotificationHandler.WasDisconnectPlanned}");
-
-        // Save off the calling parameters in case we reboot while connected
-        var vpnResumeParameters = JsonSerializer.Serialize(VpnResumeParameters, VPNCallParametersJsonContext.Default.VPNCallParameters);
-        RegistrySettings.UpdateGuardianUserSettings(Common.kVpnCallParametersForReboot, vpnResumeParameters);
-
-        ActiveEntryName = entryName;
-
-        return new ErrorResponse();
-    }
-
-    // Called from the ClientPipe Service when a Disconnect command is received
-    public virtual ErrorResponse StopVPNTunnel(bool wasDisconnectPlanned = true)
-    {
-        Logger.LogInformation( $"VPNTransportIKEV2.StopVPNTunnel(): Disconnecting entry '{ConnectionRoutines.ActiveConnectionEntryName}' ...");
-        NotificationHandler.WasDisconnectPlanned = wasDisconnectPlanned;
-        Logger.LogInformation( $"StopVPNTunnel: WasDisconnectPlanned now equals {NotificationHandler.WasDisconnectPlanned}");
-        try
-        {
-            if (wasDisconnectPlanned)
-            {
-                ResetVPNStateAtSuspend();
-            }
-
-            ConnectionRoutines.DisconnectEntryAndRemove();
-            return new ErrorResponse();
-        }
-        catch (Exception e)
-        {
-            Logger.LogError(e, $"VPNTransportIKEV2.StopVPNTunnel(): Exception during Disconnect: {e.Message}");
-            return new ErrorResponse
-            {
-                IsError = true,
-                Message = $"Exception during Disconnect: {e.Message}",
-                ThrownException = e
-            };
-        }
-    }
-
-    public virtual ErrorResponse FetchLastDisonnectError()
-    {
-        throw new NotImplementedException();
-    }
-
     public ErrorResponse ConnectToVpnLongRunning(string entryName, string tempUser, string tempPassword)
     {
         var t = new Task<ErrorResponse>(() =>
@@ -197,18 +192,16 @@ public class VPNTransportIKEV2 : ITransportProvider
                     .IsError) // no premature errors from bad calling data/conventions or state of network/RRAS subsystem
             {
                 NotificationHandler.StartRasConnectStateWatcher();
-                return new ErrorResponse() { Message = "VPN Connection Successful!" };
+                return new ErrorResponse { Message = "VPN Connection Successful!" };
             }
-            else
+
+            return new ErrorResponse
             {
-                return new ErrorResponse
-                {
-                    Data = rasDialRetVal.ToString(),
-                    IsError = true,
-                    Message =
-                        $"An error occurred when making RASDial VPN Connection call. Return value is  {rasDialRetVal}"
-                };
-            }
+                Data = rasDialRetVal.ToString(),
+                IsError = true,
+                Message =
+                    $"An error occurred when making RASDial VPN Connection call. Return value is  {rasDialRetVal}"
+            };
         });
         t.Start();
 
@@ -225,7 +218,7 @@ public class VPNTransportIKEV2 : ITransportProvider
         var succeeded = EventWaitHandle.TryOpenExisting(Common.VPNEVT_NAME_SVRSIDE, out H_VPNStateChangeServiceEvent);
         if (!succeeded)
         {
-            Logger.LogError($"ERROR opening H_VPNStateChangeServiceEvent");
+            Logger.LogError("ERROR opening H_VPNStateChangeServiceEvent");
             throw new Exception("VPNConnectionEvent WaitHandle Open Exception");
         }
 
@@ -236,14 +229,14 @@ public class VPNTransportIKEV2 : ITransportProvider
             H_VPNStateChangeServiceEvent?.WaitOne(-1);
             H_VPNStateChangeServiceEvent?.Reset();
 
-            Logger.LogInformation($"PollConnectionState(): woke from ConnStateChange.");
+            Logger.LogInformation("PollConnectionState(): woke from ConnStateChange.");
             // TJE TODO: change # of clients connected to be available here so we can set signal only if clients connected
             //Logger.LogInformation($"PollConnectionState(): Clients connected - signalling them.");
 
             // Logger.LogInformation($"PollConnectionState(): Signaling clients ...");
 
-            Utility.CheckConnectionResult connectionResult = Utility.CheckConnectionResult.Uninitialized;
-            RASCONNSTATUSW rasConnStatus = new RASCONNSTATUSW
+            var connectionResult = Utility.CheckConnectionResult.Uninitialized;
+            var rasConnStatus = new RASCONNSTATUSW
             {
                 dwSize = (uint)sizeof(RASCONNSTATUSW)
             };
@@ -251,7 +244,6 @@ public class VPNTransportIKEV2 : ITransportProvider
             var cs = ITransportProvider.VPNProviderStatus.VPNStatusInvalid;
             try
             {
-
                 Logger.LogInformation(
                     "PollConnectionState(): Calling ConnectionRoutines.GetConnectionState to get current status...");
                 connectionResult =

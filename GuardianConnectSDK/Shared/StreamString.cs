@@ -7,8 +7,8 @@ namespace GuardianConnect.Shared;
 // Defines the data protocol for reading and writing strings on our stream
 public class StreamString
 {
-    private Stream ioStream;
-    private UnicodeEncoding streamEncoding;
+    private readonly Stream ioStream;
+    private readonly UnicodeEncoding streamEncoding;
 
     public StreamString(Stream ioStream)
     {
@@ -19,7 +19,7 @@ public class StreamString
 
     public string ReadString()
     {
-        int len = 0;
+        var len = 0;
 
         len = ioStream.ReadByte() * 256;
         len += ioStream.ReadByte();
@@ -29,7 +29,7 @@ public class StreamString
             return "";
         }
 
-        byte[] inBuffer = new byte[len];
+        var inBuffer = new byte[len];
         ioStream.ReadExactly(inBuffer, 0, len);
 
         return streamEncoding.GetString(inBuffer);
@@ -38,7 +38,7 @@ public class StreamString
 
     public async Task<string> ReadStringAsync()
     {
-        int len = 0;
+        var len = 0;
 
         len = ioStream.ReadByte() * 256;
         len += ioStream.ReadByte();
@@ -48,22 +48,19 @@ public class StreamString
             return "";
         }
 
-        byte[] inBuffer = new byte[len];
+        var inBuffer = new byte[len];
         var readAsync = await ioStream.ReadAsync(inBuffer, 0, len);
 
-        string s = streamEncoding.GetString(inBuffer);
+        var s = streamEncoding.GetString(inBuffer);
 
         return Task.FromResult(s).Result;
     }
 
     public int WriteString(string outString)
     {
-        byte[] outBuffer = streamEncoding.GetBytes(outString);
-        int len = outBuffer.Length;
-        if (len > UInt16.MaxValue)
-        {
-            len = (int)UInt16.MaxValue;
-        }
+        var outBuffer = streamEncoding.GetBytes(outString);
+        var len = outBuffer.Length;
+        if (len > ushort.MaxValue) len = ushort.MaxValue;
         ioStream.WriteByte((byte)(len / 256));
         ioStream.WriteByte((byte)(len & 255));
         ioStream.Write(outBuffer, 0, len);

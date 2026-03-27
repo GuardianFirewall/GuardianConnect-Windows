@@ -5,287 +5,265 @@ using System.Text;
 namespace GuardianConnect.Win32;
 
 /// <summary>
-/// Encrypts and decrypts data using DPAPI functions.
+///     Encrypts and decrypts data using DPAPI functions.
 /// </summary>
- 
 public class DPAPI
 {
-    // Wrapper for DPAPI CryptProtectData function.
-    [DllImport( "crypt32.dll",
-                SetLastError=true,
-                CharSet=System.Runtime.InteropServices.CharSet.Auto)]
-    private static extern
-        bool CryptProtectData(  ref DATA_BLOB     pPlainText,
-                                    string        szDescription,
-                                ref DATA_BLOB     pEntropy,
-                                    IntPtr        pReserved,
-                                ref CRYPTPROTECT_PROMPTSTRUCT pPrompt,
-                                    int           dwFlags,
-                                ref DATA_BLOB     pCipherText);
- 
-    // Wrapper for DPAPI CryptUnprotectData function.
-    [DllImport( "crypt32.dll",
-                SetLastError=true,
-                CharSet=System.Runtime.InteropServices.CharSet.Auto)]
-    private static extern
-        bool CryptUnprotectData(ref DATA_BLOB       pCipherText,
-                                ref string          pszDescription,
-                                ref DATA_BLOB       pEntropy,
-                                    IntPtr          pReserved,
-                                ref CRYPTPROTECT_PROMPTSTRUCT pPrompt,
-                                    int             dwFlags,
-                                ref DATA_BLOB       pPlainText);
- 
-    // BLOB structure used to pass data to DPAPI functions.
-    [StructLayout(LayoutKind.Sequential, CharSet=CharSet.Unicode)]
-    internal struct DATA_BLOB
+    // Flag indicating the type of key. DPAPI terminology refers to
+    // key types as user store or machine store.
+    public enum KeyType
     {
-        public int     cbData;
-        public IntPtr  pbData;
+        UserKey = 1,
+        MachineKey
     }
- 
-    // Prompt structure to be used for required parameters.
-    [StructLayout(LayoutKind.Sequential, CharSet=CharSet.Unicode)]
-    internal struct CRYPTPROTECT_PROMPTSTRUCT
-    {
-        public int      cbSize;
-        public int      dwPromptFlags;
-        public IntPtr   hwndApp;
-        public string   szPrompt;
-    }
- 
-    // Wrapper for the NULL handle or pointer.
-    static private IntPtr NullPtr = ((IntPtr)((int)(0)));
- 
+
     // DPAPI key initialization flags.
-    private const int CRYPTPROTECT_UI_FORBIDDEN  = 0x1;
+    private const int CRYPTPROTECT_UI_FORBIDDEN = 0x1;
     private const int CRYPTPROTECT_LOCAL_MACHINE = 0x4;
- 
+
+    // Wrapper for the NULL handle or pointer.
+    private static readonly IntPtr NullPtr = 0;
+
+    // It is reasonable to set default key type to user key.
+    private static readonly KeyType defaultKeyType = KeyType.UserKey;
+
+    // Wrapper for DPAPI CryptProtectData function.
+    [DllImport("crypt32.dll",
+        SetLastError = true,
+        CharSet = CharSet.Auto)]
+    private static extern
+        bool CryptProtectData(ref DATA_BLOB pPlainText,
+            string szDescription,
+            ref DATA_BLOB pEntropy,
+            IntPtr pReserved,
+            ref CRYPTPROTECT_PROMPTSTRUCT pPrompt,
+            int dwFlags,
+            ref DATA_BLOB pCipherText);
+
+    // Wrapper for DPAPI CryptUnprotectData function.
+    [DllImport("crypt32.dll",
+        SetLastError = true,
+        CharSet = CharSet.Auto)]
+    private static extern
+        bool CryptUnprotectData(ref DATA_BLOB pCipherText,
+            ref string pszDescription,
+            ref DATA_BLOB pEntropy,
+            IntPtr pReserved,
+            ref CRYPTPROTECT_PROMPTSTRUCT pPrompt,
+            int dwFlags,
+            ref DATA_BLOB pPlainText);
+
     /// <summary>
-    /// Initializes empty prompt structure.
+    ///     Initializes empty prompt structure.
     /// </summary>
- 
     /// <param name="ps">
-    /// Prompt parameter (which we do not actually need).
+    ///     Prompt parameter (which we do not actually need).
     /// </param>
     private static void InitPrompt(ref CRYPTPROTECT_PROMPTSTRUCT ps)
     {
-        ps.cbSize       = Marshal.SizeOf<CRYPTPROTECT_PROMPTSTRUCT>();
-        ps.dwPromptFlags= 0;
-        ps.hwndApp      = NullPtr;
+        ps.cbSize = Marshal.SizeOf<CRYPTPROTECT_PROMPTSTRUCT>();
+        ps.dwPromptFlags = 0;
+        ps.hwndApp = NullPtr;
         ps.szPrompt = string.Empty;
     }
- 
+
     /// <summary>
-    /// Initializes a BLOB structure from a byte array.
+    ///     Initializes a BLOB structure from a byte array.
     /// </summary>
- 
     /// <param name="data">
-    /// Original data in a byte array format.
+    ///     Original data in a byte array format.
     /// </param>
     /// <param name="blob">
-    /// Returned blob structure.
+    ///     Returned blob structure.
     /// </param>
     private static void InitBLOB(byte[] data, ref DATA_BLOB blob)
     {
         // Use empty array for null parameter.
         data ??= new byte[0];
-             
+
         // Allocate memory for the BLOB data.
         blob.pbData = Marshal.AllocHGlobal(data.Length);
- 
+
         // Make sure that memory allocation was successful.
         if (blob.pbData == IntPtr.Zero)
             throw new Exception(
                 "Unable to allocate data buffer for BLOB structure.");
- 
+
         // Specify number of bytes in the BLOB.
         blob.cbData = data.Length;
- 
+
         // Copy data from original source to the BLOB structure.
         Marshal.Copy(data, 0, blob.pbData, data.Length);
     }
- 
-    // Flag indicating the type of key. DPAPI terminology refers to
-    // key types as user store or machine store.
-    public enum KeyType {UserKey = 1, MachineKey};
- 
-    // It is reasonable to set default key type to user key.
-    private static KeyType defaultKeyType = KeyType.UserKey;
- 
+
     /// <summary>
-    /// Calls DPAPI CryptProtectData function to encrypt a plaintext
-    /// string value with a user-specific key. This function does not
-    /// specify data description and additional entropy.
+    ///     Calls DPAPI CryptProtectData function to encrypt a plaintext
+    ///     string value with a user-specific key. This function does not
+    ///     specify data description and additional entropy.
     /// </summary>
- 
     /// <param name="plainText">
-    /// Plaintext data to be encrypted.
+    ///     Plaintext data to be encrypted.
     /// </param>
     /// <returns>
-    /// Encrypted value in a base64-encoded format.
+    ///     Encrypted value in a base64-encoded format.
     /// </returns>
     public static string Encrypt(string plainText)
     {
-        return Encrypt(defaultKeyType, plainText, String.Empty,
-                        String.Empty);
+        return Encrypt(defaultKeyType, plainText, string.Empty,
+            string.Empty);
     }
- 
+
     /// <summary>
-    /// Calls DPAPI CryptProtectData function to encrypt a plaintext
-    /// string value. This function does not specify data description
-    /// and additional entropy.
+    ///     Calls DPAPI CryptProtectData function to encrypt a plaintext
+    ///     string value. This function does not specify data description
+    ///     and additional entropy.
     /// </summary>
- 
     /// <param name="keyType">
-    /// Defines type of encryption key to use. When user key is
-    /// specified, any application running under the same user account
-    /// as the one making this call, will be able to decrypt data.
-    /// Machine key will allow any application running on the same
-    /// computer where data were encrypted to perform decryption.
-    /// Note: If optional entropy is specifed, it will be required
-    /// for decryption.
+    ///     Defines type of encryption key to use. When user key is
+    ///     specified, any application running under the same user account
+    ///     as the one making this call, will be able to decrypt data.
+    ///     Machine key will allow any application running on the same
+    ///     computer where data were encrypted to perform decryption.
+    ///     Note: If optional entropy is specifed, it will be required
+    ///     for decryption.
     /// </param>
     /// <param name="plainText">
-    /// Plaintext data to be encrypted.
+    ///     Plaintext data to be encrypted.
     /// </param>
     /// <returns>
-    /// Encrypted value in a base64-encoded format.
+    ///     Encrypted value in a base64-encoded format.
     /// </returns>
     public static string Encrypt(KeyType keyType, string plainText)
     {
-        return Encrypt(keyType, plainText, String.Empty,
-                        String.Empty);
+        return Encrypt(keyType, plainText, string.Empty,
+            string.Empty);
     }
- 
+
     /// <summary>
-    /// Calls DPAPI CryptProtectData function to encrypt a plaintext
-    /// string value. This function does not specify data description.
+    ///     Calls DPAPI CryptProtectData function to encrypt a plaintext
+    ///     string value. This function does not specify data description.
     /// </summary>
- 
     /// <param name="keyType">
-    /// Defines type of encryption key to use. When user key is
-    /// specified, any application running under the same user account
-    /// as the one making this call, will be able to decrypt data.
-    /// Machine key will allow any application running on the same
-    /// computer where data were encrypted to perform decryption.
-    /// Note: If optional entropy is specifed, it will be required
-    /// for decryption.
+    ///     Defines type of encryption key to use. When user key is
+    ///     specified, any application running under the same user account
+    ///     as the one making this call, will be able to decrypt data.
+    ///     Machine key will allow any application running on the same
+    ///     computer where data were encrypted to perform decryption.
+    ///     Note: If optional entropy is specifed, it will be required
+    ///     for decryption.
     /// </param>
     /// <param name="plainText">
-    /// Plaintext data to be encrypted.
+    ///     Plaintext data to be encrypted.
     /// </param>
     /// <param name="entropy">
-    /// Optional entropy which - if specified - will be required to
-    /// perform decryption.
+    ///     Optional entropy which - if specified - will be required to
+    ///     perform decryption.
     /// </param>
     /// <returns>
-    /// Encrypted value in a base64-encoded format.
+    ///     Encrypted value in a base64-encoded format.
     /// </returns>
     public static string Encrypt(KeyType keyType,
-                                 string  plainText,
-                                 string  entropy)
+        string plainText,
+        string entropy)
     {
-        return Encrypt(keyType, plainText, entropy, String.Empty);
+        return Encrypt(keyType, plainText, entropy, string.Empty);
     }
- 
+
     /// <summary>
-    /// Calls DPAPI CryptProtectData function to encrypt a plaintext
-    /// string value.
+    ///     Calls DPAPI CryptProtectData function to encrypt a plaintext
+    ///     string value.
     /// </summary>
- 
     /// <param name="keyType">
-    /// Defines type of encryption key to use. When user key is
-    /// specified, any application running under the same user account
-    /// as the one making this call, will be able to decrypt data.
-    /// Machine key will allow any application running on the same
-    /// computer where data were encrypted to perform decryption.
-    /// Note: If optional entropy is specifed, it will be required
-    /// for decryption.
+    ///     Defines type of encryption key to use. When user key is
+    ///     specified, any application running under the same user account
+    ///     as the one making this call, will be able to decrypt data.
+    ///     Machine key will allow any application running on the same
+    ///     computer where data were encrypted to perform decryption.
+    ///     Note: If optional entropy is specifed, it will be required
+    ///     for decryption.
     /// </param>
     /// <param name="plainText">
-    /// Plaintext data to be encrypted.
+    ///     Plaintext data to be encrypted.
     /// </param>
     /// <param name="entropy">
-    /// Optional entropy which - if specified - will be required to
-    /// perform decryption.
+    ///     Optional entropy which - if specified - will be required to
+    ///     perform decryption.
     /// </param>
     /// <param name="description">
-    /// Optional description of data to be encrypted. If this value is
-    /// specified, it will be stored along with encrypted data and
-    /// returned as a separate value during decryption.
+    ///     Optional description of data to be encrypted. If this value is
+    ///     specified, it will be stored along with encrypted data and
+    ///     returned as a separate value during decryption.
     /// </param>
     /// <returns>
-    /// Encrypted value in a base64-encoded format.
+    ///     Encrypted value in a base64-encoded format.
     /// </returns>
     public static string Encrypt(KeyType keyType,
-                                 string  plainText,
-                                 string  entropy,
-                                 string  description)
+        string plainText,
+        string entropy,
+        string description)
     {
         // Make sure that parameters are valid.
-        if (plainText == null) plainText = String.Empty;
-        entropy ??= String.Empty;
- 
+        if (plainText == null) plainText = string.Empty;
+        entropy ??= string.Empty;
+
         // Call encryption routine and convert returned bytes into
         // a base64-encoded value.
         return Convert.ToBase64String(
-                Encrypt(keyType,
-                        Encoding.UTF8.GetBytes(plainText),
-                        Encoding.UTF8.GetBytes(entropy),
-                        description));
+            Encrypt(keyType,
+                Encoding.UTF8.GetBytes(plainText),
+                Encoding.UTF8.GetBytes(entropy),
+                description));
     }
- 
+
     /// <summary>
-    /// Calls DPAPI CryptProtectData function to encrypt an array of
-    /// plaintext bytes.
+    ///     Calls DPAPI CryptProtectData function to encrypt an array of
+    ///     plaintext bytes.
     /// </summary>
- 
     /// <param name="keyType">
-    /// Defines type of encryption key to use. When user key is
-    /// specified, any application running under the same user account
-    /// as the one making this call, will be able to decrypt data.
-    /// Machine key will allow any application running on the same
-    /// computer where data were encrypted to perform decryption.
-    /// Note: If optional entropy is specifed, it will be required
-    /// for decryption.
+    ///     Defines type of encryption key to use. When user key is
+    ///     specified, any application running under the same user account
+    ///     as the one making this call, will be able to decrypt data.
+    ///     Machine key will allow any application running on the same
+    ///     computer where data were encrypted to perform decryption.
+    ///     Note: If optional entropy is specifed, it will be required
+    ///     for decryption.
     /// </param>
     /// <param name="plainTextBytes">
-    /// Plaintext data to be encrypted.
+    ///     Plaintext data to be encrypted.
     /// </param>
     /// <param name="entropyBytes">
-    /// Optional entropy which - if specified - will be required to
-    /// perform decryption.
+    ///     Optional entropy which - if specified - will be required to
+    ///     perform decryption.
     /// </param>
     /// <param name="description">
-    /// Optional description of data to be encrypted. If this value is
-    /// specified, it will be stored along with encrypted data and
-    /// returned as a separate value during decryption.
+    ///     Optional description of data to be encrypted. If this value is
+    ///     specified, it will be stored along with encrypted data and
+    ///     returned as a separate value during decryption.
     /// </param>
     /// <returns>
-    /// Encrypted value.
+    ///     Encrypted value.
     /// </returns>
     public static byte[] Encrypt(KeyType keyType,
-                                 byte[]  plainTextBytes,
-                                 byte[]  entropyBytes,
-                                 string  description)
+        byte[] plainTextBytes,
+        byte[] entropyBytes,
+        string description)
     {
         // Make sure that parameters are valid.
         plainTextBytes ??= new byte[0];
         entropyBytes ??= new byte[0];
-        description ??= String.Empty;
- 
+        description ??= string.Empty;
+
         // Create BLOBs to hold data.
-        DATA_BLOB plainTextBlob  = new DATA_BLOB();
-        DATA_BLOB cipherTextBlob = new DATA_BLOB();
-        DATA_BLOB entropyBlob    = new DATA_BLOB();
- 
+        var plainTextBlob = new DATA_BLOB();
+        var cipherTextBlob = new DATA_BLOB();
+        var entropyBlob = new DATA_BLOB();
+
         // We only need prompt structure because it is a required
         // parameter.
-        CRYPTPROTECT_PROMPTSTRUCT prompt =
-                                  new CRYPTPROTECT_PROMPTSTRUCT();
+        var prompt =
+            new CRYPTPROTECT_PROMPTSTRUCT();
         InitPrompt(ref prompt);
- 
+
         try
         {
             // Convert plaintext bytes into a BLOB structure.
@@ -298,7 +276,7 @@ public class DPAPI
                 throw new Exception(
                     "Cannot initialize plaintext BLOB.", ex);
             }
- 
+
             // Convert entropy bytes into a BLOB structure.
             try
             {
@@ -309,43 +287,43 @@ public class DPAPI
                 throw new Exception(
                     "Cannot initialize entropy BLOB.", ex);
             }
- 
+
             // Disable any types of UI.
-            int flags = CRYPTPROTECT_UI_FORBIDDEN;
- 
+            var flags = CRYPTPROTECT_UI_FORBIDDEN;
+
             // When using machine-specific key, set up machine flag.
             if (keyType == KeyType.MachineKey)
                 flags |= CRYPTPROTECT_LOCAL_MACHINE;
- 
+
             // Call DPAPI to encrypt data.
-            bool success = CryptProtectData(ref plainTextBlob,
-                                                description,
-                                            ref entropyBlob,
-                                                IntPtr.Zero,
-                                            ref prompt,
-                                                flags,
-                                            ref cipherTextBlob);
+            var success = CryptProtectData(ref plainTextBlob,
+                description,
+                ref entropyBlob,
+                IntPtr.Zero,
+                ref prompt,
+                flags,
+                ref cipherTextBlob);
             // Check the result.
             if (!success)
             {
                 // If operation failed, retrieve last Win32 error.
-                int errCode = Marshal.GetLastWin32Error();
- 
+                var errCode = Marshal.GetLastWin32Error();
+
                 // Win32Exception will contain error message corresponding
                 // to the Windows error code.
                 throw new Exception(
                     "CryptProtectData failed.", new Win32Exception(errCode));
             }
- 
+
             // Allocate memory to hold ciphertext.
-            byte[] cipherTextBytes = new byte[cipherTextBlob.cbData];
- 
+            var cipherTextBytes = new byte[cipherTextBlob.cbData];
+
             // Copy ciphertext from the BLOB to a byte array.
             Marshal.Copy(cipherTextBlob.pbData,
-                            cipherTextBytes,
-                            0,
-                            cipherTextBlob.cbData);
- 
+                cipherTextBytes,
+                0,
+                cipherTextBlob.cbData);
+
             // Return the result.
             return cipherTextBytes;
         }
@@ -358,95 +336,92 @@ public class DPAPI
         {
             if (plainTextBlob.pbData != IntPtr.Zero)
                 Marshal.FreeHGlobal(plainTextBlob.pbData);
- 
+
             if (cipherTextBlob.pbData != IntPtr.Zero)
                 Marshal.FreeHGlobal(cipherTextBlob.pbData);
- 
+
             if (entropyBlob.pbData != IntPtr.Zero)
                 Marshal.FreeHGlobal(entropyBlob.pbData);
         }
     }
- 
+
     /// <summary>
-    /// Calls DPAPI CryptUnprotectData to decrypt ciphertext bytes.
-    /// This function does not use additional entropy and does not
-    /// return data description.
+    ///     Calls DPAPI CryptUnprotectData to decrypt ciphertext bytes.
+    ///     This function does not use additional entropy and does not
+    ///     return data description.
     /// </summary>
- 
     /// <param name="cipherText">
-    /// Encrypted data formatted as a base64-encoded string.
+    ///     Encrypted data formatted as a base64-encoded string.
     /// </param>
     /// <returns>
-    /// Decrypted data returned as a UTF-8 string.
+    ///     Decrypted data returned as a UTF-8 string.
     /// </returns>
     /// <remarks>
-    /// When decrypting data, it is not necessary to specify which
-    /// type of encryption key to use: user-specific or
-    /// machine-specific; DPAPI will figure it out by looking at
-    /// the signature of encrypted data.
+    ///     When decrypting data, it is not necessary to specify which
+    ///     type of encryption key to use: user-specific or
+    ///     machine-specific; DPAPI will figure it out by looking at
+    ///     the signature of encrypted data.
     /// </remarks>
     public static string Decrypt(string cipherText)
     {
         string description;
- 
-        return Decrypt(cipherText, String.Empty, out description);
+
+        return Decrypt(cipherText, string.Empty, out description);
     }
- 
+
     /// <summary>
-    /// Calls DPAPI CryptUnprotectData to decrypt ciphertext bytes.
-    /// This function does not use additional entropy.
+    ///     Calls DPAPI CryptUnprotectData to decrypt ciphertext bytes.
+    ///     This function does not use additional entropy.
     /// </summary>
- 
     /// <param name="cipherText">
-    /// Encrypted data formatted as a base64-encoded string.
+    ///     Encrypted data formatted as a base64-encoded string.
     /// </param>
     /// <param name="description">
-    /// Returned description of data specified during encryption.
+    ///     Returned description of data specified during encryption.
     /// </param>
     /// <returns>
-    /// Decrypted data returned as a UTF-8 string.
+    ///     Decrypted data returned as a UTF-8 string.
     /// </returns>
     /// <remarks>
-    /// When decrypting data, it is not necessary to specify which
-    /// type of encryption key to use: user-specific or
-    /// machine-specific; DPAPI will figure it out by looking at
-    /// the signature of encrypted data.
+    ///     When decrypting data, it is not necessary to specify which
+    ///     type of encryption key to use: user-specific or
+    ///     machine-specific; DPAPI will figure it out by looking at
+    ///     the signature of encrypted data.
     /// </remarks>
-    public static string Decrypt(    string cipherText,
-                                 out string description)
+    public static string Decrypt(string cipherText,
+        out string description)
     {
-        return Decrypt(cipherText, String.Empty, out description);
+        return Decrypt(cipherText, string.Empty, out description);
     }
- 
+
     /// <summary>
-    /// Calls DPAPI CryptUnprotectData to decrypt ciphertext bytes.
+    ///     Calls DPAPI CryptUnprotectData to decrypt ciphertext bytes.
     /// </summary>
- 
     /// <param name="cipherText">
-    /// Encrypted data formatted as a base64-encoded string.
+    ///     Encrypted data formatted as a base64-encoded string.
     /// </param>
     /// <param name="entropy">
-    /// Optional entropy, which is required if it was specified during
-    /// encryption.
+    ///     Optional entropy, which is required if it was specified during
+    ///     encryption.
     /// </param>
     /// <param name="description">
-    /// Returned description of data specified during encryption.
+    ///     Returned description of data specified during encryption.
     /// </param>
     /// <returns>
-    /// Decrypted data returned as a UTF-8 string.
+    ///     Decrypted data returned as a UTF-8 string.
     /// </returns>
     /// <remarks>
-    /// When decrypting data, it is not necessary to specify which
-    /// type of encryption key to use: user-specific or
-    /// machine-specific; DPAPI will figure it out by looking at
-    /// the signature of encrypted data.
+    ///     When decrypting data, it is not necessary to specify which
+    ///     type of encryption key to use: user-specific or
+    ///     machine-specific; DPAPI will figure it out by looking at
+    ///     the signature of encrypted data.
     /// </remarks>
-    public static string Decrypt(    string cipherText,
-                                     string entropy,
-                                 out string description)
+    public static string Decrypt(string cipherText,
+        string entropy,
+        out string description)
     {
         // Make sure that parameters are valid.
-        entropy ??= String.Empty;
+        entropy ??= string.Empty;
 
         var entrypBytes = Encoding.UTF8.GetBytes(entropy);
         var cipherTextBytes = Convert.FromBase64String(cipherText);
@@ -454,48 +429,47 @@ public class DPAPI
         var retVal = Encoding.UTF8.GetString(decrypted);
         return retVal;
     }
- 
+
     /// <summary>
-    /// Calls DPAPI CryptUnprotectData to decrypt ciphertext bytes.
+    ///     Calls DPAPI CryptUnprotectData to decrypt ciphertext bytes.
     /// </summary>
- 
     /// <param name="cipherTextBytes">
-    /// Encrypted data.
+    ///     Encrypted data.
     /// </param>
     /// <param name="entropyBytes">
-    /// Optional entropy, which is required if it was specified during
-    /// encryption.
+    ///     Optional entropy, which is required if it was specified during
+    ///     encryption.
     /// </param>
     /// <param name="description">
-    /// Returned description of data specified during encryption.
+    ///     Returned description of data specified during encryption.
     /// </param>
     /// <returns>
-    /// Decrypted data bytes.
+    ///     Decrypted data bytes.
     /// </returns>
     /// <remarks>
-    /// When decrypting data, it is not necessary to specify which
-    /// type of encryption key to use: user-specific or
-    /// machine-specific; DPAPI will figure it out by looking at
-    /// the signature of encrypted data.
+    ///     When decrypting data, it is not necessary to specify which
+    ///     type of encryption key to use: user-specific or
+    ///     machine-specific; DPAPI will figure it out by looking at
+    ///     the signature of encrypted data.
     /// </remarks>
-    public static byte[] Decrypt(    byte[] cipherTextBytes,
-                                     byte[] entropyBytes,
-                                 out string description)
+    public static byte[] Decrypt(byte[] cipherTextBytes,
+        byte[] entropyBytes,
+        out string description)
     {
         // Create BLOBs to hold data.
-        DATA_BLOB plainTextBlob  = new DATA_BLOB();
-        DATA_BLOB cipherTextBlob = new DATA_BLOB();
-        DATA_BLOB entropyBlob    = new DATA_BLOB();
- 
+        var plainTextBlob = new DATA_BLOB();
+        var cipherTextBlob = new DATA_BLOB();
+        var entropyBlob = new DATA_BLOB();
+
         // We only need prompt structure because it is a required
         // parameter.
-        CRYPTPROTECT_PROMPTSTRUCT prompt =
-                                  new CRYPTPROTECT_PROMPTSTRUCT();
+        var prompt =
+            new CRYPTPROTECT_PROMPTSTRUCT();
         InitPrompt(ref prompt);
- 
+
         // Initialize description string.
-        description = String.Empty;
- 
+        description = string.Empty;
+
         try
         {
             // Convert ciphertext bytes into a BLOB structure.
@@ -508,7 +482,7 @@ public class DPAPI
                 throw new Exception(
                     "Cannot initialize ciphertext BLOB.", ex);
             }
- 
+
             // Convert entropy bytes into a BLOB structure.
             try
             {
@@ -519,21 +493,21 @@ public class DPAPI
                 throw new Exception(
                     "Cannot initialize entropy BLOB.", ex);
             }
- 
+
             // Disable any types of UI. CryptUnprotectData does not
             // mention CRYPTPROTECT_LOCAL_MACHINE flag in the list of
             // supported flags so we will not set it up.
-            int flags = CRYPTPROTECT_UI_FORBIDDEN;
- 
+            var flags = CRYPTPROTECT_UI_FORBIDDEN;
+
             // Call DPAPI to decrypt data.
-            bool success = CryptUnprotectData(ref cipherTextBlob,
-                                              ref description,
-                                              ref entropyBlob,
-                                                  IntPtr.Zero,
-                                              ref prompt,
-                                                  flags,
-                                              ref plainTextBlob);
- 
+            var success = CryptUnprotectData(ref cipherTextBlob,
+                ref description,
+                ref entropyBlob,
+                IntPtr.Zero,
+                ref prompt,
+                flags,
+                ref plainTextBlob);
+
             // Check the result.
             if (!success)
             {
@@ -542,28 +516,28 @@ public class DPAPI
                 // Did it get stored wrong? Did it get retrieved from storage wrong?
                 // We must log when happens, then set a flag and for the next N number of times, log the data going
                 // in and back out - and create test programs with inbound data in question and go through cycle
-                
+
                 // If operation failed, retrieve last Win32 error.
-                int errCode = Marshal.GetLastWin32Error(); 
+                var errCode = Marshal.GetLastWin32Error();
                 // Win32Exception will contain error message corresponding
                 // to the Windows error code.
                 var w32ex = new Win32Exception(errCode);
-                var ex = new Exception( "CryptUnprotectData failed.", w32ex);
+                var ex = new Exception("CryptUnprotectData failed.", w32ex);
                 var ctbText = Convert.ToHexString(cipherTextBytes);
                 //Serilog.Log.Error(ex, $"CipherTextBlob: {ctbText}");
                 return Array.Empty<byte>();
                 //throw ex;
             }
- 
+
             // Allocate memory to hold plaintext.
-            byte[] plainTextBytes = new byte[plainTextBlob.cbData];
- 
+            var plainTextBytes = new byte[plainTextBlob.cbData];
+
             // Copy ciphertext from the BLOB to a byte array.
             Marshal.Copy(plainTextBlob.pbData,
-                         plainTextBytes,
-                         0,
-                         plainTextBlob.cbData);
- 
+                plainTextBytes,
+                0,
+                plainTextBlob.cbData);
+
             // Return the result.
             return plainTextBytes;
         }
@@ -576,12 +550,30 @@ public class DPAPI
         {
             if (plainTextBlob.pbData != IntPtr.Zero)
                 Marshal.FreeHGlobal(plainTextBlob.pbData);
- 
+
             if (cipherTextBlob.pbData != IntPtr.Zero)
                 Marshal.FreeHGlobal(cipherTextBlob.pbData);
- 
+
             if (entropyBlob.pbData != IntPtr.Zero)
                 Marshal.FreeHGlobal(entropyBlob.pbData);
         }
+    }
+
+    // BLOB structure used to pass data to DPAPI functions.
+    [StructLayout(LayoutKind.Sequential, CharSet = CharSet.Unicode)]
+    internal struct DATA_BLOB
+    {
+        public int cbData;
+        public IntPtr pbData;
+    }
+
+    // Prompt structure to be used for required parameters.
+    [StructLayout(LayoutKind.Sequential, CharSet = CharSet.Unicode)]
+    internal struct CRYPTPROTECT_PROMPTSTRUCT
+    {
+        public int cbSize;
+        public int dwPromptFlags;
+        public IntPtr hwndApp;
+        public string szPrompt;
     }
 }

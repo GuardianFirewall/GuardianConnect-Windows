@@ -11,14 +11,14 @@ public static class ErrorResponseExtensions
         if (string.IsNullOrEmpty(er.Message)) er.Message = exception.Message;
         return er;
     }
-    
+
     public static ErrorResponse SetErrorMessage(this ErrorResponse er, string message)
     {
         er.IsError = true;
         er.Message = message;
         return er;
     }
-    
+
     public static ErrorResponse SetResponse(this ErrorResponse er, HttpResponseMessage response)
     {
         er.IsError = !response.IsSuccessStatusCode;
@@ -26,7 +26,7 @@ public static class ErrorResponseExtensions
         er.HttpResponse = response;
         return er;
     }
-    
+
     public static ErrorResponse SetData(this ErrorResponse er, object data)
     {
         er.Data = data;
@@ -36,16 +36,21 @@ public static class ErrorResponseExtensions
     public static string ToString(this HttpResponseMessage response)
     {
         if (response is null) return string.Empty;
-        var text = $"{response.ReasonPhrase}, IsSuccess: {response.IsSuccessStatusCode}, StatusCode: {response.StatusCode}";
+        var text =
+            $"{response.ReasonPhrase}, IsSuccess: {response.IsSuccessStatusCode}, StatusCode: {response.StatusCode}";
         return text;
     }
-    
-    public static ErrorResponse SetGrdApiError(this ErrorResponse er, Dictionary<string, object?>? data, HttpStatusCode statusCode)
+
+    public static ErrorResponse SetGrdApiError(this ErrorResponse er, Dictionary<string, object?>? data,
+        HttpStatusCode statusCode)
     {
         er.IsError = true;
-        er.GRDApiError = new GRDAPIError(data?.ToDictionary(kvp => kvp.Key, kvp => kvp.Value as object), statusCode);
+        er.GRDApiError = new GRDAPIError(data?.ToDictionary(kvp => kvp.Key, kvp => kvp.Value), statusCode);
         return er;
     }
-    
-    public static ErrorResponse SetGrdApiError(this ErrorResponse er, GRDAPIError error) => er.SetGrdApiError(error);
+
+    public static ErrorResponse SetGrdApiError(this ErrorResponse er, GRDAPIError error)
+    {
+        return er.SetGrdApiError(error);
+    }
 }

@@ -13,11 +13,12 @@ namespace GuardianConnect.Services;
 public class VpnManagerService : BackgroundService
 {
     private static ILogger _logger = NullLogger.Instance;
+
     public VpnManagerService(ILogger<VpnManagerService> logger)
     {
         _logger = logger;
     }
-    
+
     private static void ShowSecurity(EventWaitHandleSecurity security, string who)
     {
         _logger.LogInformation($"\r\nCurrent access rules for {who}:\r\n");
@@ -39,35 +40,38 @@ public class VpnManagerService : BackgroundService
 
         stoppingToken.Register(() => _logger.LogInformation("VpnManagerService is stopping."));
 
-        _logger.LogInformation($"VpnManagerService: creating task...stoppingToken.IsCancllationRequestioned = {stoppingToken.IsCancellationRequested}");
+        _logger.LogInformation(
+            $"VpnManagerService: creating task...stoppingToken.IsCancllationRequestioned = {stoppingToken.IsCancellationRequested}");
         _logger.LogInformation("VpnManagerService: In task...");
-        VPNTransportIKEV2 vpnikeInstance = new VPNTransportIKEV2();
+        var vpnikeInstance = new VPNTransportIKEV2();
 
         _logger.LogInformation("Creating Change Event for listeners - SERVICE-SIDE and CLIENT-SIDE...");
         _logger.LogInformation($"stoppingToken.IsCancllationRequestioned = {stoppingToken.IsCancellationRequested}");
         // Create VPNChange Event so Service and UI can wait for notification - OURS - not Ras'
-        
+
         var Everyone = new SecurityIdentifier(WellKnownSidType.WorldSid, null);
-        EventWaitHandleAccessRule rule = new EventWaitHandleAccessRule(Everyone,
+        var rule = new EventWaitHandleAccessRule(Everyone,
             EventWaitHandleRights.FullControl, AccessControlType.Allow);
 
-        EventWaitHandleSecurity mSecSvc = new EventWaitHandleSecurity();
+        var mSecSvc = new EventWaitHandleSecurity();
         mSecSvc.AddAccessRule(rule);
-        EventWaitHandle H_VPNStateChangeServiceEvent = new EventWaitHandle(false, EventResetMode.ManualReset, Common.VPNEVT_NAME_SVRSIDE);
+        var H_VPNStateChangeServiceEvent =
+            new EventWaitHandle(false, EventResetMode.ManualReset, Common.VPNEVT_NAME_SVRSIDE);
         var currentAC = H_VPNStateChangeServiceEvent.GetAccessControl();
         H_VPNStateChangeServiceEvent.SetAccessControl(mSecSvc);
-        Win32Calls.NotificationHandler.VPNServiceNotifierHandle = H_VPNStateChangeServiceEvent;
+        NotificationHandler.VPNServiceNotifierHandle = H_VPNStateChangeServiceEvent;
         var afterAC = H_VPNStateChangeServiceEvent.GetAccessControl();
         ShowSecurity(afterAC, "Service");
 
-        EventWaitHandleSecurity mSecCli = new EventWaitHandleSecurity();
+        var mSecCli = new EventWaitHandleSecurity();
         mSecCli.AddAccessRule(rule);
-        EventWaitHandle H_VPNStateChangeClientEvent = new EventWaitHandle(false, EventResetMode.ManualReset, Common.VPNEVT_NAME_CLIENTSIDE);
+        var H_VPNStateChangeClientEvent =
+            new EventWaitHandle(false, EventResetMode.ManualReset, Common.VPNEVT_NAME_CLIENTSIDE);
         currentAC = H_VPNStateChangeClientEvent.GetAccessControl();
         H_VPNStateChangeClientEvent.SetAccessControl(mSecCli);
         afterAC = H_VPNStateChangeClientEvent.GetAccessControl();
         ShowSecurity(afterAC, "Client");
-        Win32Calls.NotificationHandler.VPNClientNotifierHandle = H_VPNStateChangeClientEvent;
+        NotificationHandler.VPNClientNotifierHandle = H_VPNStateChangeClientEvent;
 
         _logger.LogInformation("Checking for active connection...");
         _logger.LogInformation($"stoppingToken.IsCancllationRequestioned = {stoppingToken.IsCancellationRequested}");
@@ -76,7 +80,8 @@ public class VpnManagerService : BackgroundService
         {
             // Now spawn watcher at native level so we trap CONNECT/DISCONNECT notifications
             _logger.LogInformation("VpnManagerService: Calling StartConnectionStateWatcher...");
-            _logger.LogInformation($"stoppingToken.IsCancllationRequestioned = {stoppingToken.IsCancellationRequested}");
+            _logger.LogInformation(
+                $"stoppingToken.IsCancllationRequestioned = {stoppingToken.IsCancellationRequested}");
             NotificationHandler.StartRasConnectStateWatcher();
         }
 
@@ -85,8 +90,10 @@ public class VpnManagerService : BackgroundService
         try
         {
             var heartbeatCounter = 0;
-            var priorMessage = $"VpnService is running... Cancellation Request is {stoppingToken.IsCancellationRequested}";
-            _logger.LogInformation( $"Going into while() loop. stoppingToken.IsCancllationRequestioned = {stoppingToken.IsCancellationRequested}");
+            var priorMessage =
+                $"VpnService is running... Cancellation Request is {stoppingToken.IsCancellationRequested}";
+            _logger.LogInformation(
+                $"Going into while() loop. stoppingToken.IsCancllationRequestioned = {stoppingToken.IsCancellationRequested}");
             while (!stoppingToken.IsCancellationRequested)
             {
                 var currentMessage =
@@ -98,8 +105,11 @@ public class VpnManagerService : BackgroundService
                     heartbeatCounter = 0;
                     priorMessage = currentMessage;
                 }
-                else if (++heartbeatCounter % 5 == 0) _logger.LogInformation("VpnService is running...");
-                
+                else if (++heartbeatCounter % 5 == 0)
+                {
+                    _logger.LogInformation("VpnService is running...");
+                }
+
                 // Do stuff with vpnManager here
                 await Task.Delay(60000, stoppingToken);
             }

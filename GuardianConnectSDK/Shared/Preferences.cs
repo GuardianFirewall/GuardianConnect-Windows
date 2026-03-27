@@ -1,6 +1,5 @@
 ﻿using System.Text.Json;
 using Microsoft.Win32;
-using System.Text.Json.Serialization;
 using Serilog;
 
 namespace GuardianConnect.Shared;
@@ -10,14 +9,13 @@ namespace GuardianConnect.Shared;
  *         Preferences.Default.Set("Region", myPhysicalRegionKey);
  *         string StoredSelectedRegion = Preferences.Get("SelectedRegion", "NOTSET");
  * GET, SET, CLEAR, REMOVE, CONTAINSKEY
- * 
+ *
  */
 public static class Preferences
 {
-
     private const string GRDKeyPath = @"Software\GuardianVPN";
 
-    private static string SettingsPath = "UserPreferences";
+    private static readonly string SettingsPath = "UserPreferences";
     private static bool notLoadedYet = true;
 
     private static PreferencesStore Store = new();
@@ -57,10 +55,9 @@ public static class Preferences
 
         var jsonData = (string)rk.GetValue(SettingsPath)!;
         if (!string.IsNullOrEmpty(jsonData))
-        {
-            Store = JsonSerializer.Deserialize<PreferencesStore>(jsonData, PreferencesStoreJsonContext.Default.PreferencesStore) ??
+            Store = JsonSerializer.Deserialize<PreferencesStore>(jsonData,
+                        PreferencesStoreJsonContext.Default.PreferencesStore) ??
                     new PreferencesStore();
-        }
 
         notLoadedYet = false;
     }
@@ -115,10 +112,9 @@ public static class Preferences
 
             var jsonData = (string)rk.GetValue(DefaultSettingsPath)!;
             if (!string.IsNullOrEmpty(jsonData))
-            {
-                Store = JsonSerializer.Deserialize<PreferencesStore>(jsonData, PreferencesStoreJsonContext.Default.PreferencesStore) ??
-                    new Dictionary<string, string>();
-            }
+                Store = JsonSerializer.Deserialize<PreferencesStore>(jsonData,
+                            PreferencesStoreJsonContext.Default.PreferencesStore) ??
+                        new Dictionary<string, string>();
 
             notLoadedYet = false;
         }

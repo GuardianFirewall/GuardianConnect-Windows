@@ -9,12 +9,13 @@ public static class Utility
         CONNECTING,
         CONNECT_FAILED,
         DISCONNECTING,
-        DISCONNECTED,
+        DISCONNECTED
     }
 
     public struct RasOperationResult
     {
         public bool Success;
+
         // If not success, store user friendly error description.
         public string ErrorDescription;
     }
