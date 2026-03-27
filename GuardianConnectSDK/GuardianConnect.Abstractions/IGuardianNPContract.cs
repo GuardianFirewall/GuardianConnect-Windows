@@ -4,8 +4,6 @@ namespace GuardianConnect.Abstractions;
 
 public interface IGuardianNPContract
 {
-
-
     public enum NPCommands
     {
         StartVPNConnection,

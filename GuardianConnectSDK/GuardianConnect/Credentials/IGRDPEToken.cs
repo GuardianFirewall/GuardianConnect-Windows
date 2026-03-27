@@ -28,12 +28,17 @@ namespace GuardianConnect.Credentials
         {
             if (dict.Count == 0) return new GRDPEToken();
             GRDPEToken peToken = new GRDPEToken();
-            if (dict.ContainsKey("Token")) peToken.Token = dict["Token"].ToString() ?? throw new InvalidOperationException();
+            if (dict.ContainsKey("Token")) peToken.Token =
+ dict["Token"].ToString() ?? throw new InvalidOperationException();
             if (dict.ContainsKey("expirationDateUnix")) peToken.ExpirationDateUnix = (long)dict["ExpirationDateUnix"];
-            if (dict.ContainsKey("ExpirationDate")) peToken.ExpirationDate = DateTime.Parse(dict["ExpirationDate"].ToString() ?? throw new InvalidOperationException());
-            if (dict.ContainsKey("ConnectAPIEnv")) peToken.ConnectAPIEnv = dict["ConnectAPIEnv"]?.ToString() ?? Common.DefaultConnectAPIHostname;
-            if (dict.ContainsKey("SubscriptionType")) peToken.SubscriptionType = dict["SubscriptionType"].ToString() ?? throw new InvalidOperationException();
-            if (dict.ContainsKey("SubscriptionTypePretty")) peToken.SubscriptionTypePretty = dict["SubscriptionTypePretty"].ToString() ?? throw new InvalidOperationException();
+            if (dict.ContainsKey("ExpirationDate")) peToken.ExpirationDate =
+ DateTime.Parse(dict["ExpirationDate"].ToString() ?? throw new InvalidOperationException());
+            if (dict.ContainsKey("ConnectAPIEnv")) peToken.ConnectAPIEnv =
+ dict["ConnectAPIEnv"]?.ToString() ?? Common.DefaultConnectAPIHostname;
+            if (dict.ContainsKey("SubscriptionType")) peToken.SubscriptionType =
+ dict["SubscriptionType"].ToString() ?? throw new InvalidOperationException();
+            if (dict.ContainsKey("SubscriptionTypePretty")) peToken.SubscriptionTypePretty =
+ dict["SubscriptionTypePretty"].ToString() ?? throw new InvalidOperationException();
             return peToken;
         }
 

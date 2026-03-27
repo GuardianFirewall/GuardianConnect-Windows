@@ -22,6 +22,10 @@ namespace GuardianConnect.API.Model;
  */
 public class ConnectDeviceRequestData
 {
+    private ConnectDeviceRequestData()
+    {
+    }
+
     [JsonPropertyName("pe-token")]
     [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
     public string? PeToken { get; set; }
@@ -42,8 +46,6 @@ public class ConnectDeviceRequestData
     [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
     public string? AcceptedTOS { get; set; }
 
-    private ConnectDeviceRequestData() { }
-
     public static ConnectDeviceRequestData WithPeToken(string peToken)
     {
         return new ConnectDeviceRequestData { PeToken = peToken };
@@ -51,7 +53,7 @@ public class ConnectDeviceRequestData
 
     public static ConnectDeviceRequestData ForNickName(string peToken, string nickname)
     {
-        return new ConnectDeviceRequestData { PeToken = peToken, Nickname = nickname};
+        return new ConnectDeviceRequestData { PeToken = peToken, Nickname = nickname };
     }
 
     public static ConnectDeviceRequestData WithIdentifierAndSecret(string identifier, string secret)

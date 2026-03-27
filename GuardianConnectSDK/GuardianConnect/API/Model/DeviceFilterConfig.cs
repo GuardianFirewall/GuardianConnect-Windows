@@ -1,33 +1,34 @@
+using System.Text.Json.Serialization;
 using GuardianConnect.Credentials;
 using GuardianConnect.Helpers;
 using GuardianConnect.Shared;
+using Microsoft.Extensions.Logging;
 //using Newtonsoft.Json;
-using System.Text.Json.Serialization;
 
 namespace GuardianConnect.API.Model;
 
 public class DeviceFilterConfig
 {
-    private Microsoft.Extensions.Logging.ILogger<DeviceFilterConfig> _logger;
-
-    [JsonIgnore]
-    public DeviceFilterConfigFlags DeviceFilterConfigBlockList;
-
     #region Definitions
+
     [Flags]
     public enum DeviceFilterConfigFlags
     {
-        BlocklistCleared            = 0,
-        BlocklistDisableFirewall 	= (1 << 0),
-        BlocklistBlockAds 		    = (1 << 1),
-        BlocklistBlockPhishing 	    = (1 << 2),
-        BlocklistMax 				= (1 << 3)
+        BlocklistCleared = 0,
+        BlocklistDisableFirewall = 1 << 0,
+        BlocklistBlockAds = 1 << 1,
+        BlocklistBlockPhishing = 1 << 2,
+        BlocklistMax = 1 << 3
     }
+
     #endregion
 
+    [JsonIgnore] public DeviceFilterConfigFlags DeviceFilterConfigBlockList;
+    private ILogger<DeviceFilterConfig> _logger;
+
     #region fields
-    [JsonPropertyName("api-auth-token")]
-    public string Api_auth_token { get; set; } = string.Empty;
+
+    [JsonPropertyName("api-auth-token")] public string Api_auth_token { get; set; } = string.Empty;
 
     [JsonPropertyName("block-phishing")]
     //[Newtonsoft.Json.JsonConverter(typeof(YesNoConverter))]
@@ -56,6 +57,7 @@ public class DeviceFilterConfig
     #endregion
 
     #region methods
+
     [JsonConstructor]
     public DeviceFilterConfig()
     {
@@ -71,13 +73,13 @@ public class DeviceFilterConfig
     {
         DeviceFilterConfigBlockList ^= flag;
     }
-    
+
     public void Set(DeviceFilterConfigFlags flag)
     {
         DeviceFilterConfigBlockList |= flag;
         SyncBlocklist();
     }
-    
+
     public void Clear(DeviceFilterConfigFlags flag)
     {
         DeviceFilterConfigBlockList &= ~flag;
@@ -99,7 +101,7 @@ public class DeviceFilterConfig
 
     public override string ToString()
     {
-        List<string> json = new List<string>();
+        var json = new List<string>();
         return string.Join(Environment.NewLine, json);
     }
 

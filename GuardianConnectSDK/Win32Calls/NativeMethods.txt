@@ -24,8 +24,8 @@ RASDIALPARAMSW
 RASCONNW
 
 // RRAS Enumerations
-RASCONNSUBSTATEW
-RASCONNSTATEW
+RASCONNSUBSTATE
+RASCONNSTATE
 
 RASEO_RemoteDefaultGateway
 RASEO_RequireEAP
@@ -45,16 +45,12 @@ RASEO2_IPv6RemoteDefaultGateway
 RASEO2_CacheCredentials
 RASCM_UserName
 RASCM_Password
-ERROR_BUFFER_TOO_SMALL
-ERROR_SUCCESS
-ERROR_INVALID_PARAMETER
-ERROR_BUFFER_OVERFLOW
 IP*
-IP_ADAPTER_INFO*
-PIP_ADAPTER_INFO*
+IP_ADAPTER_INFO
 
 // Global
 WIN32_ERROR
+ERROR_BUFFER_TOO_SMALL
 HRASCONN
 
 INFINITE
@@ -62,27 +58,18 @@ INFINITE
 CreateEvent
 SetEvent
 ResetEvent
-CreateEventW
-SetEventW
-ResetEventW
 WaitForSingleObject
-RasConnectionNotificationW
-InitializeSecurityDescriptorW
+RasConnectionNotification
+InitializeSecurityDescriptor
 
 RASCN*
-RASCS_*
-RASCS_DONE
-RASCS_Disconnected
+RASCONNSTATE
 
-SetSecurityDescriptorDaclW
-SetSecurityDescriptorSaclW
+SetSecurityDescriptorDacl
+SetSecurityDescriptorSacl
 SECURITY_DESCRIPTOR
-PSECURITY_DESCRIPTOR
 SECURITY_DESCRIPTOR_REVISION
 SECURITY_ATTRIBUTES
-LPSECURITY_ATTRIBUTES
-PSECURITY_ATTRIBUTES
-PACL
 ACL
 
 // Libraries
@@ -92,7 +79,7 @@ Ws2_32.*
 Iphlpapi.*
 //advapi32.*
 powrprof.*
-Synchapi.*
+//Synchapi.*
 
 //RAS*
 
@@ -100,7 +87,6 @@ Synchapi.*
 RPC*
 FWPM_SESSION_FLAG_DYNAMIC
 FWPM*
-Fwpm*
 IP_*
 MAX_ADAPTER_NAME_LENGTH
 MAX_ADAPTER_DESCRIPTION_LENGTH

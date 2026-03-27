@@ -1,19 +1,14 @@
-﻿using System;
-using System.Collections.Generic;
-using System.Linq;
-using System.Text;
-using System.Text.Json.Serialization;
+﻿using System.Text.Json.Serialization;
 
-namespace GuardianConnect.Credentials
+namespace GuardianConnect.Credentials;
+
+[JsonSourceGenerationOptions(GenerationMode = JsonSourceGenerationMode.Metadata, WriteIndented = true)]
+[JsonSerializable(typeof(bool))]
+[JsonSerializable(typeof(string))]
+[JsonSerializable(typeof(DateTime))]
+[JsonSerializable(typeof(byte[]))]
+[JsonSerializable(typeof(GRDCredential))]
+[JsonSerializable(typeof(List<GRDCredential>))]
+public partial class GRDCredentialJsonContext : JsonSerializerContext
 {
-    [JsonSourceGenerationOptions(GenerationMode = JsonSourceGenerationMode.Metadata, WriteIndented = true)]
-    [JsonSerializable(typeof(bool))]
-    [JsonSerializable(typeof(string))]
-    [JsonSerializable(typeof(DateTime))]
-    [JsonSerializable(typeof(byte[]))]
-    [JsonSerializable(typeof(GRDCredential))]
-    [JsonSerializable(typeof(List<GRDCredential>))]
-    public partial class GRDCredentialJsonContext : JsonSerializerContext
-    {
-    }
 }

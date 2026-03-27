@@ -1,4 +1,5 @@
 //using Newtonsoft.Json;
+
 using System.Text.Json.Serialization;
 
 namespace GuardianConnect.API.Model;
@@ -11,12 +12,6 @@ namespace GuardianConnect.API.Model;
  */
 public class PeTokenRequest
 {
-    [JsonPropertyName("validation-method")]
-    public string ValidationMethod { get; }= "pe-token";
-
-    [JsonPropertyName("pe-token")]
-    public string PeToken { get; set; }
-
     public PeTokenRequest(string method, string token)
     {
         ValidationMethod = method;
@@ -27,4 +22,9 @@ public class PeTokenRequest
     {
         PeToken = token;
     }
+
+    [JsonPropertyName("validation-method")]
+    public string ValidationMethod { get; } = "pe-token";
+
+    [JsonPropertyName("pe-token")] public string PeToken { get; set; }
 }

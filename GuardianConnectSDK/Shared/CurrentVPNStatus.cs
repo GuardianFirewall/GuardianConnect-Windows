@@ -1,37 +1,35 @@
-﻿using System;
-using System.Text.Json.Serialization;
+﻿using System.Text.Json.Serialization;
 
-namespace GuardianConnect.Shared
+namespace GuardianConnect.Shared;
+
+public enum ConnectionStateEnum
 {
-    public enum ConnectionStateEnum
+    Connected,
+    Connecting,
+    Disconnected,
+    Disconnecting
+}
+
+//public struct CurrentVPNStatus
+public class CurrentVPNStatus
+{
+    [JsonConstructor]
+    public CurrentVPNStatus()
     {
-        Connected,
-        Connecting,
-        Disconnected,
-        Disconnecting
+        EntryName = string.Empty;
     }
 
-    //public struct CurrentVPNStatus
-    public class CurrentVPNStatus
+    public CurrentVPNStatus(ConnectionStateEnum state, string entryName)
     {
-        [JsonConstructor]
-        public CurrentVPNStatus()
-        {
-            EntryName = string.Empty;
-        }
-
-        public CurrentVPNStatus(ConnectionStateEnum state, string entryName)
-        {
-            ConnectionState = state;
-            EntryName = entryName;
-        }
-
-        [JsonPropertyName("EntryName")]
-        [JsonInclude]
-        public string EntryName { get; set; }
-
-        [JsonPropertyName("ConnectionState")]
-        [JsonInclude]
-        public ConnectionStateEnum ConnectionState { get; set; }
+        ConnectionState = state;
+        EntryName = entryName;
     }
+
+    [JsonPropertyName("EntryName")]
+    [JsonInclude]
+    public string EntryName { get; set; }
+
+    [JsonPropertyName("ConnectionState")]
+    [JsonInclude]
+    public ConnectionStateEnum ConnectionState { get; set; }
 }
