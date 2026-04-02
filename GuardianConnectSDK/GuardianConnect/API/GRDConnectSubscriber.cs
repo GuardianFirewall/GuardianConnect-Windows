@@ -13,7 +13,6 @@ namespace GuardianConnect.API;
 
 public class GRDConnectSubscriber
 {
-    // REMOVE THIS!! TESTING ONLY  - TODO TODO TODO CHECK
 #pragma warning disable CS0169
     private static Dictionary<string, object>? _deviceDict;
 #pragma warning restore CS0169
@@ -47,9 +46,7 @@ public class GRDConnectSubscriber
     [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
     public GRDConnectDevice? Device { get; set; }
 
-    // CHECK WITH CJ ON THIS
     public bool AcceptedTOS { get; set; }
-    //
 
     // Convenience: Create from dictionary
     public static GRDConnectSubscriber InitFromDictionary(Dictionary<string, JsonElement> subscriberDetailsDict)
@@ -408,7 +405,6 @@ public class GRDConnectSubscriber
     // Logout subscriber [ #173 ]
     public async Task<ErrorResponse> LogoutConnectSubscriberAsync()
     {
-        // TJE: FIX/CHECK/TODO var pet = GRDPEToken.GetCurrentPEToken().Token;
         var pet = GRDConnectDevice.GetCurrentDevice().Device?.PEToken;
         if (string.IsNullOrEmpty(pet))
             return new ErrorResponse("Failed to validate Connect subscriber. No PE-Token present on device");

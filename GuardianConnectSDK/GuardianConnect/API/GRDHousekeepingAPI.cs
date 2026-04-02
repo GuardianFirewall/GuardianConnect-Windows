@@ -60,7 +60,7 @@ public static class GRDHousekeepingAPI
                 .SetErrorMessage("No pe token provided");
         }
 
-        // TJE - TODO - CLEAN THIS UP TO MATCH CONCISE CODE IN CONNECTSUBSCRIBER/DEVICE METHODS
+        // TODO - MATCH CONCISE CODE IN CONNECTSUBSCRIBER/DEVICE METHODS
         var uri = new Uri($"https://{Common.DefaultConnectAPIHostname}/api/v1/users/info-for-pe-token");
         try
         {
@@ -128,9 +128,6 @@ public static class GRDHousekeepingAPI
     public static async Task<ErrorResponse> CreateSubscriberCredentialForBundleId(string bundleId)
     {
         ErrorResponse errorResponse;
-        // CONN#9
-        Logger.LogInformation("CONN#9");
-        // TJE: Called by GRDVPNHelper.GetValidSubscriberCredentialWithCompletion()
 
         // set host to use
         var connectHost = GRDVPNHelper.Singleton.PeToken?.ConnectAPIEnv ?? Common.DefaultConnectAPIHostname;
@@ -154,9 +151,6 @@ public static class GRDHousekeepingAPI
 
         var petRequest = new PeTokenRequest(peToken);
 
-        // TJE: ASK CJ ABOUT THIS! [022526] - everywhere else in this class we call into our own backend server
-        // but here we decide whether to call into our own backend server or an external API
-        // Is that because pe-token can be set from us or a partner?
         var uri = new Uri($"https://{connectHost}/api/v1.2/subscriber-credential/create");
         try
         {

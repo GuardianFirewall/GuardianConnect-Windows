@@ -74,8 +74,8 @@ public static class ConnectionRoutines
         return connections;
     }
 
-    // TJE - this is similar to CheckConnection below except entry name is not known. This is
-    // used when we have been started and don't known if or what entry has an
+    // This is similar to CheckConnection below except entry name is not known. This is
+    // used when we have been started and don't know if or what entry has an
     // active connection. So we iterate through and find ANY active connection
     // and return the handle to be used for notification setup.
     // We'll save entryName elsewhere for UI propagation

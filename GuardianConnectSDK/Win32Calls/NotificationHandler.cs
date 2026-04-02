@@ -9,18 +9,6 @@ using Microsoft.Extensions.Logging.Abstractions;
 using PInvoke = Windows.Win32.PInvoke;
 
 namespace Win32Calls;
-#if FROM_HEADER
-{
-    public:
-
-//        static DEVICE_NOTIFY_CALLBACK_ROUTINE DeviceNotifyCallbackRoutine;
-//        static DWORD RegisterForPowerEvents();
-//        static void UnregisterFromPowerNotifications();
-        
-    internal:
-        static void RasConnChangeWaiterThread();
-    };
-#endif
 public static class NotificationHandler
 {
     private static ILogger _logger = NullLogger.Instance;

@@ -194,9 +194,7 @@ public class Common
     public const string kGuardianDeviceSubscriberIdentifier = "ep-grd-device-subscriber-identifier";
     public const string kGuardianDeviceSubscriberSecret = "ep-grd-device-subscriber-secret";
 
-
-    // Error Text Here?? (TJE TODO)
-    public const string kPETOKENNOTSET = "PE TOKEN IS NOT SET";
+    public const string kPETOKENNOTSET = "PE-Token is not set";
 
     // Other useful definitions and constants
     public const string VPNEVT_NAME_CLIENTSIDE = "Global\\GRDRASCONNCLIENTSIGNAL";

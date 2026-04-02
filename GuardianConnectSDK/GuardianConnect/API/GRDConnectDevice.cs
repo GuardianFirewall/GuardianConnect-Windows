@@ -110,7 +110,7 @@ public class GRDConnectDevice
             };
             GRDKeychain.StoreDictionaryOfObjects(kGuardianConnectDeviceStore, deviceDict);
 
-            // TJE - per CJ talk - going to replicate storing GRDPEToken here if given in the device so we stay consistent
+            // going to replicate storing GRDPEToken here if given in the device so we stay consistent
             if (!string.IsNullOrEmpty(PEToken))
             {
                 var updatedPet = GRDPEToken.GetCurrentPEToken();
@@ -234,7 +234,7 @@ public class GRDConnectDevice
     }
 
     // [#178 - calls #194] Delete device
-    // TJE - CHECK THIS - Delete a singular device from the registry as the only one?
+    // Delete a singular device from the registry as the only one
     public async Task<ErrorResponse> DeleteDeviceAsync(string peToken, string identifier, string secret)
     {
         try

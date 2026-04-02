@@ -206,7 +206,6 @@ public class ClientPipeImpl : IGuardianNPContract
         var cmdString = $"{(int)IGuardianNPContract.NPCommands.GetCurrentVpnConnectionStatus}.";
         ss.WriteString(cmdString);
         ClientPipe.Logger.LogInformation("Reading status...");
-        //var statusString = ss.ReadStringAsync().Result;
         var statusString = ss.ReadString();
         var status =
             JsonSerializer.Deserialize<CurrentVPNStatus>(statusString,
@@ -301,7 +300,6 @@ public class ClientPipeImpl : IGuardianNPContract
             ClientPipe.Logger.LogInformation("ClientPipeImpl.Connect: Calling OpenNamedPipe...");
             OpenNamedPipe(servicePipeName);
             ss = new StreamString(_clientStream);
-            //var testAck = ss.ReadStringAsync();
             var testAck = ss.ReadString();
             ClientPipe.Logger.LogInformation($"Client Pipe connected to Service. testAck returned '{testAck}'");
             var pieces = testAck.Split(new[] { '#' });

@@ -10,7 +10,6 @@ public enum ConnectionStateEnum
     Disconnecting
 }
 
-//public struct CurrentVPNStatus
 public class CurrentVPNStatus
 {
     [JsonConstructor]

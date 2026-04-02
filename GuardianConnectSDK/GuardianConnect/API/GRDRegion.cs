@@ -1,6 +1,5 @@
 ﻿using System.Text.Json.Serialization;
 using GuardianConnect.API.Model;
-//using Newtonsoft.Json;
 
 namespace GuardianConnect.API;
 

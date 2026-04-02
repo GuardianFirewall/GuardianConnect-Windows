@@ -98,7 +98,7 @@ public class VPNTransportIKEV2 : ITransportProvider
         NotificationHandler.WasDisconnectPlanned = false;
         Logger.LogInformation(
             $"StartVPNTunnelWithOptions: WasDisconnectPlanned now equals {NotificationHandler.WasDisconnectPlanned}");
-        SetVPNStateAtSuspend(); // CHECK THIS - moving to here - makes sense after non-error Connect command return
+        SetVPNStateAtSuspend(); // CHECK - moving to here - makes sense after non-error Connect command return
         Logger.LogInformation(
             $"StartVPNTunnelWithOptions: (CHECK#2) WasDisconnectPlanned now equals {NotificationHandler.WasDisconnectPlanned}");
 
@@ -144,7 +144,6 @@ public class VPNTransportIKEV2 : ITransportProvider
         throw new NotImplementedException();
     }
 
-    // TJE - revisit this - I don't like scattered and seemingly redundant data and methods
     public static ITransportProvider.VPNProviderStatus GetCurrentVPNState()
     {
         var status = ITransportProvider.VPNProviderStatus.VPNStatusDisconnected;
@@ -230,7 +229,7 @@ public class VPNTransportIKEV2 : ITransportProvider
             H_VPNStateChangeServiceEvent?.Reset();
 
             Logger.LogInformation("PollConnectionState(): woke from ConnStateChange.");
-            // TJE TODO: change # of clients connected to be available here so we can set signal only if clients connected
+            // TODO: change # of clients connected to be available here so we can set signal only if clients connected
             //Logger.LogInformation($"PollConnectionState(): Clients connected - signalling them.");
 
             // Logger.LogInformation($"PollConnectionState(): Signaling clients ...");

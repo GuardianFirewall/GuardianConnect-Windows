@@ -4,12 +4,10 @@ using GuardianConnect.VPNTransports;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Logging.Abstractions;
 using Win32Calls;
-//using Serilog;
 using ILogger = Microsoft.Extensions.Logging.ILogger;
 
 namespace GuardianFirewallService;
 
-//public class GuardianNPCommandDispatcher :IGuardianNPContract
 public class GuardianNPCommandDispatcher : IGuardianNPContract
 {
     private static ILogger _logger = NullLogger.Instance;
