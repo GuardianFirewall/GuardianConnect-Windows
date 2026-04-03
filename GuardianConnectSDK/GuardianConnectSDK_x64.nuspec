@@ -20,7 +20,7 @@
     </metadata>
     <files>
         <file src="..\README.md" target="content"/>
-        <file src="Guardian.png"/>
+        <file src="..\Guardian.png"/>
 
         <file src="BuildOutput\GuardianConnect\runtimes\win10-x64\lib\net9.0-windows\GuardianConnect.dll" target="lib\net9.0\GuardianConnect.dll"/>
         <file src="BuildOutput\GuardianConnect\runtimes\win10-x64\lib\net9.0-windows\GuardianConnect.Shared.dll" target="lib\net9.0\GuardianConnect.Shared.dll"/>
