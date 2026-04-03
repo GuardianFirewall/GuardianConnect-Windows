@@ -21,7 +21,7 @@
     <files>
         <!--    <file src="GuardianConnectSDK.targets" target="buildTransitive\GuardianConnectSDK.targets" />-->
         <file src="..\README.md" target="content"/>
-        <file src="Guardian.png"/>
+        <file src="..\Guardian.png"/>
         <file src="BuildOutput\GuardianConnect.Services\runtimes\win10-x64\lib\net9.0-windows\GuardianConnect.Services.dll"
               target="lib\net9.0\GuardianConnect.Services.dll"/>
     </files>
