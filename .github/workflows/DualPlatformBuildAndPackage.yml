@@ -61,7 +61,7 @@ jobs:
 
     - name: Create GuardianConnectSDK_NugetPackages folder
       shell: cmd
-      run: md GuardianConnectSDK_NugetPackages
+      run: md ..\GuardianConnectSDK_NugetPackages
 
     # Add  MSBuild to the PATH: https://github.com/microsoft/setup-msbuild
     - name: Setup MSBuild.exe
