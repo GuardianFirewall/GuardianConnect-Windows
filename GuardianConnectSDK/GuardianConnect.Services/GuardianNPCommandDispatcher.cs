@@ -25,7 +25,6 @@ public class GuardianNPCommandDispatcher : IGuardianNPContract
             if (_logger == NullLogger.Instance)
             {
                 _logger = StaticLoggerFactory.CreateLogger("GuardianNPCommandDispatcher");
-                _logger.LogInformation("GRDGateway: TEST Log");
             }
 
             return _logger;

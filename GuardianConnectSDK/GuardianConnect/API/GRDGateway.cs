@@ -23,7 +23,6 @@ public class GRDGateway
             if (_logger == NullLogger.Instance)
             {
                 _logger = StaticLoggerFactory.CreateLogger("GRDGateway");
-                _logger.LogInformation("GRDGateway: TEST Log");
             }
 
             return _logger;
@@ -60,16 +59,14 @@ public class GRDGateway
         return request;
     }
 
-    /// endpoint: /vpnsrv/api/server-status
+    /// endpoint: /api/v1.3/server-status
     /// hits the endpoint for the current VPN host to check if a VPN connection can be established
     public static async Task<ErrorResponse> GetServerStatus(string hostOverride, bool clientCall = false)
     {
         var vpnHost = hostOverride;
         var errorResponse = new ErrorResponse();
         var response = new HttpResponseMessage();
-        Logger.LogInformation(
-            "In GetServerStatus. Called from Guardian Firewall "
-            + (clientCall ? "Client Connection step" : "Service Power Resume"));
+        Logger.LogInformation("GetServerStatus - " + (clientCall ? "Client Connection step" : "Service Power Resume"));
 
         if (clientCall && !CanMakeApiRequests)
         {
@@ -79,7 +76,7 @@ public class GRDGateway
         }
 
         Logger.LogInformation($"GetServerStatus: Making status call to host {vpnHost} ...");
-        var reqUri = new Uri($"https://{vpnHost}/vpnsrv/api/server-status");
+        var reqUri = new Uri($"https://{vpnHost}/api/v1.3/server-status");
         var request = new HttpRequestMessage(HttpMethod.Get, reqUri);
 
         try
@@ -103,7 +100,7 @@ public class GRDGateway
         return errorResponse;
     }
 
-    /// endpoint: /vpnsrv/api/server-status
+    /// endpoint: /api/v1.3/server-status
     /// hits the endpoint for the current VPN host to check if a VPN connection can be established
     /// This signature of method uses host from main credentials in GRDVPNHelper
     /// and calls dual-use (service/client) version that takes host parameter
@@ -145,7 +142,6 @@ public class GRDGateway
         var payload = new RegisterDevicePayload
         {
             subscriberCredential = subscriberCredentialJWT,
-            //transportProtocol = ITransportProvider.TransportProtocol.TransportIKEv2.ToString()
             transportProtocol = "ikev2"
         };
 
@@ -163,15 +159,9 @@ public class GRDGateway
             var respContent = await response.Content.ReadAsStringAsync();
             var cred = JsonSerializer.Deserialize<GRDCredential>(respContent,
                 GRDCredentialJsonContext.Default.GRDCredential);
-            // 0.40.1 - settings ClientId from EapUser if IKEv2
+            // 0.40.1 - sets ClientId from EapUser if IKEv2
             if (cred != null && cred.TransportProtocol == ITransportProvider.TransportProtocol.TransportIKEv2)
                 cred.ClientId = cred.UserName;
-            if (cred != null)
-            {
-                Logger.LogInformation(
-                    $"RegisterDeviceForTransportProtocol: resp Status={response.StatusCode}, cred values: ApiAuthToken: {cred.ApiAuthToken}, ClientId: {cred.ClientId}, DevicePrivateKey: {cred.DevicePrivateKey}, DevicePublicKey: {cred.DevicePublicKey}, Ipv4Address: {cred.IPv4Address}");
-                credsList.Add(cred);
-            }
         }
         catch (Exception e)
         {

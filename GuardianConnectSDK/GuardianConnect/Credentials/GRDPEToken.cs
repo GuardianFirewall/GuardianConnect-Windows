@@ -4,7 +4,7 @@ using static GuardianConnect.Shared.Common;
 
 namespace GuardianConnect.Credentials;
 
-public class GRDPEToken //: IGRDPEToken
+public class GRDPEToken
 {
     public GRDPEToken()
     {
@@ -68,7 +68,7 @@ public class GRDPEToken //: IGRDPEToken
         return peToken;
     }
 
-    // Useful function to update Current PEToken with fields
+    /// Convenience function to update current PEToken with fields
     public void UpdateFromDict(Dictionary<string, JsonElement> dict)
     {
         if (dict.ContainsKey(kPETokenKey)) Token = dict[kPETokenKey].GetString() ?? string.Empty;
@@ -95,19 +95,19 @@ public class GRDPEToken //: IGRDPEToken
     public bool RequiresValidation()
     {
         if (IsExpired()) return true;
-
-        // TODO - check on extra info about validationThreshold
+        
+        //
+        // Note from CJ 2026-04-03
+        // Allow for 7 day grace period to ensure that PETs 
+        // can be rotated prior to expiring in the first place
+        if (ExpirationDate < DateTime.Now.AddDays(-7)) return true
+        
         return false;
     }
 
     public void Store()
     {
         var jsonOut = JsonSerializer.Serialize(this, GRDPETokenJsonContext.Default.GRDPEToken);
-        var plainTextData = Encoding.UTF8.GetBytes(jsonOut);
-        var tempFileNamePath = Path.GetTempFileName();
-        // temp for test cases
-
-        //GRDKeychain.StoreData(IGRDKeychain.kKeychainStr_PEToken_Object, plainTextData);
         GRDKeychain.StorePassword(jsonOut, kKeychainStr_PEToken_Object);
     }
 

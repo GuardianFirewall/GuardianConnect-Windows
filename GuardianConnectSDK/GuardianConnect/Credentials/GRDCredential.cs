@@ -122,7 +122,7 @@ public class GRDCredential
         self.HostName = (string)credDict[Common.kGRDHostnameOverride];
         self.ExpirationDate = DateTime.Now.AddDays(validForDays);
         self.HostnameDisplayValue = (string)credDict[Common.kGRDVPNHostLocation];
-        self.Name = "DEFAULTFILENAME"; // FIGURE THIS RELEVANCY self.defaultFileName();
+        self.Name = (string)credDict[Common.kGRDVPNHostLocation];
 
         _checkedExpiration = false;
         _checkedExpiration = false;
@@ -136,7 +136,7 @@ public class GRDCredential
         Dictionary<string, object> credDict, int validForDays, bool areMainCreds)
     {
         var self = new GRDCredential(credDict);
-        self.Name = "DEFAULTFILENAME"; // FIGURE THIS RELEVANCY self.defaultFileName();
+        self.Name = (string)credDict[Common.kGRDVPNHostLocation];
         self.Identifer = areMainCreds ? "main" : Guid.NewGuid().ToString();
         self.MainCredential = areMainCreds;
 

@@ -396,7 +396,6 @@ public class Common
     public static string LogFilePath { get; set; } = "INVALID:";
 
     public static bool LogFilterOn { get; set; }
-    // 
 
     #endregion
 }

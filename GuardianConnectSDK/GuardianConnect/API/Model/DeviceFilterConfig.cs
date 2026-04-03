@@ -37,7 +37,6 @@ public class DeviceFilterConfig
     }
 
     [JsonPropertyName("block-ads")]
-    //[Newtonsoft.Json.JsonConverter(typeof(YesNoConverter))]
     public bool Block_Ads
     {
         get => (DeviceFilterConfigBlockList & DeviceFilterConfigFlags.BlocklistBlockAds) != 0;

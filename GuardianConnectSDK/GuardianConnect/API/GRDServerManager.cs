@@ -27,7 +27,6 @@ public class GRDServerManager
             if (_logger == NullLogger.Instance)
             {
                 _logger = StaticLoggerFactory.CreateLogger("GRDServerManager");
-                _logger.LogInformation("GRDServerManager: TEST Log");
             }
 
             return _logger;
@@ -41,7 +40,6 @@ public class GRDServerManager
     /// @param completion Completion block that will contain the selected host, hostLocation upon success or an error message upon failure.
     // This is called from GRDVPNHelper.SelectAndSetBestGuardianHost
     public static (string, string, ErrorResponse) SelectGuardianHostWithCompletion(string? selectedRegionKey)
-        // CHANGE ^-----------------------^
     {
         SelectedRegion = GetGRDRegionByKey(selectedRegionKey ?? GetRegionForOurTimeZone());
 
@@ -49,7 +47,7 @@ public class GRDServerManager
             $"GRDServerManager.SelectGuardianHostWithCompletion: Calling SelectBestHostInRegion for region '{SelectedRegion.RegionName}'");
         var regionHostRecord = SelectBestHostInRegion(SelectedRegion.RegionName);
 
-        return (regionHostRecord.Hostname, regionHostRecord.HostLocation(), new ErrorResponse()); // CHANGE!!
+        return (regionHostRecord.Hostname, regionHostRecord.HostLocation(), new ErrorResponse());
     }
 
     #region GRDServerManager private stuff
@@ -76,7 +74,7 @@ public class GRDServerManager
 
     // Caller can set the refresh interval. Defaulting to 1 hour.
     public static TimeSpan TimeSpanBetweenEachGeoRefresh { get; set; } =
-        new(1, 0, 0); // Change to registry setting later
+        new(1, 0, 0);
 
     public static ManualResetEventSlim InitialGeoInformationLoadComplete = new();
 
