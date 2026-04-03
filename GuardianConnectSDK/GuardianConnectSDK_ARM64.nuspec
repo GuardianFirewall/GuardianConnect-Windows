@@ -2,7 +2,7 @@
 <package >
   <metadata>
     <id>GuardianConnectSDK_ARM64</id>
-    <version>0.40.1</version>
+    <version>0.45.0</version>
     <title>GuardianConnect SDK Nuget Bundle Package for arm64</title>
     <authors>DNSFilter, Inc.</authors>
     <license type="expression">MIT</license>
@@ -27,9 +27,5 @@
     <file src="BuildOutput\GuardianConnect\runtimes\win10-arm64\lib\net9.0-windows\GuardianConnect.Abstractions.dll" target="lib\net9.0\GuardianConnect.Abstractions.dll"/>
     <file src="BuildOutput\GuardianConnect\runtimes\win10-arm64\lib\net9.0-windows\Win32Calls.dll" target="lib\net9.0\Win32Calls.dll"  />
     <file src="BuildOutput\GuardianConnect\runtimes\win10-arm64\lib\net9.0-windows\Win32Calls.WFP.dll" target="lib\net9.0\Win32Calls.WFP.dll"  />
-
-    <!-- TODO
-    <file src="BuildOutput\GuardianConnect\runtimes\win10-arm64\lib\net9.0-windows\*.dll" target="lib\net9.0" />
-    -->
   </files>
 </package>

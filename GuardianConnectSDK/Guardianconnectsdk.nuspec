@@ -2,7 +2,7 @@
 <package >
   <metadata>
     <id>GuardianConnectSDK (x64)</id>
-    <version>0.40.1</version>
+    <version>0.45.0</version>
     <title>GuardianConnect SDK Nuget Bundle Package for x64</title>
     <authors>DNSFilter, Inc.</authors>
     <license type="expression">MIT</license>
@@ -49,10 +49,6 @@
 <!--    <file src="BuildOutput\GuardianConnect\runtimes\win10-x64\lib\net9.0-windows\GuardianConnect.Shared.dll" target="runtimes\lib\net9.0-windows\win-x64\GuardianConnect.Shared.dll"   />-->
 <!--    <file src="BuildOutput\GuardianConnect\runtimes\win10-x64\lib\net9.0-windows\Ijwhost.dll" target="runtimes\win10-x64\native\Ijwhost.dll"   />-->
 <!--    <file src="BuildOutput\GuardianConnect\runtimes\win10-x64\lib\net9.0-windows\NativeRoutines.dll" target="runtimes\win10-x64\native\NativeRoutines.dll"   />-->
-
-    <!-- TODO
-    <file src="BuildOutput\GuardianConnect\runtimes\win10-arm64\lib\net9.0-windows\*.dll" target="lib\net9.0" />
-    -->
     
     <!-- DIFFERENT APPROACH AS NEEDED - INCLUDE SOURCE CODE OF THE THREE PROJECTS FOR GUARDIAN FIREWALL UI CLIENT:
       GuardianConnect\**, Shared\**, NativeRoutines\**
