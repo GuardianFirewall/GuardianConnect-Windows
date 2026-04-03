@@ -56,13 +56,13 @@ internal class VpnDnsFilteringHandler
 
     private static bool SetupPlatformFilters(string EntryName)
     {
-        Logger.LogInformation("SetupPlatformFilters: [CONNECT#5.1] Attempting to add filters...");
+        Logger.LogDebug("SetupPlatformFilters: Attempting to add filters...");
         return VpnUtils.AddWpmFilters(engine_, EntryName);
     }
 
     private static bool RemovePlatformFilters(string EntryName)
     {
-        Logger.LogInformation("RemovePlatformFilters: [DISCONNECT#5.1] Attempting to remove filters...");
+        Logger.LogDebug("RemovePlatformFilters: Attempting to remove filters...");
         return VpnUtils.RemoveWpmFilters(engine_, EntryName);
     }
 
@@ -106,37 +106,35 @@ internal class VpnDnsFilteringHandler
 
     internal static void UpdateFiltersState(string EntryName)
     {
-        Logger.LogInformation(
-            $"UpdateFiltersState: Calling CheckConnection('{EntryName}')...[CONNECT#1.2.1][DISCONNECT#?.?]");
+        Logger.LogDebug($"UpdateFiltersState: Calling CheckConnection('{EntryName}')");
         var connectionResult = ConnectionRoutines.CheckConnection(EntryName);
         switch (connectionResult)
         {
             case Utility.CheckConnectionResult.CONNECTED:
-                Logger.LogInformation("UpdateFiltersState: GuardianVPN connected, set filters [CONNECT#1.2.2]");
+                Logger.LogDebug("UpdateFiltersState: GuardianVPN connected, set filters");
                 if (IsActive())
                 {
-                    Logger.LogInformation(
-                        "UpdateFiltersState: GuardianVPN connected and Filters are already installed [CONNECT#1.2.2a]");
+                    Logger.LogDebug(
+                        "UpdateFiltersState: GuardianVPN connected and Filters are already installed");
                     return;
                 }
 
-                Logger.LogInformation("UpdateFiltersState: GuardianVPN connected, setting filters [CONNECT#1.2.3]");
+                Logger.LogDebug("UpdateFiltersState: GuardianVPN connected, setting filters");
                 // Enable DNS filtering
                 if (!SetFilters(EntryName))
                 {
-                    Logger.LogInformation("UpdateFiltersState: Failed to set DNS filters [CONNECT#1.2.3-FAIL]");
+                    Logger.LogDebug("UpdateFiltersState: Failed to set DNS filters");
                     RemoveFilters(EntryName);
                     ConnectionRoutines.DisconnectEntryAndRemove();
                     return;
                 }
 
-                Logger.LogInformation("UpdateFiltersState: Calling SetFiltersInstalledFlag(): [CONNECT#1.2.3-OK]");
+                Logger.LogDebug("UpdateFiltersState: Calling SetFiltersInstalledFlag():");
                 VpnUtils.SetFiltersInstalledFlag();
                 break;
             case Utility.CheckConnectionResult.DISCONNECTED:
                 // Disable DNS filtering
-                Logger.LogInformation(
-                    "UpdateFiltersState: GuardianVPN Disconnected, remove filters [DISCONNECT#1.2.1]");
+                Logger.LogDebug("UpdateFiltersState: GuardianVPN Disconnected, remove filters");
                 if (!RemoveFilters(EntryName))
                 {
                     Logger.LogInformation("UpdateFiltersState: Failed to remove DNS filters");

@@ -135,7 +135,6 @@ public class GRDKeychain : IGRDKeychain
         return 0;
     }
 
-    // TODO: Check callers
     public static void WriteRegistryData(byte[] encryptedData, string key)
     {
         try

@@ -229,10 +229,6 @@ public class VPNTransportIKEV2 : ITransportProvider
             H_VPNStateChangeServiceEvent?.Reset();
 
             Logger.LogInformation("PollConnectionState(): woke from ConnStateChange.");
-            // TODO: change # of clients connected to be available here so we can set signal only if clients connected
-            //Logger.LogInformation($"PollConnectionState(): Clients connected - signalling them.");
-
-            // Logger.LogInformation($"PollConnectionState(): Signaling clients ...");
 
             var connectionResult = Utility.CheckConnectionResult.Uninitialized;
             var rasConnStatus = new RASCONNSTATUSW
