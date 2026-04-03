@@ -91,7 +91,7 @@ public class VpnUtils
             return HANDLE.Null;
         }
 
-        Log.LogDebug("OpenWpmSession: success");
+        Log.Debug("OpenWpmSession: success");
         return engine;
     }
 
@@ -162,11 +162,11 @@ public class VpnUtils
     internal static unsafe uint RegisterSublayer(HANDLE engineHandle, Guid uuid)
     {
         FWPM_SUBLAYER0* sublayerPtr = null;
-        Log.LogDebug("RegisterSublayer: checking if sublayer already exists...");
+        Log.Debug("RegisterSublayer: checking if sublayer already exists...");
         /* Check sublayer exists and add one if it does not */
         if (PInvoke.FwpmSubLayerGetByKey0(engineHandle, &uuid, &sublayerPtr) != 0)
         {
-            Log.LogDebug("RegisterSublayer: sublayer does not exist, adding...");
+            Log.Debug("RegisterSublayer: sublayer does not exist, adding...");
             var result = AddSublayer(engineHandle, uuid);
             if (result != 0)
             {
@@ -176,7 +176,7 @@ public class VpnUtils
         }
         else
         {
-            Log.LogDebug("RegisterSublayer: sublayer already exists.");
+            Log.Debug("RegisterSublayer: sublayer already exists.");
             PInvoke.FwpmFreeMemory0((void**)&sublayerPtr);
         }
 
@@ -330,7 +330,7 @@ public class VpnUtils
         filter.numFilterConditions = 0;
 
         ulong filterId = 0;
-        Log.LogDebug("PermitQueriesFromTAP: Calling FwpmFilterAdd0() to Permit IPv4 DNS queries from TAP...");
+        Log.Debug("PermitQueriesFromTAP: Calling FwpmFilterAdd0() to Permit IPv4 DNS queries from TAP...");
         var retVal = PInvoke.FwpmFilterAdd0(engineHandle, &filter, PSECURITY_DESCRIPTOR.Null, &filterId);
         if (retVal != 0)
         {
@@ -347,7 +347,7 @@ public class VpnUtils
 
         // Permit IPv6 DNS queries from TAP. Use same weight as IPv4 filter.
         filter.layerKey = PInvoke.FWPM_LAYER_ALE_AUTH_CONNECT_V6;
-        Log.LogDebug("PermitQueriesFromTAP: Calling FwpmFilterAdd0() to Permit IPv6 DNS queries from TAP...");
+        Log.Debug("PermitQueriesFromTAP: Calling FwpmFilterAdd0() to Permit IPv6 DNS queries from TAP...");
         retVal = PInvoke.FwpmFilterAdd0(engineHandle, &filter, PSECURITY_DESCRIPTOR.Null, &filterId);
         if (retVal != 0)
         {
@@ -368,7 +368,7 @@ public class VpnUtils
             return false;
         }
 
-        Log.LogDebug("AddWpmFilters: Calling RegisterSubLayer()...");
+        Log.Debug("AddWpmFilters: Calling RegisterSubLayer()...");
         var result = RegisterSublayer(engine_handle, kVpnDnsSublayerGUID);
         if (result != 0)
         {
@@ -377,7 +377,7 @@ public class VpnUtils
         }
 
         // Block all IPv4 DNS queries
-        Log.LogDebug("AddWpmFilters: Calling BlockIPv4Queries()...");
+        Log.Debug("AddWpmFilters: Calling BlockIPv4Queries()...");
         result = BlockIPv4Queries(engine_handle);
         if (result != 0)
         {
@@ -386,7 +386,7 @@ public class VpnUtils
         }
 
         // Block all IPv6 DNS Queries
-        Log.LogDebug("AddWpmFilters: Calling BlockIPv6Queries()...");
+        Log.Debug("AddWpmFilters: Calling BlockIPv6Queries()...");
         result = BlockIPv6Queries(engine_handle);
         if (result != 0)
         {
@@ -395,7 +395,7 @@ public class VpnUtils
         }
 
         // Permit IPv4 DNS queries from TAP adapter
-        Log.LogDebug("AddWpmFilters: Calling PermitIPv4QueriesFromTAP()...");
+        Log.Debug("AddWpmFilters: Calling PermitIPv4QueriesFromTAP()...");
         result = PermitQueriesFromTAP(engine_handle, name);
         if (result != 0)
         {
@@ -403,7 +403,7 @@ public class VpnUtils
             return false;
         }
 
-        Log.LogDebug("AddWpmFilters: Added block filters for all interfaces");
+        Log.Debug("AddWpmFilters: Added block filters for all interfaces");
 
         return true;
     }
@@ -425,7 +425,7 @@ public class VpnUtils
             // Remove TAP IPv4 filter
             if (TAP_IPv4_Id != 0)
             {
-                Log.LogDebug("RemoveWpmFilters: Removing TAP IPv4 filter...");
+                Log.Debug("RemoveWpmFilters: Removing TAP IPv4 filter...");
                 result = PInvoke.FwpmFilterDeleteById0(engine_handle, TAP_IPv4_Id);
                 if (result != 0)
                 {
@@ -439,7 +439,7 @@ public class VpnUtils
             // Remove TAP IPv6 filter
             if (TAP_IPv6_Id != 0)
             {
-                Log.LogDebug("RemoveWpmFilters: Removing TAP IPv6 filter...");
+                Log.Debug("RemoveWpmFilters: Removing TAP IPv6 filter...");
                 result = PInvoke.FwpmFilterDeleteById0(engine_handle, TAP_IPv6_Id);
                 if (result != 0)
                 {
@@ -467,7 +467,7 @@ public class VpnUtils
             }
 
             // Remove sublayer
-            Log.LogDebug("RemoveWpmFilters: Removing sublayer...");
+            Log.Debug("RemoveWpmFilters: Removing sublayer...");
             result = RemoveSublayer(engine_handle, kVpnDnsSublayerGUID);
             if (result != 0)
             {
