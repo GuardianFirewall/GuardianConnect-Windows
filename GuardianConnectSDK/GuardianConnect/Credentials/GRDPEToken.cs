@@ -95,14 +95,12 @@ public class GRDPEToken
     public bool RequiresValidation()
     {
         if (IsExpired()) return true;
-        
+
         //
         // Note from CJ 2026-04-03
         // Allow for 7 day grace period to ensure that PETs 
         // can be rotated prior to expiring in the first place
-        if (ExpirationDate < DateTime.Now.AddDays(-7)) return true
-        
-        return false;
+        return ExpirationDate < DateTime.Now.AddDays(-7);
     }
 
     public void Store()
