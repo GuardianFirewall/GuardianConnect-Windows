@@ -3,7 +3,6 @@ using GuardianConnect.Credentials;
 using GuardianConnect.Helpers;
 using GuardianConnect.Shared;
 using Microsoft.Extensions.Logging;
-//using Newtonsoft.Json;
 
 namespace GuardianConnect.API.Model;
 
@@ -31,7 +30,6 @@ public class DeviceFilterConfig
     [JsonPropertyName("api-auth-token")] public string Api_auth_token { get; set; } = string.Empty;
 
     [JsonPropertyName("block-phishing")]
-    //[Newtonsoft.Json.JsonConverter(typeof(YesNoConverter))]
     public bool Block_Phishing
     {
         get => (DeviceFilterConfigBlockList & DeviceFilterConfigFlags.BlocklistBlockPhishing) != 0;
@@ -47,7 +45,6 @@ public class DeviceFilterConfig
     }
 
     [JsonPropertyName("block-none")]
-    //[Newtonsoft.Json.JsonConverter(typeof(YesNoConverter))]
     public bool Disable_Firewall
     {
         get => (DeviceFilterConfigBlockList & DeviceFilterConfigFlags.BlocklistDisableFirewall) != 0;

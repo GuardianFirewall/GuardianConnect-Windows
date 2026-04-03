@@ -511,12 +511,6 @@ public class DPAPI
             // Check the result.
             if (!success)
             {
-                // TJE FIX!! 04/06/24 - for some reason we are choking on what is being decrypted.
-                // Need to find out how the data blob being decrypted is wrong. Did it get encrypted incorrectly?
-                // Did it get stored wrong? Did it get retrieved from storage wrong?
-                // We must log when happens, then set a flag and for the next N number of times, log the data going
-                // in and back out - and create test programs with inbound data in question and go through cycle
-
                 // If operation failed, retrieve last Win32 error.
                 var errCode = Marshal.GetLastWin32Error();
                 // Win32Exception will contain error message corresponding

@@ -147,7 +147,7 @@ public class VpnUtils
         return result;
     }
 
-    // CHECK THIS! TODO - WHO WOULD CALL THIS?
+    // TODO - WHO WOULD CALL THIS?
     internal static unsafe uint RemoveSublayer(HANDLE engineHandle, Guid uuid)
     {
         uint result = 0;
@@ -273,7 +273,7 @@ public class VpnUtils
     }
 
 
-    // TJE - CHECK THIS!!  - WHY AREN'T WE ADDING CONDITION FOR IPv6 like we do with IPv4??
+    // TODO: IPv6 ...
     internal static unsafe uint BlockIPv6Queries(HANDLE engineHandle)
     {
         var filter = new FWPM_FILTER0();
@@ -328,50 +328,8 @@ public class VpnUtils
         filter.action.type = FWP_ACTION_TYPE.FWP_ACTION_PERMIT;
         // Filter created - continue with conditions...
 
-#if WORKING // Original code from Brian at Brave - seems to have issues finding TAP adapter by name
-// TJE TODO - FIX THIS!! - compare with C++ code to see if both return same adapter index and ComboIndex. Also compare LUID values.
-            // Get TAP adapter index
-            adapterNameToMatch = connectionName.ToCharArray();
-            int adapterIndex = GetAdapterIndexByName();
-            if (adapterIndex == -1)
-            {
-                Log.Error("PermitQueriesFromTAP: Failed to find TAP adapter by name.");
-                return 1;
-            }
 
-            NET_LUID_LH tapluid = new NET_LUID_LH();
-            var result = PInvoke.ConvertInterfaceIndexToLuid((uint)adapterIndex, &tapluid);
-            if (result != WIN32_ERROR.ERROR_SUCCESS) return 1;
-
-            //FWPM_FILTER_CONDITION0* pCondition = (FWPM_FILTER_CONDITION0*)Unsafe.AsPointer(ref VpnUtils.conditions[0]);
-            fixed (FWPM_FILTER_CONDITION0* pCondition = VpnUtils.conditions)
-            {
-                // Condition 1
-                FWP_CONDITION_VALUE0 cv1 = new FWP_CONDITION_VALUE0();
-                cv1.type = FWP_DATA_TYPE.FWP_UINT16;
-                cv1.Anonymous.uint16 = 53; // DNS port
-
-                FWPM_FILTER_CONDITION0 tCondition = new FWPM_FILTER_CONDITION0();
-                pCondition[0].fieldKey = PInvoke.FWPM_CONDITION_IP_REMOTE_PORT;
-                pCondition[0].matchType = FWP_MATCH_TYPE.FWP_MATCH_EQUAL;
-                pCondition[0].conditionValue = cv1;
-
-                // Condition 2
-                FWP_CONDITION_VALUE0 cv2 = new FWP_CONDITION_VALUE0();
-                cv2.type = FWP_DATA_TYPE.FWP_UINT64;
-                cv2.Anonymous.uint64 = (ulong*)(&tapluid.Value);
-
-                pCondition[1].fieldKey = PInvoke.FWPM_CONDITION_IP_LOCAL_INTERFACE;
-                pCondition[1].matchType = FWP_MATCH_TYPE.FWP_MATCH_EQUAL;
-                pCondition[1].conditionValue = cv2;
-
-                // Add conditions to filter
-                filter.filterCondition = pCondition;
-                filter.numFilterConditions = 2;
-            }
-#else
         filter.numFilterConditions = 0;
-#endif
 
         ulong filterId = 0;
         Log.Information(

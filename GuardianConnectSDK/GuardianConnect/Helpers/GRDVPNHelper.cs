@@ -164,8 +164,8 @@ public class GRDVPNHelper
             if (mainCreds.TransportProtocol == ITransportProvider.TransportProtocol.TransportIKEv2)
                 clientId = mainCreds.UserName;
             (var subCreds, errorResponse) = await GetValidSubscriberCredentialWithCompletion();
-            if (subCreds == null || errorResponse.Message.Equals("PE TOKEN NOT SET"))
-                return; // TJE TODO: CHECK THIS
+            if (subCreds == null || errorResponse.Message.Equals(Common.kPETOKENNOTSET))
+                return;
 
             errorResponse = await GRDGateway.InvalidateCredentialsForClientId(clientId, mainCreds.ApiAuthToken,
                 mainCreds.HostName, subCreds.Jwt);
@@ -210,10 +210,7 @@ public class GRDVPNHelper
     {
         var errorResponse = new ErrorResponse();
 
-        // CONN#3
-        _logger.LogInformation("CONN#3");
-
-        errorResponse = await CreateStandaloneCredentialsForTransportProtocol(protocol); // CONN#4-CONN#10
+        errorResponse = await CreateStandaloneCredentialsForTransportProtocol(protocol);
         if (errorResponse.IsError) return errorResponse;
 
         var credentials = (List<GRDCredential>)errorResponse.Data!;
@@ -244,8 +241,6 @@ public class GRDVPNHelper
             || string.IsNullOrEmpty(mainCredentials.ApiAuthToken))
             _logger.LogInformation("GRDVPNHelper: main credentials not set. Syncing now.");
 
-        // CONN#11
-        _logger.LogInformation("CONN#11");
         errorResponse = await GRDGateway.GetServerStatus();
         if (errorResponse.IsError)
         {
@@ -287,7 +282,6 @@ public class GRDVPNHelper
         var errorResponse = new ErrorResponse();
         _logger.LogInformation("In GRDVPNHelper.DisconnectVPN().");
 
-        _logger.LogInformation("DISCONN#2");
         var entryName = GetNameOfConnectionEntry();
         _logger.LogInformation($"GRDVPNHelper.DisconnectVPN(): Name of entry to disconnect is '{entryName}'");
 
@@ -314,7 +308,6 @@ public class GRDVPNHelper
         }
 
         _logger.LogInformation("GRDVPNHelper.DisconnectVPN(): Back from ClientPipe.DisconnectVPNConnectionAsync()");
-        _logger.LogInformation("DISCONN#3");
 
         return errorResponse;
     }
@@ -322,8 +315,6 @@ public class GRDVPNHelper
     /// There should be no need to call this directly, this is for internal use only.
     public async Task<(GRDSubscriberCredential?, ErrorResponse)> GetValidSubscriberCredentialWithCompletion()
     {
-        // CONN#7
-        _logger.LogInformation("CONN#7");
 
         ErrorResponse errorResponse;
         var subCred = GRDSubscriberCredential.GetCurrentStoredSubscriberCredential();
@@ -348,14 +339,12 @@ public class GRDVPNHelper
         ITransportProvider.TransportProtocol protocol, int validForDays = 30)
     {
         var errorResponse = new ErrorResponse();
-        // CONN#4
-        _logger.LogInformation("CONN#4");
 
         var (host, hostDisplay, error) = GRDServerManager.SelectGuardianHostWithCompletion(PreferredRegion);
         errorResponse = await CreateStandaloneCredentialsForTransportProtocol(protocol, validForDays, host);
         if (errorResponse.IsError) return errorResponse;
 
-        // TJE - adding in host stuff here instead of above in caller
+        // adding in host info here instead of above in caller
         var credentials = (List<GRDCredential>)errorResponse.Data!;
         credentials[0].HostName = host;
         credentials[0].HostnameDisplayValue = hostDisplay;
@@ -372,17 +361,11 @@ public class GRDVPNHelper
     public async Task<ErrorResponse> CreateStandaloneCredentialsForTransportProtocol(
         ITransportProvider.TransportProtocol protocol, int days, string hostname)
     {
-        // CONN#6
-        _logger.LogInformation("CONN#6");
-
-        //string errorMessage = "NONE";
         ErrorResponse errorResponse;
         (var subCreds, errorResponse) = await GetValidSubscriberCredentialWithCompletion();
         if (errorResponse.IsError) return errorResponse;
-        // TJE TODO - CHECK IF errorMessage is "PE TOKEN IS NOT SET"
         errorResponse = await GRDGateway.RegisterDeviceForTransportProtocol(protocol, hostname, subCreds!.Jwt, days);
 
-        // TJE TODO - WHY NOT CHECKING success for false??
         return errorResponse;
     }
 
@@ -405,10 +388,6 @@ public class GRDVPNHelper
     private async Task<ErrorResponse> StartIKEv2Connection()
     {
         var errorResponse = new ErrorResponse();
-
-        // CONN#13
-        _logger.LogInformation("CONN#13");
-        // TJE: - called from configureAndConnectVPNWithCompletion after Server check
 
         var mainCredential = GRDCredentialManager.GetMainCredentials();
         // Make WCF call to GuardianWindowsService to start the connection

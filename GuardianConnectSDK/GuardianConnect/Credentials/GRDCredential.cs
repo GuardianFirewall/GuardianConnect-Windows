@@ -1,7 +1,6 @@
 ﻿using System.Text.Json.Serialization;
 using GuardianConnect.Abstractions;
 using GuardianConnect.Shared;
-//using Newtonsoft.Json;
 
 namespace GuardianConnect.Credentials;
 
@@ -123,7 +122,7 @@ public class GRDCredential
         self.HostName = (string)credDict[Common.kGRDHostnameOverride];
         self.ExpirationDate = DateTime.Now.AddDays(validForDays);
         self.HostnameDisplayValue = (string)credDict[Common.kGRDVPNHostLocation];
-        self.Name = "DEFAULTFILENAME"; // TJE FIGURE THIS RELEVANCY self.defaultFileName();
+        self.Name = "DEFAULTFILENAME"; // FIGURE THIS RELEVANCY self.defaultFileName();
 
         _checkedExpiration = false;
         _checkedExpiration = false;
@@ -137,7 +136,7 @@ public class GRDCredential
         Dictionary<string, object> credDict, int validForDays, bool areMainCreds)
     {
         var self = new GRDCredential(credDict);
-        self.Name = "DEFAULTFILENAME"; // TJE FIGURE THIS RELEVANCY self.defaultFileName();
+        self.Name = "DEFAULTFILENAME"; // FIGURE THIS RELEVANCY self.defaultFileName();
         self.Identifer = areMainCreds ? "main" : Guid.NewGuid().ToString();
         self.MainCredential = areMainCreds;
 

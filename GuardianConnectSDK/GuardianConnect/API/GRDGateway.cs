@@ -9,7 +9,6 @@ using GuardianConnect.Shared;
 using GuardianConnect.Shared.Extensions;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Logging.Abstractions;
-//using Newtonsoft.Json;
 
 namespace GuardianConnect.API;
 
@@ -53,7 +52,6 @@ public class GRDGateway
 
     public static HttpRequestMessage RequestWithEndpoint(string apiEndpoint, string requestData)
     {
-        // TJE - do we need this?
         var reqUri = new Uri($"https://{BaseHostName}{apiEndpoint}");
         var request = new HttpRequestMessage(HttpMethod.Post, reqUri);
         HttpContent content = new StringContent(requestData);
@@ -71,7 +69,7 @@ public class GRDGateway
         var response = new HttpResponseMessage();
         Logger.LogInformation(
             "In GetServerStatus. Called from Guardian Firewall "
-            + (clientCall ? "Client CONN#12" : "Service Power Resume"));
+            + (clientCall ? "Client Connection step" : "Service Power Resume"));
 
         if (clientCall && !CanMakeApiRequests)
         {
@@ -144,9 +142,6 @@ public class GRDGateway
         var response = new HttpResponseMessage();
         var credsList = new List<GRDCredential>();
 
-        // CONN#10
-        Logger.LogInformation("CONN#10: RegisterDeviceForTransportProtocol()");
-
         var payload = new RegisterDevicePayload
         {
             subscriberCredential = subscriberCredentialJWT,
@@ -168,7 +163,7 @@ public class GRDGateway
             var respContent = await response.Content.ReadAsStringAsync();
             var cred = JsonSerializer.Deserialize<GRDCredential>(respContent,
                 GRDCredentialJsonContext.Default.GRDCredential);
-            // TJE 0.40.1 - settings ClientId from EapUser if IKEv2
+            // 0.40.1 - settings ClientId from EapUser if IKEv2
             if (cred != null && cred.TransportProtocol == ITransportProvider.TransportProtocol.TransportIKEv2)
                 cred.ClientId = cred.UserName;
             if (cred != null)
@@ -184,7 +179,6 @@ public class GRDGateway
         }
 
         errorResponse.SetData(credsList);
-        // TJE - TODO - CHECK WITH CJ AS TO WHY WE AREN'T CHECKING 
 
         return errorResponse;
     }

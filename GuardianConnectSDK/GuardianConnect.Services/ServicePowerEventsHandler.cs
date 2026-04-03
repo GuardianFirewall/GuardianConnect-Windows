@@ -198,7 +198,7 @@ public static class ServicePowerEventsHandler
                 }
 
                 break;
-// TJE 082025: This is a Battery/AC state change - not going to log this for now - too noisy on laptops
+// This is a Battery/AC state change - not going to log this for now - too noisy on laptops
 //#if TRACKINGTHIS
             case PowerModes.StatusChange:
                 Logger.LogInformation(

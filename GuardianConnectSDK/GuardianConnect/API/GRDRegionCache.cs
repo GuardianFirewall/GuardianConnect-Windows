@@ -12,7 +12,7 @@ namespace GuardianConnect.API;
 ///     for the consumer. This completely runs in background task and consumer's
 ///     calls reference the static active sister.
 /// </summary>
-public class GeoInfoCache
+public class GRDRegionCache
 {
     internal List<string> RegionKeys = new();
     internal Dictionary<string, string> RegionKeysByDisplay = new();
@@ -23,7 +23,7 @@ public class GeoInfoCache
 
     internal Dictionary<string, List<string>> timezonesLookup = new();
 
-    internal GeoInfoCache()
+    internal GRDRegionCache()
     {
         timezonesLookup = new Dictionary<string, List<string>>();
         regionLookup = new Dictionary<string, GRDRegion>();

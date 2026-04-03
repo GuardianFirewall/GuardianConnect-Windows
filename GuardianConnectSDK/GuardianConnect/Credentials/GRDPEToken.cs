@@ -96,7 +96,7 @@ public class GRDPEToken //: IGRDPEToken
     {
         if (IsExpired()) return true;
 
-        // TJE - check on extra stuff about validationThreshold
+        // TODO - check on extra info about validationThreshold
         return false;
     }
 

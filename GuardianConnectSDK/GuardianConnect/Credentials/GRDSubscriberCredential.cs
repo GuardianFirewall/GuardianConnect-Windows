@@ -37,9 +37,6 @@ public class GRDSubscriberCredential
 
     public static GRDSubscriberCredential GetCurrentStoredSubscriberCredential()
     {
-        // CONN#8
-        Logger.LogDebug("CONN#8");
-
         var subCredBytes = GRDKeychain.GetDataForAccount(Common.kKeychainStr_SubscriberCredential);
         var subscriberCredential = new GRDSubscriberCredential("");
         if (subCredBytes.Length > 0)

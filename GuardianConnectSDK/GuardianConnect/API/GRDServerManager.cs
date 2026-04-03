@@ -43,9 +43,6 @@ public class GRDServerManager
     public static (string, string, ErrorResponse) SelectGuardianHostWithCompletion(string? selectedRegionKey)
         // CHANGE ^-----------------------^
     {
-        // CONN#5
-        Logger.LogInformation("GRDServerManager.SelectGuardianHostWithCompletion: [CONN#5]  selectedRegionKey: " +
-                              (selectedRegionKey ?? "null"));
         SelectedRegion = GetGRDRegionByKey(selectedRegionKey ?? GetRegionForOurTimeZone());
 
         Logger.LogInformation(
@@ -61,15 +58,15 @@ public class GRDServerManager
     private static int Active;
     private static int Standby => Active ^ 1;
 
-    private static readonly Dictionary<int, GeoInfoCache> _geoInfoCaches = new()
+    private static readonly Dictionary<int, GRDRegionCache> _geoInfoCaches = new()
     {
-        { 0, new GeoInfoCache() },
-        { 1, new GeoInfoCache() }
+        { 0, new GRDRegionCache() },
+        { 1, new GRDRegionCache() }
     };
 
 
-    private static GeoInfoCache Live => _geoInfoCaches[Active];
-    private static GeoInfoCache Alternate => _geoInfoCaches[Standby];
+    private static GRDRegionCache Live => _geoInfoCaches[Active];
+    private static GRDRegionCache Alternate => _geoInfoCaches[Standby];
     private static DateTime LastUpdateChangeTime;
     private static readonly ManualResetEventSlim RegionHostsRetrievalWaiter = new();
 
@@ -227,7 +224,7 @@ public class GRDServerManager
 
     private static void InitializeAlternate()
     {
-        _geoInfoCaches[Standby] = new GeoInfoCache();
+        _geoInfoCaches[Standby] = new GRDRegionCache();
     }
 
 
