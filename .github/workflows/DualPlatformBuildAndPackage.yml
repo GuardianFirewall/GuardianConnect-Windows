@@ -59,6 +59,10 @@ jobs:
       run: |
         echo "PKGVERSION="${{ env.PKGVERSION }}
 
+    - name: Create GuardianConnectSDK_NugetPackages folder
+      shell: cmd
+      run: md GuardianConnectSDK_NugetPackages
+
     # Add  MSBuild to the PATH: https://github.com/microsoft/setup-msbuild
     - name: Setup MSBuild.exe
       uses: microsoft/setup-msbuild@v2
