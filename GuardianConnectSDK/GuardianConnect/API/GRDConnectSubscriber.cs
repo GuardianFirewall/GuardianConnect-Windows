@@ -17,33 +17,20 @@ public class GRDConnectSubscriber
     private static Dictionary<string, object>? _deviceDict;
 #pragma warning restore CS0169
 
-    //
-
-    // Properties
-    [JsonPropertyName("ep-grd-subscriber-identifier")]
     public string Identifier { get; set; } = string.Empty;
-
-    [JsonIgnore] // Secret is never serialized; stored separately in the keychain
+    
     public string Secret { get; set; } = string.Empty;
 
-    [JsonPropertyName("ep-grd-subscriber-email")]
-    [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
     public string? Email { get; set; }
 
-    [JsonPropertyName("ep-grd-subscription-sku")]
     public string SubscriptionSKU { get; set; } = string.Empty;
 
-    [JsonPropertyName("ep-grd-subscription-name-formatted")]
     public string SubscriptionNameFormatted { get; set; } = string.Empty;
 
-    [JsonPropertyName("ep-grd-subscription-expiration-date")]
     public long SubscriptionExpirationDate { get; set; }
 
-    [JsonPropertyName("ep-grd-subscriber-created-at")]
     public long CreatedAt { get; set; }
 
-    [JsonPropertyName("ep-grd-device")]
-    [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
     public GRDConnectDevice? Device { get; set; }
 
     public bool AcceptedTOS { get; set; }
@@ -397,8 +384,6 @@ public class GRDConnectSubscriber
                 updateErr.SetErrorMessage(
                     $"Failed to store persistent local data of validated Connect Subscriber: {updateErr.Message}"));
 
-        Log.Debug($"END OF VALIDATE: PRIOR PETOKEN IS {tokenBefore}, DEVICE PET IS {deviceTokenBefore}");
-        Log.Debug($"END OF VALIDATE: PETOKEN IS {currentPET.Token}, DEVICE PET IS {newDevice?.PEToken}");
         return (newSubscriber, updateErr);
     }
 

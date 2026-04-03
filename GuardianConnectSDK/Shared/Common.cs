@@ -194,25 +194,12 @@ public class Common
     public const string kGuardianDeviceSubscriberIdentifier = "ep-grd-device-subscriber-identifier";
     public const string kGuardianDeviceSubscriberSecret = "ep-grd-device-subscriber-secret";
 
-    public const string kPETOKENNOTSET = "PE-Token is not set";
+    public const string kPETOKENNOTSET = "PE-Token not found";
 
     // Other useful definitions and constants
     public const string VPNEVT_NAME_CLIENTSIDE = "Global\\GRDRASCONNCLIENTSIGNAL";
 
     public const string VPNEVT_NAME_SVRSIDE = "Global\\GRDRASCONNSERVICESIGNAL";
-    //
-    //  Shared.h
-    //  Guardian
-    //
-    //  Created by Kevin Bradley on 10/13/20.
-    //  Copyright © 2020 Sudo Security Group Inc. All rights reserved.
-    //
-
-    //typedef void (^StandardBlock)(BOOL success, NSString * _Nullable errorMessage);
-    //typedef void (^ResponseBlock)(NSDictionary * _Nullable response, NSString * _Nullable errorMessage, BOOL success);
-
-    // Define below to 0 to make guardian specific code inactive
-    //#define GUARDIAN_INTERNAL 1
 
     public static JsonSerializerOptions DefaultJsonSerializerOptions = new()
     {

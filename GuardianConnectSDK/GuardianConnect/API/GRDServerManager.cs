@@ -58,15 +58,15 @@ public class GRDServerManager
     private static int Active;
     private static int Standby => Active ^ 1;
 
-    private static readonly Dictionary<int, GRDREgionCache> _geoInfoCaches = new()
+    private static readonly Dictionary<int, GRDRegionCache> _geoInfoCaches = new()
     {
-        { 0, new GRDREgionCache() },
-        { 1, new GRDREgionCache() }
+        { 0, new GRDRegionCache() },
+        { 1, new GRDRegionCache() }
     };
 
 
-    private static GRDREgionCache Live => _geoInfoCaches[Active];
-    private static GRDREgionCache Alternate => _geoInfoCaches[Standby];
+    private static GRDRegionCache Live => _geoInfoCaches[Active];
+    private static GRDRegionCache Alternate => _geoInfoCaches[Standby];
     private static DateTime LastUpdateChangeTime;
     private static readonly ManualResetEventSlim RegionHostsRetrievalWaiter = new();
 
@@ -224,7 +224,7 @@ public class GRDServerManager
 
     private static void InitializeAlternate()
     {
-        _geoInfoCaches[Standby] = new GRDREgionCache();
+        _geoInfoCaches[Standby] = new GRDRegionCache();
     }
 
 

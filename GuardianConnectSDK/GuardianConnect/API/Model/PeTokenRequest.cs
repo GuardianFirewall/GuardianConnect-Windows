@@ -2,12 +2,6 @@ using System.Text.Json.Serialization;
 
 namespace GuardianConnect.API.Model;
 
-/*
- * {
-      "validation-method": "pe-token",
-      "pe-token": "xxxxxxxoAwQsahAK5RkcHR0W560W0vhQ"
- * }
- */
 public class PeTokenRequest
 {
     public PeTokenRequest(string method, string token)
