@@ -160,8 +160,15 @@ public class GRDGateway
             var cred = JsonSerializer.Deserialize<GRDCredential>(respContent,
                 GRDCredentialJsonContext.Default.GRDCredential);
             // 0.40.1 - sets ClientId from EapUser if IKEv2
-            if (cred != null && cred.TransportProtocol == ITransportProvider.TransportProtocol.TransportIKEv2)
-                cred.ClientId = cred.UserName;
+            if (cred != null)
+            {
+                if (cred.TransportProtocol == ITransportProvider.TransportProtocol.TransportIKEv2)
+                {
+                    cred.ClientId = cred.UserName;
+                }
+                
+                credsList.Add(cred);
+            }
         }
         catch (Exception e)
         {
