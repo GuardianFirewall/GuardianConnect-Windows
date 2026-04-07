@@ -1,0 +1,38 @@
+﻿<Project Sdk="Microsoft.NET.Sdk">
+
+    <PropertyGroup>
+        <ImplicitUsings>enable</ImplicitUsings>
+        <Nullable>enable</Nullable>
+        <AllowUnsafeBlocks>true</AllowUnsafeBlocks>
+        <PublishAot>true</PublishAot>
+
+        <GeneratePackageOnBuild>False</GeneratePackageOnBuild>
+        <PackageIcon>Guardian.png</PackageIcon>
+        <!--
+        <TargetFramework>net9.0-windows10.0.26100.0</TargetFramework>
+        -->
+        <Platforms>x64;ARM64</Platforms>
+    </PropertyGroup>
+
+    <ItemGroup>
+        <None Include="..\Guardian.png" Pack="true" PackagePath=""/>
+        <None Include="..\README.md" Pack="true" PackagePath=""/>
+    </ItemGroup>
+
+    <ItemGroup>
+        <ProjectReference Include="..\GuardianConnect.Abstractions\GuardianConnect.Abstractions.csproj"/>
+        <ProjectReference Include="..\Shared\GuardianConnect.Shared.csproj"/>
+        <ProjectReference Include="..\Win32Calls\Win32Calls.csproj"/>
+    </ItemGroup>
+
+    <ItemGroup>
+        <None Update="..\..\Guardian.png">
+            <CopyToOutputDirectory>Always</CopyToOutputDirectory>
+        </None>
+    </ItemGroup>
+
+    <ItemGroup>
+        <PackageReference Include="Microsoft.Extensions.Logging" Version="9.0.10"/>
+        <PackageReference Include="Microsoft.Extensions.Logging.Abstractions" Version="9.0.10"/>
+    </ItemGroup>
+</Project>

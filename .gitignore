@@ -1,0 +1,16 @@
+/.idea
+/**/.idea
+/.vs
+*.swp
+*.nupkg
+/GuardianConnectSDK/_.swo
+/GuardianConnectSDK/**/bin/
+/GuardianConnectSDK/**/obj/
+/GuardianConnectSDK/.vs/**
+/GuardianConnectSDK/x64
+/GuardianConnectSDK/ARM64
+/GuardianConnectSDK/BuildOutput
+/GuardianConnectSDK/GuardianConnect/BuildOutput
+/GuardianConnectSDK/.vs
+/GuardianConnectSDK/NativeRoutinesLoadTest/obj
+.DS_Store
