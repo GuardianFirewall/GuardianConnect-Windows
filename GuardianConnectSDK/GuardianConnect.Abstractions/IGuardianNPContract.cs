@@ -16,7 +16,17 @@ public interface IGuardianNPContract
         UninstallerShutdownOccurring,
         ToggleLogging,
         RequestLogLines,
-        SwitchLoggingLevel
+        SwitchLoggingLevel,
+        SendPowerAndNetworkEvents
+    }
+    
+    public enum SystemEventType
+    {
+        NotSet,
+        PowerChangeNotifyNotificationEvent,
+        PowerModeChangeEvent,
+        NetworkChangeOnNetworkAddressChanged,
+        NetworkChangeOnNetworkAvailabilityChanged
     }
 
     string GetData(int value);

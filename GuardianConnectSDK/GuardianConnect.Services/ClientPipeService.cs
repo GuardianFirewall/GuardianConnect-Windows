@@ -198,9 +198,16 @@ public class ClientPipeService : BackgroundService
                     _logger.Log(LogLevel.Information,
                         $"ClientPipeService[{threadId}]: string from client: {commandString}");
                     if (!pipeServer.IsConnected) continue;
-                    var cmdToken = commandString[0];
-                    var cmdPayload =
-                        commandString.Substring(2); // Skip the '.' between first char cmd enum and params data
+                    var cmdToken = commandString[0] - '0';
+                    // See if we have a sub-command via text after first command byte
+                    var cmdPayload = commandString.Substring(1);
+                    IGuardianNPContract.SystemEventType systemEventType = IGuardianNPContract.SystemEventType.NotSet;
+                    if (cmdPayload[0] != '.')
+                    {
+                        systemEventType = (IGuardianNPContract.SystemEventType)short.Parse(cmdPayload[0].ToString());
+                        cmdPayload = cmdPayload.Substring(2);
+                    }
+                    else cmdPayload = cmdPayload.Substring(1);
                     var cmd = (IGuardianNPContract.NPCommands)short.Parse(cmdToken.ToString());
 
                     _logger.Log(LogLevel.Information,
@@ -208,60 +215,45 @@ public class ClientPipeService : BackgroundService
                     switch (cmd)
                     {
                         case IGuardianNPContract.NPCommands.StartVPNConnection:
-                            _logger.Log(LogLevel.Information,
-                                $"ClientPipeService[{threadId}][12121026]: Performing spawn of StartVPNConnection command");
+                            _logger.Log(LogLevel.Information, $"ClientPipeService[{threadId}]: Performing spawn of StartVPNConnection command");
                             var serializedVpnParameters = cmdPayload;
-                            var vpnCallParameters = JsonSerializer.Deserialize<VPNCallParameters>(
-                                serializedVpnParameters, VPNCallParametersJsonContext.Default.VPNCallParameters);
+                            var vpnCallParameters = JsonSerializer.Deserialize<VPNCallParameters>( serializedVpnParameters, VPNCallParametersJsonContext.Default.VPNCallParameters);
                             try
                             {
                                 var didItStart = await cmdDispatcher.StartVPNConnection(vpnCallParameters!);
-                                _logger.Log(LogLevel.Information,
-                                    $"ClientPipeService.StartVPNConnection - response IsError: {didItStart.IsError}");
-                                var startResponseJson = JsonSerializer.Serialize(didItStart,
-                                    ErrorResponseJsonContext.Default.ErrorResponse);
-                                _logger.Log(LogLevel.Information,
-                                    $"ClientPipeService.StartVPNConnection - writing response to pipe, string is '{startResponseJson}'");
+                                _logger.Log(LogLevel.Information, $"ClientPipeService.StartVPNConnection - response IsError: {didItStart.IsError}");
+                                var startResponseJson = JsonSerializer.Serialize(didItStart, ErrorResponseJsonContext.Default.ErrorResponse);
+                                _logger.Log(LogLevel.Information, $"ClientPipeService.StartVPNConnection - writing response to pipe, string is '{startResponseJson}'");
                                 ss.WriteString(startResponseJson);
-                                _logger.Log(LogLevel.Information,
-                                    $"ClientPipeService[{threadId}]: Exiting StartVPNConnection command.");
+                                _logger.Log(LogLevel.Information, $"ClientPipeService[{threadId}]: Exiting StartVPNConnection command.");
                             }
                             catch (Exception e)
                             {
-                                _logger.LogError(e,
-                                    $"Exception thrown when executing StartVPNConnection and parsing its response. '{e.Message}");
+                                _logger.LogError(e, $"Exception thrown when executing StartVPNConnection and parsing its response. '{e.Message}");
                             }
 
                             break;
                         case IGuardianNPContract.NPCommands.DisconnectVPNConnection:
                             var entryName = ConnectionRoutines.ActiveConnectionEntryName;
-                            _logger.Log(LogLevel.Information,
-                                $"ClientPipeService[{threadId}]: Performing DisconnectVPNConnection. Entry is '{entryName}'");
+                            _logger.Log(LogLevel.Information, $"ClientPipeService[{threadId}]: Performing DisconnectVPNConnection. Entry is '{entryName}'");
                             var response = cmdDispatcher.DisconnectVPNConnection();
-                            var discResponseJson = JsonSerializer.Serialize(response,
-                                ErrorResponseJsonContext.Default.ErrorResponse);
-                            _logger.Log(LogLevel.Information,
-                                $"ClientPipeService.StartVPNConnection - string is '{discResponseJson}'");
+                            var discResponseJson = JsonSerializer.Serialize(response, ErrorResponseJsonContext.Default.ErrorResponse);
+                            _logger.Log(LogLevel.Information, $"ClientPipeService.StartVPNConnection - string is '{discResponseJson}'");
                             ss.WriteString(discResponseJson);
                             break;
                         case IGuardianNPContract.NPCommands.GetCurrentVpnConnectionStatus:
-                            _logger.Log(LogLevel.Information,
-                                $"ClientPipeService[{threadId}]: Performing GetCurrentVpnConnectionStatus");
+                            _logger.Log(LogLevel.Information, $"ClientPipeService[{threadId}]: Performing GetCurrentVpnConnectionStatus");
                             var statusCheck = cmdDispatcher.GetCurrentVpnConnectionStatus();
-                            var statusString = JsonSerializer.Serialize(statusCheck,
-                                CurrentVPNStatusJsonConect.Default.CurrentVPNStatus);
-                            _logger.Log(LogLevel.Information,
-                                $"ClientPipeService[{threadId}]: GetCurrentVpnConnectionStatus - writing statusString '{statusString}' to client");
+                            var statusString = JsonSerializer.Serialize(statusCheck, CurrentVPNStatusJsonConect.Default.CurrentVPNStatus);
+                            _logger.Log(LogLevel.Information, $"ClientPipeService[{threadId}]: GetCurrentVpnConnectionStatus - writing statusString '{statusString}' to client");
                             ss.WriteString(statusString);
                             break;
                         case IGuardianNPContract.NPCommands.Ping:
-                            _logger.Log(LogLevel.Information,
-                                $"ClientPipeService[{threadId}]: Performing Ping response to client");
+                            _logger.Log(LogLevel.Information, $"ClientPipeService[{threadId}]: Performing Ping response to client");
                             ss.WriteString("GFS");
                             break;
                         case IGuardianNPContract.NPCommands.AdministrativeShutdownRequested:
-                            _logger.Log(LogLevel.Information,
-                                $"ClientPipeService[{threadId}]: Performing AdministrativeShutdownRequested");
+                            _logger.Log(LogLevel.Information, $"ClientPipeService[{threadId}]: Performing AdministrativeShutdownRequested");
                             AdministrativeShutdownRequested = true;
                             break;
                         case IGuardianNPContract.NPCommands.UninstallerShutdownOccurring:
@@ -279,21 +271,6 @@ public class ClientPipeService : BackgroundService
                             var msg = Common.LogFilterOn ? "ON" : "OFF";
                             _logger.Log(LogLevel.Critical,
                                 $"ClientPipeService[{threadId}]: Logging is now turned {msg}");
-#if FIXTHIS
-                            if (Common.LogFilterOn)
-                            {
-                                if (cmdPayload.Equals("true", StringComparison.InvariantCultureIgnoreCase))
-                                {
-                                    Log.CloseAndFlush();
-                                    File.Delete(Common.LogFilePath);
-                                }
-                            }
-                            else
-                            {
-                                Common.SetUpLogging();
-                            }
-#endif
-
                             break;
                         case IGuardianNPContract.NPCommands.RequestLogLines:
                             _logger.Log(LogLevel.Information,
@@ -306,6 +283,10 @@ public class ClientPipeService : BackgroundService
                                 JsonSerializer.Serialize<List<string>>(lastLogLines,
                                     LogLinesJsonContext.Default.ListString);
                             ss.WriteString(serializedLogLines);
+                            break;
+                        case IGuardianNPContract.NPCommands.SendPowerAndNetworkEvents:
+                            _logger.Log(LogLevel.Information, $"ClientPipeService[{threadId}]: Received PowerAndNetworkEvent: Event Type: {systemEventType}");
+                            ServicePowerEventsHandler.HandleSystemEventsFromclient(systemEventType, cmdPayload);
                             break;
                         default:
                             _logger.Log(LogLevel.Information, "WHY ARE WE HERE?");

@@ -1,11 +1,13 @@
 using System.Diagnostics.CodeAnalysis;
 using System.IO.Pipes;
+using System.Net.NetworkInformation;
 using System.Text.Json;
 using GuardianConnect.Abstractions;
 using GuardianConnect.Shared;
 using GuardianConnect.Shared.Extensions;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Logging.Abstractions;
+using Microsoft.Win32;
 
 namespace GuardianConnect.Helpers;
 
@@ -100,6 +102,13 @@ public static class ClientPipe
         if (!Instance.IsConnected) Instance.ReopenNamedPipe();
         Instance.SwitchServiceLoggingLevel(loggingLevel);
     }
+    
+    // Send Power and Network Change messages to server
+    public static void SendPowerAndNetworkChangeMessages(Dictionary<string, object> systemEventsDict)
+    {
+        if (!Instance.IsConnected) Instance.ReopenNamedPipe();
+        Instance.SendPowerAndNetworkChangeEvents(systemEventsDict);
+    }
 }
 
 public class ClientPipeImpl : IGuardianNPContract
@@ -112,6 +121,11 @@ public class ClientPipeImpl : IGuardianNPContract
     {
     }
 
+    private char Hexify(IGuardianNPContract.NPCommands command)
+    {
+        return (char)(command + '0');
+    }
+    
     internal bool IsConnected => _clientStream.IsConnected;
 
     string IGuardianNPContract.GetData(int value)
@@ -126,7 +140,7 @@ public class ClientPipeImpl : IGuardianNPContract
     public CompositeType GetDataUsingDataContract(CompositeType composite)
     {
         var cmdPayload = JsonSerializer.Serialize(composite);
-        var cmdString = $"{(int)IGuardianNPContract.NPCommands.GetDataUsingDataContract}.{cmdPayload}";
+        var cmdString = $"{Hexify(IGuardianNPContract.NPCommands.GetDataUsingDataContract)}.{cmdPayload}";
         ss.WriteString(cmdString);
         var response = ss.ReadStringAsync().Result;
         var value = JsonSerializer.Deserialize<CompositeType>(response);
@@ -144,13 +158,15 @@ public class ClientPipeImpl : IGuardianNPContract
         var startedJson = "";
         try
         {
-            var cmdPayload =
-                JsonSerializer.Serialize(protocolRequest, VPNCallParametersJsonContext.Default.VPNCallParameters);
-            var cmdString = $"{(int)IGuardianNPContract.NPCommands.StartVPNConnection}.{cmdPayload}";
+            var cmdPayload = JsonSerializer.Serialize(protocolRequest, VPNCallParametersJsonContext.Default.VPNCallParameters);
+            var cmdString = $"{Hexify(IGuardianNPContract.NPCommands.StartVPNConnection)}.{cmdPayload}";
             ss.WriteString(cmdString);
             ClientPipe.Logger.LogInformation("ClientPipeImpl.StartVPNConnection: command sent to service.");
             startedJson = await ss.ReadStringAsync();
-            ClientPipe.Logger.LogInformation("ClientPipeImpl.StartVPNConnection: Received response from service.");
+            startedJson = startedJson.TrimEnd('\0');
+            if (!startedJson.StartsWith('{')) startedJson = "{ " + startedJson;
+            //ClientPipe.Logger.LogInformation("ClientPipeImpl.StartVPNConnection: Received response from service");
+            ClientPipe.Logger.LogInformation($"ClientPipeImpl.StartVPNConnection: Received response from service: '{startedJson}'");
 
             startedErrorResponse =
                 JsonSerializer.Deserialize<ErrorResponse>(startedJson,
@@ -182,7 +198,7 @@ public class ClientPipeImpl : IGuardianNPContract
         try
         {
             var cmdPayload = "";
-            var cmdString = $"{(int)IGuardianNPContract.NPCommands.DisconnectVPNConnection}.{cmdPayload}";
+            var cmdString = $"{Hexify(IGuardianNPContract.NPCommands.DisconnectVPNConnection)}.{cmdPayload}";
             ss.WriteString(cmdString);
         }
         catch (Exception e)
@@ -203,7 +219,7 @@ public class ClientPipeImpl : IGuardianNPContract
     public CurrentVPNStatus GetCurrentVpnConnectionStatus()
     {
         ClientPipe.Logger.LogInformation("Calling service to GetCurrentVpnConnectionStatus...");
-        var cmdString = $"{(int)IGuardianNPContract.NPCommands.GetCurrentVpnConnectionStatus}.";
+        var cmdString = $"{Hexify(IGuardianNPContract.NPCommands.GetCurrentVpnConnectionStatus)}.";
         ss.WriteString(cmdString);
         ClientPipe.Logger.LogInformation("Reading status...");
         var statusString = ss.ReadString();
@@ -219,7 +235,7 @@ public class ClientPipeImpl : IGuardianNPContract
     public async Task<string> Ping()
     {
         ClientPipe.Logger.LogInformation("Pinging service");
-        var cmdString = $"{(int)IGuardianNPContract.NPCommands.Ping}.";
+        var cmdString = $"{Hexify(IGuardianNPContract.NPCommands.Ping)}.";
         ss.WriteString(cmdString);
         ClientPipe.Logger.LogInformation("Reading status...");
         var ping = await ss.ReadStringAsync();
@@ -236,14 +252,14 @@ public class ClientPipeImpl : IGuardianNPContract
     {
         var msg = Common.LogFilterOn ? "OFF" : "ON";
         ClientPipe.Logger.LogInformation($"Telling Service to turn Logging {msg}");
-        var cmdString = $"{(int)IGuardianNPContract.NPCommands.ToggleLogging}.{whetherToDeleteLogFiles.ToString()}";
+        var cmdString = $"{Hexify(IGuardianNPContract.NPCommands.ToggleLogging)}.{whetherToDeleteLogFiles.ToString()}";
         ss.WriteString(cmdString);
     }
 
     public void SwitchServiceLoggingLevel(Common.LoggingLevels loggingLevel)
     {
         ClientPipe.Logger.LogWarning($"Sending command to service to switch logging level to {loggingLevel}");
-        var cmdString = $"{(int)IGuardianNPContract.NPCommands.SwitchLoggingLevel}.{loggingLevel}";
+        var cmdString = $"{Hexify(IGuardianNPContract.NPCommands.SwitchLoggingLevel)}.{loggingLevel}";
         ss.WriteString(cmdString);
     }
 
@@ -323,7 +339,7 @@ public class ClientPipeImpl : IGuardianNPContract
     {
         ClientPipe.Logger.LogInformation(
             $"Requesting GuardianFirewall Service's last {maxNumberOfLinesToGet} log lines...");
-        var cmdString = $"{(int)IGuardianNPContract.NPCommands.RequestLogLines}.{maxNumberOfLinesToGet}";
+        var cmdString = $"{Hexify(IGuardianNPContract.NPCommands.RequestLogLines)}.{maxNumberOfLinesToGet}";
         ss.WriteString(cmdString);
         ClientPipe.Logger.LogInformation("Reading response...");
         var serializedServiceLogs = await ss.ReadStringAsync();
@@ -333,5 +349,71 @@ public class ClientPipeImpl : IGuardianNPContract
         ClientPipe.Logger.LogInformation($"Number of log lines returned from the service = {serviceLogLines.Count}");
 
         return serviceLogLines;
+    }
+
+    public async Task<ErrorResponse> SendPowerAndNetworkChangeEvents( Dictionary<string, object> systemEventsDict)
+    {
+        if (systemEventsDict == null)
+        {
+            throw new ArgumentNullException(nameof(systemEventsDict), "systemEventsDict cannot be null");
+        }
+
+        var options = new JsonSerializerOptions
+        {
+            WriteIndented = false
+        };
+        
+        // We're going to split this out to preserve argments and not deal with 'too-generic' json hassle
+        var sender = systemEventsDict.Keys.First();
+        var o = systemEventsDict[sender];
+        int senderEventType = 0;
+        var cmdPayload = "";
+        switch (sender)
+        {
+            case "Client_PowerModeChangeEvent":
+                senderEventType = (int)IGuardianNPContract.SystemEventType.PowerModeChangeEvent;
+                try
+                {
+                    if (o == null || !(o is PowerModeChangedEventArgs))
+                    {
+                        ClientPipe.Logger.LogError($"Invalid event data for PowerModeChangeEvent: {o?.GetType().FullName}");
+                        return new ErrorResponse();
+                    }
+                    cmdPayload = JsonSerializer.Serialize<PowerModeChangedEventArgs>((PowerModeChangedEventArgs)o, PowerModeChangedEventArgsContext.Default.PowerModeChangedEventArgs);
+                }
+                catch (Exception e)
+                {
+                    ClientPipe.Logger.LogError($"Error serializing PowerModeChangedEventArgs: {e.Message}");
+                }
+                break;
+            case "Client_PowerChangeNotifyCallbackRoutine":
+                senderEventType = (int)IGuardianNPContract.SystemEventType.PowerChangeNotifyNotificationEvent;
+                try
+                {
+                    cmdPayload = JsonSerializer.Serialize((Tuple<int, uint, int>)o, PowerChangeNotifyTupleContext.Default.TupleInt32UInt32Int32);
+                }
+                catch (Exception e)
+                {
+                    ClientPipe.Logger.LogError($"Error serializing PowerChangeNotifyCallbackRoutine event: {e.Message}");
+                }
+                break;
+            
+            case "Client_NetworkAddressChanged":
+                senderEventType = (int)IGuardianNPContract.SystemEventType.NetworkChangeOnNetworkAddressChanged;
+                cmdPayload = ""; // The EventArgs passed in on the NetworkAddressChanged event is always empty.
+                break;
+            case "Client_NetworkAvailabilityChange":
+                senderEventType = (int)IGuardianNPContract.SystemEventType.NetworkChangeOnNetworkAvailabilityChanged;
+                cmdPayload = JsonSerializer.Serialize<NetworkAvailabilityEventArgs>((NetworkAvailabilityEventArgs)o, options);
+                break;
+        }
+        var cmdString = $"{Hexify(IGuardianNPContract.NPCommands.SendPowerAndNetworkEvents)}{senderEventType}.{cmdPayload}";
+        ss.WriteString(cmdString);
+        // Don't think we need a response from Service on what we threw over to it - basically a fire and forget
+        //var response = ss.ReadStringAsync().Result;
+        //ClientPipe.Logger.Log(LogLevel.Information, $"ClientPipe: string from service: '{response}'");
+        //var value = JsonSerializer.Deserialize<CompositeType>(response);
+
+        return new ErrorResponse();
     }
 }

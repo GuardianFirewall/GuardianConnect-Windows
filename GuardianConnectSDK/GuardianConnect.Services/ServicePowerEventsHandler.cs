@@ -1,3 +1,4 @@
+using System.Diagnostics;
 using System.Net.NetworkInformation;
 using System.Text.Json;
 using GuardianConnect.Abstractions;
@@ -57,10 +58,10 @@ public static class ServicePowerEventsHandler
     public static void SetupServicePowerEventsHandler()
     {
         Logger.LogInformation("ServicePowerEventsHandler.SetupServicePowerEventsHandler: TESTING LOG!");
-        SystemEvents.PowerModeChanged += SystemEventsOnPowerModeChanged;
-        NetworkChange.NetworkAddressChanged += NetworkChangeOnNetworkAddressChanged;
-        NetworkChange.NetworkAvailabilityChanged += NetworkChangeOnNetworkAvailabilityChanged;
-        PowerTransitionMonitor.RegisterForPowerNotifications(PowerChangeNotifyCallbackRoutine);
+        //SystemEvents.PowerModeChanged += SystemEventsOnPowerModeChanged;
+        //NetworkChange.NetworkAddressChanged += NetworkChangeOnNetworkAddressChanged;
+        //NetworkChange.NetworkAvailabilityChanged += NetworkChangeOnNetworkAvailabilityChanged;
+        //PowerTransitionMonitor.RegisterForPowerNotifications(PowerChangeNotifyCallbackRoutine);
         // Add Resume function to VPNTransportIKEV2 delegate for sake of Disconnect recovery
         VPNTransportIKEV2.PowerResumeActions = PerformResumeActions;
         VPNTransportIKEV2.SetVPNStateAtSuspend = SetConnectedAtSuspendTime;
@@ -285,5 +286,34 @@ public static class ServicePowerEventsHandler
         }
 
         CurrentPowerTransitionState = Common.PowerTransitionStates.Running;
+    }
+
+    public static void HandleSystemEventsFromclient(IGuardianNPContract.SystemEventType systemEventType, string serializedClientEventParameters)
+    {
+        switch (systemEventType)
+        {
+            case IGuardianNPContract.SystemEventType.NetworkChangeOnNetworkAddressChanged:
+                Logger.LogInformation("Network address  changed");
+                NetworkChangeOnNetworkAddressChanged("Client_NetworkAddressChangedEvent", EventArgs.Empty);
+                break;
+            case IGuardianNPContract.SystemEventType.NetworkChangeOnNetworkAvailabilityChanged:
+                var networkAvailabilityEventArg = JsonSerializer.Deserialize<NetworkAvailabilityEventArgs>(serializedClientEventParameters);
+                Logger.LogInformation($"Network availability changed: {networkAvailabilityEventArg.IsAvailable}");
+                NetworkChangeOnNetworkAvailabilityChanged("ClientSentEvent", networkAvailabilityEventArg);
+                break;
+            case IGuardianNPContract.SystemEventType.PowerModeChangeEvent:
+                var powerModeChangeEventArg = JsonSerializer.Deserialize<PowerModeChangedEventArgs>(serializedClientEventParameters, PowerModeChangedEventArgsContext.Default.PowerModeChangedEventArgs);
+                Logger.LogInformation($"Client PowerModeChangedEvent: {powerModeChangeEventArg.Mode}");
+                SystemEventsOnPowerModeChanged("Client_PowerModeChangeEvent", powerModeChangeEventArg);
+                break;
+            case IGuardianNPContract.SystemEventType.PowerChangeNotifyNotificationEvent:
+                var (context, powerNotificationType, settings) = JsonSerializer.Deserialize(serializedClientEventParameters, PowerChangeNotifyTupleContext.Default.TupleInt32UInt32Int32)!;
+                Logger.LogInformation($"Client PowerChangeNotify event: Context:{context}, powerNotificationType:{powerNotificationType}, Settings: {settings}");
+                PowerChangeNotifyCallbackRoutine(new IntPtr(context), powerNotificationType, new IntPtr(settings));
+                break;
+            default:
+                Logger.LogWarning($"Unknown event type: {systemEventType}");
+                break;
+        }
     }
 }
