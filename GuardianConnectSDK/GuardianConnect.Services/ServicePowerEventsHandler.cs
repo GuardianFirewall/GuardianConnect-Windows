@@ -221,13 +221,13 @@ public static class ServicePowerEventsHandler
     {
         Logger.LogInformation("*************** PerformSuspendActions ...");
 
-        // Cancel any in-progress resume retry loop from a prior cycle
+        // Cancel any in-progress resume retry loop from a prior cycle.
+        // Do NOT dispose here -- the resume thread may still hold the token.
+        // PerformResumeActions is responsible for disposing its own CTS.
         if (_resumeCts != null)
         {
             Logger.LogInformation("*************** PerformSuspendActions: Cancelling in-progress PerformResumeActions...");
             _resumeCts.Cancel();
-            _resumeCts.Dispose();
-            _resumeCts = null;
         }
 
         if (VPNStatusAtSuspendTime == ITransportProvider.VPNProviderStatus.VPNStatusConnected)
@@ -249,10 +249,10 @@ public static class ServicePowerEventsHandler
     {
         Logger.LogInformation("*************** PerformResumeActions ...");
 
-        // Create a new CancellationTokenSource for this resume cycle
-        _resumeCts?.Cancel();
-        _resumeCts?.Dispose();
-        _resumeCts = new CancellationTokenSource();
+        // Dispose any previous CTS (safe here since we own it), then create a new one
+        var previousCts = Interlocked.Exchange(ref _resumeCts, new CancellationTokenSource());
+        previousCts?.Cancel();
+        previousCts?.Dispose();
         var ct = _resumeCts.Token;
 
         // We don't care if user brought us out or not - we are resuming
@@ -344,7 +344,7 @@ public static class ServicePowerEventsHandler
 
             // Now do the HTTP host status check (should succeed quickly since DNS is resolved)
             var hostCheckAttempt = 0;
-            var hostCheckRemaining = maxRetriesCount;
+            var hostCheckRemaining = Math.Max(maxRetriesCount, 1);
             do
             {
                 if (ct.IsCancellationRequested)
@@ -357,11 +357,18 @@ public static class ServicePowerEventsHandler
                 hostCheckAttempt++;
                 Logger.LogInformation(
                     $"Calling status of host '{host}' to verify if network is ready - retry # {hostCheckAttempt}");
-                errorResponse = GRDGateway.GetServerStatus(host).Result;
-
-                if (ct.IsCancellationRequested)
+                try
                 {
-                    Logger.LogInformation("*************** PerformResumeActions: Cancelled after GetServerStatus returned.");
+                    errorResponse = GRDGateway.GetServerStatus(host).WaitAsync(TimeSpan.FromSeconds(10), ct).GetAwaiter().GetResult();
+                }
+                catch (TimeoutException)
+                {
+                    Logger.LogInformation($"GetServerStatus for '{host}' timed out after 10 seconds.");
+                    errorResponse = new ErrorResponse { IsError = true, Message = "GetServerStatus timed out" };
+                }
+                catch (OperationCanceledException)
+                {
+                    Logger.LogInformation("*************** PerformResumeActions: Cancelled during GetServerStatus.");
                     ResetStateIfStillResuming();
                     return;
                 }
