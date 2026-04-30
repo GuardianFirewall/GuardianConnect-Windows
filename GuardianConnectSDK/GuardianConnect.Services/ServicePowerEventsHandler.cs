@@ -21,7 +21,13 @@ public static class ServicePowerEventsHandler
     private const string hash20 = "####################";
     private const string plus20 = "++++++++++++++++++++";
 
-    private static Common.PowerTransitionStates CurrentPowerTransitionState = Common.PowerTransitionStates.Running;
+    private static int _powerTransitionState = (int)Common.PowerTransitionStates.Running;
+
+    private static Common.PowerTransitionStates CurrentPowerTransitionState
+    {
+        get => (Common.PowerTransitionStates)Volatile.Read(ref _powerTransitionState);
+        set => Volatile.Write(ref _powerTransitionState, (int)value);
+    }
 
     private static ITransportProvider.VPNProviderStatus VPNStatusAtSuspendTime =
         ITransportProvider.VPNProviderStatus.VPNStatusInvalid;
@@ -264,76 +270,174 @@ public static class ServicePowerEventsHandler
 
             var host = vpnResumeParameters?.VpnHostName ?? string.Empty;
             Logger.LogInformation("************** PerformResumeActions - VPN WAS CONNECTED AT SUSPENSION.");
+
+            // Validate host before entering retry loops
+            if (string.IsNullOrWhiteSpace(host))
+            {
+                Logger.LogInformation("************** PerformResumeActions: VPN host is empty -- cannot resume. Aborting.");
+                ResetStateIfStillResuming();
+                return;
+            }
+
             Logger.LogInformation(
-                $"************** Check network stack readiness by attempting a status check of the vpn host '{host}");
+                $"************** Check network stack readiness by attempting a status check of the vpn host '{host}'");
             var countValue = RegistrySettings.RetrieveGuardianUserSettings(Common.kServicePowerResumeReconnectAttempts);
             if (string.IsNullOrEmpty(countValue)) countValue = defaultRetries;
             var maxRetriesCount = int.Parse(countValue);
-            var readinessCheckCount = maxRetriesCount;
 
-            var header = "PerformResumeActions (waiting for host availability): GetServerStatus returned:";
+            // DNS pre-check with timeout -- avoids burning HTTP retries on unresolvable hosts
+            var dnsReady = false;
+            for (var dnsAttempt = 0; dnsAttempt < maxRetriesCount; dnsAttempt++)
+            {
+                if (ct.IsCancellationRequested)
+                {
+                    Logger.LogInformation("*************** PerformResumeActions: Cancelled during DNS readiness check.");
+                    ResetStateIfStillResuming();
+                    return;
+                }
+
+                try
+                {
+                    Logger.LogInformation($"DNS readiness check #{dnsAttempt + 1} for '{host}'...");
+                    System.Net.Dns.GetHostAddressesAsync(host)
+                        .WaitAsync(TimeSpan.FromSeconds(5), ct)
+                        .GetAwaiter()
+                        .GetResult();
+
+                    Logger.LogInformation($"DNS resolved '{host}' successfully.");
+                    dnsReady = true;
+                    break;
+                }
+                catch (TimeoutException)
+                {
+                    if (ct.IsCancellationRequested)
+                    {
+                        Logger.LogInformation("*************** PerformResumeActions: Cancelled during DNS readiness check.");
+                        ResetStateIfStillResuming();
+                        return;
+                    }
+
+                    Logger.LogInformation($"DNS readiness check for '{host}' timed out.");
+                }
+                catch (OperationCanceledException)
+                {
+                    Logger.LogInformation("*************** PerformResumeActions: Cancelled during DNS readiness check.");
+                    ResetStateIfStillResuming();
+                    return;
+                }
+                catch (Exception ex)
+                {
+                    Logger.LogInformation($"DNS not ready for '{host}': {ex.Message}");
+                }
+
+                try { Task.Delay(3000, ct).Wait(ct); }
+                catch (OperationCanceledException)
+                {
+                    Logger.LogInformation("*************** PerformResumeActions: Cancelled during DNS readiness wait.");
+                    ResetStateIfStillResuming();
+                    return;
+                }
+            }
+
+            if (!dnsReady)
+                Logger.LogInformation("************** DNS never resolved -- will attempt GetServerStatus/VPN connect anyway.");
+
+            // Now do the HTTP host status check (should succeed quickly since DNS is resolved)
+            var hostCheckAttempt = 0;
+            var hostCheckRemaining = maxRetriesCount;
             do
             {
                 if (ct.IsCancellationRequested)
                 {
                     Logger.LogInformation("*************** PerformResumeActions: Cancelled during host availability check.");
-                    CurrentPowerTransitionState = Common.PowerTransitionStates.Running;
+                    ResetStateIfStillResuming();
                     return;
                 }
 
+                hostCheckAttempt++;
                 Logger.LogInformation(
-                    $"Calling status of host '{host}' to verify if network is ready - retry # {maxRetriesCount - --readinessCheckCount}");
+                    $"Calling status of host '{host}' to verify if network is ready - retry # {hostCheckAttempt}");
                 errorResponse = GRDGateway.GetServerStatus(host).Result;
-                Logger.LogInformation($"{header}: errorResponse from GetServerStatus: {errorResponse}");
+
+                if (ct.IsCancellationRequested)
+                {
+                    Logger.LogInformation("*************** PerformResumeActions: Cancelled after GetServerStatus returned.");
+                    ResetStateIfStillResuming();
+                    return;
+                }
+
+                Logger.LogInformation($"PerformResumeActions (waiting for host availability) GetServerStatus returned: {errorResponse}");
                 if (!errorResponse.IsError)
                 {
                     Logger.LogInformation(
-                        $"************** PerformResumeActions - NO error returned from GetServerStatus. Response message = '{errorResponse.Message}. StatusCode={errorResponse.HttpResponse.StatusCode}");
+                        $"************** PerformResumeActions - NO error returned from GetServerStatus. Response message = '{errorResponse.Message}', StatusCode={errorResponse.HttpResponse.StatusCode}");
                     break; // ok - not an error - so then let's break and try to connect
                 }
 
-                try { Task.Delay(5000, ct).Wait(ct); }
+                try { Task.Delay(3000, ct).Wait(ct); }
                 catch (OperationCanceledException)
                 {
                     Logger.LogInformation("*************** PerformResumeActions: Cancelled during host availability wait.");
-                    CurrentPowerTransitionState = Common.PowerTransitionStates.Running;
+                    ResetStateIfStillResuming();
                     return;
                 }
-            } while (--readinessCheckCount != 0);
+            } while (--hostCheckRemaining != 0);
 
             // let's fall through and see if we can connect anyway
             // Let's reconnect
-            var connectionAttemptCount = maxRetriesCount;
+            var connectionAttemptCount = 0;
             do
             {
                 if (ct.IsCancellationRequested)
                 {
                     Logger.LogInformation("*************** PerformResumeActions: Cancelled during VPN reconnect.");
-                    CurrentPowerTransitionState = Common.PowerTransitionStates.Running;
+                    ResetStateIfStillResuming();
                     return;
                 }
 
+                connectionAttemptCount++;
                 Logger.LogInformation(
-                    $" Calling VPNTransportIKEV2.PowerResumeVPNConnection... attempt #{maxRetriesCount - --connectionAttemptCount}");
+                    $" Calling VPNTransportIKEV2.PowerResumeVPNConnection... attempt #{connectionAttemptCount}");
                 errorResponse = VPNTransportIKEV2.PowerResumeVPNConnection();
+
+                if (ct.IsCancellationRequested)
+                {
+                    Logger.LogInformation("*************** PerformResumeActions: Cancelled after VPN reconnect attempt returned.");
+                    ResetStateIfStillResuming();
+                    return;
+                }
+
                 if (errorResponse.IsError)
                 {
-                    try { Task.Delay(5000, ct).Wait(ct); }
+                    Logger.LogInformation($"*************** PowerResumeVPNConnection attempt failed: {errorResponse.Message}");
+                    try { Task.Delay(3000, ct).Wait(ct); }
                     catch (OperationCanceledException)
                     {
                         Logger.LogInformation("*************** PerformResumeActions: Cancelled during VPN reconnect wait.");
-                        CurrentPowerTransitionState = Common.PowerTransitionStates.Running;
+                        ResetStateIfStillResuming();
                         return;
                     }
                 }
-            } while (connectionAttemptCount != 0 && errorResponse.IsError);
+            } while (connectionAttemptCount < maxRetriesCount && errorResponse.IsError);
 
             Logger.LogInformation(errorResponse.IsError
                 ? "**************** PerformResumeActions failed!"
                 : "**************** PerformResumeActions successful!");
         }
 
-        CurrentPowerTransitionState = Common.PowerTransitionStates.Running;
+        ResetStateIfStillResuming();
+    }
+
+    /// <summary>
+    /// Only reset state to Running if we're still in Resume.
+    /// Avoids race where a cancelled resume overwrites a Suspend set by PerformSuspendActions.
+    /// Uses Interlocked.CompareExchange for thread-safe atomic transition.
+    /// </summary>
+    private static void ResetStateIfStillResuming()
+    {
+        Interlocked.CompareExchange(ref _powerTransitionState,
+            (int)Common.PowerTransitionStates.Running,
+            (int)Common.PowerTransitionStates.Resume);
     }
 
     /// <summary>
