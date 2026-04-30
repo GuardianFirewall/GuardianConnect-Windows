@@ -271,7 +271,44 @@ public static class ServicePowerEventsHandler
             var maxRetriesCount = int.Parse(countValue);
             var readinessCheckCount = maxRetriesCount;
 
+            // Wait for DNS to resolve before making HTTP calls -- avoids burning retries on unresolvable hosts
             var header = "PerformResumeActions (waiting for host availability): GetServerStatus returned:";
+            var dnsReady = false;
+            for (var dnsAttempt = 0; dnsAttempt < maxRetriesCount; dnsAttempt++)
+            {
+                if (ct.IsCancellationRequested)
+                {
+                    Logger.LogInformation("*************** PerformResumeActions: Cancelled during DNS readiness check.");
+                    CurrentPowerTransitionState = Common.PowerTransitionStates.Running;
+                    return;
+                }
+
+                try
+                {
+                    Logger.LogInformation($"DNS readiness check #{dnsAttempt + 1} for '{host}'...");
+                    System.Net.Dns.GetHostAddresses(host);
+                    Logger.LogInformation($"DNS resolved '{host}' successfully.");
+                    dnsReady = true;
+                    break;
+                }
+                catch (Exception ex)
+                {
+                    Logger.LogInformation($"DNS not ready for '{host}': {ex.Message}");
+                }
+
+                try { Task.Delay(3000, ct).Wait(ct); }
+                catch (OperationCanceledException)
+                {
+                    Logger.LogInformation("*************** PerformResumeActions: Cancelled during DNS readiness wait.");
+                    CurrentPowerTransitionState = Common.PowerTransitionStates.Running;
+                    return;
+                }
+            }
+
+            if (!dnsReady)
+                Logger.LogInformation("************** DNS never resolved -- will attempt GetServerStatus/VPN connect anyway.");
+
+            // Now do the HTTP host status check (should succeed quickly since DNS is resolved)
             do
             {
                 if (ct.IsCancellationRequested)
@@ -284,6 +321,14 @@ public static class ServicePowerEventsHandler
                 Logger.LogInformation(
                     $"Calling status of host '{host}' to verify if network is ready - retry # {maxRetriesCount - --readinessCheckCount}");
                 errorResponse = GRDGateway.GetServerStatus(host).Result;
+
+                if (ct.IsCancellationRequested)
+                {
+                    Logger.LogInformation("*************** PerformResumeActions: Cancelled after GetServerStatus returned.");
+                    CurrentPowerTransitionState = Common.PowerTransitionStates.Running;
+                    return;
+                }
+
                 Logger.LogInformation($"{header}: errorResponse from GetServerStatus: {errorResponse}");
                 if (!errorResponse.IsError)
                 {
@@ -292,7 +337,7 @@ public static class ServicePowerEventsHandler
                     break; // ok - not an error - so then let's break and try to connect
                 }
 
-                try { Task.Delay(5000, ct).Wait(ct); }
+                try { Task.Delay(3000, ct).Wait(ct); }
                 catch (OperationCanceledException)
                 {
                     Logger.LogInformation("*************** PerformResumeActions: Cancelled during host availability wait.");
@@ -316,9 +361,18 @@ public static class ServicePowerEventsHandler
                 Logger.LogInformation(
                     $" Calling VPNTransportIKEV2.PowerResumeVPNConnection... attempt #{maxRetriesCount - --connectionAttemptCount}");
                 errorResponse = VPNTransportIKEV2.PowerResumeVPNConnection();
+
+                if (ct.IsCancellationRequested)
+                {
+                    Logger.LogInformation("*************** PerformResumeActions: Cancelled after VPN reconnect attempt returned.");
+                    CurrentPowerTransitionState = Common.PowerTransitionStates.Running;
+                    return;
+                }
+
                 if (errorResponse.IsError)
                 {
-                    try { Task.Delay(5000, ct).Wait(ct); }
+                    Logger.LogInformation($"*************** PowerResumeVPNConnection attempt failed: {errorResponse.Message}");
+                    try { Task.Delay(3000, ct).Wait(ct); }
                     catch (OperationCanceledException)
                     {
                         Logger.LogInformation("*************** PerformResumeActions: Cancelled during VPN reconnect wait.");
