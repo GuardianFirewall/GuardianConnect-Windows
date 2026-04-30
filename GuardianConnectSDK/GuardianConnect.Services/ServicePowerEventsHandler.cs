@@ -21,7 +21,13 @@ public static class ServicePowerEventsHandler
     private const string hash20 = "####################";
     private const string plus20 = "++++++++++++++++++++";
 
-    private static Common.PowerTransitionStates CurrentPowerTransitionState = Common.PowerTransitionStates.Running;
+    private static int _powerTransitionState = (int)Common.PowerTransitionStates.Running;
+
+    private static Common.PowerTransitionStates CurrentPowerTransitionState
+    {
+        get => (Common.PowerTransitionStates)Volatile.Read(ref _powerTransitionState);
+        set => Volatile.Write(ref _powerTransitionState, (int)value);
+    }
 
     private static ITransportProvider.VPNProviderStatus VPNStatusAtSuspendTime =
         ITransportProvider.VPNProviderStatus.VPNStatusInvalid;
@@ -265,7 +271,7 @@ public static class ServicePowerEventsHandler
             var host = vpnResumeParameters?.VpnHostName ?? string.Empty;
             Logger.LogInformation("************** PerformResumeActions - VPN WAS CONNECTED AT SUSPENSION.");
 
-            // Fix #4: Validate host before entering retry loops
+            // Validate host before entering retry loops
             if (string.IsNullOrWhiteSpace(host))
             {
                 Logger.LogInformation("************** PerformResumeActions: VPN host is empty -- cannot resume. Aborting.");
@@ -274,12 +280,12 @@ public static class ServicePowerEventsHandler
             }
 
             Logger.LogInformation(
-                $"************** Check network stack readiness by attempting a status check of the vpn host '{host}");
+                $"************** Check network stack readiness by attempting a status check of the vpn host '{host}'");
             var countValue = RegistrySettings.RetrieveGuardianUserSettings(Common.kServicePowerResumeReconnectAttempts);
             if (string.IsNullOrEmpty(countValue)) countValue = defaultRetries;
             var maxRetriesCount = int.Parse(countValue);
 
-            // Fix #1: DNS pre-check with timeout -- avoids burning HTTP retries on unresolvable hosts
+            // DNS pre-check with timeout -- avoids burning HTTP retries on unresolvable hosts
             var dnsReady = false;
             for (var dnsAttempt = 0; dnsAttempt < maxRetriesCount; dnsAttempt++)
             {
@@ -293,27 +299,25 @@ public static class ServicePowerEventsHandler
                 try
                 {
                     Logger.LogInformation($"DNS readiness check #{dnsAttempt + 1} for '{host}'...");
-                    var dnsLookupTask = Task.Run(() => System.Net.Dns.GetHostAddresses(host));
-                    var completedTask = Task.WhenAny(dnsLookupTask, Task.Delay(5000, ct)).GetAwaiter().GetResult();
+                    System.Net.Dns.GetHostAddressesAsync(host)
+                        .WaitAsync(TimeSpan.FromSeconds(5), ct)
+                        .GetAwaiter()
+                        .GetResult();
 
-                    if (completedTask != dnsLookupTask)
+                    Logger.LogInformation($"DNS resolved '{host}' successfully.");
+                    dnsReady = true;
+                    break;
+                }
+                catch (TimeoutException)
+                {
+                    if (ct.IsCancellationRequested)
                     {
-                        if (ct.IsCancellationRequested)
-                        {
-                            Logger.LogInformation("*************** PerformResumeActions: Cancelled during DNS readiness check.");
-                            ResetStateIfStillResuming();
-                            return;
-                        }
+                        Logger.LogInformation("*************** PerformResumeActions: Cancelled during DNS readiness check.");
+                        ResetStateIfStillResuming();
+                        return;
+                    }
 
-                        Logger.LogInformation($"DNS readiness check for '{host}' timed out.");
-                    }
-                    else
-                    {
-                        dnsLookupTask.GetAwaiter().GetResult();
-                        Logger.LogInformation($"DNS resolved '{host}' successfully.");
-                        dnsReady = true;
-                        break;
-                    }
+                    Logger.LogInformation($"DNS readiness check for '{host}' timed out.");
                 }
                 catch (OperationCanceledException)
                 {
@@ -339,7 +343,6 @@ public static class ServicePowerEventsHandler
                 Logger.LogInformation("************** DNS never resolved -- will attempt GetServerStatus/VPN connect anyway.");
 
             // Now do the HTTP host status check (should succeed quickly since DNS is resolved)
-            // Fix #2: Use a separate counter for display vs. loop control
             var hostCheckAttempt = 0;
             var hostCheckRemaining = maxRetriesCount;
             do
@@ -363,12 +366,11 @@ public static class ServicePowerEventsHandler
                     return;
                 }
 
-                // Fix #3: Remove double-colon in log
                 Logger.LogInformation($"PerformResumeActions (waiting for host availability) GetServerStatus returned: {errorResponse}");
                 if (!errorResponse.IsError)
                 {
                     Logger.LogInformation(
-                        $"************** PerformResumeActions - NO error returned from GetServerStatus. Response message = '{errorResponse.Message}. StatusCode={errorResponse.HttpResponse.StatusCode}");
+                        $"************** PerformResumeActions - NO error returned from GetServerStatus. Response message = '{errorResponse.Message}', StatusCode={errorResponse.HttpResponse.StatusCode}");
                     break; // ok - not an error - so then let's break and try to connect
                 }
 
@@ -427,13 +429,15 @@ public static class ServicePowerEventsHandler
     }
 
     /// <summary>
-    /// Fix #5: Only reset state to Running if we're still in Resume.
+    /// Only reset state to Running if we're still in Resume.
     /// Avoids race where a cancelled resume overwrites a Suspend set by PerformSuspendActions.
+    /// Uses Interlocked.CompareExchange for thread-safe atomic transition.
     /// </summary>
     private static void ResetStateIfStillResuming()
     {
-        if (CurrentPowerTransitionState == Common.PowerTransitionStates.Resume)
-            CurrentPowerTransitionState = Common.PowerTransitionStates.Running;
+        Interlocked.CompareExchange(ref _powerTransitionState,
+            (int)Common.PowerTransitionStates.Running,
+            (int)Common.PowerTransitionStates.Resume);
     }
 
     /// <summary>
