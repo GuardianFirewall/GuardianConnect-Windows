@@ -358,11 +358,6 @@ public class ClientPipeImpl : IGuardianNPContract
             throw new ArgumentNullException(nameof(systemEventsDict), "systemEventsDict cannot be null");
         }
 
-        var options = new JsonSerializerOptions
-        {
-            WriteIndented = false
-        };
-        
         // We're going to split this out to preserve argments and not deal with 'too-generic' json hassle
         var sender = systemEventsDict.Keys.First();
         var o = systemEventsDict[sender];
@@ -404,7 +399,7 @@ public class ClientPipeImpl : IGuardianNPContract
                 break;
             case "Client_NetworkAvailabilityChange":
                 senderEventType = (int)IGuardianNPContract.SystemEventType.NetworkChangeOnNetworkAvailabilityChanged;
-                cmdPayload = JsonSerializer.Serialize<NetworkAvailabilityEventArgs>((NetworkAvailabilityEventArgs)o, options);
+                cmdPayload = JsonSerializer.Serialize((NetworkAvailabilityEventArgs)o, NetworkAvailabilityEventArgsContext.Default.NetworkAvailabilityEventArgs);
                 break;
         }
         var cmdString = $"{Hexify(IGuardianNPContract.NPCommands.SendPowerAndNetworkEvents)}{senderEventType}.{cmdPayload}";

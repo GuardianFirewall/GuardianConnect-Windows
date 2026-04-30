@@ -26,6 +26,8 @@ public static class ServicePowerEventsHandler
     private static ITransportProvider.VPNProviderStatus VPNStatusAtSuspendTime =
         ITransportProvider.VPNProviderStatus.VPNStatusInvalid;
 
+    private static CancellationTokenSource? _resumeCts;
+
     private static ILogger _logger = NullLogger.Instance;
 
     public static ILogger Logger
@@ -212,6 +214,16 @@ public static class ServicePowerEventsHandler
     private static void PerformSuspendActions()
     {
         Logger.LogInformation("*************** PerformSuspendActions ...");
+
+        // Cancel any in-progress resume retry loop from a prior cycle
+        if (_resumeCts != null)
+        {
+            Logger.LogInformation("*************** PerformSuspendActions: Cancelling in-progress PerformResumeActions...");
+            _resumeCts.Cancel();
+            _resumeCts.Dispose();
+            _resumeCts = null;
+        }
+
         if (VPNStatusAtSuspendTime == ITransportProvider.VPNProviderStatus.VPNStatusConnected)
         {
             // If VPN connected - it will disconnect when network stack collapses - we'll get it on the way up
@@ -230,6 +242,13 @@ public static class ServicePowerEventsHandler
     internal static void PerformResumeActions()
     {
         Logger.LogInformation("*************** PerformResumeActions ...");
+
+        // Create a new CancellationTokenSource for this resume cycle
+        _resumeCts?.Cancel();
+        _resumeCts?.Dispose();
+        _resumeCts = new CancellationTokenSource();
+        var ct = _resumeCts.Token;
+
         // We don't care if user brought us out or not - we are resuming
         // IF we were connected, then reconnect now
         Logger.LogInformation(
@@ -255,6 +274,13 @@ public static class ServicePowerEventsHandler
             var header = "PerformResumeActions (waiting for host availability): GetServerStatus returned:";
             do
             {
+                if (ct.IsCancellationRequested)
+                {
+                    Logger.LogInformation("*************** PerformResumeActions: Cancelled during host availability check.");
+                    CurrentPowerTransitionState = Common.PowerTransitionStates.Running;
+                    return;
+                }
+
                 Logger.LogInformation(
                     $"Calling status of host '{host}' to verify if network is ready - retry # {maxRetriesCount - --readinessCheckCount}");
                 errorResponse = GRDGateway.GetServerStatus(host).Result;
@@ -266,7 +292,13 @@ public static class ServicePowerEventsHandler
                     break; // ok - not an error - so then let's break and try to connect
                 }
 
-                Task.Delay(5000).Wait();
+                try { Task.Delay(5000, ct).Wait(ct); }
+                catch (OperationCanceledException)
+                {
+                    Logger.LogInformation("*************** PerformResumeActions: Cancelled during host availability wait.");
+                    CurrentPowerTransitionState = Common.PowerTransitionStates.Running;
+                    return;
+                }
             } while (--readinessCheckCount != 0);
 
             // let's fall through and see if we can connect anyway
@@ -274,10 +306,26 @@ public static class ServicePowerEventsHandler
             var connectionAttemptCount = maxRetriesCount;
             do
             {
+                if (ct.IsCancellationRequested)
+                {
+                    Logger.LogInformation("*************** PerformResumeActions: Cancelled during VPN reconnect.");
+                    CurrentPowerTransitionState = Common.PowerTransitionStates.Running;
+                    return;
+                }
+
                 Logger.LogInformation(
                     $" Calling VPNTransportIKEV2.PowerResumeVPNConnection... attempt #{maxRetriesCount - --connectionAttemptCount}");
                 errorResponse = VPNTransportIKEV2.PowerResumeVPNConnection();
-                if (errorResponse.IsError) Task.Delay(5000).Wait();
+                if (errorResponse.IsError)
+                {
+                    try { Task.Delay(5000, ct).Wait(ct); }
+                    catch (OperationCanceledException)
+                    {
+                        Logger.LogInformation("*************** PerformResumeActions: Cancelled during VPN reconnect wait.");
+                        CurrentPowerTransitionState = Common.PowerTransitionStates.Running;
+                        return;
+                    }
+                }
             } while (connectionAttemptCount != 0 && errorResponse.IsError);
 
             Logger.LogInformation(errorResponse.IsError
@@ -286,6 +334,43 @@ public static class ServicePowerEventsHandler
         }
 
         CurrentPowerTransitionState = Common.PowerTransitionStates.Running;
+    }
+
+    /// <summary>
+    /// Fallback entry point for SCM power events (MainService.OnPowerEvent).
+    /// Triggers the same suspend/resume state machine as client-forwarded events.
+    /// </summary>
+    public static void HandleScmPowerEvent(int powerBroadcastStatus)
+    {
+        // PowerBroadcastStatus enum values:
+        // Suspend = 4, ResumeAutomatic = 18, ResumeSuspend = 7
+        switch (powerBroadcastStatus)
+        {
+            case 4: // Suspend
+                Logger.LogInformation("HandleScmPowerEvent: SCM Suspend received (fallback path).");
+                if (CurrentPowerTransitionState == Common.PowerTransitionStates.Running)
+                {
+                    CurrentPowerTransitionState = Common.PowerTransitionStates.Suspend;
+                    PerformSuspendActions();
+                }
+                break;
+            case 18: // ResumeAutomatic
+                Logger.LogInformation("HandleScmPowerEvent: SCM ResumeAutomatic received (fallback path).");
+                if (CurrentPowerTransitionState == Common.PowerTransitionStates.Suspend)
+                {
+                    CurrentPowerTransitionState = Common.PowerTransitionStates.Resume;
+                    PerformResumeActions();
+                }
+                break;
+            case 7: // ResumeSuspend
+                Logger.LogInformation("HandleScmPowerEvent: SCM ResumeSuspend received (fallback path).");
+                if (CurrentPowerTransitionState == Common.PowerTransitionStates.Suspend)
+                {
+                    CurrentPowerTransitionState = Common.PowerTransitionStates.Resume;
+                    PerformResumeActions();
+                }
+                break;
+        }
     }
 
     public static void HandleSystemEventsFromclient(IGuardianNPContract.SystemEventType systemEventType, string serializedClientEventParameters)
@@ -297,8 +382,8 @@ public static class ServicePowerEventsHandler
                 NetworkChangeOnNetworkAddressChanged("Client_NetworkAddressChangedEvent", EventArgs.Empty);
                 break;
             case IGuardianNPContract.SystemEventType.NetworkChangeOnNetworkAvailabilityChanged:
-                var networkAvailabilityEventArg = JsonSerializer.Deserialize<NetworkAvailabilityEventArgs>(serializedClientEventParameters);
-                Logger.LogInformation($"Network availability changed: {networkAvailabilityEventArg.IsAvailable}");
+                var networkAvailabilityEventArg = JsonSerializer.Deserialize(serializedClientEventParameters, NetworkAvailabilityEventArgsContext.Default.NetworkAvailabilityEventArgs);
+                Logger.LogInformation($"Network availability changed: {networkAvailabilityEventArg?.IsAvailable}");
                 NetworkChangeOnNetworkAvailabilityChanged("ClientSentEvent", networkAvailabilityEventArg);
                 break;
             case IGuardianNPContract.SystemEventType.PowerModeChangeEvent:
