@@ -49,11 +49,28 @@ jobs:
     - name: Show env after above with colon syntax
       run: echo "$env:CPU"
 
-    - name: Extract Version and set as env var
+    - name: Extract Version and prerelease suffix
       shell: pwsh
       run: |
-            $version = Select-String '<Version>(.+?)</Version>' Directory.Build.Props | % { $_.Matches[0].Groups[1].Value }
-            "PKGVERSION=$version" | Out-File -FilePath $env:GITHUB_ENV -Encoding utf8 -Append
+            $baseVersion = Select-String '<Version>(.+?)</Version>' Directory.Build.Props |
+              % { $_.Matches[0].Groups[1].Value }
+            $suffixMatch = Select-String '<VersionSuffix>(.+?)</VersionSuffix>' Directory.Build.Props
+            $suffix = if ($suffixMatch) { $suffixMatch.Matches[0].Groups[1].Value } else { "" }
+
+            if ($suffix) {
+              $pkgVersion = "$baseVersion-$suffix"
+              $msiVersion = "$baseVersion.9999"
+              $isPrerelease = "true"
+            } else {
+              $pkgVersion = $baseVersion
+              $msiVersion = "$baseVersion.0"
+              $isPrerelease = "false"
+            }
+
+            "PKGVERSION=$pkgVersion"   | Out-File -FilePath $env:GITHUB_ENV -Encoding utf8 -Append
+            "BASEVERSION=$baseVersion" | Out-File -FilePath $env:GITHUB_ENV -Encoding utf8 -Append
+            "MSIVERSION=$msiVersion"   | Out-File -FilePath $env:GITHUB_ENV -Encoding utf8 -Append
+            "IS_PRERELEASE=$isPrerelease" | Out-File -FilePath $env:GITHUB_ENV -Encoding utf8 -Append
 
     - name: Use the extracted value
       run: |
@@ -134,18 +151,15 @@ jobs:
       shell: cmd
 
     - name: Create GuardianConnect.Services.SDK_x64.nupkg package bundle for EACH CPU build - x64 first
-      if: github.ref_name == 'main'
-      run: nuget pack GuardianConnect.Services.SDK_x64.nuspec -Version ${{env.PKGVERSION}}.1
+      run: nuget pack GuardianConnect.Services.SDK_x64.nuspec -Version ${{env.PKGVERSION}}
       shell: cmd
-      
+
     - name: Create GuardianConnect.Services.SDK_arm64.nupkg package bundle for EACH CPU build - arm64 first
-      if: github.ref_name == 'main'
-      run: nuget pack GuardianConnect.Services.SDK_arm64.nuspec -Version ${{env.PKGVERSION}}.1
+      run: nuget pack GuardianConnect.Services.SDK_arm64.nuspec -Version ${{env.PKGVERSION}}
       shell: cmd
 
     - name: Create GuardianConnectSDK.Services.Abstractions.nupkg package bundle
-      if: github.ref_name == 'main'
-      run: nuget pack GuardianConnectSDK.Services.Abstractions.nuspec -Version ${{env.PKGVERSION}}.2
+      run: nuget pack GuardianConnectSDK.Services.Abstractions.nuspec -Version ${{env.PKGVERSION}}
       shell: cmd
 
 #    - name: Upload build artifacts - both Service SDKs - x64 first- UNSIGNED SO WE CAN GIVE AS SAMPLE TO SIGNPATH
@@ -213,8 +227,8 @@ jobs:
         -ProjectSlug "Guardian" `
         -SigningPolicySlug "Guardian_DNSF_Branded" `
         -ArtifactConfigurationSlug GuardianConnectServiceSDK_X64 `
-        -InputArtifactPath "GuardianConnect_Services_SDK_x64.${{env.PKGVERSION}}.1.nupkg" `
-        -OutputArtifactPath "SIGNED_GuardianConnect_Services_SDK_x64.${{env.PKGVERSION}}.1.nupkg"  `
+        -InputArtifactPath "GuardianConnect_Services_SDK_x64.${{env.PKGVERSION}}.nupkg" `
+        -OutputArtifactPath "SIGNED_GuardianConnect_Services_SDK_x64.${{env.PKGVERSION}}.nupkg"  `
         -WaitForCompletion
 
     - name: Sign GuardianConnectServicesSDK_arm64 package with certificate
@@ -226,8 +240,8 @@ jobs:
         -ProjectSlug "Guardian" `
         -SigningPolicySlug "Guardian_DNSF_Branded" `
         -ArtifactConfigurationSlug GuardianConnectServicesSDK_ARM64 `
-        -InputArtifactPath "GuardianConnect_Services_SDK_arm64.${{env.PKGVERSION}}.1.nupkg" `
-        -OutputArtifactPath "SIGNED_GuardianConnect_Services_SDK_arm64.${{env.PKGVERSION}}.1.nupkg"  `
+        -InputArtifactPath "GuardianConnect_Services_SDK_arm64.${{env.PKGVERSION}}.nupkg" `
+        -OutputArtifactPath "SIGNED_GuardianConnect_Services_SDK_arm64.${{env.PKGVERSION}}.nupkg"  `
         -WaitForCompletion
     
       # Sign GuardianFirewallService package with certificate
@@ -263,13 +277,13 @@ jobs:
       uses: actions/upload-artifact@v4
       with:
         name: SIGNED_GuardianConnectServicesSDK_x64.${{env.PKGVERSION}}.nupkg
-        path: D:\a\GuardianConnect-Windows\GuardianConnect-Windows\GuardianConnectSDK\SIGNED_GuardianConnect_Services_SDK_x64.${{env.PKGVERSION}}.1.nupkg
+        path: D:\a\GuardianConnect-Windows\GuardianConnect-Windows\GuardianConnectSDK\SIGNED_GuardianConnect_Services_SDK_x64.${{env.PKGVERSION}}.nupkg
 
     - name: Upload build artifacts - GuardianConnect.Services.SDK_ARM64
       uses: actions/upload-artifact@v4
       with:
         name: SIGNED_GuardianConnectServicesSDK_ARM64.${{env.PKGVERSION}}.nupkg
-        path: D:\a\GuardianConnect-Windows\GuardianConnect-Windows\GuardianConnectSDK\SIGNED_GuardianConnect_Services_SDK_ARM64.${{env.PKGVERSION}}.1.nupkg
+        path: D:\a\GuardianConnect-Windows\GuardianConnect-Windows\GuardianConnectSDK\SIGNED_GuardianConnect_Services_SDK_ARM64.${{env.PKGVERSION}}.nupkg
         
         ####    - name: Upload build artifacts - GuardianFirewall Service
 ####      uses: actions/upload-artifact@v4
@@ -285,25 +299,20 @@ jobs:
         
     # Update GitHub Packages with these nuget packages
     - name: Update GitHub with nuget packages - SDK x64
-      if: github.ref_name == 'main'
       run: nuget push SIGNED_GuardianConnectSDK_x64.${{env.PKGVERSION}}.nupkg `${{ secrets.GUARDIANFIREWALL_GH_PKG_TOKEN }} -Source GitHub -SkipDuplicate
     - name: Update GitHub with nuget packages - SDK ARM64
-      if: github.ref_name == 'main'
       run: nuget push SIGNED_GuardianConnectSDK_ARM64.${{env.PKGVERSION}}.nupkg `${{ secrets.GUARDIANFIREWALL_GH_PKG_TOKEN }} -Source GitHub -SkipDuplicate
-      
+
     # Update GitHub Packages for Connect.Services with these nuget packages
     - name: Update GitHub with nuget packages - SDK Services x64
-      if: github.ref_name == 'main'
-      run: nuget push SIGNED_GuardianConnect_Services_SDK_x64.${{env.PKGVERSION}}.1.nupkg `${{ secrets.GUARDIANFIREWALL_GH_PKG_TOKEN }} -Source GitHub
-      
+      run: nuget push SIGNED_GuardianConnect_Services_SDK_x64.${{env.PKGVERSION}}.nupkg `${{ secrets.GUARDIANFIREWALL_GH_PKG_TOKEN }} -Source GitHub -SkipDuplicate
+
     - name: Update GitHub with nuget packages - SDK Services ARM64
-      if: github.ref_name == 'main'
-      run: nuget push SIGNED_GuardianConnect_Services_SDK_ARM64.${{env.PKGVERSION}}.1.nupkg `${{ secrets.GUARDIANFIREWALL_GH_PKG_TOKEN }} -Source GitHub
-      
+      run: nuget push SIGNED_GuardianConnect_Services_SDK_ARM64.${{env.PKGVERSION}}.nupkg `${{ secrets.GUARDIANFIREWALL_GH_PKG_TOKEN }} -Source GitHub -SkipDuplicate
+
     # Update GitHub Packages for ConnectSDK.Services.Abstractions with nuget package
     - name: Update GitHub with nuget packages - SDK Services Abstractions
-      if: github.ref_name == 'main'
-      run: nuget push GuardianConnectSDK_Services_Abstractions.${{env.PKGVERSION}}.2.nupkg `${{ secrets.GUARDIANFIREWALL_GH_PKG_TOKEN }} -Source GitHub
+      run: nuget push GuardianConnectSDK_Services_Abstractions.${{env.PKGVERSION}}.nupkg `${{ secrets.GUARDIANFIREWALL_GH_PKG_TOKEN }} -Source GitHub -SkipDuplicate
       
 ####    - name: Update GitHub with nuget packages - Service
 ####      run: nuget push SIGNED_GuardianFirewallService.${{env.PKGVERSION}}.nupkg ${{ secrets.GUARDIANFIREWALL_GH_PKG_TOKEN }} -Source GitHub -SkipDuplicate
