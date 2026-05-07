@@ -155,21 +155,20 @@ jobs:
       run: nuget pack GuardianConnectSDK.Services.Abstractions.nuspec -Version ${{env.PKGVERSION}}
       shell: cmd
 
-    # Upload unsigned nupkgs as workflow artifacts so they can be downloaded and used to set
-    # up new SignPath ArtifactConfiguration templates for the consolidated package shape.
-    # Once SignPath templates are configured, the slug names in the sign steps below get
-    # updated to match.
-    - name: Upload UNSIGNED GuardianConnectSDK.nupkg (sample for SignPath template setup)
-      uses: actions/upload-artifact@v4
-      with:
-        name: UNSIGNED_GuardianConnectSDK.${{env.PKGVERSION}}.nupkg
-        path: D:\a\GuardianConnect-Windows\GuardianConnect-Windows\GuardianConnectSDK\GuardianConnectSDK.${{env.PKGVERSION}}.nupkg
-
-    - name: Upload UNSIGNED GuardianConnect.Services.SDK.nupkg (sample for SignPath template setup)
-      uses: actions/upload-artifact@v4
-      with:
-        name: UNSIGNED_GuardianConnect.Services.SDK.${{env.PKGVERSION}}.nupkg
-        path: D:\a\GuardianConnect-Windows\GuardianConnect-Windows\GuardianConnectSDK\GuardianConnect.Services.SDK.${{env.PKGVERSION}}.nupkg
+    # Upload unsigned nupkgs as workflow artifacts. Disabled by default; uncomment when the
+    # consolidated package shape changes (e.g., new files added to the nuspec) and you need
+    # fresh unsigned nupkgs to update the SignPath ArtifactConfiguration templates against.
+#    - name: Upload UNSIGNED GuardianConnectSDK.nupkg (sample for SignPath template setup)
+#      uses: actions/upload-artifact@v4
+#      with:
+#        name: UNSIGNED_GuardianConnectSDK.${{env.PKGVERSION}}.nupkg
+#        path: D:\a\GuardianConnect-Windows\GuardianConnect-Windows\GuardianConnectSDK\GuardianConnectSDK.${{env.PKGVERSION}}.nupkg
+#
+#    - name: Upload UNSIGNED GuardianConnect.Services.SDK.nupkg (sample for SignPath template setup)
+#      uses: actions/upload-artifact@v4
+#      with:
+#        name: UNSIGNED_GuardianConnect.Services.SDK.${{env.PKGVERSION}}.nupkg
+#        path: D:\a\GuardianConnect-Windows\GuardianConnect-Windows\GuardianConnectSDK\GuardianConnect.Services.SDK.${{env.PKGVERSION}}.nupkg
 
     # SignPath signing for the consolidated multi-RID packages.
     # NOTE: ArtifactConfigurationSlug values below are placeholders pending SignPath template
