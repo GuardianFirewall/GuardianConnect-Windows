@@ -1,0 +1,28 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+    <PropertyGroup>
+        <OutputType>Exe</OutputType>
+        <TargetFramework>net9.0-windows</TargetFramework>
+        <RootNamespace>GuardianConnect.Tools.KillSwitchSmokeTest</RootNamespace>
+        <AssemblyName>KillSwitchSmokeTest</AssemblyName>
+        <Nullable>enable</Nullable>
+        <ImplicitUsings>enable</ImplicitUsings>
+        <AllowUnsafeBlocks>true</AllowUnsafeBlocks>
+        <Platforms>x64;ARM64</Platforms>
+
+        <!-- Throwaway dev tool; not packaged, not signed, not in the solution. Run as admin. -->
+        <IsPackable>false</IsPackable>
+        <PublishAot>false</PublishAot>
+    </PropertyGroup>
+
+    <ItemGroup>
+        <ProjectReference Include="..\..\Win32Calls.WFP\Win32Calls.WFP.csproj" />
+        <ProjectReference Include="..\..\Shared\GuardianConnect.Shared.csproj" />
+    </ItemGroup>
+
+    <ItemGroup>
+        <PackageReference Include="Serilog" Version="4.3.0" />
+        <PackageReference Include="Serilog.Sinks.Console" Version="6.0.0" />
+    </ItemGroup>
+
+</Project>
