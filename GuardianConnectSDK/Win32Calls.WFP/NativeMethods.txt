@@ -38,3 +38,24 @@ IP_*
 MAX_ADAPTER_NAME_LENGTH
 MAX_ADAPTER_DESCRIPTION_LENGTH
 MAX_ADAPTER_ADDRESS_LENGTH
+
+// Kill Switch additions (i221) - explicit names for clarity (most are also covered by the wildcards above)
+// Transaction APIs are ambiguous between Windows.Win32 (user-mode) and Windows.Wdk (kernel-mode);
+// fully qualify to disambiguate to the user-mode flavour.
+Windows.Win32.NetworkManagement.WindowsFilteringPlatform.FwpmTransactionBegin0
+Windows.Win32.NetworkManagement.WindowsFilteringPlatform.FwpmTransactionCommit0
+Windows.Win32.NetworkManagement.WindowsFilteringPlatform.FwpmTransactionAbort0
+FwpmGetAppIdFromFileName0
+FWPM_LAYER_ALE_AUTH_RECV_ACCEPT_V4
+FWPM_LAYER_ALE_AUTH_RECV_ACCEPT_V6
+FWPM_CONDITION_IP_LOCAL_INTERFACE
+FWPM_CONDITION_IP_REMOTE_ADDRESS
+FWPM_CONDITION_IP_REMOTE_PORT
+FWPM_CONDITION_IP_LOCAL_PORT
+FWPM_CONDITION_IP_PROTOCOL
+FWPM_CONDITION_ALE_APP_ID
+FWP_CONDITION_FLAG_IS_LOOPBACK
+ConvertInterfaceIndexToLuid
+ConvertInterfaceLuidToGuid
+GetIfTable2
+FreeMibTable
