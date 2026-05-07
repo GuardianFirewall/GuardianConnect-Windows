@@ -1,0 +1,34 @@
+<?xml version="1.0" encoding="utf-8"?>
+<package>
+    <metadata>
+        <id>GuardianConnect.Services.SDK</id>
+        <version>0.0.0</version>
+        <title>GuardianConnect Services SDK</title>
+        <authors>DNSFilter, Inc.</authors>
+        <license type="expression">MIT</license>
+        <icon>Guardian.png</icon>
+        <projectUrl>https://github.com/GuardianFirewall/guardianconnect-windows</projectUrl>
+        <description>Use this Nuget package to incorporate into your service executable to provide Guardian Firewall Services. Multi-platform package containing both x64 and ARM64 runtime assemblies.</description>
+        <releaseNotes>$(Version): Multi-platform (x64 + ARM64) consolidated Services SDK package</releaseNotes>
+        <copyright>Copyright DNSFilter, Inc.</copyright>
+        <tags>GuardianConnectSDK Windows</tags>
+        <dependencies>
+            <group targetFramework="net9.0">
+                <!-- Add your dependencies here -->
+            </group>
+        </dependencies>
+    </metadata>
+    <files>
+        <file src="..\README.md" target="content"/>
+        <file src="..\Guardian.png"/>
+
+        <!-- Compile-time ref assembly (managed IL is identical across platforms; use x64 build) -->
+        <file src="BuildOutput\GuardianConnect.Services\runtimes\win10-x64\lib\net9.0-windows\GuardianConnect.Services.dll" target="lib\net9.0\GuardianConnect.Services.dll"/>
+
+        <!-- x64 runtime assembly -->
+        <file src="BuildOutput\GuardianConnect.Services\runtimes\win10-x64\lib\net9.0-windows\GuardianConnect.Services.dll" target="runtimes\win-x64\lib\net9.0\GuardianConnect.Services.dll"/>
+
+        <!-- ARM64 runtime assembly -->
+        <file src="BuildOutput\GuardianConnect.Services\runtimes\win10-arm64\lib\net9.0-windows\GuardianConnect.Services.dll" target="runtimes\win-arm64\lib\net9.0\GuardianConnect.Services.dll"/>
+    </files>
+</package>
