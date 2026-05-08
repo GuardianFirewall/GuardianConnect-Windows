@@ -207,18 +207,28 @@ public sealed class KillSwitchService : BackgroundService
             return;
         }
 
-        // Resolve tunnel LUID (best-effort; if missing, install without tunnel permits — the
-        // user will lose all connectivity but block-all is honored).
-        ulong? tunnelLuid = null;
+        // Resolve tunnel LUID. Try multiple strategies in order; if all fail, dump every
+        // up adapter to the log so we can diagnose what's actually present.
         var entryName = ConnectionRoutines.ActiveConnectionEntryName;
+        _logger.LogInformation("KillSwitchService: resolving tunnel LUID (RAS entry name='{Entry}')", entryName);
+
+        ulong? tunnelLuid = null;
         if (!string.IsNullOrEmpty(entryName))
-        {
-            tunnelLuid = AdapterLuidResolver.FindTunnelLuidByEntryName(entryName)
-                      ?? AdapterLuidResolver.FindFirstUpAdapterByDescriptionContains("WAN Miniport (IKEv2)");
-        }
+            tunnelLuid = AdapterLuidResolver.FindTunnelLuidByEntryName(entryName);
+        tunnelLuid ??= AdapterLuidResolver.FindFirstUpAdapterByDescriptionContains("WAN Miniport (IKEv2)");
+        tunnelLuid ??= AdapterLuidResolver.FindFirstUpPppAdapter();
+
         if (tunnelLuid == null)
         {
-            _logger.LogWarning("KillSwitchService: tunnel LUID not resolved; tunnel-permit filters will be skipped.");
+            _logger.LogWarning(
+                "KillSwitchService: tunnel LUID not resolved by any strategy. Tunnel-permit filters " +
+                "will be skipped — block-all will block ALL traffic including tunnel-bound. " +
+                "Diagnostic dump of up adapters follows so we can fix the resolver.");
+            _logger.LogWarning(AdapterLuidResolver.DumpUpAdapters());
+        }
+        else
+        {
+            _logger.LogInformation("KillSwitchService: using tunnel LUID 0x{Luid:X16}", tunnelLuid.Value);
         }
 
         if (KillSwitchFilters.BeginTransaction(_engine) != 0)

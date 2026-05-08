@@ -1,4 +1,5 @@
 using System;
+using System.Text;
 using Windows.Win32;
 using Windows.Win32.Foundation;
 using Windows.Win32.NetworkManagement.IpHelper;
@@ -16,19 +17,19 @@ namespace Win32Calls.WFP;
 /// OperStatus=Up; this helper iterates that table and returns the LUID of the most
 /// likely candidate.
 ///
-/// v1 strategy: match on the alias (which RAS sets to the entry name) + OperStatus=Up.
-/// If multiple matches exist, prefer the most recently up one. Returns null if none
-/// found.
+/// Multiple strategies because we don't fully control what Windows names the resulting
+/// adapter (depends on Windows version, RAS phonebook contents, and whether multiple
+/// concurrent RAS connections exist):
+/// 1. Exact alias-match against the RAS entry name.
+/// 2. Substring alias-match (in case Windows decorates the alias).
+/// 3. Description-substring "WAN Miniport (IKEv2)".
+/// 4. Adapter type == IF_TYPE_PPP (23) — what RAS uses for IKEv2 tunnels.
 /// </summary>
 public static unsafe class AdapterLuidResolver
 {
-    /// <summary>
-    /// Find the IF_LUID of the active tunnel adapter for a given RAS entry name. RAS
-    /// names the WAN Miniport adapter after the entry name when the connection comes up,
-    /// so the alias field in MIB_IF_ROW2 should match (case-insensitively, exact).
-    /// </summary>
-    /// <param name="rasEntryName">The RAS entry name (e.g., "Guardian Firewall - us-east").</param>
-    /// <returns>The IF_LUID value if a matching up-state adapter is found; null otherwise.</returns>
+    private const uint IF_TYPE_PPP = 23;
+
+    /// <summary>Try (exact then substring) alias-match against the RAS entry name.</summary>
     public static ulong? FindTunnelLuidByEntryName(string rasEntryName)
     {
         if (string.IsNullOrEmpty(rasEntryName))
@@ -37,61 +38,95 @@ public static unsafe class AdapterLuidResolver
             return null;
         }
 
-        MIB_IF_TABLE2* table = null;
-        try
+        // Exact match first
+        var exact = WalkUpAdapters(row =>
         {
-            var result = PInvoke.GetIfTable2(&table);
-            if (result != 0 || table == null)
-            {
-                Log.Error($"AdapterLuidResolver.FindTunnelLuidByEntryName: GetIfTable2 failed. Error: 0x{result:X8}");
-                return null;
-            }
+            var alias = ReadFixedString(row.Alias.AsSpan());
+            return string.Equals(alias, rasEntryName, StringComparison.OrdinalIgnoreCase);
+        }, $"alias == '{rasEntryName}' (exact)");
+        if (exact != null) return exact;
 
-            // Walk the variable-length Table[] in MIB_IF_TABLE2 (inline-array struct field).
-            var rowPtr = (MIB_IF_ROW2*)&table->Table;
-            for (uint i = 0; i < table->NumEntries; i++)
-            {
-                var row = rowPtr[i];
-                if (row.OperStatus != IF_OPER_STATUS.IfOperStatusUp) continue;
-
-                var alias = ReadFixedString(row.Alias.AsSpan());
-                if (string.Equals(alias, rasEntryName, StringComparison.OrdinalIgnoreCase))
-                {
-                    var luid = row.InterfaceLuid.Value;
-                    Log.Information(
-                        "AdapterLuidResolver: matched RAS entry '{Entry}' to adapter '{Alias}' (LUID 0x{Luid:X16}, ifIndex={Idx}).",
-                        rasEntryName, alias, luid, row.InterfaceIndex);
-                    return luid;
-                }
-            }
-
-            Log.Warning(
-                "AdapterLuidResolver.FindTunnelLuidByEntryName: no up-state adapter alias matched '{Entry}'.",
-                rasEntryName);
-            return null;
-        }
-        finally
+        // Substring match (e.g., Windows prefixes/suffixes the alias)
+        return WalkUpAdapters(row =>
         {
-            if (table != null) PInvoke.FreeMibTable(table);
-        }
+            var alias = ReadFixedString(row.Alias.AsSpan());
+            return alias.IndexOf(rasEntryName, StringComparison.OrdinalIgnoreCase) >= 0;
+        }, $"alias contains '{rasEntryName}'");
     }
 
-    /// <summary>
-    /// Fallback: find the first up-state adapter whose description contains a given
-    /// substring (case-insensitive). Useful when the alias-match path fails — RAS's
-    /// description usually contains "WAN Miniport (IKEv2)" or similar.
-    /// </summary>
+    /// <summary>Substring match on the description field of an Up adapter.</summary>
     public static ulong? FindFirstUpAdapterByDescriptionContains(string descriptionSubstring)
     {
         if (string.IsNullOrEmpty(descriptionSubstring)) return null;
 
+        return WalkUpAdapters(row =>
+        {
+            var description = ReadFixedString(row.Description.AsSpan());
+            return description.IndexOf(descriptionSubstring, StringComparison.OrdinalIgnoreCase) >= 0;
+        }, $"description contains '{descriptionSubstring}'");
+    }
+
+    /// <summary>Match the first Up adapter with the given IF_TYPE (e.g., IF_TYPE_PPP = 23).</summary>
+    public static ulong? FindFirstUpAdapterByType(uint ifType)
+    {
+        return WalkUpAdapters(row => (uint)row.Type == ifType, $"type == {ifType}");
+    }
+
+    /// <summary>Convenience wrapper that returns IF_TYPE_PPP (23) — what RAS uses for IKEv2.</summary>
+    public static ulong? FindFirstUpPppAdapter() => FindFirstUpAdapterByType(IF_TYPE_PPP);
+
+    /// <summary>
+    /// Diagnostic dump of every up adapter. Useful when none of the resolution strategies
+    /// match; lets us see in the service log what we were actually presented with.
+    /// </summary>
+    public static string DumpUpAdapters()
+    {
+        var sb = new StringBuilder();
+        sb.AppendLine("Up adapters (per GetIfTable2):");
+
         MIB_IF_TABLE2* table = null;
         try
         {
             var result = PInvoke.GetIfTable2(&table);
             if (result != 0 || table == null)
             {
-                Log.Error($"AdapterLuidResolver.FindFirstUpAdapterByDescriptionContains: GetIfTable2 failed. Error: 0x{result:X8}");
+                sb.AppendLine($"  GetIfTable2 failed: 0x{result:X8}");
+                return sb.ToString();
+            }
+
+            var rowPtr = (MIB_IF_ROW2*)&table->Table;
+            var count = 0;
+            for (uint i = 0; i < table->NumEntries; i++)
+            {
+                var row = rowPtr[i];
+                if (row.OperStatus != IF_OPER_STATUS.IfOperStatusUp) continue;
+                count++;
+                sb.AppendLine(
+                    $"  ifIndex={row.InterfaceIndex,4} luid=0x{row.InterfaceLuid.Value:X16} type={(uint)row.Type,3} " +
+                    $"alias='{ReadFixedString(row.Alias.AsSpan())}' description='{ReadFixedString(row.Description.AsSpan())}'");
+            }
+            if (count == 0) sb.AppendLine("  (none)");
+            return sb.ToString();
+        }
+        finally
+        {
+            if (table != null) PInvoke.FreeMibTable(table);
+        }
+    }
+
+    // ----------------------------------------------------------------------
+    // Internal
+    // ----------------------------------------------------------------------
+
+    private static ulong? WalkUpAdapters(MibIfRowPredicate predicate, string predicateLabel)
+    {
+        MIB_IF_TABLE2* table = null;
+        try
+        {
+            var result = PInvoke.GetIfTable2(&table);
+            if (result != 0 || table == null)
+            {
+                Log.Error($"AdapterLuidResolver: GetIfTable2 failed (predicate={predicateLabel}). Error: 0x{result:X8}");
                 return null;
             }
 
@@ -100,21 +135,18 @@ public static unsafe class AdapterLuidResolver
             {
                 var row = rowPtr[i];
                 if (row.OperStatus != IF_OPER_STATUS.IfOperStatusUp) continue;
+                if (!predicate(row)) continue;
 
-                var description = ReadFixedString(row.Description.AsSpan());
-                if (description.IndexOf(descriptionSubstring, StringComparison.OrdinalIgnoreCase) >= 0)
-                {
-                    var luid = row.InterfaceLuid.Value;
-                    Log.Information(
-                        "AdapterLuidResolver: matched description '{Description}' (LUID 0x{Luid:X16}, ifIndex={Idx}).",
-                        description, luid, row.InterfaceIndex);
-                    return luid;
-                }
+                var luid = row.InterfaceLuid.Value;
+                Log.Information(
+                    "AdapterLuidResolver: matched on {Predicate} -> ifIndex={Idx} luid=0x{Luid:X16} alias='{Alias}' description='{Description}'",
+                    predicateLabel, row.InterfaceIndex, luid,
+                    ReadFixedString(row.Alias.AsSpan()),
+                    ReadFixedString(row.Description.AsSpan()));
+                return luid;
             }
 
-            Log.Warning(
-                "AdapterLuidResolver.FindFirstUpAdapterByDescriptionContains: no up-state adapter description matched '{Sub}'.",
-                descriptionSubstring);
+            Log.Information("AdapterLuidResolver: no up adapter matched predicate {Predicate}.", predicateLabel);
             return null;
         }
         finally
@@ -123,9 +155,10 @@ public static unsafe class AdapterLuidResolver
         }
     }
 
+    private delegate bool MibIfRowPredicate(MIB_IF_ROW2 row);
+
     private static string ReadFixedString(ReadOnlySpan<char> chars)
     {
-        // Inline-array char buffers in MIB_IF_ROW2 are zero-padded to fixed length.
         var nulIndex = chars.IndexOf('\0');
         if (nulIndex < 0) return chars.ToString();
         return chars.Slice(0, nulIndex).ToString();
