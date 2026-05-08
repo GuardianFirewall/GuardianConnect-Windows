@@ -20,7 +20,7 @@ public static class NotificationHandler
 
     internal static string lNameOfEventForVPNStateListeners = "GRDRASCONNLISTENEREVENT";
 
-    internal static Utility.CheckConnectionResult CurrentConnectionState;
+    public static Utility.CheckConnectionResult CurrentConnectionState;
     internal static HANDLE HRasConnState = HANDLE.Null;
 
     internal static HANDLE hVPNSvrSideEvtHandle;
