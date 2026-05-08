@@ -1,3 +1,5 @@
+using System.Text.Json.Serialization;
+
 namespace GuardianConnect.Abstractions;
 
 /// <summary>
@@ -33,3 +35,10 @@ public sealed class KillSwitchStatus
     /// </summary>
     public bool IsActive { get; init; }
 }
+
+[JsonSerializable(typeof(KillSwitchStatus))]
+[JsonSerializable(typeof(KillSwitchMode))]
+public partial class KillSwitchStatusJsonContext : JsonSerializerContext
+{
+}
+

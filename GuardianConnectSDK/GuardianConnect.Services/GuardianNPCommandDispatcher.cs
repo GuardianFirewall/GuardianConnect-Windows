@@ -1,5 +1,7 @@
 using GuardianConnect.Abstractions;
+using GuardianConnect.Services;
 using GuardianConnect.Shared;
+using GuardianConnect.Shared.Extensions;
 using GuardianConnect.VPNTransports;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Logging.Abstractions;
@@ -104,5 +106,44 @@ public class GuardianNPCommandDispatcher : IGuardianNPContract
         Logger.LogWarning($"Command sent to switch log level from {Common.CurrentMinimumLogLevel} to {loggingLevel}");
         Common.CurrentMinimumLogLevel = loggingLevel;
         Common.SetMinimumLogLevelToCurrentLevel();
+    }
+
+    public ErrorResponse SetKillSwitchMode(KillSwitchMode mode)
+    {
+        var svc = KillSwitchService.Current;
+        if (svc == null)
+        {
+            Logger.LogError("GuardianNPCommandDispatcher.SetKillSwitchMode: KillSwitchService.Current is null (service not registered?).");
+            var resp = new ErrorResponse();
+            resp.SetException(new InvalidOperationException("Kill switch service is not running."));
+            return resp;
+        }
+        svc.SetMode(mode);
+        return new ErrorResponse();
+    }
+
+    public ErrorResponse SetKillSwitchAllowLan(bool allow)
+    {
+        var svc = KillSwitchService.Current;
+        if (svc == null)
+        {
+            Logger.LogError("GuardianNPCommandDispatcher.SetKillSwitchAllowLan: KillSwitchService.Current is null.");
+            var resp = new ErrorResponse();
+            resp.SetException(new InvalidOperationException("Kill switch service is not running."));
+            return resp;
+        }
+        svc.SetAllowLan(allow);
+        return new ErrorResponse();
+    }
+
+    public KillSwitchStatus GetKillSwitchStatus()
+    {
+        var svc = KillSwitchService.Current;
+        if (svc == null)
+        {
+            // Service not running: return Off/inactive snapshot rather than throwing across the pipe.
+            return new KillSwitchStatus { Mode = KillSwitchMode.Off, AllowLan = false, IsActive = false };
+        }
+        return svc.GetStatus();
     }
 }

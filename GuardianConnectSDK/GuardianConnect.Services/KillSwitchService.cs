@@ -45,9 +45,19 @@ public sealed class KillSwitchService : BackgroundService
     // Cached observed VPN state
     private Utility.CheckConnectionResult _lastObservedState = Utility.CheckConnectionResult.Uninitialized;
 
+    /// <summary>
+    /// The currently-running KillSwitchService instance. Set in the constructor; read by
+    /// the named-pipe command dispatcher (which is constructed per-thread without DI
+    /// parameters and so can't inject the service directly). This is OK because the host
+    /// registers KillSwitchService as a singleton hosted service — only one instance ever
+    /// exists.
+    /// </summary>
+    public static KillSwitchService? Current { get; private set; }
+
     public KillSwitchService(ILogger<KillSwitchService>? logger = null)
     {
         _logger = logger ?? NullLogger<KillSwitchService>.Instance;
+        Current = this;
     }
 
     // -------------------------------------------------------------------------------

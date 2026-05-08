@@ -109,6 +109,25 @@ public static class ClientPipe
         if (!Instance.IsConnected) Instance.ReopenNamedPipe();
         Instance.SendPowerAndNetworkChangeEvents(systemEventsDict);
     }
+
+    // Kill Switch (i221)
+    public static ErrorResponse SetKillSwitchMode(KillSwitchMode mode)
+    {
+        if (!Instance.IsConnected) Instance.ReopenNamedPipe();
+        return Instance.SetKillSwitchMode(mode);
+    }
+
+    public static ErrorResponse SetKillSwitchAllowLan(bool allow)
+    {
+        if (!Instance.IsConnected) Instance.ReopenNamedPipe();
+        return Instance.SetKillSwitchAllowLan(allow);
+    }
+
+    public static KillSwitchStatus GetKillSwitchStatus()
+    {
+        if (!Instance.IsConnected) Instance.ReopenNamedPipe();
+        return Instance.GetKillSwitchStatus();
+    }
 }
 
 public class ClientPipeImpl : IGuardianNPContract
@@ -261,6 +280,68 @@ public class ClientPipeImpl : IGuardianNPContract
         ClientPipe.Logger.LogWarning($"Sending command to service to switch logging level to {loggingLevel}");
         var cmdString = $"{Hexify(IGuardianNPContract.NPCommands.SwitchLoggingLevel)}.{loggingLevel}";
         ss.WriteString(cmdString);
+    }
+
+    // -- Kill Switch IPC (i221) ----------------------------------------------------
+
+    public ErrorResponse SetKillSwitchMode(KillSwitchMode mode)
+    {
+        var resp = new ErrorResponse();
+        try
+        {
+            var cmdString = $"{Hexify(IGuardianNPContract.NPCommands.SetKillSwitchMode)}.{(int)mode}";
+            ss.WriteString(cmdString);
+            var responseJson = ss.ReadStringAsync().Result.TrimEnd('\0');
+            if (!responseJson.StartsWith('{')) responseJson = "{ " + responseJson;
+            resp = JsonSerializer.Deserialize<ErrorResponse>(responseJson,
+                ErrorResponseJsonContext.Default.ErrorResponse) ?? new ErrorResponse();
+        }
+        catch (Exception e)
+        {
+            ClientPipe.Logger.LogError(e, $"ClientPipe.SetKillSwitchMode: Exception {e.Message}");
+            resp.SetException(e);
+            if (e is IOException) resp.Message = "PIPE BROKEN";
+        }
+        return resp;
+    }
+
+    public ErrorResponse SetKillSwitchAllowLan(bool allow)
+    {
+        var resp = new ErrorResponse();
+        try
+        {
+            var cmdString = $"{Hexify(IGuardianNPContract.NPCommands.SetKillSwitchAllowLan)}.{allow}";
+            ss.WriteString(cmdString);
+            var responseJson = ss.ReadStringAsync().Result.TrimEnd('\0');
+            if (!responseJson.StartsWith('{')) responseJson = "{ " + responseJson;
+            resp = JsonSerializer.Deserialize<ErrorResponse>(responseJson,
+                ErrorResponseJsonContext.Default.ErrorResponse) ?? new ErrorResponse();
+        }
+        catch (Exception e)
+        {
+            ClientPipe.Logger.LogError(e, $"ClientPipe.SetKillSwitchAllowLan: Exception {e.Message}");
+            resp.SetException(e);
+            if (e is IOException) resp.Message = "PIPE BROKEN";
+        }
+        return resp;
+    }
+
+    public KillSwitchStatus GetKillSwitchStatus()
+    {
+        try
+        {
+            var cmdString = $"{Hexify(IGuardianNPContract.NPCommands.GetKillSwitchStatus)}.";
+            ss.WriteString(cmdString);
+            var statusJson = ss.ReadString();
+            return JsonSerializer.Deserialize<KillSwitchStatus>(statusJson,
+                       KillSwitchStatusJsonContext.Default.KillSwitchStatus)
+                   ?? new KillSwitchStatus();
+        }
+        catch (Exception e)
+        {
+            ClientPipe.Logger.LogError(e, $"ClientPipe.GetKillSwitchStatus: Exception {e.Message}");
+            return new KillSwitchStatus();
+        }
     }
 
     internal void OpenNamedPipe(string servicePipeName = Common.kGRDServicePipeName)

@@ -17,7 +17,10 @@ public interface IGuardianNPContract
         ToggleLogging,
         RequestLogLines,
         SwitchLoggingLevel,
-        SendPowerAndNetworkEvents
+        SendPowerAndNetworkEvents,
+        SetKillSwitchMode,
+        SetKillSwitchAllowLan,
+        GetKillSwitchStatus
     }
     
     public enum SystemEventType
@@ -46,4 +49,10 @@ public interface IGuardianNPContract
     void ToggleLogging(bool whetherToDeleteLogFiles);
 
     void SwitchServiceLoggingLevel(Common.LoggingLevels loggingLevel);
+
+    ErrorResponse SetKillSwitchMode(KillSwitchMode mode);
+
+    ErrorResponse SetKillSwitchAllowLan(bool allow);
+
+    KillSwitchStatus GetKillSwitchStatus();
 }

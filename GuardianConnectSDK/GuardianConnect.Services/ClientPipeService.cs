@@ -288,6 +288,23 @@ public class ClientPipeService : BackgroundService
                             _logger.Log(LogLevel.Information, $"ClientPipeService[{threadId}]: Received PowerAndNetworkEvent: Event Type: {systemEventType}");
                             ServicePowerEventsHandler.HandleSystemEventsFromclient(systemEventType, cmdPayload);
                             break;
+                        case IGuardianNPContract.NPCommands.SetKillSwitchMode:
+                            _logger.Log(LogLevel.Information, $"ClientPipeService[{threadId}]: Performing SetKillSwitchMode (payload='{cmdPayload}')");
+                            var ksMode = (KillSwitchMode)int.Parse(cmdPayload);
+                            var ksModeResp = cmdDispatcher.SetKillSwitchMode(ksMode);
+                            ss.WriteString(JsonSerializer.Serialize(ksModeResp, ErrorResponseJsonContext.Default.ErrorResponse));
+                            break;
+                        case IGuardianNPContract.NPCommands.SetKillSwitchAllowLan:
+                            _logger.Log(LogLevel.Information, $"ClientPipeService[{threadId}]: Performing SetKillSwitchAllowLan (payload='{cmdPayload}')");
+                            var ksLan = bool.Parse(cmdPayload);
+                            var ksLanResp = cmdDispatcher.SetKillSwitchAllowLan(ksLan);
+                            ss.WriteString(JsonSerializer.Serialize(ksLanResp, ErrorResponseJsonContext.Default.ErrorResponse));
+                            break;
+                        case IGuardianNPContract.NPCommands.GetKillSwitchStatus:
+                            _logger.Log(LogLevel.Information, $"ClientPipeService[{threadId}]: Performing GetKillSwitchStatus");
+                            var ksStatus = cmdDispatcher.GetKillSwitchStatus();
+                            ss.WriteString(JsonSerializer.Serialize(ksStatus, KillSwitchStatusJsonContext.Default.KillSwitchStatus));
+                            break;
                         default:
                             _logger.Log(LogLevel.Information, "WHY ARE WE HERE?");
                             break;
