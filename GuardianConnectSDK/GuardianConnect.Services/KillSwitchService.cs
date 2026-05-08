@@ -268,6 +268,11 @@ public sealed class KillSwitchService : BackgroundService
             Track(KillSwitchFilters.AddPermitDhcpOutboundV4(_engine));
             Track(KillSwitchFilters.AddPermitDhcpInboundV4(_engine));
 
+            // IKEv2 transport permits — required for the tunnel itself to stay alive.
+            // Without these, keepalives hit block-all and the IPSec SA dies within ~30s.
+            Track(KillSwitchFilters.AddPermitIkeOutboundV4(_engine));
+            Track(KillSwitchFilters.AddPermitIkeNatTOutboundV4(_engine));
+
             if (tunnelLuid is { } luid)
             {
                 Track(KillSwitchFilters.AddPermitTunnelLuidOutboundV4(_engine, luid));

@@ -40,6 +40,8 @@ public static unsafe class KillSwitchFilters
     private const ushort DhcpV4ServerPort = 67;
     private const ushort DhcpV4ClientPort = 68;
     private const ushort DnsPort = 53;
+    private const ushort IkePort = 500;       // IKEv2 negotiation
+    private const ushort IkeNatTPort = 4500;  // IKEv2 NAT-Traversal
 
     private static readonly char[] SessionName  = "Guardian Kill Switch Session\0".ToCharArray();
     private static readonly char[] SessionDesc  = "Dynamic WFP session for Guardian Kill Switch (OnConnected mode)\0".ToCharArray();
@@ -304,6 +306,28 @@ public static unsafe class KillSwitchFilters
                             "PermitTunnelLuidInboundV6");
 
     // -----------------------------------------------------------------------------------
+    // IKEv2 transport permits (weight 4) — REQUIRED so IKEv2 keepalives + negotiation can
+    // flow over the underlying physical NIC even while block-all is in effect. Without
+    // these, the tunnel goes up briefly, then dies as soon as keepalives are due (~30s)
+    // because they hit ALE_AUTH_CONNECT_V4 with LOCAL_INTERFACE=physical-NIC and get
+    // dropped by block-all. Tunnel-LUID permits don't help here since IKEv2 transport is
+    // what carries the tunnel itself, not what flows through it.
+    //
+    // These permit UDP/500 and UDP/4500 to ANY remote — slightly broader than ProtonVPN's
+    // approach (which permits only the configured server IP), but pragmatic for v1: we
+    // don't always know the resolved server IP at filter-install time, and IKEv2 ports
+    // are not normally used by anything else.
+    // -----------------------------------------------------------------------------------
+
+    public static ulong AddPermitIkeOutboundV4(HANDLE engine) =>
+        AddIkePortFilter(engine, PInvoke.FWPM_LAYER_ALE_AUTH_CONNECT_V4, IkePort,
+                         "PermitIkeOutboundV4 (UDP/500)");
+
+    public static ulong AddPermitIkeNatTOutboundV4(HANDLE engine) =>
+        AddIkePortFilter(engine, PInvoke.FWPM_LAYER_ALE_AUTH_CONNECT_V4, IkeNatTPort,
+                         "PermitIkeNatTOutboundV4 (UDP/4500)");
+
+    // -----------------------------------------------------------------------------------
     // DNS block (weight 3) — belt-and-suspenders against any future app-id permits that
     // might otherwise leak port-53 traffic. Block-all (weight 1) already covers DNS in
     // the simple case; this is a tighter ring around just port 53 so a process-permit
@@ -455,6 +479,36 @@ public static unsafe class KillSwitchFilters
 
         return AddFilterWithConditions(engine, layerKey, FWP_ACTION_TYPE.FWP_ACTION_PERMIT,
                                        WeightSpecificPermit, &condition, 1, label);
+    }
+
+    private static ulong AddIkePortFilter(HANDLE engine, Guid layerKey, ushort remotePort, string label)
+    {
+        var protoVal = new FWP_CONDITION_VALUE0
+        {
+            type = FWP_DATA_TYPE.FWP_UINT8,
+            Anonymous = { uint8 = ProtocolUdp }
+        };
+        var portVal = new FWP_CONDITION_VALUE0
+        {
+            type = FWP_DATA_TYPE.FWP_UINT16,
+            Anonymous = { uint16 = remotePort }
+        };
+        var conditions = stackalloc FWPM_FILTER_CONDITION0[2];
+        conditions[0] = new FWPM_FILTER_CONDITION0
+        {
+            fieldKey = PInvoke.FWPM_CONDITION_IP_PROTOCOL,
+            matchType = FWP_MATCH_TYPE.FWP_MATCH_EQUAL,
+            conditionValue = protoVal
+        };
+        conditions[1] = new FWPM_FILTER_CONDITION0
+        {
+            fieldKey = PInvoke.FWPM_CONDITION_IP_REMOTE_PORT,
+            matchType = FWP_MATCH_TYPE.FWP_MATCH_EQUAL,
+            conditionValue = portVal
+        };
+
+        return AddFilterWithConditions(engine, layerKey, FWP_ACTION_TYPE.FWP_ACTION_PERMIT,
+                                       WeightSpecificPermit, conditions, 2, label);
     }
 
     private static ulong AddDnsBlockFilter(HANDLE engine, Guid layerKey, byte protocol, string label)
