@@ -94,6 +94,21 @@ public static class NotificationHandler
         VPNServiceNotifierHandle?.Set();
         VPNClientNotifierHandle?.Set();
 
+        // Fire the C# event at watcher arm time too, mirroring the named events.
+        // Use case: user reconnects VPN while KS is already on. ConnectToVpnLongRunning
+        // calls StartRasConnectStateWatcher → this task spawns. Without firing the C#
+        // event here, KillSwitchService wouldn't notice the reconnect until the NEXT
+        // state change (the watcher is one-shot per arm). Subscribers re-fetch state
+        // anyway, so passing CurrentConnectionState (possibly stale) is fine.
+        try
+        {
+            RasConnectionStateChanged?.Invoke(CurrentConnectionState);
+        }
+        catch (Exception ex)
+        {
+            Log.LogError(ex, "RasConnChangedWaiterTask: subscriber threw on watcher-arm notification.");
+        }
+
         Log.LogInformation("RasConnChangedWaiterTask: Waiting for RASConnectionNotification event ...");
         var retVal = PInvoke.WaitForSingleObject(HRasConnState, PInvoke.INFINITE);
 
