@@ -1,4 +1,7 @@
+using System.Security.AccessControl;
+using System.Security.Principal;
 using GuardianConnect.Abstractions;
+using GuardianConnect.Shared;
 using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Logging.Abstractions;
@@ -47,6 +50,12 @@ public sealed class KillSwitchService : BackgroundService
     //   - NotificationHandler.RasConnectionStateChanged event on every RAS state change
     private bool _lastObservedConnected;
 
+    // Named EventWaitHandle the UI subscribes to for status auto-refresh. Created with
+    // Everyone-FullControl so the desktop client (running as the user) can open it.
+    // Set() is called whenever observable KS state changes (install, remove, mode flip,
+    // allow-LAN flip); UI loops on WaitOne and re-fetches via GetKillSwitchStatus IPC.
+    private EventWaitHandle? _statusChangedEvent;
+
     /// <summary>
     /// The currently-running KillSwitchService instance. Set in the constructor; read by
     /// the named-pipe command dispatcher (which is constructed per-thread without DI
@@ -91,6 +100,7 @@ public sealed class KillSwitchService : BackgroundService
             _mode = mode;
             ReevaluateUnsafe();
         }
+        SignalStatusChanged();
     }
 
     public void SetAllowLan(bool allow)
@@ -102,6 +112,19 @@ public sealed class KillSwitchService : BackgroundService
             _allowLan = allow;
             // If filters are already installed, reinstall to pick up the new LAN setting.
             if (_isActive) ReinstallUnsafe();
+        }
+        SignalStatusChanged();
+    }
+
+    private void SignalStatusChanged()
+    {
+        try
+        {
+            _statusChangedEvent?.Set();
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "KillSwitchService.SignalStatusChanged: Set() threw");
         }
     }
 
@@ -121,6 +144,26 @@ public sealed class KillSwitchService : BackgroundService
         _logger.LogInformation("KillSwitchService running. Initial mode: {Mode}, AllowLan: {AllowLan}",
             Mode, AllowLan);
 
+        // Create the status-changed named event with World access so the user-mode UI
+        // can open it. Mirrors the approach in VpnManagerService for the VPN state events.
+        try
+        {
+            var everyone = new SecurityIdentifier(WellKnownSidType.WorldSid, null);
+            var rule = new EventWaitHandleAccessRule(everyone,
+                EventWaitHandleRights.FullControl, AccessControlType.Allow);
+            var sec = new EventWaitHandleSecurity();
+            sec.AddAccessRule(rule);
+            _statusChangedEvent = new EventWaitHandle(false, EventResetMode.ManualReset,
+                Common.KSEVT_NAME_STATUSCHANGED);
+            _statusChangedEvent.SetAccessControl(sec);
+            _logger.LogInformation("KillSwitchService: status-changed event created ({Name}).",
+                Common.KSEVT_NAME_STATUSCHANGED);
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "KillSwitchService: failed to create status-changed event; UI auto-refresh will not work.");
+        }
+
         NotificationHandler.RasConnectionStateChanged += OnRasConnectionStateChanged;
 
         stoppingToken.Register(() =>
@@ -128,6 +171,8 @@ public sealed class KillSwitchService : BackgroundService
             _logger.LogInformation("KillSwitchService stopping; tearing down filters.");
             NotificationHandler.RasConnectionStateChanged -= OnRasConnectionStateChanged;
             lock (_stateLock) RemoveFiltersUnsafe();
+            try { _statusChangedEvent?.Dispose(); } catch { /* best-effort */ }
+            _statusChangedEvent = null;
         });
 
         // Initial sync: handle the boot-with-VPN-already-connected case.
@@ -138,6 +183,7 @@ public sealed class KillSwitchService : BackgroundService
             _logger.LogInformation(
                 "KillSwitchService initial state: VPN connected={Connected}", connected);
             lock (_stateLock) ReevaluateUnsafe();
+            SignalStatusChanged();
         }
         catch (Exception ex)
         {
@@ -166,6 +212,7 @@ public sealed class KillSwitchService : BackgroundService
             _lastObservedConnected = connected;
 
             lock (_stateLock) ReevaluateUnsafe();
+            SignalStatusChanged();
         }
         catch (Exception ex)
         {

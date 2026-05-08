@@ -201,6 +201,12 @@ public class Common
 
     public const string VPNEVT_NAME_SVRSIDE = "Global\\GRDRASCONNSERVICESIGNAL";
 
+    // Signaled by KillSwitchService whenever its observable state changes (install,
+    // remove, mode flip, allow-LAN flip). UI subscribes and calls GetKillSwitchStatus
+    // to refresh the Status label without polling. Separate from the VPN-state events
+    // above so AdvancedContentPage doesn't race GeneralPageViewModel on Reset.
+    public const string KSEVT_NAME_STATUSCHANGED = "Global\\GRDKILLSWITCHSTATUSCHANGED";
+
     public static JsonSerializerOptions DefaultJsonSerializerOptions = new()
     {
         WriteIndented = true,
