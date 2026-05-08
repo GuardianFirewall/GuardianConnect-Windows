@@ -36,8 +36,10 @@ public static unsafe class KillSwitchFilters
     private const byte WeightSpecificPermit = 4;
 
     private const byte ProtocolUdp = 17;     // IANA: UDP
+    private const byte ProtocolTcp = 6;      // IANA: TCP
     private const ushort DhcpV4ServerPort = 67;
     private const ushort DhcpV4ClientPort = 68;
+    private const ushort DnsPort = 53;
 
     private static readonly char[] SessionName  = "Guardian Kill Switch Session\0".ToCharArray();
     private static readonly char[] SessionDesc  = "Dynamic WFP session for Guardian Kill Switch (OnConnected mode)\0".ToCharArray();
@@ -302,6 +304,50 @@ public static unsafe class KillSwitchFilters
                             "PermitTunnelLuidInboundV6");
 
     // -----------------------------------------------------------------------------------
+    // DNS block (weight 3) — belt-and-suspenders against any future app-id permits that
+    // might otherwise leak port-53 traffic. Block-all (weight 1) already covers DNS in
+    // the simple case; this is a tighter ring around just port 53 so a process-permit
+    // that's added later (Phase 4) doesn't accidentally allow DNS off-tunnel.
+    // -----------------------------------------------------------------------------------
+
+    public static ulong AddBlockDnsUdpOutboundV4(HANDLE engine) =>
+        AddDnsBlockFilter(engine, PInvoke.FWPM_LAYER_ALE_AUTH_CONNECT_V4, ProtocolUdp,
+                          "BlockDnsUdpOutboundV4");
+
+    public static ulong AddBlockDnsTcpOutboundV4(HANDLE engine) =>
+        AddDnsBlockFilter(engine, PInvoke.FWPM_LAYER_ALE_AUTH_CONNECT_V4, ProtocolTcp,
+                          "BlockDnsTcpOutboundV4");
+
+    public static ulong AddBlockDnsUdpOutboundV6(HANDLE engine) =>
+        AddDnsBlockFilter(engine, PInvoke.FWPM_LAYER_ALE_AUTH_CONNECT_V6, ProtocolUdp,
+                          "BlockDnsUdpOutboundV6");
+
+    public static ulong AddBlockDnsTcpOutboundV6(HANDLE engine) =>
+        AddDnsBlockFilter(engine, PInvoke.FWPM_LAYER_ALE_AUTH_CONNECT_V6, ProtocolTcp,
+                          "BlockDnsTcpOutboundV6");
+
+    // -----------------------------------------------------------------------------------
+    // DNS via tunnel permits (weight 4) — permit DNS queries leaving on the tunnel
+    // adapter only. Combines protocol + remote-port + local-interface conditions.
+    // -----------------------------------------------------------------------------------
+
+    public static ulong AddPermitDnsUdpOnTunnelV4(HANDLE engine, ulong luid) =>
+        AddDnsTunnelPermitFilter(engine, PInvoke.FWPM_LAYER_ALE_AUTH_CONNECT_V4, ProtocolUdp,
+                                 luid, "PermitDnsUdpOnTunnelV4");
+
+    public static ulong AddPermitDnsTcpOnTunnelV4(HANDLE engine, ulong luid) =>
+        AddDnsTunnelPermitFilter(engine, PInvoke.FWPM_LAYER_ALE_AUTH_CONNECT_V4, ProtocolTcp,
+                                 luid, "PermitDnsTcpOnTunnelV4");
+
+    public static ulong AddPermitDnsUdpOnTunnelV6(HANDLE engine, ulong luid) =>
+        AddDnsTunnelPermitFilter(engine, PInvoke.FWPM_LAYER_ALE_AUTH_CONNECT_V6, ProtocolUdp,
+                                 luid, "PermitDnsUdpOnTunnelV6");
+
+    public static ulong AddPermitDnsTcpOnTunnelV6(HANDLE engine, ulong luid) =>
+        AddDnsTunnelPermitFilter(engine, PInvoke.FWPM_LAYER_ALE_AUTH_CONNECT_V6, ProtocolTcp,
+                                 luid, "PermitDnsTcpOnTunnelV6");
+
+    // -----------------------------------------------------------------------------------
     // LAN permits (weight 2) — opt-in. Installs permit filters for the standard private +
     // link-local + multicast/broadcast ranges on both outbound (ALE_AUTH_CONNECT) and
     // inbound (ALE_AUTH_RECV_ACCEPT) layers, both V4 and V6.
@@ -409,6 +455,79 @@ public static unsafe class KillSwitchFilters
 
         return AddFilterWithConditions(engine, layerKey, FWP_ACTION_TYPE.FWP_ACTION_PERMIT,
                                        WeightSpecificPermit, &condition, 1, label);
+    }
+
+    private static ulong AddDnsBlockFilter(HANDLE engine, Guid layerKey, byte protocol, string label)
+    {
+        var protoVal = new FWP_CONDITION_VALUE0
+        {
+            type = FWP_DATA_TYPE.FWP_UINT8,
+            Anonymous = { uint8 = protocol }
+        };
+        var portVal = new FWP_CONDITION_VALUE0
+        {
+            type = FWP_DATA_TYPE.FWP_UINT16,
+            Anonymous = { uint16 = DnsPort }
+        };
+        var conditions = stackalloc FWPM_FILTER_CONDITION0[2];
+        conditions[0] = new FWPM_FILTER_CONDITION0
+        {
+            fieldKey = PInvoke.FWPM_CONDITION_IP_PROTOCOL,
+            matchType = FWP_MATCH_TYPE.FWP_MATCH_EQUAL,
+            conditionValue = protoVal
+        };
+        conditions[1] = new FWPM_FILTER_CONDITION0
+        {
+            fieldKey = PInvoke.FWPM_CONDITION_IP_REMOTE_PORT,
+            matchType = FWP_MATCH_TYPE.FWP_MATCH_EQUAL,
+            conditionValue = portVal
+        };
+
+        return AddFilterWithConditions(engine, layerKey, FWP_ACTION_TYPE.FWP_ACTION_BLOCK,
+                                       WeightDnsBlock, conditions, 2, label);
+    }
+
+    private static ulong AddDnsTunnelPermitFilter(HANDLE engine, Guid layerKey, byte protocol,
+                                                  ulong luid, string label)
+    {
+        ulong luidStorage = luid;
+        var protoVal = new FWP_CONDITION_VALUE0
+        {
+            type = FWP_DATA_TYPE.FWP_UINT8,
+            Anonymous = { uint8 = protocol }
+        };
+        var portVal = new FWP_CONDITION_VALUE0
+        {
+            type = FWP_DATA_TYPE.FWP_UINT16,
+            Anonymous = { uint16 = DnsPort }
+        };
+        var luidVal = new FWP_CONDITION_VALUE0
+        {
+            type = FWP_DATA_TYPE.FWP_UINT64,
+            Anonymous = { uint64 = &luidStorage }
+        };
+        var conditions = stackalloc FWPM_FILTER_CONDITION0[3];
+        conditions[0] = new FWPM_FILTER_CONDITION0
+        {
+            fieldKey = PInvoke.FWPM_CONDITION_IP_PROTOCOL,
+            matchType = FWP_MATCH_TYPE.FWP_MATCH_EQUAL,
+            conditionValue = protoVal
+        };
+        conditions[1] = new FWPM_FILTER_CONDITION0
+        {
+            fieldKey = PInvoke.FWPM_CONDITION_IP_REMOTE_PORT,
+            matchType = FWP_MATCH_TYPE.FWP_MATCH_EQUAL,
+            conditionValue = portVal
+        };
+        conditions[2] = new FWPM_FILTER_CONDITION0
+        {
+            fieldKey = PInvoke.FWPM_CONDITION_IP_LOCAL_INTERFACE,
+            matchType = FWP_MATCH_TYPE.FWP_MATCH_EQUAL,
+            conditionValue = luidVal
+        };
+
+        return AddFilterWithConditions(engine, layerKey, FWP_ACTION_TYPE.FWP_ACTION_PERMIT,
+                                       WeightSpecificPermit, conditions, 3, label);
     }
 
     private static ulong AddPermitV4Subnet(HANDLE engine, Guid layerKey, uint addr, uint mask, string label)
