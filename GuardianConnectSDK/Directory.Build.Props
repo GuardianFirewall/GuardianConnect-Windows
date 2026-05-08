@@ -12,7 +12,7 @@
         <FileVersion>0.46.0</FileVersion>
         <Version>0.46.0</Version>
         <!-- Set this for prerelease builds (e.g., "alpha.1", "beta.1", "rc.1"); remove or leave empty for stable releases. -->
-        <VersionSuffix>alpha.4</VersionSuffix>
+        <VersionSuffix>alpha.5</VersionSuffix>
     </PropertyGroup>
 
     <PropertyGroup>

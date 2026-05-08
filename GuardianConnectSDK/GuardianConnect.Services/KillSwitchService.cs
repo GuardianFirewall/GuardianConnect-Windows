@@ -42,8 +42,13 @@ public sealed class KillSwitchService : BackgroundService
     private readonly List<ulong> _installedFilterIds = new();
     private bool _isActive;
 
-    // Cached observed VPN state
-    private Utility.CheckConnectionResult _lastObservedState = Utility.CheckConnectionResult.Uninitialized;
+    // Last observed connected/disconnected state. Polled fresh from ConnectionRoutines.
+    // Cannot use NotificationHandler.CurrentConnectionState — that field is only updated
+    // by RasConnChangeWaiterTask, which is only spawned if an active RAS connection is
+    // present at service startup. With VPN disconnected at boot (the normal case), the
+    // watcher never starts and the field stays Uninitialized forever, so observing it
+    // never tells us when VPN connects.
+    private bool _lastObservedConnected;
 
     /// <summary>
     /// The currently-running KillSwitchService instance. Set in the constructor; read by
@@ -124,14 +129,14 @@ public sealed class KillSwitchService : BackgroundService
         {
             try
             {
-                var current = NotificationHandler.CurrentConnectionState;
-                if (current != _lastObservedState)
+                var connected = ConnectionRoutines.IsAnyConnectionActive(out _);
+                if (connected != _lastObservedConnected)
                 {
                     var planned = NotificationHandler.WasDisconnectPlanned;
                     _logger.LogInformation(
-                        "KillSwitchService observed VPN state {Old} -> {New} (WasDisconnectPlanned={Planned})",
-                        _lastObservedState, current, planned);
-                    _lastObservedState = current;
+                        "KillSwitchService observed VPN connected={Old} -> {New} (WasDisconnectPlanned={Planned})",
+                        _lastObservedConnected, connected, planned);
+                    _lastObservedConnected = connected;
 
                     lock (_stateLock) ReevaluateUnsafe();
                 }
@@ -158,42 +163,22 @@ public sealed class KillSwitchService : BackgroundService
             return;
         }
 
-        // Mode == OnConnected
-        var state = _lastObservedState;
+        // Mode == OnConnected. Poll fresh state to handle the case where SetMode is
+        // called between polling-loop iterations.
+        var connected = _lastObservedConnected;
         var wasPlanned = NotificationHandler.WasDisconnectPlanned;
 
-        switch (state)
+        if (connected)
         {
-            case Utility.CheckConnectionResult.CONNECTED:
-                if (!_isActive) InstallFiltersUnsafe();
-                break;
-
-            case Utility.CheckConnectionResult.CONNECTING:
-                // Don't install yet — would block IKEv2 negotiation. Wait for CONNECTED.
-                break;
-
-            case Utility.CheckConnectionResult.DISCONNECTING:
-                // User asked to disconnect. Remove filters.
-                if (_isActive && wasPlanned) RemoveFiltersUnsafe();
-                break;
-
-            case Utility.CheckConnectionResult.DISCONNECTED:
-                // If the disconnect was planned, remove. Otherwise keep filters in place
-                // (the kill switch is doing its job — block traffic until reconnect or
-                // explicit Off).
-                if (_isActive && wasPlanned) RemoveFiltersUnsafe();
-                break;
-
-            case Utility.CheckConnectionResult.CONNECT_FAILED:
-                // Connection attempt failed. Keep no filters; user has internet to retry.
-                if (_isActive) RemoveFiltersUnsafe();
-                break;
-
-            case Utility.CheckConnectionResult.Uninitialized:
-            default:
-                // No known VPN state; don't engage.
-                break;
+            if (!_isActive) InstallFiltersUnsafe();
+            return;
         }
+
+        // Disconnected:
+        // - If the disconnect was planned (user-initiated), remove filters.
+        // - If unplanned (drop), keep filters installed — the kill switch is doing its
+        //   job: block traffic until the user reconnects or explicitly turns KS off.
+        if (_isActive && wasPlanned) RemoveFiltersUnsafe();
     }
 
     private void ReinstallUnsafe()
