@@ -185,9 +185,15 @@ public sealed class KillSwitchService : BackgroundService
             return;
         }
 
-        // Mode == OnConnected. Poll fresh state to handle the case where SetMode is
-        // called between polling-loop iterations.
-        var connected = _lastObservedConnected;
+        // Mode == OnConnected. Always read fresh state from RAS — _lastObservedConnected
+        // can lag reality because the C# event (RasConnectionStateChanged) only fires on
+        // transitions AFTER the watcher arms, and the watcher doesn't arm until either
+        // service-startup-with-VPN-connected OR a manual Connect command. The flow
+        // "service starts disconnected → user connects → user toggles KS on" produces no
+        // C# event yet, so without this fresh read SetMode would see stale state and
+        // skip the install.
+        var connected = ConnectionRoutines.IsAnyConnectionActive(out _);
+        _lastObservedConnected = connected;
         var wasPlanned = NotificationHandler.WasDisconnectPlanned;
 
         if (connected)
