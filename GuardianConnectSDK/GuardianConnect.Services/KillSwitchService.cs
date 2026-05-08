@@ -42,12 +42,9 @@ public sealed class KillSwitchService : BackgroundService
     private readonly List<ulong> _installedFilterIds = new();
     private bool _isActive;
 
-    // Last observed connected/disconnected state. Polled fresh from ConnectionRoutines.
-    // Cannot use NotificationHandler.CurrentConnectionState — that field is only updated
-    // by RasConnChangeWaiterTask, which is only spawned if an active RAS connection is
-    // present at service startup. With VPN disconnected at boot (the normal case), the
-    // watcher never starts and the field stays Uninitialized forever, so observing it
-    // never tells us when VPN connects.
+    // Last observed connected/disconnected state. Refreshed by:
+    //   - one-shot evaluation at service start (in case VPN is already connected at boot)
+    //   - NotificationHandler.RasConnectionStateChanged event on every RAS state change
     private bool _lastObservedConnected;
 
     /// <summary>
@@ -109,45 +106,70 @@ public sealed class KillSwitchService : BackgroundService
     }
 
     // -------------------------------------------------------------------------------
-    // BackgroundService loop — polls observed VPN state and reacts to transitions.
-    // 1Hz is plenty for kill-switch responsiveness; state changes already happen
-    // through RAS event signalling (NotificationHandler updates CurrentConnectionState
-    // on RAS connect/disconnect events), so we just sample what's there.
+    // BackgroundService entry — event-driven. We subscribe to
+    // NotificationHandler.RasConnectionStateChanged (the same signal that drives the
+    // UI's connection-state indicator) and react when it fires. No polling.
+    //
+    // We do an initial state evaluation here too, so that if the service starts with
+    // VPN already connected (e.g., reboot-with-tunnel-up scenarios) and KS is set to
+    // OnConnected, we install filters immediately rather than waiting for the next
+    // RAS state change.
     // -------------------------------------------------------------------------------
 
-    protected override async Task ExecuteAsync(CancellationToken stoppingToken)
+    protected override Task ExecuteAsync(CancellationToken stoppingToken)
     {
         _logger.LogInformation("KillSwitchService running. Initial mode: {Mode}, AllowLan: {AllowLan}",
             Mode, AllowLan);
+
+        NotificationHandler.RasConnectionStateChanged += OnRasConnectionStateChanged;
+
         stoppingToken.Register(() =>
         {
             _logger.LogInformation("KillSwitchService stopping; tearing down filters.");
+            NotificationHandler.RasConnectionStateChanged -= OnRasConnectionStateChanged;
             lock (_stateLock) RemoveFiltersUnsafe();
         });
 
-        while (!stoppingToken.IsCancellationRequested)
+        // Initial sync: handle the boot-with-VPN-already-connected case.
+        try
         {
-            try
-            {
-                var connected = ConnectionRoutines.IsAnyConnectionActive(out _);
-                if (connected != _lastObservedConnected)
-                {
-                    var planned = NotificationHandler.WasDisconnectPlanned;
-                    _logger.LogInformation(
-                        "KillSwitchService observed VPN connected={Old} -> {New} (WasDisconnectPlanned={Planned})",
-                        _lastObservedConnected, connected, planned);
-                    _lastObservedConnected = connected;
+            var connected = ConnectionRoutines.IsAnyConnectionActive(out _);
+            _lastObservedConnected = connected;
+            _logger.LogInformation(
+                "KillSwitchService initial state: VPN connected={Connected}", connected);
+            lock (_stateLock) ReevaluateUnsafe();
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "KillSwitchService initial state evaluation failed.");
+        }
 
-                    lock (_stateLock) ReevaluateUnsafe();
-                }
-            }
-            catch (Exception ex)
-            {
-                _logger.LogError(ex, "KillSwitchService poll loop error");
-            }
+        // ExecuteAsync would normally hold the host running; with no work loop we just
+        // wait on cancellation. The event handler does the actual work.
+        return Task.Delay(Timeout.Infinite, stoppingToken).ContinueWith(_ => { },
+            TaskContinuationOptions.OnlyOnCanceled | TaskContinuationOptions.ExecuteSynchronously);
+    }
 
-            try { await Task.Delay(1000, stoppingToken); }
-            catch (TaskCanceledException) { break; }
+    private void OnRasConnectionStateChanged(Utility.CheckConnectionResult state)
+    {
+        try
+        {
+            // CheckConnectionResult covers more than two values, so resolve to a clean
+            // up/down via IsAnyConnectionActive (cheap; just walks RAS connection table).
+            var connected = ConnectionRoutines.IsAnyConnectionActive(out _);
+            if (connected == _lastObservedConnected) return;
+
+            var planned = NotificationHandler.WasDisconnectPlanned;
+            _logger.LogInformation(
+                "KillSwitchService observed VPN connected={Old} -> {New} (state={State}, WasDisconnectPlanned={Planned})",
+                _lastObservedConnected, connected, state, planned);
+            _lastObservedConnected = connected;
+
+            lock (_stateLock) ReevaluateUnsafe();
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "KillSwitchService event handler error");
         }
     }
 

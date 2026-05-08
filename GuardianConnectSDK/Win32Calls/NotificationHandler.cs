@@ -23,6 +23,16 @@ public static class NotificationHandler
     public static Utility.CheckConnectionResult CurrentConnectionState;
     internal static HANDLE HRasConnState = HANDLE.Null;
 
+    /// <summary>
+    /// Fired by RasConnChangeWaiterTask after CurrentConnectionState has been
+    /// refreshed from a RAS state-change notification. Subscribers receive the
+    /// freshly-observed state. Same trigger as VPNServiceNotifierHandle/
+    /// VPNClientNotifierHandle, just exposed as a managed event so in-process
+    /// consumers (like KillSwitchService) don't have to wrestle with named-event
+    /// reset semantics across multiple waiters.
+    /// </summary>
+    public static event Action<Utility.CheckConnectionResult>? RasConnectionStateChanged;
+
     internal static HANDLE hVPNSvrSideEvtHandle;
     internal static HANDLE hVPNCliSideEvtHandle;
 
@@ -101,6 +111,15 @@ public static class NotificationHandler
 
         VPNServiceNotifierHandle?.Set();
         VPNClientNotifierHandle?.Set();
+
+        try
+        {
+            RasConnectionStateChanged?.Invoke(CurrentConnectionState);
+        }
+        catch (Exception ex)
+        {
+            Log.LogError(ex, "RasConnChangedWaiterTask: subscriber threw while handling state change.");
+        }
 
         Log.LogInformation("RasConnChangedWaiterTask: Service and Client listeners notified.");
         Log.LogInformation("RasConnChangedWaiterTask: Now exiting this thread ...");
