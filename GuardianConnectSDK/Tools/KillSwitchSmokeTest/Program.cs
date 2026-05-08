@@ -5,12 +5,22 @@
 //   cd GuardianConnectSDK/Tools/KillSwitchSmokeTest
 //   dotnet run -c Release -p:Platform=x64
 //
+// IMPORTANT: by default the test installs full block-all (no LAN exception). If you're
+// running this over RDP / SSH / Remote Desktop you WILL be disconnected the moment the
+// transaction commits. Pass `--allow-lan` to install the LAN-permit filter set as well
+// (RFC1918, link-local, multicast, broadcast on v4; fe80::/10 + fc00::/7 on v6) so RDP
+// keeps working:
+//
+//   dotnet run -c Release -p:Platform=x64 -- --allow-lan
+//
 // Not part of the SDK solution. Not signed. Not packaged. Don't ship.
 
 using System.Security.Principal;
 using Serilog;
 using Win32Calls.WFP;
 using Windows.Win32.Foundation;
+
+var allowLan = args.Any(a => a.Equals("--allow-lan", StringComparison.OrdinalIgnoreCase));
 
 Log.Logger = new LoggerConfiguration()
     .MinimumLevel.Debug()
@@ -25,6 +35,10 @@ if (!IsRunningAsAdmin())
 
 Log.Information("=== Kill Switch smoke test (Phase 1 primitives) ===");
 Log.Information("Sublayer GUID: {Guid}", KillSwitchFilters.SublayerDynamicGuid);
+Log.Information("LAN exception: {AllowLan} (pass --allow-lan to enable; required if running over RDP)",
+                allowLan ? "ON" : "OFF");
+if (!allowLan)
+    Log.Warning("Block-all is in effect with no LAN exception. Remote-desktop sessions will be severed.");
 
 HANDLE engine = HANDLE.Null;
 var filterIds = new List<ulong>();
@@ -68,6 +82,14 @@ try
 
     AddAndTrack(engine, filterIds, "PermitDhcpOutboundV4", KillSwitchFilters.AddPermitDhcpOutboundV4);
     AddAndTrack(engine, filterIds, "PermitDhcpInboundV4",  KillSwitchFilters.AddPermitDhcpInboundV4);
+
+    if (allowLan)
+    {
+        Log.Information("Adding LAN permit filters (--allow-lan) ...");
+        var lanIds = KillSwitchFilters.AddPermitLanAll(engine);
+        foreach (var id in lanIds) Log.Information("  [+] LAN permit filterId={Id}", id);
+        filterIds.AddRange(lanIds);
+    }
 
     Log.Information("Committing transaction ...");
     if (KillSwitchFilters.CommitTransaction(engine) != 0)

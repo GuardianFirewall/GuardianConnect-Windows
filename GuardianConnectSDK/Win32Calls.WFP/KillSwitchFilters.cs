@@ -302,6 +302,62 @@ public static unsafe class KillSwitchFilters
                             "PermitTunnelLuidInboundV6");
 
     // -----------------------------------------------------------------------------------
+    // LAN permits (weight 2) — opt-in. Installs permit filters for the standard private +
+    // link-local + multicast/broadcast ranges on both outbound (ALE_AUTH_CONNECT) and
+    // inbound (ALE_AUTH_RECV_ACCEPT) layers, both V4 and V6.
+    //
+    // Range list (per plan §3.3):
+    //   V4: 10.0.0.0/8, 172.16.0.0/12, 192.168.0.0/16, 169.254.0.0/16, 224.0.0.0/4, 255.255.255.255/32
+    //   V6: fe80::/10, fc00::/7
+    //
+    // Returns the filter IDs added (caller tracks them for later DeleteFiltersById).
+    // -----------------------------------------------------------------------------------
+
+    public static List<ulong> AddPermitLanAll(HANDLE engine)
+    {
+        var ids = new List<ulong>();
+        var v4Outbound = PInvoke.FWPM_LAYER_ALE_AUTH_CONNECT_V4;
+        var v4Inbound  = PInvoke.FWPM_LAYER_ALE_AUTH_RECV_ACCEPT_V4;
+        var v6Outbound = PInvoke.FWPM_LAYER_ALE_AUTH_CONNECT_V6;
+        var v6Inbound  = PInvoke.FWPM_LAYER_ALE_AUTH_RECV_ACCEPT_V6;
+
+        // V4 ranges (addr, mask) in host byte order
+        (uint addr, uint mask, string name)[] v4Ranges =
+        {
+            (0x0A000000u, 0xFF000000u, "10.0.0.0/8"),
+            (0xAC100000u, 0xFFF00000u, "172.16.0.0/12"),
+            (0xC0A80000u, 0xFFFF0000u, "192.168.0.0/16"),
+            (0xA9FE0000u, 0xFFFF0000u, "169.254.0.0/16"),
+            (0xE0000000u, 0xF0000000u, "224.0.0.0/4"),
+            (0xFFFFFFFFu, 0xFFFFFFFFu, "255.255.255.255/32"),
+        };
+        foreach (var r in v4Ranges)
+        {
+            TrackId(ids, AddPermitV4Subnet(engine, v4Outbound, r.addr, r.mask, $"PermitLanOutboundV4 {r.name}"));
+            TrackId(ids, AddPermitV4Subnet(engine, v4Inbound,  r.addr, r.mask, $"PermitLanInboundV4 {r.name}"));
+        }
+
+        // V6 ranges (16-byte addr, prefix length)
+        (byte[] addr, byte prefix, string name)[] v6Ranges =
+        {
+            (new byte[] { 0xFE, 0x80, 0,0,0,0,0,0, 0,0,0,0,0,0,0,0 }, (byte)10, "fe80::/10"),
+            (new byte[] { 0xFC, 0x00, 0,0,0,0,0,0, 0,0,0,0,0,0,0,0 }, (byte)7,  "fc00::/7"),
+        };
+        foreach (var r in v6Ranges)
+        {
+            TrackId(ids, AddPermitV6Subnet(engine, v6Outbound, r.addr, r.prefix, $"PermitLanOutboundV6 {r.name}"));
+            TrackId(ids, AddPermitV6Subnet(engine, v6Inbound,  r.addr, r.prefix, $"PermitLanInboundV6 {r.name}"));
+        }
+
+        return ids;
+    }
+
+    private static void TrackId(List<ulong> ids, ulong id)
+    {
+        if (id != 0) ids.Add(id);
+    }
+
+    // -----------------------------------------------------------------------------------
     // Cleanup
     // -----------------------------------------------------------------------------------
 
@@ -353,6 +409,52 @@ public static unsafe class KillSwitchFilters
 
         return AddFilterWithConditions(engine, layerKey, FWP_ACTION_TYPE.FWP_ACTION_PERMIT,
                                        WeightSpecificPermit, &condition, 1, label);
+    }
+
+    private static ulong AddPermitV4Subnet(HANDLE engine, Guid layerKey, uint addr, uint mask, string label)
+    {
+        FWP_V4_ADDR_AND_MASK addrMask;
+        addrMask.addr = addr;
+        addrMask.mask = mask;
+
+        var val = new FWP_CONDITION_VALUE0
+        {
+            type = FWP_DATA_TYPE.FWP_V4_ADDR_MASK,
+            Anonymous = { v4AddrMask = &addrMask }
+        };
+        var condition = new FWPM_FILTER_CONDITION0
+        {
+            fieldKey = PInvoke.FWPM_CONDITION_IP_REMOTE_ADDRESS,
+            matchType = FWP_MATCH_TYPE.FWP_MATCH_EQUAL,
+            conditionValue = val
+        };
+
+        return AddFilterWithConditions(engine, layerKey, FWP_ACTION_TYPE.FWP_ACTION_PERMIT,
+                                       WeightLanPermit, &condition, 1, label);
+    }
+
+    private static ulong AddPermitV6Subnet(HANDLE engine, Guid layerKey, byte[] addr16, byte prefixLength, string label)
+    {
+        if (addr16.Length != 16) throw new ArgumentException("V6 address must be 16 bytes", nameof(addr16));
+
+        FWP_V6_ADDR_AND_MASK v6;
+        v6.prefixLength = prefixLength;
+        for (int i = 0; i < 16; i++) v6.addr[i] = addr16[i];
+
+        var val = new FWP_CONDITION_VALUE0
+        {
+            type = FWP_DATA_TYPE.FWP_V6_ADDR_MASK,
+            Anonymous = { v6AddrMask = &v6 }
+        };
+        var condition = new FWPM_FILTER_CONDITION0
+        {
+            fieldKey = PInvoke.FWPM_CONDITION_IP_REMOTE_ADDRESS,
+            matchType = FWP_MATCH_TYPE.FWP_MATCH_EQUAL,
+            conditionValue = val
+        };
+
+        return AddFilterWithConditions(engine, layerKey, FWP_ACTION_TYPE.FWP_ACTION_PERMIT,
+                                       WeightLanPermit, &condition, 1, label);
     }
 
     private static ulong AddTunnelLuidFilter(HANDLE engine, Guid layerKey, ulong luid, string label)
