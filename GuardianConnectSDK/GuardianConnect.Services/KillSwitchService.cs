@@ -241,7 +241,15 @@ public sealed class KillSwitchService : BackgroundService
         // skip the install.
         var connected = ConnectionRoutines.IsAnyConnectionActive(out _);
         _lastObservedConnected = connected;
-        var wasPlanned = NotificationHandler.WasDisconnectPlanned;
+
+        // Treat power-transition drops (suspend / resume) as planned, even if the RAS
+        // notification reports them as unplanned. Without this, the user wakes from sleep
+        // with filters still installed, the resume reconnect can't resolve DNS (DNS-block
+        // matches outbound on the physical NIC), and they're stuck without internet until
+        // they manually disable KS. Filters reinstall once VPN is back up via the normal
+        // RasConnectionStateChanged path.
+        var wasPlanned = NotificationHandler.WasDisconnectPlanned
+                      || ServicePowerEventsHandler.IsInPowerTransition;
 
         if (connected)
         {
@@ -370,6 +378,12 @@ public sealed class KillSwitchService : BackgroundService
                 Track(KillSwitchFilters.AddPermitDnsTcpOnTunnelV4(_engine, luid));
                 Track(KillSwitchFilters.AddPermitDnsUdpOnTunnelV6(_engine, luid));
                 Track(KillSwitchFilters.AddPermitDnsTcpOnTunnelV6(_engine, luid));
+
+                // ICMP gap closer at OUTBOUND_IPPACKET layer. ALE_AUTH_CONNECT often
+                // doesn't fire for stateless ICMP, so the ALE block-all misses ping/
+                // traceroute leaks. Block ICMP outbound where local interface != tunnel.
+                Track(KillSwitchFilters.AddBlockNonTunnelIcmpOutboundV4(_engine, luid));
+                Track(KillSwitchFilters.AddBlockNonTunnelIcmpOutboundV6(_engine, luid));
             }
 
             if (KillSwitchFilters.CommitTransaction(_engine) != 0)

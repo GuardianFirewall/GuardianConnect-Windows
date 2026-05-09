@@ -29,6 +29,23 @@ public static class ServicePowerEventsHandler
         set => Volatile.Write(ref _powerTransitionState, (int)value);
     }
 
+    /// <summary>
+    /// True while the system is in a Suspend or Resume transition. KillSwitchService
+    /// reads this to decide whether a VPN drop should be treated as planned (transitions)
+    /// vs unplanned (genuine network blip during normal operation). Suspend-induced drops
+    /// must be treated as planned so PerformResumeActions can resolve DNS and re-dial
+    /// without the kill-switch DNS-block blocking the resume reconnect.
+    /// </summary>
+    public static bool IsInPowerTransition
+    {
+        get
+        {
+            var s = CurrentPowerTransitionState;
+            return s == Common.PowerTransitionStates.Suspend
+                || s == Common.PowerTransitionStates.Resume;
+        }
+    }
+
     private static ITransportProvider.VPNProviderStatus VPNStatusAtSuspendTime =
         ITransportProvider.VPNProviderStatus.VPNStatusInvalid;
 

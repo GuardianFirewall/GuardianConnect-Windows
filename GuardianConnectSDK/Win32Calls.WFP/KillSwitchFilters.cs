@@ -37,8 +37,10 @@ public static unsafe class KillSwitchFilters
 
     private const byte ProtocolUdp = 17;     // IANA: UDP
     private const byte ProtocolTcp = 6;      // IANA: TCP
+    private const byte ProtocolIcmpV4 = 1;   // IANA: ICMP (V4)
     private const byte ProtocolIpInIp = 4;   // IANA: IPv4-in-IPv4 (Windows IKEv2 tunnel transport)
     private const byte ProtocolEsp = 50;     // IANA: IPSec ESP
+    private const byte ProtocolIcmpV6 = 58;  // IANA: ICMPv6
     private const ushort DhcpV4ServerPort = 67;
     private const ushort DhcpV4ClientPort = 68;
     private const ushort DnsPort = 53;
@@ -342,6 +344,30 @@ public static unsafe class KillSwitchFilters
         AddProtocolPermitFilter(engine, PInvoke.FWPM_LAYER_ALE_AUTH_CONNECT_V4, ProtocolEsp,
                                 "PermitEspOutboundV4 (proto 50 — IPSec ESP)");
 
+    // -----------------------------------------------------------------------------------
+    // ICMP non-tunnel block at OUTBOUND_IPPACKET layer.
+    //
+    // ALE_AUTH_CONNECT only fires reliably for stateful protocols (TCP, UDP). ICMP often
+    // bypasses ALE classification entirely, which means our block-all at ALE doesn't catch
+    // ping/traceroute leaks. To close the gap we drop ICMP at the IP-packet layer when its
+    // local interface isn't the tunnel LUID. ICMP via the tunnel still flows because the
+    // condition is FWP_MATCH_NOT_EQUAL against the tunnel LUID.
+    //
+    // Note: this does not cover the case where the user has Allow LAN on and wants to ping
+    // a LAN host — LAN ICMP gets blocked too. TCP/UDP LAN traffic still respects Allow LAN
+    // via the ALE-layer LAN permits. v1 trade-off.
+    // -----------------------------------------------------------------------------------
+
+    public static ulong AddBlockNonTunnelIcmpOutboundV4(HANDLE engine, ulong tunnelLuid) =>
+        AddBlockProtocolNonTunnelFilter(engine, PInvoke.FWPM_LAYER_OUTBOUND_IPPACKET_V4,
+                                        ProtocolIcmpV4, tunnelLuid,
+                                        "BlockNonTunnelIcmpOutboundV4");
+
+    public static ulong AddBlockNonTunnelIcmpOutboundV6(HANDLE engine, ulong tunnelLuid) =>
+        AddBlockProtocolNonTunnelFilter(engine, PInvoke.FWPM_LAYER_OUTBOUND_IPPACKET_V6,
+                                        ProtocolIcmpV6, tunnelLuid,
+                                        "BlockNonTunnelIcmpOutboundV6");
+
     public static ulong AddPermitIkeNatTOutboundV4(HANDLE engine) =>
         AddIkePortFilter(engine, PInvoke.FWPM_LAYER_ALE_AUTH_CONNECT_V4, IkeNatTPort,
                          "PermitIkeNatTOutboundV4 (UDP/4500)");
@@ -498,6 +524,39 @@ public static unsafe class KillSwitchFilters
 
         return AddFilterWithConditions(engine, layerKey, FWP_ACTION_TYPE.FWP_ACTION_PERMIT,
                                        WeightSpecificPermit, &condition, 1, label);
+    }
+
+    private static ulong AddBlockProtocolNonTunnelFilter(HANDLE engine, Guid layerKey,
+                                                         byte protocol, ulong tunnelLuid,
+                                                         string label)
+    {
+        ulong luidStorage = tunnelLuid;
+        var protoVal = new FWP_CONDITION_VALUE0
+        {
+            type = FWP_DATA_TYPE.FWP_UINT8,
+            Anonymous = { uint8 = protocol }
+        };
+        var luidVal = new FWP_CONDITION_VALUE0
+        {
+            type = FWP_DATA_TYPE.FWP_UINT64,
+            Anonymous = { uint64 = &luidStorage }
+        };
+        var conditions = stackalloc FWPM_FILTER_CONDITION0[2];
+        conditions[0] = new FWPM_FILTER_CONDITION0
+        {
+            fieldKey = PInvoke.FWPM_CONDITION_IP_PROTOCOL,
+            matchType = FWP_MATCH_TYPE.FWP_MATCH_EQUAL,
+            conditionValue = protoVal
+        };
+        conditions[1] = new FWPM_FILTER_CONDITION0
+        {
+            fieldKey = PInvoke.FWPM_CONDITION_IP_LOCAL_INTERFACE,
+            matchType = FWP_MATCH_TYPE.FWP_MATCH_NOT_EQUAL,
+            conditionValue = luidVal
+        };
+
+        return AddFilterWithConditions(engine, layerKey, FWP_ACTION_TYPE.FWP_ACTION_BLOCK,
+                                       WeightSpecificPermit, conditions, 2, label);
     }
 
     private static ulong AddProtocolPermitFilter(HANDLE engine, Guid layerKey, byte protocol, string label)
