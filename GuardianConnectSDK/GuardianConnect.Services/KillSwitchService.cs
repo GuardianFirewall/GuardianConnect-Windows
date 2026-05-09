@@ -118,6 +118,30 @@ public sealed class KillSwitchService : BackgroundService
 
     private void SignalStatusChanged()
     {
+        // Snapshot under lock so what we publish to HKLM matches what we signal about.
+        bool isActive;
+        KillSwitchMode mode;
+        bool allowLan;
+        lock (_stateLock)
+        {
+            isActive = _isActive;
+            mode = _mode;
+            allowLan = _allowLan;
+        }
+
+        // Publish to HKLM so the UI watcher can read state without an IPC call. The
+        // service runs as SYSTEM (write access to HKLM); the per-user UI reads it.
+        try
+        {
+            RegistrySettings.UpdateGuardianMachineSetting(Common.kKillSwitchActiveRegValue, isActive ? "1" : "0");
+            RegistrySettings.UpdateGuardianMachineSetting(Common.kKillSwitchModeRegValue, mode.ToString());
+            RegistrySettings.UpdateGuardianMachineSetting(Common.kKillSwitchAllowLanRegValue, allowLan ? "1" : "0");
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "KillSwitchService.SignalStatusChanged: HKLM publish threw");
+        }
+
         try
         {
             _statusChangedEvent?.Set();

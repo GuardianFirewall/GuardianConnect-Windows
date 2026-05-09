@@ -202,10 +202,18 @@ public class Common
     public const string VPNEVT_NAME_SVRSIDE = "Global\\GRDRASCONNSERVICESIGNAL";
 
     // Signaled by KillSwitchService whenever its observable state changes (install,
-    // remove, mode flip, allow-LAN flip). UI subscribes and calls GetKillSwitchStatus
-    // to refresh the Status label without polling. Separate from the VPN-state events
-    // above so AdvancedContentPage doesn't race GeneralPageViewModel on Reset.
+    // remove, mode flip, allow-LAN flip). UI subscribes and reads the corresponding
+    // HKLM machine values below — no IPC on the auto-refresh path. Separate from the
+    // VPN-state events so AdvancedContentPage doesn't race GeneralPageViewModel on
+    // Reset.
     public const string KSEVT_NAME_STATUSCHANGED = "Global\\GRDKILLSWITCHSTATUSCHANGED";
+
+    // HKLM\Software\GuardianVPN values written by the service alongside the
+    // KSEVT_NAME_STATUSCHANGED signal. UI reads after WaitOne returns. "1"/"0" for
+    // bools, the KillSwitchMode enum name for the mode.
+    public const string kKillSwitchActiveRegValue = "KillSwitchIsActive";
+    public const string kKillSwitchModeRegValue   = "KillSwitchActiveMode";
+    public const string kKillSwitchAllowLanRegValue = "KillSwitchActiveAllowLan";
 
     public static JsonSerializerOptions DefaultJsonSerializerOptions = new()
     {
