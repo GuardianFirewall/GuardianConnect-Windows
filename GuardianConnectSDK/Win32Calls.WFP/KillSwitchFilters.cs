@@ -37,6 +37,8 @@ public static unsafe class KillSwitchFilters
 
     private const byte ProtocolUdp = 17;     // IANA: UDP
     private const byte ProtocolTcp = 6;      // IANA: TCP
+    private const byte ProtocolIpInIp = 4;   // IANA: IPv4-in-IPv4 (Windows IKEv2 tunnel transport)
+    private const byte ProtocolEsp = 50;     // IANA: IPSec ESP
     private const ushort DhcpV4ServerPort = 67;
     private const ushort DhcpV4ClientPort = 68;
     private const ushort DnsPort = 53;
@@ -323,6 +325,23 @@ public static unsafe class KillSwitchFilters
         AddIkePortFilter(engine, PInvoke.FWPM_LAYER_ALE_AUTH_CONNECT_V4, IkePort,
                          "PermitIkeOutboundV4 (UDP/500)");
 
+    // ESP (proto 50) and IP-in-IP (proto 4) carry the encrypted tunnel payload itself
+    // from the physical NIC to the VPN server. Native Windows IKEv2 RAS exposes these
+    // outer encapsulated packets to ALE_AUTH_CONNECT_V4 (unlike Wireguard, where the
+    // encryption happens in user mode and the encrypted UDP flows through a different
+    // path that block-all doesn't gate). Without these permits, app traffic gets routed
+    // through the tunnel adapter, gets encrypted, and then the encrypted packet is
+    // dropped on its way out the physical NIC — the tunnel transport dies and nothing
+    // flows. Confirmed via WFP capture (filter 72517 = block-all drops on proto 4
+    // egressing to the VPN gateway IP).
+    public static ulong AddPermitIpInIpOutboundV4(HANDLE engine) =>
+        AddProtocolPermitFilter(engine, PInvoke.FWPM_LAYER_ALE_AUTH_CONNECT_V4, ProtocolIpInIp,
+                                "PermitIpInIpOutboundV4 (proto 4 — IKEv2 tunnel transport)");
+
+    public static ulong AddPermitEspOutboundV4(HANDLE engine) =>
+        AddProtocolPermitFilter(engine, PInvoke.FWPM_LAYER_ALE_AUTH_CONNECT_V4, ProtocolEsp,
+                                "PermitEspOutboundV4 (proto 50 — IPSec ESP)");
+
     public static ulong AddPermitIkeNatTOutboundV4(HANDLE engine) =>
         AddIkePortFilter(engine, PInvoke.FWPM_LAYER_ALE_AUTH_CONNECT_V4, IkeNatTPort,
                          "PermitIkeNatTOutboundV4 (UDP/4500)");
@@ -475,6 +494,24 @@ public static unsafe class KillSwitchFilters
             fieldKey = PInvoke.FWPM_CONDITION_FLAGS,
             matchType = FWP_MATCH_TYPE.FWP_MATCH_FLAGS_ANY_SET,
             conditionValue = flagsVal
+        };
+
+        return AddFilterWithConditions(engine, layerKey, FWP_ACTION_TYPE.FWP_ACTION_PERMIT,
+                                       WeightSpecificPermit, &condition, 1, label);
+    }
+
+    private static ulong AddProtocolPermitFilter(HANDLE engine, Guid layerKey, byte protocol, string label)
+    {
+        var protoVal = new FWP_CONDITION_VALUE0
+        {
+            type = FWP_DATA_TYPE.FWP_UINT8,
+            Anonymous = { uint8 = protocol }
+        };
+        var condition = new FWPM_FILTER_CONDITION0
+        {
+            fieldKey = PInvoke.FWPM_CONDITION_IP_PROTOCOL,
+            matchType = FWP_MATCH_TYPE.FWP_MATCH_EQUAL,
+            conditionValue = protoVal
         };
 
         return AddFilterWithConditions(engine, layerKey, FWP_ACTION_TYPE.FWP_ACTION_PERMIT,

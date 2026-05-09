@@ -348,6 +348,17 @@ public sealed class KillSwitchService : BackgroundService
             Track(KillSwitchFilters.AddPermitIkeOutboundV4(_engine));
             Track(KillSwitchFilters.AddPermitIkeNatTOutboundV4(_engine));
 
+            // IPSec tunnel transport — permit the encrypted carrier packets (IP-in-IP and
+            // ESP) outbound on the physical NIC. Native Windows IKEv2 RAS exposes these
+            // outer packets to ALE_AUTH_CONNECT_V4 with LOCAL_INTERFACE=physical-NIC, so
+            // the tunnel-LUID permit doesn't catch them. Without this, app traffic gets
+            // routed through the tunnel adapter, gets encrypted, and then the encrypted
+            // packets are blocked on their way out the physical NIC — tunnel transport
+            // dies and nothing flows. (Wireguard doesn't need this because Wintun handles
+            // encryption in user mode.)
+            Track(KillSwitchFilters.AddPermitIpInIpOutboundV4(_engine));
+            Track(KillSwitchFilters.AddPermitEspOutboundV4(_engine));
+
             if (tunnelLuid is { } luid)
             {
                 Track(KillSwitchFilters.AddPermitTunnelLuidOutboundV4(_engine, luid));
