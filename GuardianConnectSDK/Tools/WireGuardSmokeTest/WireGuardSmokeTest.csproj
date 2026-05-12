@@ -16,6 +16,7 @@
     </PropertyGroup>
 
     <ItemGroup>
+        <ProjectReference Include="..\..\Win32Calls.WFP\Win32Calls.WFP.csproj" />
         <ProjectReference Include="..\..\Win32Calls.WireGuard\Win32Calls.WireGuard.csproj" />
     </ItemGroup>
 

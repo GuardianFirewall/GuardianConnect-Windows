@@ -1,22 +1,28 @@
+using System.ComponentModel;
 using GuardianConnect.Abstractions;
 using GuardianConnect.Shared;
 using Serilog;
+using Win32Calls.WFP;
 using Win32Calls.WireGuard;
 
 namespace GuardianConnect.Services;
 
 /// <summary>
 /// WireGuard transport. Drives a single WireGuardNT adapter via
-/// <see cref="WireGuardTunnel"/>. Mirrors <see cref="GuardianConnect.VPNTransports.VPNTransportIKEV2"/>
-/// in surface area but owns its adapter lifecycle directly rather than going through RAS.
-///
-/// Step 4a scope: cryptographic adapter setup only (create / set config / Up).
-/// IP / DNS / route configuration is Step 4b; the tunnel created here will not
-/// carry traffic until that lands.
+/// <see cref="WireGuardTunnel"/> and configures the adapter's IP / routes /
+/// DNS via <see cref="AdapterIpDnsRoutes"/>. Mirrors
+/// <see cref="GuardianConnect.VPNTransports.VPNTransportIKEV2"/> in surface
+/// area but owns its adapter lifecycle directly rather than going through RAS.
 /// </summary>
 public sealed class VpnTunnelManager : ITransportProvider, IDisposable
 {
     private const string AdapterName = "GuardianWireGuard";
+
+    // Interface metric to set on the WireGuard adapter so its routes are
+    // preferred over the physical NIC's. Windows ranks routes by total cost
+    // (interface metric + route metric); pinning the WG adapter to 1 beats
+    // typical physical adapter metrics (5–25+).
+    private const uint TunnelInterfaceMetric = 1;
 
     private readonly object _lock = new();
     private WireGuardTunnel? _tunnel;
@@ -99,6 +105,7 @@ public sealed class VpnTunnelManager : ITransportProvider, IDisposable
         try
         {
             tunnel.Activate(config);
+            ApplyAdapterConfiguration(tunnel.AdapterLuid, config);
         }
         catch (Exception ex)
         {
@@ -107,6 +114,8 @@ public sealed class VpnTunnelManager : ITransportProvider, IDisposable
                 _status = ITransportProvider.VPNProviderStatus.VPNStatusDisconnected;
                 _lastError = ITransportProvider.VPNConnectionError.VPNConnectionErrorConfigurationFailed;
             }
+            // Dispose tears down the WG adapter, which sweeps away any IP / DNS / route
+            // entries we attached to it before the failure.
             tunnel.Dispose();
             Log.Error(ex, "VpnTunnelManager: WireGuard tunnel activation failed");
             return ErrorResponse.FromException(ex);
@@ -123,6 +132,40 @@ public sealed class VpnTunnelManager : ITransportProvider, IDisposable
         Log.Information(
             "VpnTunnelManager: adapter '{Name}' up. LUID={Luid:X16}", AdapterName, tunnel.AdapterLuid);
         return new ErrorResponse();
+    }
+
+    /// <summary>
+    /// Pin interface metric to 1, then attach Addresses, Routes (one per
+    /// AllowedIPs entry), and DNS servers. Throws Win32Exception on first
+    /// failure — caller is expected to <see cref="WireGuardTunnel.Dispose"/>
+    /// the tunnel, which destroys the adapter and rolls back any partial state.
+    /// </summary>
+    private static void ApplyAdapterConfiguration(ulong luid, WireGuardConfig config)
+    {
+        var rv = AdapterIpDnsRoutes.SetInterfaceMetric(luid, TunnelInterfaceMetric);
+        if (rv != 0)
+            throw new Win32Exception(rv, $"SetInterfaceMetric({TunnelInterfaceMetric}) failed.");
+
+        foreach (var addr in config.Addresses)
+        {
+            rv = AdapterIpDnsRoutes.AddUnicastAddress(luid, addr.Address, (byte)addr.PrefixLength);
+            if (rv != 0)
+                throw new Win32Exception(rv, $"AddUnicastAddress({addr.Address}/{addr.PrefixLength}) failed.");
+        }
+
+        foreach (var network in config.Peer.AllowedIPs)
+        {
+            rv = AdapterIpDnsRoutes.AddRoute(luid, network.Address, (byte)network.PrefixLength);
+            if (rv != 0)
+                throw new Win32Exception(rv, $"AddRoute({network.Address}/{network.PrefixLength}) failed.");
+        }
+
+        if (config.DnsServers.Count > 0)
+        {
+            rv = AdapterIpDnsRoutes.SetDnsServers(luid, config.DnsServers);
+            if (rv != 0)
+                throw new Win32Exception(rv, "SetDnsServers failed.");
+        }
     }
 
     public ErrorResponse DisconnectVPNTunnel() => StopVPNTunnel(false);
