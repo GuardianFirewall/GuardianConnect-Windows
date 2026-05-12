@@ -240,8 +240,12 @@ public static unsafe partial class AdapterIpDnsRoutes
     // ---------------------------------------------------------------------
 
     private const uint DnsInterfaceSettingsVersion1 = 1;
-    private const ulong DnsSettingNameServer = 0x01;
-    private const ulong DnsSettingIpv6       = 0x10;
+    // Flag values verified against wireguard-windows upstream
+    // (tunnel/winipcfg/iphlpapi_windows.go): IPv6 = 0x01, NameServer = 0x02.
+    // An earlier draft of this file had IPv6 / NameServer swapped, which made
+    // SetInterfaceDnsSettings return 0 but silently ignore NameServer.
+    private const ulong DnsSettingIpv6       = 0x01;
+    private const ulong DnsSettingNameServer = 0x02;
 
     [StructLayout(LayoutKind.Sequential)]
     private struct DNS_INTERFACE_SETTINGS_V1
