@@ -1,0 +1,46 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+    <PropertyGroup>
+        <OutputType>Exe</OutputType>
+        <TargetFramework>net9.0-windows</TargetFramework>
+        <RootNamespace>GuardianConnect.Tools.WireGuardSmokeTest</RootNamespace>
+        <AssemblyName>WireGuardSmokeTest</AssemblyName>
+        <Nullable>enable</Nullable>
+        <ImplicitUsings>enable</ImplicitUsings>
+        <AllowUnsafeBlocks>true</AllowUnsafeBlocks>
+        <Platforms>x64;ARM64</Platforms>
+
+        <!-- Throwaway dev tool; not packaged, not signed, not in the SDK release. Run as admin. -->
+        <IsPackable>false</IsPackable>
+        <PublishAot>false</PublishAot>
+    </PropertyGroup>
+
+    <ItemGroup>
+        <ProjectReference Include="..\..\Win32Calls.WireGuard\Win32Calls.WireGuard.csproj" />
+    </ItemGroup>
+
+    <ItemGroup>
+        <PackageReference Include="Serilog" Version="4.3.0" />
+        <PackageReference Include="Serilog.Sinks.Console" Version="6.0.0" />
+    </ItemGroup>
+
+    <!--
+        wireguard.dll is not on the system PATH and isn't yet plumbed into a NuGet package's
+        runtimes/win-{arch}/native/ slot (that's a follow-up commit). For the smoke test to
+        load it via the default DLL search order, we copy the appropriate per-platform DLL
+        next to the smoke-test exe at build time.
+    -->
+    <ItemGroup Condition=" '$(Platform)' == 'x64' ">
+        <None Include="..\..\native\wireguard\win-x64\wireguard.dll">
+            <Link>wireguard.dll</Link>
+            <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+        </None>
+    </ItemGroup>
+    <ItemGroup Condition=" '$(Platform)' == 'ARM64' ">
+        <None Include="..\..\native\wireguard\win-arm64\wireguard.dll">
+            <Link>wireguard.dll</Link>
+            <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+        </None>
+    </ItemGroup>
+
+</Project>

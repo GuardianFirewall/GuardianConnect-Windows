@@ -26,6 +26,7 @@
         <ProjectReference Include="..\GuardianConnect\GuardianConnect.csproj"/>
         <ProjectReference Include="..\Shared\GuardianConnect.Shared.csproj"/>
         <ProjectReference Include="..\Win32Calls.WFP\Win32Calls.WFP.csproj"/>
+        <ProjectReference Include="..\Win32Calls.WireGuard\Win32Calls.WireGuard.csproj"/>
         <ProjectReference Include="..\Win32Calls\Win32Calls.csproj"/>
     </ItemGroup>
 
