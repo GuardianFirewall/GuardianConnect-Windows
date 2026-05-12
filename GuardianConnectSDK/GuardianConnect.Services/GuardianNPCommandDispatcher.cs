@@ -55,10 +55,18 @@ public class GuardianNPCommandDispatcher : IGuardianNPContract
         await _transportGate.WaitAsync().ConfigureAwait(false);
         try
         {
-            // Tear down any previously-active transport. Defensive — a well-behaved
-            // client always disconnects first, but a stale handle here would prevent
-            // a fresh adapter from coming up (for WireGuard) or leak resources.
-            DisposeActiveTransportUnsafe();
+            // Connect/Disconnect are strictly paired. If a transport is already
+            // active, refuse the second Connect — the caller must Disconnect
+            // first. Silently tearing down would hide a client-side bug and
+            // disrupt a working tunnel without the user asking.
+            if (_activeTransport is not null)
+            {
+                Logger.LogWarning(
+                    "GuardianNPCommandDispatcher.StartVPNConnection: refused — transport {Transport} already active",
+                    _activeTransport.ProtocolType);
+                return new ErrorResponse().SetErrorMessage(
+                    $"VPN is already connected via {_activeTransport.ProtocolType}. Disconnect first.");
+            }
 
             var transport = SelectTransport(protocolRequest);
             _activeTransport = transport;
