@@ -14,11 +14,16 @@ public class GuardianNPCommandDispatcher : IGuardianNPContract
 {
     private static ILogger _logger = NullLogger.Instance;
 
-    // The currently-running transport, if any. IKEv2 doesn't strictly need to
-    // be held (its state is in RAS, system-wide) but WireGuard does (the adapter
-    // handle lives inside VpnTunnelManager and a fresh instance won't find it).
-    // So we hold whichever was started until disconnect.
-    private ITransportProvider? _activeTransport;
+    // Connect / disconnect / protocol-switch is a single-flight, process-wide
+    // operation: only one VPN transport may be active for the whole service at
+    // a time, regardless of how many pipe connections a client opens. Each
+    // ServerThread creates its own GuardianNPCommandDispatcher instance, so
+    // per-instance state would strand a started transport when a follow-up
+    // command arrives on a different pipe. Keep the active transport static,
+    // and serialize start/stop through a process-wide semaphore (SemaphoreSlim
+    // because Start is async and a plain lock can't cross an await).
+    private static readonly SemaphoreSlim _transportGate = new(1, 1);
+    private static ITransportProvider? _activeTransport;
 
     private static ILogger Logger
     {
@@ -47,54 +52,70 @@ public class GuardianNPCommandDispatcher : IGuardianNPContract
 
     public async Task<ErrorResponse> StartVPNConnection(VPNCallParameters protocolRequest)
     {
-        // Tear down any previously-active transport. Defensive — a well-behaved
-        // client always disconnects first, but a stale handle here would prevent
-        // a fresh adapter from coming up (for WireGuard) or leak resources.
-        DisposeActiveTransport();
-
-        var transport = SelectTransport(protocolRequest);
-        _activeTransport = transport;
-
-        Logger.LogInformation(
-            "GuardianNPCommandDispatcher.StartVPNConnection: starting transport {Transport}",
-            transport.ProtocolType);
-
-        var result = await transport.StartVPNTunnelWithOptions(protocolRequest);
-        Logger.LogInformation(
-            "GuardianNPCommandDispatcher.StartVPNConnection: transport {Transport} returned IsError={IsError}",
-            transport.ProtocolType, result.IsError);
-
-        if (result.IsError)
+        await _transportGate.WaitAsync().ConfigureAwait(false);
+        try
         {
-            // Failure on start means the transport may already have torn itself
-            // down (VpnTunnelManager.StartVPNTunnelWithOptions disposes its tunnel
-            // on the error path). Drop the reference so a follow-up disconnect
-            // doesn't try to use a dead instance.
-            DisposeActiveTransport();
-        }
+            // Tear down any previously-active transport. Defensive — a well-behaved
+            // client always disconnects first, but a stale handle here would prevent
+            // a fresh adapter from coming up (for WireGuard) or leak resources.
+            DisposeActiveTransportUnsafe();
 
-        return result;
+            var transport = SelectTransport(protocolRequest);
+            _activeTransport = transport;
+
+            Logger.LogInformation(
+                "GuardianNPCommandDispatcher.StartVPNConnection: starting transport {Transport}",
+                transport.ProtocolType);
+
+            var result = await transport.StartVPNTunnelWithOptions(protocolRequest).ConfigureAwait(false);
+            Logger.LogInformation(
+                "GuardianNPCommandDispatcher.StartVPNConnection: transport {Transport} returned IsError={IsError}",
+                transport.ProtocolType, result.IsError);
+
+            if (result.IsError)
+            {
+                // Failure on start means the transport may already have torn itself
+                // down (VpnTunnelManager.StartVPNTunnelWithOptions disposes its tunnel
+                // on the error path). Drop the reference so a follow-up disconnect
+                // doesn't try to use a dead instance.
+                DisposeActiveTransportUnsafe();
+            }
+
+            return result;
+        }
+        finally
+        {
+            _transportGate.Release();
+        }
     }
 
     public ErrorResponse DisconnectVPNConnection()
     {
-        Logger.LogInformation(
-            "GuardianNPCommandDispatcher.DisconnectVPNConnection: stopping active transport (current entry '{Entry}')",
-            ConnectionRoutines.ActiveConnectionEntryName);
-
-        if (_activeTransport is null)
+        _transportGate.Wait();
+        try
         {
-            // Backward-compat: legacy clients call Disconnect without a prior Start
-            // in this process (e.g., a fresh service handling a "clean up after
-            // ungraceful client exit" disconnect). Fall through to a fresh IKEv2
-            // instance which can still find and tear down the RAS connection.
-            var ikev2 = new VPNTransportIKEV2();
-            return ikev2.StopVPNTunnel();
-        }
+            Logger.LogInformation(
+                "GuardianNPCommandDispatcher.DisconnectVPNConnection: stopping active transport (current entry '{Entry}')",
+                ConnectionRoutines.ActiveConnectionEntryName);
 
-        var result = _activeTransport.StopVPNTunnel();
-        DisposeActiveTransport();
-        return result;
+            if (_activeTransport is null)
+            {
+                // Backward-compat: legacy clients call Disconnect without a prior Start
+                // in this process (e.g., a fresh service handling a "clean up after
+                // ungraceful client exit" disconnect). Fall through to a fresh IKEv2
+                // instance which can still find and tear down the RAS connection.
+                var ikev2 = new VPNTransportIKEV2();
+                return ikev2.StopVPNTunnel();
+            }
+
+            var result = _activeTransport.StopVPNTunnel();
+            DisposeActiveTransportUnsafe();
+            return result;
+        }
+        finally
+        {
+            _transportGate.Release();
+        }
     }
 
     /// <summary>
@@ -114,7 +135,8 @@ public class GuardianNPCommandDispatcher : IGuardianNPContract
             : new VPNTransportIKEV2();
     }
 
-    private void DisposeActiveTransport()
+    // Caller must hold _transportGate.
+    private static void DisposeActiveTransportUnsafe()
     {
         if (_activeTransport is IDisposable disposable)
         {

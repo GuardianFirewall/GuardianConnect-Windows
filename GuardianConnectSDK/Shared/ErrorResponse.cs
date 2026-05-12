@@ -5,7 +5,7 @@ namespace GuardianConnect.Shared;
 
 public record ErrorResponse(
     string MessageArg = "",
-    object? ThrownExceptionArg = null,
+    Exception? ThrownExceptionArg = null,
     bool IsErrorArg = false,
     object? ResponseArg = null,
     object? DataArg = null,
@@ -15,7 +15,12 @@ public record ErrorResponse(
     public bool IsError { get; set; } = IsErrorArg;
 
     public string Message { get; set; } = MessageArg;
-    public object? ThrownException { get; set; } = ThrownExceptionArg;
+
+    // Typed as Exception (not object) so the JsonConverter is picked up by
+    // System.Text.Json static-type dispatch — without that, STJ walks the
+    // runtime Exception and chokes on `TargetSite` (a MethodBase).
+    [JsonConverter(typeof(ExceptionJsonConverter))]
+    public Exception? ThrownException { get; set; } = ThrownExceptionArg;
     public object? Response { get; set; } = ResponseArg;
     public object? GRDApiError { get; set; } = GrdapiErrorArg;
     public object? Data { get; set; } = DataArg;
@@ -54,9 +59,8 @@ public record ErrorResponse(
     public override string ToString()
     {
         var xt = string.Empty;
-        if (ThrownException != null)
+        if (ThrownException is { } tx)
         {
-            var tx = (Exception)ThrownException;
             var innerX = tx.InnerException != null ? tx.InnerException.ToString() : string.Empty;
             xt = $"Exception: Message = {tx.Message}, StackTrace = {tx.StackTrace}, InnerException = {innerX}";
         }
