@@ -387,6 +387,23 @@ public class ClientPipeImpl : IGuardianNPContract
         ClientPipe.Logger.LogWarning("!!!!!!!!!!!!!! REOPENING CLIENTPIPE TO SERVICE...");
         OpenNamedPipe();
         ss = new StreamString(_clientStream);
+
+        // Drain the service's startup ACK (`GuardianFirewallService#ACK#<wasConnectedAtSuspend>`).
+        // The service writes it unconditionally on every pipe connect — if we don't read it
+        // now, the next ss.ReadString() returns the ACK instead of the command response and
+        // JSON parsing trips. Connect() does this drain; ReopenNamedPipe (called by every
+        // public API when IsConnected is false) must too, otherwise the first call after a
+        // cold pipe open fails. Swallow ack-read errors so a broken handshake still surfaces
+        // as the caller's normal IOException, not a different exception here.
+        try
+        {
+            var ack = ss.ReadString();
+            ClientPipe.Logger.LogInformation($"ClientPipeImpl.ReopenNamedPipe: drained ACK '{ack}'");
+        }
+        catch (Exception e)
+        {
+            ClientPipe.Logger.LogWarning(e, $"ClientPipeImpl.ReopenNamedPipe: failed to drain ACK: {e.Message}");
+        }
     }
 
     internal bool Connect(string servicePipeName = Common.kGRDServicePipeName)
