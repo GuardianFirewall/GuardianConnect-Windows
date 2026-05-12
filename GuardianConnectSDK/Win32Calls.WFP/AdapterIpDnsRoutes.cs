@@ -227,9 +227,16 @@ public static unsafe partial class AdapterIpDnsRoutes
     }
 
     // ---------------------------------------------------------------------
-    // Hand-written P/Invoke for SetInterfaceDnsSettings (dnsapi.dll).
-    // CsWin32's dnsapi surface is unused elsewhere; avoiding the metadata
-    // expansion by declaring just what we need here.
+    // Hand-written P/Invoke for SetInterfaceDnsSettings.
+    //
+    // DLL: iphlpapi.dll (NOT dnsapi.dll — the older docs page is misleading;
+    // the canonical home on Win10 2004+ is iphlpapi per
+    // https://learn.microsoft.com/en-us/windows/win32/api/netioapi/nf-netioapi-setinterfacednssettings).
+    //
+    // CsWin32 covers iphlpapi.dll via the Iphlpapi.* wildcard in
+    // NativeMethods.txt and would generate SetInterfaceDnsSettings, but
+    // the DNS_INTERFACE_SETTINGS struct uses LPWSTR strings that we want
+    // to allocate/free ourselves, so a hand-written declaration is simpler.
     // ---------------------------------------------------------------------
 
     private const uint DnsInterfaceSettingsVersion1 = 1;
@@ -251,7 +258,7 @@ public static unsafe partial class AdapterIpDnsRoutes
         public IntPtr ProfileNameServer;
     }
 
-    [LibraryImport("dnsapi.dll", EntryPoint = "SetInterfaceDnsSettings")]
+    [LibraryImport("iphlpapi.dll", EntryPoint = "SetInterfaceDnsSettings")]
     private static partial uint SetInterfaceDnsSettings(
         Guid interfaceId, ref DNS_INTERFACE_SETTINGS_V1 settings);
 }
