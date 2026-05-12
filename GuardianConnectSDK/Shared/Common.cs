@@ -69,6 +69,7 @@ public class Common
     public const string kGRDRefreshProxySettings = "kGRDRefreshProxySettings";
     public const string kGRDTunnelEnabled = "kGRDTunnelEnabled";
     public const string kGuardianTransportProtocol = "kGuardianTransportProtocol";
+    public const string kGuardianWireGuardConfigPath = "kGuardianWireGuardConfigPath";
 
     public const string kGRDWGDevicePublicKey = "wg-device-public-key";
     public const string kGRDWGDevicePrivateKey = "wg-device-private-key";

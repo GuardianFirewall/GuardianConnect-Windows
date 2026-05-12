@@ -234,6 +234,24 @@ public class GRDVPNHelper
     public async Task<ErrorResponse> ConnectVpnWithConfiguredCredentials()
     {
         ErrorResponse errorResponse;
+
+        // Transport selection comes from the user's saved preference, not the
+        // credential — WireGuard configs come from a file on disk (and later
+        // from CJ's backend), separate from the IKEv2 EAP credentials flow.
+        var selectedTransport = RegistrySettings.RetrieveGuardianUserSettings(Common.kGuardianTransportProtocol);
+        if (string.Equals(selectedTransport, "WireGuard", StringComparison.OrdinalIgnoreCase))
+        {
+            var wgConfigPath = RegistrySettings.RetrieveGuardianUserSettings(Common.kGuardianWireGuardConfigPath);
+            if (string.IsNullOrWhiteSpace(wgConfigPath))
+            {
+                return new ErrorResponse()
+                    .SetException(new InvalidOperationException(
+                        "WireGuard is selected but no config file path is configured."))
+                    .SetErrorMessage("WireGuard config file is not set.");
+            }
+            return await StartWireGuardConnection(wgConfigPath);
+        }
+
         // Need to check if we've set our local copy of credentials and if null then grab from GRDCM
         var mainCredentials = GRDCredentialManager.GetMainCredentials();
         if (mainCredentials == null
@@ -422,6 +440,39 @@ public class GRDVPNHelper
 
         _logger.LogInformation(
             $"StartIKEv2Connection: returning with errorResponse.IsError == {errorResponse.IsError}");
+        return errorResponse;
+    }
+
+    private async Task<ErrorResponse> StartWireGuardConnection(string configPath)
+    {
+        var errorResponse = new ErrorResponse();
+        _logger.LogInformation($"StartWireGuardConnection: configPath='{configPath}'");
+
+        // Dispatcher selects the WireGuard transport implicitly when the request
+        // carries a WireGuardConfigPath. EAP/IKEv2 fields stay empty — they're
+        // irrelevant on this code path.
+        var vpnValues = new VPNCallParameters
+        {
+            EntryName = "Guardian WireGuard",
+            WireGuardConfigPath = configPath,
+        };
+
+        try
+        {
+            errorResponse = await ClientPipe.StartVPNConnection(vpnValues);
+            if (errorResponse.IsError)
+                _logger.LogError(
+                    $"StartWireGuardConnection: FAILURE to establish VPN connection. ErrorResponse = {errorResponse}");
+            else
+                _logger.LogInformation("StartWireGuardConnection: VPN connection established.");
+        }
+        catch (Exception e)
+        {
+            Debug.WriteLine(e);
+            errorResponse.SetException(e).SetErrorMessage(e.Message);
+            _logger.LogError(e, $"{errorResponse}");
+        }
+
         return errorResponse;
     }
 
