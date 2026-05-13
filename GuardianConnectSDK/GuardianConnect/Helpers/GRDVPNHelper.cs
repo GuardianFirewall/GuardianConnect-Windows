@@ -236,20 +236,32 @@ public class GRDVPNHelper
         ErrorResponse errorResponse;
 
         // Transport selection comes from the user's saved preference, not the
-        // credential — WireGuard configs come from a file on disk (and later
-        // from CJ's backend), separate from the IKEv2 EAP credentials flow.
+        // credential — WireGuard configs come from one of two paths now:
+        //   1. Dynamic negotiation with the backend (default; matches iOS/macOS).
+        //   2. A user-picked wg-quick file (developer override).
+        // The toggle lives in HKCU/kGuardianUseFileBasedWireGuardConfig and is
+        // surfaced in AdvancedSettings.
         var selectedTransport = RegistrySettings.RetrieveGuardianUserSettings(Common.kGuardianTransportProtocol);
         if (string.Equals(selectedTransport, "WireGuard", StringComparison.OrdinalIgnoreCase))
         {
-            var wgConfigPath = RegistrySettings.RetrieveGuardianUserSettings(Common.kGuardianWireGuardConfigPath);
-            if (string.IsNullOrWhiteSpace(wgConfigPath))
+            var useFileBased = string.Equals(
+                RegistrySettings.RetrieveGuardianUserSettings(Common.kGuardianUseFileBasedWireGuardConfig),
+                "true", StringComparison.OrdinalIgnoreCase);
+
+            if (useFileBased)
             {
-                return new ErrorResponse()
-                    .SetException(new InvalidOperationException(
-                        "WireGuard is selected but no config file path is configured."))
-                    .SetErrorMessage("WireGuard config file is not set.");
+                var wgConfigPath = RegistrySettings.RetrieveGuardianUserSettings(Common.kGuardianWireGuardConfigPath);
+                if (string.IsNullOrWhiteSpace(wgConfigPath))
+                {
+                    return new ErrorResponse()
+                        .SetException(new InvalidOperationException(
+                            "WireGuard is selected with file-based override but no config file path is configured."))
+                        .SetErrorMessage("WireGuard config file is not set.");
+                }
+                return await StartWireGuardConnection(wgConfigPath);
             }
-            return await StartWireGuardConnection(wgConfigPath);
+
+            return await StartWireGuardConnectionWithNegotiation();
         }
 
         // Need to check if we've set our local copy of credentials and if null then grab from GRDCM
@@ -440,6 +452,98 @@ public class GRDVPNHelper
 
         _logger.LogInformation(
             $"StartIKEv2Connection: returning with errorResponse.IsError == {errorResponse.IsError}");
+        return errorResponse;
+    }
+
+    /// <summary>
+    /// Negotiates a fresh WireGuard credential with the chosen host (Curve25519
+    /// keypair generated locally, public key + subscriber JWT POSTed to
+    /// /api/v1.3/device), persists the credential as the main one, materialises
+    /// a wg-quick text from it, and asks the service to bring up the tunnel.
+    /// Mirrors the iOS/macOS pattern: createStandaloneCredentialsForTransport
+    /// Protocol + wireguardQuickConfigForCredential + start the tunnel with
+    /// the resulting text.
+    /// </summary>
+    private async Task<ErrorResponse> StartWireGuardConnectionWithNegotiation()
+    {
+        _logger.LogInformation("StartWireGuardConnectionWithNegotiation: entry");
+
+        // Pick a host. Mirror CreateStandaloneCredentialsForTransportProtocol's
+        // strategy so the negotiate path and the IKEv2 register path land on
+        // hosts the same way.
+        var (host, hostDisplay, hostErr) =
+            GRDServerManager.SelectGuardianHostWithCompletion(PreferredRegion);
+        if (hostErr.IsError)
+        {
+            _logger.LogError(
+                "StartWireGuardConnectionWithNegotiation: host selection failed: {Msg}", hostErr.Message);
+            return hostErr;
+        }
+
+        var (subCred, jwtErr) = await GetValidSubscriberCredentialWithCompletion();
+        if (jwtErr.IsError || subCred is null)
+        {
+            _logger.LogError(
+                "StartWireGuardConnectionWithNegotiation: subscriber JWT unavailable: {Msg}", jwtErr.Message);
+            return jwtErr;
+        }
+
+        var negResult = await GRDGateway.NegotiateWireGuardCredential(host, subCred.Jwt, validForDays: 30);
+        if (negResult.IsError || negResult.Data is not List<GRDCredential> creds || creds.Count == 0)
+        {
+            _logger.LogError(
+                "StartWireGuardConnectionWithNegotiation: NegotiateWireGuardCredential failed: {Msg}",
+                negResult.Message);
+            return negResult;
+        }
+
+        var cred = creds[0];
+        cred.HostName             = host;
+        cred.HostnameDisplayValue = hostDisplay;
+        cred.Name                 = hostDisplay;
+        cred.MainCredential       = true;
+        cred.Identifer            = "main";
+        cred.TransportProtocol    = ITransportProvider.TransportProtocol.TransportWireGuard;
+
+        // Persist the credential so subsequent connects can reuse it without
+        // re-negotiating; an explicit "rotate keys" path can clear it later.
+        GRDCredentialManager.AddOrUpdateCredential(cred);
+
+        var configText = GRDWireGuardConfiguration.WireGuardQuickConfigForCredential(cred);
+        if (string.IsNullOrEmpty(configText))
+        {
+            return new ErrorResponse()
+                .SetException(new InvalidOperationException(
+                    "WireGuardQuickConfigForCredential returned null — negotiated credential is incomplete."))
+                .SetErrorMessage("Failed to build WireGuard config from negotiated credential.");
+        }
+
+        var vpnValues = new VPNCallParameters
+        {
+            EntryName            = $"Guardian WireGuard - {hostDisplay}",
+            WireGuardConfigText  = configText,
+            VpnHostName          = host,
+            VpnHostDisplay       = hostDisplay,
+        };
+
+        var errorResponse = new ErrorResponse();
+        try
+        {
+            errorResponse = await ClientPipe.StartVPNConnection(vpnValues);
+            if (errorResponse.IsError)
+                _logger.LogError(
+                    "StartWireGuardConnectionWithNegotiation: service refused start: {Msg}",
+                    errorResponse.Message);
+            else
+                _logger.LogInformation(
+                    "StartWireGuardConnectionWithNegotiation: tunnel up on host {Host}", host);
+        }
+        catch (Exception e)
+        {
+            errorResponse.SetException(e).SetErrorMessage(e.Message);
+            _logger.LogError(e, "StartWireGuardConnectionWithNegotiation: ClientPipe threw");
+        }
+
         return errorResponse;
     }
 
