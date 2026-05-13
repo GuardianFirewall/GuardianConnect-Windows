@@ -165,6 +165,27 @@ public class GuardianNPCommandDispatcher : IGuardianNPContract
             EntryName = "None"
         };
 
+        // WireGuard adapters aren't RAS connections, so IsAnyConnectionActive
+        // would miss them. The static _activeTransport is our process-wide
+        // source of truth for which transport (if any) is up; consult it first
+        // and only fall back to RAS for IKEv2.
+        ITransportProvider? active;
+        _transportGate.Wait();
+        try { active = _activeTransport; }
+        finally { _transportGate.Release(); }
+
+        if (active is { ProtocolType: ITransportProvider.TransportProtocol.TransportWireGuard })
+        {
+            status.ConnectionState = ConnectionStateEnum.Connected;
+            status.EntryName = string.IsNullOrEmpty(NotificationHandler.LastKnownConnectedEntry)
+                ? "Guardian WireGuard"
+                : NotificationHandler.LastKnownConnectedEntry;
+            Logger.LogInformation(
+                "GuardianNPCommandDispatcher.GetVpnConnectionStatus: WG active, Entry='{Entry}'",
+                status.EntryName);
+            return status;
+        }
+
         var anyConnectionActive = ConnectionRoutines.IsAnyConnectionActive(out var entryOut);
         Logger.Log(LogLevel.Information,
             $"GuardianNPCommandDispatcher.GetVpnConnectionStatus: IsAnyConnectionActive returned {anyConnectionActive}, Entry: '{entryOut}'");

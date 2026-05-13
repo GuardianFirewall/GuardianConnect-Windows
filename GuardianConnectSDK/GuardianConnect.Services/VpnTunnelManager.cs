@@ -2,6 +2,7 @@ using System.ComponentModel;
 using GuardianConnect.Abstractions;
 using GuardianConnect.Shared;
 using Serilog;
+using Win32Calls;
 using Win32Calls.WFP;
 using Win32Calls.WireGuard;
 
@@ -129,6 +130,17 @@ public sealed class VpnTunnelManager : ITransportProvider, IDisposable
             _lastError = 0;
         }
 
+        // Wake the client watcher. IKEv2 gets this for free via
+        // RasConnectionNotification → RasConnChangeWaiterTask, but WG has no RAS
+        // path. Without this, the app's GeneralPageViewModel sits on
+        // VPNEVT_NAME_CLIENTSIDE forever and the Connect button never flips to
+        // "Disconnect." Use the same name LastKnownConnectedEntry the dispatcher
+        // reports back to clients.
+        NotificationHandler.LastKnownConnectedEntry = options.EntryName ?? AdapterName;
+        NotificationHandler.WasDisconnectPlanned = false;
+        NotificationHandler.VPNClientNotifierHandle?.Set();
+        NotificationHandler.VPNServiceNotifierHandle?.Set();
+
         Log.Information(
             "VpnTunnelManager: adapter '{Name}' up. LUID={Luid:X16}", AdapterName, tunnel.AdapterLuid);
         return new ErrorResponse();
@@ -204,6 +216,13 @@ public sealed class VpnTunnelManager : ITransportProvider, IDisposable
             _status = ITransportProvider.VPNProviderStatus.VPNStatusDisconnected;
             _connectedDate = DateTime.MinValue;
         }
+
+        // Wake the client watcher on tear-down too. Mirrors what
+        // RasConnChangeWaiterTask does for IKEv2.
+        NotificationHandler.WasDisconnectPlanned = wasDisconnectPlanned;
+        NotificationHandler.LastKnownConnectedEntry = string.Empty;
+        NotificationHandler.VPNClientNotifierHandle?.Set();
+        NotificationHandler.VPNServiceNotifierHandle?.Set();
 
         Log.Information(
             "VpnTunnelManager: tunnel torn down (wasDisconnectPlanned={Planned})", wasDisconnectPlanned);
