@@ -136,6 +136,15 @@ public class ClientPipeImpl : IGuardianNPContract
     private static StreamString ss = new(new NamedPipeClientStream("NULL"));
     private static int usingResource;
 
+    // Serializes every IPC command/response pair. The pipe + StreamString are a
+    // single shared stream — if the UI thread is mid-DisconnectVPNConnection
+    // when GPVM.MON wakes from the state-change event and tries to send a
+    // GetCurrentVpnConnectionStatus, their writes/reads interleave and each
+    // thread ends up consuming the other's response. SemaphoreSlim (not `lock`)
+    // because StartVPNConnection has to hold this across an `await`, which a
+    // thread-affine monitor cannot do.
+    private static readonly SemaphoreSlim _pipeIO = new(1, 1);
+
     internal ClientPipeImpl()
     {
     }
@@ -179,9 +188,14 @@ public class ClientPipeImpl : IGuardianNPContract
         {
             var cmdPayload = JsonSerializer.Serialize(protocolRequest, VPNCallParametersJsonContext.Default.VPNCallParameters);
             var cmdString = $"{Hexify(IGuardianNPContract.NPCommands.StartVPNConnection)}.{cmdPayload}";
-            ss.WriteString(cmdString);
-            ClientPipe.Logger.LogInformation("ClientPipeImpl.StartVPNConnection: command sent to service.");
-            startedJson = await ss.ReadStringAsync();
+            await _pipeIO.WaitAsync().ConfigureAwait(false);
+            try
+            {
+                ss.WriteString(cmdString);
+                ClientPipe.Logger.LogInformation("ClientPipeImpl.StartVPNConnection: command sent to service.");
+                startedJson = await ss.ReadStringAsync().ConfigureAwait(false);
+            }
+            finally { _pipeIO.Release(); }
             startedJson = startedJson.TrimEnd('\0');
             if (!startedJson.StartsWith('{')) startedJson = "{ " + startedJson;
             //ClientPipe.Logger.LogInformation("ClientPipeImpl.StartVPNConnection: Received response from service");
@@ -214,16 +228,29 @@ public class ClientPipeImpl : IGuardianNPContract
     public ErrorResponse DisconnectVPNConnection()
     {
         var errorResponse = new ErrorResponse();
+        var responseJson = string.Empty;
         try
         {
-            var cmdPayload = "";
-            var cmdString = $"{Hexify(IGuardianNPContract.NPCommands.DisconnectVPNConnection)}.{cmdPayload}";
-            ss.WriteString(cmdString);
+            _pipeIO.Wait();
+            try
+            {
+                var cmdString = $"{Hexify(IGuardianNPContract.NPCommands.DisconnectVPNConnection)}.";
+                ss.WriteString(cmdString);
+                // Service writes an ErrorResponse JSON in reply — must consume it
+                // or it gets stranded in the pipe buffer and the next ClientPipe
+                // call deserialises it as the wrong type.
+                responseJson = ss.ReadString().TrimEnd('\0');
+            }
+            finally { _pipeIO.Release(); }
+
+            if (!responseJson.StartsWith('{')) responseJson = "{ " + responseJson;
+            errorResponse = JsonSerializer.Deserialize<ErrorResponse>(responseJson,
+                ErrorResponseJsonContext.Default.ErrorResponse) ?? new ErrorResponse();
         }
         catch (Exception e)
         {
             ClientPipe.Logger.LogError(e,
-                $"ClientPipe.DisconnectVPNConnection: Exception when disconnecting VPN connection: {e.Message}");
+                $"ClientPipe.DisconnectVPNConnection: Exception when disconnecting VPN connection: {e.Message}. Raw json='{responseJson}'");
             errorResponse.SetException(e);
             if (e is IOException)
             {
@@ -238,10 +265,16 @@ public class ClientPipeImpl : IGuardianNPContract
     public CurrentVPNStatus GetCurrentVpnConnectionStatus()
     {
         ClientPipe.Logger.LogInformation("Calling service to GetCurrentVpnConnectionStatus...");
-        var cmdString = $"{Hexify(IGuardianNPContract.NPCommands.GetCurrentVpnConnectionStatus)}.";
-        ss.WriteString(cmdString);
-        ClientPipe.Logger.LogInformation("Reading status...");
-        var statusString = ss.ReadString();
+        string statusString;
+        _pipeIO.Wait();
+        try
+        {
+            var cmdString = $"{Hexify(IGuardianNPContract.NPCommands.GetCurrentVpnConnectionStatus)}.";
+            ss.WriteString(cmdString);
+            ClientPipe.Logger.LogInformation("Reading status...");
+            statusString = ss.ReadString();
+        }
+        finally { _pipeIO.Release(); }
         var status =
             JsonSerializer.Deserialize<CurrentVPNStatus>(statusString,
                 CurrentVPNStatusJsonConect.Default.CurrentVPNStatus)
@@ -289,9 +322,15 @@ public class ClientPipeImpl : IGuardianNPContract
         var resp = new ErrorResponse();
         try
         {
-            var cmdString = $"{Hexify(IGuardianNPContract.NPCommands.SetKillSwitchMode)}.{(int)mode}";
-            ss.WriteString(cmdString);
-            var responseJson = ss.ReadStringAsync().Result.TrimEnd('\0');
+            string responseJson;
+            _pipeIO.Wait();
+            try
+            {
+                var cmdString = $"{Hexify(IGuardianNPContract.NPCommands.SetKillSwitchMode)}.{(int)mode}";
+                ss.WriteString(cmdString);
+                responseJson = ss.ReadStringAsync().Result.TrimEnd('\0');
+            }
+            finally { _pipeIO.Release(); }
             if (!responseJson.StartsWith('{')) responseJson = "{ " + responseJson;
             resp = JsonSerializer.Deserialize<ErrorResponse>(responseJson,
                 ErrorResponseJsonContext.Default.ErrorResponse) ?? new ErrorResponse();
@@ -310,9 +349,15 @@ public class ClientPipeImpl : IGuardianNPContract
         var resp = new ErrorResponse();
         try
         {
-            var cmdString = $"{Hexify(IGuardianNPContract.NPCommands.SetKillSwitchAllowLan)}.{allow}";
-            ss.WriteString(cmdString);
-            var responseJson = ss.ReadStringAsync().Result.TrimEnd('\0');
+            string responseJson;
+            _pipeIO.Wait();
+            try
+            {
+                var cmdString = $"{Hexify(IGuardianNPContract.NPCommands.SetKillSwitchAllowLan)}.{allow}";
+                ss.WriteString(cmdString);
+                responseJson = ss.ReadStringAsync().Result.TrimEnd('\0');
+            }
+            finally { _pipeIO.Release(); }
             if (!responseJson.StartsWith('{')) responseJson = "{ " + responseJson;
             resp = JsonSerializer.Deserialize<ErrorResponse>(responseJson,
                 ErrorResponseJsonContext.Default.ErrorResponse) ?? new ErrorResponse();
@@ -330,9 +375,15 @@ public class ClientPipeImpl : IGuardianNPContract
     {
         try
         {
-            var cmdString = $"{Hexify(IGuardianNPContract.NPCommands.GetKillSwitchStatus)}.";
-            ss.WriteString(cmdString);
-            var statusJson = ss.ReadString();
+            string statusJson;
+            _pipeIO.Wait();
+            try
+            {
+                var cmdString = $"{Hexify(IGuardianNPContract.NPCommands.GetKillSwitchStatus)}.";
+                ss.WriteString(cmdString);
+                statusJson = ss.ReadString();
+            }
+            finally { _pipeIO.Release(); }
             return JsonSerializer.Deserialize<KillSwitchStatus>(statusJson,
                        KillSwitchStatusJsonContext.Default.KillSwitchStatus)
                    ?? new KillSwitchStatus();

@@ -136,10 +136,15 @@ public sealed class VpnTunnelManager : ITransportProvider, IDisposable
         // VPNEVT_NAME_CLIENTSIDE forever and the Connect button never flips to
         // "Disconnect." Use the same name LastKnownConnectedEntry the dispatcher
         // reports back to clients.
+        //
+        // Do NOT fire VPNServiceNotifierHandle — its only listener is the IKEv2
+        // poller (PollConnectionState), which then queries RAS and, finding no
+        // RAS connection up, mis-labels the situation as an "UNPLANNED
+        // DISCONNECT" and corrupts VPNStatusAtSuspendTime. WG state is observable
+        // to the client via VPNClientNotifierHandle alone.
         NotificationHandler.LastKnownConnectedEntry = options.EntryName ?? AdapterName;
         NotificationHandler.WasDisconnectPlanned = false;
         NotificationHandler.VPNClientNotifierHandle?.Set();
-        NotificationHandler.VPNServiceNotifierHandle?.Set();
 
         Log.Information(
             "VpnTunnelManager: adapter '{Name}' up. LUID={Luid:X16}", AdapterName, tunnel.AdapterLuid);
@@ -218,11 +223,12 @@ public sealed class VpnTunnelManager : ITransportProvider, IDisposable
         }
 
         // Wake the client watcher on tear-down too. Mirrors what
-        // RasConnChangeWaiterTask does for IKEv2.
+        // RasConnChangeWaiterTask does for IKEv2. Service-side notifier is
+        // intentionally NOT signalled — see the matching note in
+        // StartVPNTunnelWithOptions.
         NotificationHandler.WasDisconnectPlanned = wasDisconnectPlanned;
         NotificationHandler.LastKnownConnectedEntry = string.Empty;
         NotificationHandler.VPNClientNotifierHandle?.Set();
-        NotificationHandler.VPNServiceNotifierHandle?.Set();
 
         Log.Information(
             "VpnTunnelManager: tunnel torn down (wasDisconnectPlanned={Planned})", wasDisconnectPlanned);

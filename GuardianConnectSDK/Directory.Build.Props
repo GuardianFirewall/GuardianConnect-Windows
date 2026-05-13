@@ -14,7 +14,7 @@
         <!-- Set this for prerelease builds (e.g., "alpha.1", "beta.1", "rc.1"); remove or leave empty for stable releases.
              "wg-alpha.N" labels SDK packages emitted from the WireGuard transport branch (i196-add-wireguard-transport)
              so they can't be confused with KS-line packages also on 0.46.0-alpha.N. -->
-        <VersionSuffix>wg-alpha.6</VersionSuffix>
+        <VersionSuffix>wg-alpha.7</VersionSuffix>
     </PropertyGroup>
 
     <PropertyGroup>
