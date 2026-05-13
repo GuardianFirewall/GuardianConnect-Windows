@@ -71,6 +71,14 @@ public class Common
     public const string kGuardianTransportProtocol = "kGuardianTransportProtocol";
     public const string kGuardianWireGuardConfigPath = "kGuardianWireGuardConfigPath";
 
+    /// <summary>
+    /// HKCU user setting. "true" means the app uses a wg-quick config file
+    /// the user picked locally (developer override). "false" or absent
+    /// (default) means the app negotiates the WireGuard config with the
+    /// backend on every connect, matching the iOS/macOS SDK pattern.
+    /// </summary>
+    public const string kGuardianUseFileBasedWireGuardConfig = "kGuardianUseFileBasedWireGuardConfig";
+
     public const string kGRDWGDevicePublicKey = "wg-device-public-key";
     public const string kGRDWGDevicePrivateKey = "wg-device-private-key";
     public const string kGRDWGServerPublicKey = "server-public-key";

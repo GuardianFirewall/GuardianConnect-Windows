@@ -23,6 +23,7 @@
         <ProjectReference Include="..\GuardianConnect.Abstractions\GuardianConnect.Abstractions.csproj"/>
         <ProjectReference Include="..\Shared\GuardianConnect.Shared.csproj"/>
         <ProjectReference Include="..\Win32Calls\Win32Calls.csproj"/>
+        <ProjectReference Include="..\Win32Calls.WireGuard\Win32Calls.WireGuard.csproj"/>
     </ItemGroup>
 
     <ItemGroup>

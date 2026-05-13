@@ -52,5 +52,12 @@
              Vendored under native/wireguard/win-{arch}/ (see VERSION.txt for source + SHAs). -->
         <file src="native\wireguard\win-x64\wireguard.dll" target="runtimes\win-x64\native\wireguard.dll"/>
         <file src="native\wireguard\win-arm64\wireguard.dll" target="runtimes\win-arm64\native\wireguard.dll"/>
+
+        <!-- Curve25519 keygen library, wrapping wireguard-tools' upstream curve25519.c
+             (MIT Fiat-Crypto / HACL*). Source under native/curve25519/src/, prebuilt
+             DLLs under native/curve25519/win-{arch}/. Loaded by Win32Calls.WireGuard
+             via [LibraryImport] for WG dynamic-negotiation keypair generation. -->
+        <file src="native\curve25519\win-x64\curve25519.dll" target="runtimes\win-x64\native\curve25519.dll"/>
+        <file src="native\curve25519\win-arm64\curve25519.dll" target="runtimes\win-arm64\native\curve25519.dll"/>
     </files>
 </package>

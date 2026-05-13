@@ -23,6 +23,43 @@ public sealed class WireGuardKey
         _bytes = bytes;
     }
 
+    /// <summary>
+    /// Generate a fresh Curve25519 keypair using the same routine the iOS,
+    /// macOS, Linux, and userspace-Go WireGuard implementations use (Fiat /
+    /// HACL via curve25519.dll). Returns the private key; derive the public
+    /// via <see cref="DerivePublicKey"/>.
+    /// </summary>
+    public static WireGuardKey GeneratePrivateKey()
+    {
+        var bytes = new byte[LengthBytes];
+        Curve25519Interop.GeneratePrivateKey(bytes);
+
+        // The native side zeros the buffer on CSPRNG failure. Refuse to
+        // hand back an all-zero key; downstream code would attempt to use
+        // it as a real secret.
+        bool allZero = true;
+        for (int i = 0; i < LengthBytes; i++)
+        {
+            if (bytes[i] != 0) { allZero = false; break; }
+        }
+        if (allZero)
+            throw new InvalidOperationException(
+                "curve25519_generate_private_key returned an all-zero key (BCryptGenRandom failure).");
+
+        return new WireGuardKey(bytes);
+    }
+
+    /// <summary>
+    /// Derive the public key for this private key via scalar multiplication
+    /// against the Curve25519 basepoint.
+    /// </summary>
+    public WireGuardKey DerivePublicKey()
+    {
+        var pub = new byte[LengthBytes];
+        Curve25519Interop.DerivePublicKey(pub, _bytes);
+        return new WireGuardKey(pub);
+    }
+
     public static WireGuardKey FromBase64(string base64)
     {
         if (string.IsNullOrWhiteSpace(base64))

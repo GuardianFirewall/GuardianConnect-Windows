@@ -119,6 +119,31 @@ public class GRDGateway
 
         [JsonPropertyName("transport-protocol")]
         public string transportProtocol { get; set; } = string.Empty;
+
+        /// <summary>
+        /// WireGuard public-key option (base64). Sent as <c>public-key</c> in the
+        /// JSON body for WG registration; absent for IKEv2. Mirrors the
+        /// transportOptions dictionary used by the iOS/macOS SDK
+        /// (<c>GRDGatewayAPI registerDeviceForTransportProtocol</c>).
+        /// </summary>
+        [JsonPropertyName("public-key")]
+        [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingDefault)]
+        public string? PublicKey { get; set; }
+    }
+
+    /// <summary>
+    /// Deserialization target for the WireGuard branch of
+    /// <c>POST /api/v1.3/device</c>. Kept separate from <see cref="GRDCredential"/>
+    /// so adding wire-format JsonPropertyName attrs here doesn't change the
+    /// on-disk shape of persisted credentials.
+    /// </summary>
+    public class WireGuardRegistrationResponse
+    {
+        [JsonPropertyName("server-public-key")]      public string ServerPublicKey { get; set; } = string.Empty;
+        [JsonPropertyName("mapped-ipv4-address")]    public string MappedIPv4Address { get; set; } = string.Empty;
+        [JsonPropertyName("mapped-ipv6-address")]    public string MappedIPv6Address { get; set; } = string.Empty;
+        [JsonPropertyName("client-id")]              public string ClientId { get; set; } = string.Empty;
+        [JsonPropertyName("api-auth-token")]         public string ApiAuthToken { get; set; } = string.Empty;
     }
 
 
@@ -142,7 +167,7 @@ public class GRDGateway
         var payload = new RegisterDevicePayload
         {
             subscriberCredential = subscriberCredentialJWT,
-            transportProtocol = "ikev2"
+            transportProtocol = TransportProtocolStringFor(transportProtocol)
         };
 
         var reqUri = new Uri($"https://{hostname}/api/v1.3/device");
@@ -177,6 +202,140 @@ public class GRDGateway
 
         errorResponse.SetData(credsList);
 
+        return errorResponse;
+    }
+
+    /// <summary>
+    /// Wire-format string used in the <c>transport-protocol</c> JSON field for
+    /// <c>POST /api/v1.3/device</c>. Matches the strings the iOS/macOS SDK uses
+    /// (<c>GRDTransportProtocol transportProtocolStringFor</c>): "ikev2" or
+    /// "wireguard".
+    /// </summary>
+    public static string TransportProtocolStringFor(ITransportProvider.TransportProtocol protocol) =>
+        protocol switch
+        {
+            ITransportProvider.TransportProtocol.TransportWireGuard => "wireguard",
+            _ => "ikev2"
+        };
+
+    /// <summary>
+    /// Generate a fresh Curve25519 keypair, register the device for the
+    /// WireGuard transport at <paramref name="hostname"/>, and populate a
+    /// <see cref="GRDCredential"/> with the device private key (kept
+    /// client-side), the device public key (echoed back from the server),
+    /// and the server-side fields (server public key, mapped IPv4/IPv6,
+    /// client id, api auth token).
+    ///
+    /// Mirrors <c>GRDVPNHelper.createStandaloneCredentialsForTransportProtocol</c>
+    /// in the iOS/macOS SDK for the WireGuard branch.
+    ///
+    /// The returned credential is NOT persisted to the keychain by this
+    /// method; callers store via <see cref="GRDCredentialManager.AddOrUpdateCredential"/>
+    /// once the higher-level workflow decides it should become the main
+    /// credential or a saved alternate.
+    /// </summary>
+    public static async Task<ErrorResponse> NegotiateWireGuardCredential(
+        string hostname, string subscriberCredentialJWT, int validForDays)
+    {
+        var errorResponse = new ErrorResponse();
+
+        if (string.IsNullOrWhiteSpace(hostname) || string.IsNullOrWhiteSpace(subscriberCredentialJWT))
+            return errorResponse.SetErrorMessage("hostname and subscriber JWT are required.");
+
+        // Generate the keypair on-device. The private key never leaves this
+        // process; only the public key is sent up.
+        Win32Calls.WireGuard.WireGuardKey privateKey;
+        Win32Calls.WireGuard.WireGuardKey publicKey;
+        try
+        {
+            privateKey = Win32Calls.WireGuard.WireGuardKey.GeneratePrivateKey();
+            publicKey  = privateKey.DerivePublicKey();
+        }
+        catch (Exception ex)
+        {
+            Logger.LogError(ex, "NegotiateWireGuardCredential: curve25519 keygen failed");
+            return errorResponse.SetException(ex);
+        }
+
+        var payload = new RegisterDevicePayload
+        {
+            subscriberCredential = subscriberCredentialJWT,
+            transportProtocol    = TransportProtocolStringFor(ITransportProvider.TransportProtocol.TransportWireGuard),
+            PublicKey            = publicKey.ToBase64()
+        };
+
+        var reqUri = new Uri($"https://{hostname}/api/v1.3/device");
+        var request = new HttpRequestMessage(HttpMethod.Post, reqUri);
+        var payloadString = JsonSerializer.Serialize(
+            payload, RegisterDevicePayloadJsonContext.Default.RegisterDevicePayload);
+        // Don't log the JWT or public key — both are sensitive. Log shape only.
+        Logger.LogInformation(
+            "NegotiateWireGuardCredential: POST /api/v1.3/device transport=wireguard host={Host}",
+            hostname);
+        request.Content = new StringContent(payloadString);
+
+        HttpResponseMessage response;
+        WireGuardRegistrationResponse? wgResponse;
+        try
+        {
+            response = await HttpUtils.Client.SendAsync(request);
+            errorResponse.SetResponse(response);
+
+            if (!response.IsSuccessStatusCode)
+            {
+                var body = await response.Content.ReadAsStringAsync();
+                Logger.LogError(
+                    "NegotiateWireGuardCredential: register failed {Status}: {Body}",
+                    (int)response.StatusCode, body);
+                return errorResponse.SetErrorMessage(
+                    $"WireGuard registration failed: {(int)response.StatusCode}");
+            }
+
+            var respContent = await response.Content.ReadAsStringAsync();
+            wgResponse = JsonSerializer.Deserialize(
+                respContent, WireGuardRegistrationResponseJsonContext.Default.WireGuardRegistrationResponse);
+        }
+        catch (Exception e)
+        {
+            Logger.LogError(e, "NegotiateWireGuardCredential: HTTP/parse failure");
+            return errorResponse.SetException(e);
+        }
+
+        if (wgResponse is null
+            || string.IsNullOrEmpty(wgResponse.ServerPublicKey)
+            || string.IsNullOrEmpty(wgResponse.MappedIPv4Address)
+            || string.IsNullOrEmpty(wgResponse.ClientId))
+        {
+            return errorResponse.SetErrorMessage(
+                "WireGuard registration response missing required fields (server-public-key / mapped-ipv4-address / client-id).");
+        }
+
+        var credential = new GRDCredential
+        {
+            TransportProtocol  = ITransportProvider.TransportProtocol.TransportWireGuard,
+            Identifer          = "main",
+            MainCredential     = true,
+            HostName           = hostname,
+            HostnameDisplayValue = hostname,
+            Name               = hostname,
+            ExpirationDate     = DateTime.UtcNow.AddDays(validForDays),
+            ClientId           = wgResponse.ClientId,
+            ApiAuthToken       = wgResponse.ApiAuthToken,
+            DevicePrivateKey   = privateKey.ToBase64(),
+            DevicePublicKey    = publicKey.ToBase64(),
+            ServerPublicKey    = wgResponse.ServerPublicKey,
+            IPv4Address        = wgResponse.MappedIPv4Address,
+            IPv6Address        = wgResponse.MappedIPv6Address,
+            // Per CJ pattern from GRDCredential.InitWithTransportProtocol — populate
+            // UserName/Password so older code paths that key off them don't break.
+            UserName           = wgResponse.ClientId,
+            Password           = "wireguard-creds",
+        };
+
+        errorResponse.SetData(new List<GRDCredential> { credential });
+        Logger.LogInformation(
+            "NegotiateWireGuardCredential: success — clientId={ClientId}, ipv4={IPv4}",
+            credential.ClientId, credential.IPv4Address);
         return errorResponse;
     }
 
