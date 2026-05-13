@@ -27,6 +27,7 @@ public sealed class VpnTunnelManager : ITransportProvider, IDisposable
 
     private readonly object _lock = new();
     private WireGuardTunnel? _tunnel;
+    private WireGuardDnsBlockPermit.Installation? _dnsFilters;
     private ITransportProvider.VPNProviderStatus _status =
         ITransportProvider.VPNProviderStatus.VPNStatusDisconnected;
     private ITransportProvider.VPNConnectionError _lastError;
@@ -103,10 +104,22 @@ public sealed class VpnTunnelManager : ITransportProvider, IDisposable
         }
 
         WireGuardTunnel tunnel = new(AdapterName);
+        WireGuardDnsBlockPermit.Installation? dnsFilters = null;
         try
         {
             tunnel.Activate(config);
             ApplyAdapterConfiguration(tunnel.AdapterLuid, config);
+
+            // DNS-leak protection: block all DNS in the VPN DNS sublayer and
+            // permit only DNS leaving on the tunnel adapter's LUID. Without
+            // this, Windows' multi-homed DNS sends parallel queries to the
+            // physical NIC's resolvers (e.g. ISP DNS) and leaks. The IKEv2
+            // path gets a similar effect for free from the RAS PPP connection
+            // bumping the physical adapter's metric; Wintun doesn't.
+            dnsFilters = WireGuardDnsBlockPermit.Install(tunnel.AdapterLuid);
+            if (dnsFilters is null)
+                throw new InvalidOperationException(
+                    "WireGuardDnsBlockPermit.Install failed; refusing to connect without DNS-leak protection.");
         }
         catch (Exception ex)
         {
@@ -115,6 +128,7 @@ public sealed class VpnTunnelManager : ITransportProvider, IDisposable
                 _status = ITransportProvider.VPNProviderStatus.VPNStatusDisconnected;
                 _lastError = ITransportProvider.VPNConnectionError.VPNConnectionErrorConfigurationFailed;
             }
+            if (dnsFilters is not null) WireGuardDnsBlockPermit.Uninstall(dnsFilters);
             // Dispose tears down the WG adapter, which sweeps away any IP / DNS / route
             // entries we attached to it before the failure.
             tunnel.Dispose();
@@ -125,6 +139,7 @@ public sealed class VpnTunnelManager : ITransportProvider, IDisposable
         lock (_lock)
         {
             _tunnel = tunnel;
+            _dnsFilters = dnsFilters;
             _status = ITransportProvider.VPNProviderStatus.VPNStatusConnected;
             _connectedDate = DateTime.UtcNow;
             _lastError = 0;
@@ -190,16 +205,23 @@ public sealed class VpnTunnelManager : ITransportProvider, IDisposable
     public ErrorResponse StopVPNTunnel(bool wasDisconnectPlanned = true)
     {
         WireGuardTunnel? tunnel;
+        WireGuardDnsBlockPermit.Installation? dnsFilters;
         lock (_lock)
         {
             tunnel = _tunnel;
+            dnsFilters = _dnsFilters;
             _tunnel = null;
+            _dnsFilters = null;
             if (tunnel is not null)
                 _status = ITransportProvider.VPNProviderStatus.VPNStatusDisconnecting;
         }
 
         if (tunnel is null)
             return new ErrorResponse();
+
+        // Uninstall DNS filters before tearing down the adapter so the
+        // LUID-scoped permits don't briefly outlive the tunnel they reference.
+        if (dnsFilters is not null) WireGuardDnsBlockPermit.Uninstall(dnsFilters);
 
         try
         {
