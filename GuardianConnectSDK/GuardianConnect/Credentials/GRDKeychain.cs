@@ -10,7 +10,13 @@ namespace GuardianConnect.Credentials;
 
 public class GRDKeychain : IGRDKeychain
 {
-    public const string GRDKeyPath = @"Software\GuardianVPN";
+    // Aligned with RegistrySettings.GRDUserKeyPath — see that comment for
+    // the rationale. The PETOKEN and other DPAPI-encrypted credentials
+    // live under this subtree; CleanupUtil's BACKUP/RESTORE round-trip
+    // during MajorUpgrade migrates the encrypted values from the legacy
+    // Software\GuardianVPN path verbatim (DPAPI ciphertext round-trips
+    // cleanly since the user account doesn't change).
+    public const string GRDKeyPath = @"Software\GuardianFirewall\Settings";
     public static ILogger _logger = NullLogger.Instance;
     public static string _entropyData = @"Быстрая, коричневая лиса, перепрыгнула через ленивого пса";
 
