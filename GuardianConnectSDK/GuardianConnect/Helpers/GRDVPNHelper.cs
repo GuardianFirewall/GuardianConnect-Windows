@@ -468,16 +468,67 @@ public class GRDVPNHelper
     {
         _logger.LogInformation("StartWireGuardConnectionWithNegotiation: entry");
 
-        // Pick a host. Mirror CreateStandaloneCredentialsForTransportProtocol's
-        // strategy so the negotiate path and the IKEv2 register path land on
-        // hosts the same way.
-        var (host, hostDisplay, hostErr) =
-            GRDServerManager.SelectGuardianHostWithCompletion(PreferredRegion);
-        if (hostErr.IsError)
+        // Host pick: prefer the user's explicit selection from the Developer
+        // tab's host tree (persisted to HKCU\kGuardianPreferredHost). If
+        // present and the host is in the cache, use it verbatim and snap
+        // PreferredRegion to the host's region so the rest of the app
+        // (RegionPicker etc.) reflects the chosen region. Fall through to
+        // the usual SelectBestHostInRegion auto-pick when no override is
+        // set or the override host isn't in the cache.
+        string host;
+        string hostDisplay;
+
+        var hostOverride = RegistrySettings.RetrieveGuardianUserSettings(Common.kGuardianPreferredHost);
+        if (!string.IsNullOrWhiteSpace(hostOverride))
         {
-            _logger.LogError(
-                "StartWireGuardConnectionWithNegotiation: host selection failed: {Msg}", hostErr.Message);
-            return hostErr;
+            var hostRecord = GRDServerManager.FindHostRecord(hostOverride);
+            if (hostRecord is not null)
+            {
+                host = hostRecord.Hostname;
+                hostDisplay = hostRecord.HostLocation();
+                var regionKey = GRDServerManager.FindRegionKeyForHostname(hostOverride);
+                if (!string.IsNullOrWhiteSpace(regionKey))
+                {
+                    PreferredRegion = regionKey;
+                }
+                _logger.LogInformation(
+                    "StartWireGuardConnectionWithNegotiation: using host override '{Host}' (display='{Display}', region='{Region}')",
+                    host, hostDisplay, regionKey ?? "<unknown>");
+            }
+            else
+            {
+                // Cache miss: probably the host's region hasn't been loaded yet.
+                // Falling back to default is safer than failing the connect;
+                // the user can retry once the region has been browsed in the
+                // tree (which populates the cache).
+                _logger.LogWarning(
+                    "StartWireGuardConnectionWithNegotiation: host override '{Host}' not in cache; falling back to region auto-pick",
+                    hostOverride);
+                var (defHost, defDisplay, hostErr) =
+                    GRDServerManager.SelectGuardianHostWithCompletion(PreferredRegion);
+                if (hostErr.IsError)
+                {
+                    _logger.LogError(
+                        "StartWireGuardConnectionWithNegotiation: host selection failed: {Msg}", hostErr.Message);
+                    return hostErr;
+                }
+                host = defHost;
+                hostDisplay = defDisplay;
+            }
+        }
+        else
+        {
+            // No override — default region-based pick.
+            var (defHost, defDisplay, hostErr) =
+                GRDServerManager.SelectGuardianHostWithCompletion(PreferredRegion);
+            if (hostErr.IsError)
+            {
+                _logger.LogError(
+                    "StartWireGuardConnectionWithNegotiation: host selection failed: {Msg}", hostErr.Message);
+                return hostErr;
+            }
+            host = defHost;
+            hostDisplay = defDisplay;
         }
 
         var (subCred, jwtErr) = await GetValidSubscriberCredentialWithCompletion();

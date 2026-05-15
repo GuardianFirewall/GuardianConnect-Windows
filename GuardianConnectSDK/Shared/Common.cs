@@ -79,6 +79,17 @@ public class Common
     /// </summary>
     public const string kGuardianUseFileBasedWireGuardConfig = "kGuardianUseFileBasedWireGuardConfig";
 
+    /// <summary>
+    /// HKCU user setting holding a specific server hostname the user picked
+    /// via the Developer tab's host tree. Non-empty means "use this exact
+    /// host for the next WG connect; ignore the usual SelectBestHostInRegion
+    /// pick". GRDVPNHelper.StartWireGuardConnectionWithNegotiation reads
+    /// this; if the host exists in the cache it's used verbatim and
+    /// PreferredRegion is updated to match. Empty / absent = default
+    /// behaviour (region-based auto-pick).
+    /// </summary>
+    public const string kGuardianPreferredHost = "kGuardianPreferredHost";
+
     public const string kGRDWGDevicePublicKey = "wg-device-public-key";
     public const string kGRDWGDevicePrivateKey = "wg-device-private-key";
     public const string kGRDWGServerPublicKey = "server-public-key";

@@ -204,6 +204,65 @@ public class GRDServerManager
         return Live.regionLookup[regionKey];
     }
 
+    /// <summary>
+    /// Returns the list of hosts for a given region. Used by the Windows
+    /// client's Developer-tab tree to populate a region's expandable host
+    /// list. If the host cache for this region is empty, triggers
+    /// GetHostsForRegion to fetch (blocks up to ~5s). If the region key
+    /// isn't in our region lookup at all, returns an empty list rather
+    /// than throwing.
+    /// </summary>
+    public static async Task<List<RegionalHostRecord>> EnumerateHostsForRegion(string regionKey)
+    {
+        if (string.IsNullOrWhiteSpace(regionKey)) return new List<RegionalHostRecord>();
+        if (!Live.regionLookup.ContainsKey(regionKey)) return new List<RegionalHostRecord>();
+
+        if (!Live._hostLookup.ContainsKey(regionKey) || Live._hostLookup[regionKey].Count == 0)
+        {
+            await GetHostsForRegion(regionKey).ConfigureAwait(false);
+        }
+
+        return Live._hostLookup.TryGetValue(regionKey, out var hosts)
+            ? hosts.ToList()
+            : new List<RegionalHostRecord>();
+    }
+
+    /// <summary>
+    /// Looks up the region key (internal name) that owns the given hostname
+    /// by scanning loaded host caches. Returns null if not found —
+    /// typically means the host's region's host list hasn't been loaded
+    /// yet. Caller should consider triggering a load first if it's
+    /// expecting a result.
+    /// </summary>
+    public static string? FindRegionKeyForHostname(string hostname)
+    {
+        if (string.IsNullOrWhiteSpace(hostname)) return null;
+        foreach (var kvp in Live._hostLookup)
+        {
+            if (kvp.Value.Any(h => string.Equals(h.Hostname, hostname, StringComparison.OrdinalIgnoreCase)))
+                return kvp.Key;
+        }
+        return null;
+    }
+
+    /// <summary>
+    /// Returns the cached RegionalHostRecord for the given hostname, or
+    /// null if not found across any loaded region's host list. Used by
+    /// the WireGuard negotiate flow to pull DisplayName for an
+    /// override host.
+    /// </summary>
+    public static RegionalHostRecord? FindHostRecord(string hostname)
+    {
+        if (string.IsNullOrWhiteSpace(hostname)) return null;
+        foreach (var hosts in Live._hostLookup.Values)
+        {
+            var match = hosts.FirstOrDefault(h =>
+                string.Equals(h.Hostname, hostname, StringComparison.OrdinalIgnoreCase));
+            if (match != null) return match;
+        }
+        return null;
+    }
+
     #endregion
 
     #region private methods
