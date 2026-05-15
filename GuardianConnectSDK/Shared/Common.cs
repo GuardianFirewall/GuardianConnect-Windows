@@ -228,9 +228,12 @@ public class Common
     // Reset.
     public const string KSEVT_NAME_STATUSCHANGED = "Global\\GRDKILLSWITCHSTATUSCHANGED";
 
-    // HKLM\Software\GuardianVPN values written by the service alongside the
+    // HKLM\Software\GuardianFirewall values written by the service alongside the
     // KSEVT_NAME_STATUSCHANGED signal. UI reads after WaitOne returns. "1"/"0" for
-    // bools, the KillSwitchMode enum name for the mode.
+    // bools, the KillSwitchMode enum name for the mode. (Moved from the historical
+    // HKLM\Software\GuardianVPN location to align with the GuardianFirewall naming
+    // the installer already uses for its Installation subtree — see
+    // RegistrySettings.GRDMachineKeyPath for the migration note.)
     public const string kKillSwitchActiveRegValue = "KillSwitchIsActive";
     public const string kKillSwitchModeRegValue   = "KillSwitchActiveMode";
     public const string kKillSwitchAllowLanRegValue = "KillSwitchActiveAllowLan";
