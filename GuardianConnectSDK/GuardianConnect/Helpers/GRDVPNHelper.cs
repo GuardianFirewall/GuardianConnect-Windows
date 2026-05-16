@@ -264,6 +264,33 @@ public class GRDVPNHelper
             return await StartWireGuardConnectionWithNegotiation();
         }
 
+        // IKEv2 host-override sync: the IKEv2 connect uses MainCredential.HostName
+        // verbatim (no kGuardianPreferredHost awareness downstream). If the user
+        // picked a different host in the Developer tab since the last successful
+        // connect, the stored MainCredential is stale and would connect to the
+        // PREVIOUS host (classic off-by-one). The RegionPicker handler only resets
+        // creds on REGION change, so same-region/different-host picks (e.g.,
+        // austria vienna10 → vienna7 → vienna4) never trigger a refresh. Detect
+        // the mismatch here and rebuild fresh credentials via
+        // ConnectVpnWithNewUserCredentialsForProtocol, which routes through
+        // CreateStandaloneCredentialsForTransportProtocol — that path now honors
+        // kGuardianPreferredHost and will lock the new MainCredential.HostName to
+        // the override.
+        var hostOverrideIke = RegistrySettings.RetrieveGuardianUserSettings(Common.kGuardianPreferredHost);
+        var existingMainCreds = GRDCredentialManager.GetMainCredentials();
+        if (!string.IsNullOrWhiteSpace(hostOverrideIke)
+            && existingMainCreds is not null
+            && !string.IsNullOrEmpty(existingMainCreds.HostName)
+            && !string.Equals(existingMainCreds.HostName, hostOverrideIke, StringComparison.OrdinalIgnoreCase))
+        {
+            _logger.LogInformation(
+                "ConnectVpnWithConfiguredCredentials (IKEv2): host override '{Override}' differs from MainCredential.HostName '{Current}'; refreshing credentials",
+                hostOverrideIke, existingMainCreds.HostName);
+            ResetMainCredentials();
+            return await ConnectVpnWithNewUserCredentialsForProtocol(
+                ITransportProvider.TransportProtocol.TransportIKEv2);
+        }
+
         // Need to check if we've set our local copy of credentials and if null then grab from GRDCM
         var mainCredentials = GRDCredentialManager.GetMainCredentials();
         if (mainCredentials == null
@@ -370,7 +397,50 @@ public class GRDVPNHelper
     {
         var errorResponse = new ErrorResponse();
 
-        var (host, hostDisplay, error) = GRDServerManager.SelectGuardianHostWithCompletion(PreferredRegion);
+        // Host pick: same precedence as the WireGuard negotiate path.
+        // 1) explicit kGuardianPreferredHost override from the Developer
+        //    tab's host tree (cache hit → use record; cache miss → use
+        //    the hostname verbatim so a swapped Live._hostLookup doesn't
+        //    silently discard the user's choice);
+        // 2) otherwise the legacy region-based auto-pick via
+        //    SelectGuardianHostWithCompletion(PreferredRegion).
+        string host;
+        string hostDisplay;
+
+        var hostOverride = RegistrySettings.RetrieveGuardianUserSettings(Common.kGuardianPreferredHost);
+        if (!string.IsNullOrWhiteSpace(hostOverride))
+        {
+            var hostRecord = GRDServerManager.FindHostRecord(hostOverride);
+            if (hostRecord is not null)
+            {
+                host = hostRecord.Hostname;
+                hostDisplay = hostRecord.HostLocation();
+                _logger.LogInformation(
+                    "CreateStandaloneCredentialsForTransportProtocol: using host override '{Host}' (display='{Display}')",
+                    host, hostDisplay);
+            }
+            else
+            {
+                // See StartWireGuardConnectionWithNegotiation for context —
+                // a SwapActiveGeoInfoCache in LongRunningRefreshTask can
+                // wipe the on-demand _hostLookup between Developer-tab
+                // selection and connect. The user's selection wins
+                // regardless; backend API will reject server-side if the
+                // hostname is invalid.
+                host = hostOverride;
+                hostDisplay = hostOverride;
+                _logger.LogWarning(
+                    "CreateStandaloneCredentialsForTransportProtocol: host override '{Host}' not in local cache; using hostname directly",
+                    hostOverride);
+            }
+        }
+        else
+        {
+            var (defHost, defDisplay, _) = GRDServerManager.SelectGuardianHostWithCompletion(PreferredRegion);
+            host = defHost;
+            hostDisplay = defDisplay;
+        }
+
         errorResponse = await CreateStandaloneCredentialsForTransportProtocol(protocol, validForDays, host);
         if (errorResponse.IsError) return errorResponse;
 
