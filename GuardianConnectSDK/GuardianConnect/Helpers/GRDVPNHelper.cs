@@ -497,23 +497,22 @@ public class GRDVPNHelper
             }
             else
             {
-                // Cache miss: probably the host's region hasn't been loaded yet.
-                // Falling back to default is safer than failing the connect;
-                // the user can retry once the region has been browsed in the
-                // tree (which populates the cache).
+                // Cache miss: the Live._hostLookup that held this region's
+                // hosts has likely been wiped by a SwapActiveGeoInfoCache
+                // (LongRunningRefreshTask kicks off a fresh Alternate cache
+                // every refresh interval and swaps Live to point at it; the
+                // newly-active cache won't have on-demand host lists until
+                // someone re-fetches per region). The user's explicit
+                // selection trumps cache state, so use the hostname verbatim
+                // — the negotiate API doesn't require a local cache hit and
+                // will simply reject if the hostname is invalid. Display
+                // falls back to the hostname (we lose the pretty
+                // HostLocation string until the user re-browses the region).
+                host = hostOverride;
+                hostDisplay = hostOverride;
                 _logger.LogWarning(
-                    "StartWireGuardConnectionWithNegotiation: host override '{Host}' not in cache; falling back to region auto-pick",
+                    "StartWireGuardConnectionWithNegotiation: host override '{Host}' not in local cache; using hostname directly (display will lack region info until host cache is repopulated)",
                     hostOverride);
-                var (defHost, defDisplay, hostErr) =
-                    GRDServerManager.SelectGuardianHostWithCompletion(PreferredRegion);
-                if (hostErr.IsError)
-                {
-                    _logger.LogError(
-                        "StartWireGuardConnectionWithNegotiation: host selection failed: {Msg}", hostErr.Message);
-                    return hostErr;
-                }
-                host = defHost;
-                hostDisplay = defDisplay;
             }
         }
         else
