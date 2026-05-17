@@ -1,4 +1,5 @@
 using System.ComponentModel;
+using System.Runtime.InteropServices;
 using GuardianConnect.Abstractions;
 using GuardianConnect.Shared;
 using Serilog;
@@ -238,6 +239,31 @@ public sealed class VpnTunnelManager : ITransportProvider, IDisposable
             return ErrorResponse.FromException(ex);
         }
 
+        // Flush the Windows DNS resolver cache: when the WG adapter was up
+        // wg-quick configured it with DNS = 1.1.1.1 / 1.0.0.1 and Windows
+        // stamped those as the system resolvers for the WG adapter. Tearing
+        // the Wintun adapter down removes the adapter cleanly, but the DNS
+        // Client service's per-process cache and the system resolver state
+        // briefly hold negative/positive entries that resolved through the
+        // now-gone interface. A rapid reconnect issuing an HTTPS lookup for
+        // a different gateway hostname (e.g., miami-2.sgw.guardianapp.com
+        // right after disconnecting from miami-4) gets back "No such host
+        // is known" because the resolver hasn't yet retried via the physical
+        // NIC. DnsFlushResolverCache is the same Win32 API used by
+        // `ipconfig /flushdns`; non-blocking, no privilege escalation.
+        try
+        {
+            var flushed = DnsFlushResolverCache();
+            Log.Information(
+                "VpnTunnelManager.StopVPNTunnel: DnsFlushResolverCache returned {Result}",
+                flushed);
+        }
+        catch (Exception ex)
+        {
+            Log.Warning(ex,
+                "VpnTunnelManager.StopVPNTunnel: DnsFlushResolverCache threw; continuing teardown");
+        }
+
         lock (_lock)
         {
             _status = ITransportProvider.VPNProviderStatus.VPNStatusDisconnected;
@@ -275,6 +301,16 @@ public sealed class VpnTunnelManager : ITransportProvider, IDisposable
     public ErrorResponse StopVPNTunnel(string entryName) => StopVPNTunnel();
 
     public void Dispose() => StopVPNTunnel();
+
+    // Flushes the system DNS resolver cache — equivalent to running
+    // `ipconfig /flushdns`. Called on WG tunnel teardown to drop any
+    // entries that resolved while the WG adapter's DNS (1.1.1.1) was the
+    // system resolver and that would otherwise leave a window where
+    // post-disconnect lookups via the physical NIC return stale results.
+    // Returns ERROR_SUCCESS (0) on success, a Win32 error code otherwise.
+    [DllImport("dnsapi.dll", EntryPoint = "DnsFlushResolverCache", CharSet = CharSet.Unicode, SetLastError = true)]
+    [return: MarshalAs(UnmanagedType.Bool)]
+    private static extern bool DnsFlushResolverCache();
 
     private static async Task<string?> ResolveConfigText(VPNCallParameters options)
     {

@@ -1,4 +1,5 @@
 ﻿using System.Net;
+using System.Net.Sockets;
 using System.Text.Json;
 using System.Text.Json.Serialization;
 using GuardianConnect.Abstractions;
@@ -15,6 +16,34 @@ namespace GuardianConnect.API;
 public class GRDGateway
 {
     private static ILogger _logger = NullLogger.Instance;
+
+    /// <summary>
+    /// True if the given exception chain represents a recoverable DNS or
+    /// network connectivity hiccup of the kind that resolves on its own
+    /// within a few hundred ms — typically post-WG-teardown when the
+    /// Windows resolver hasn't yet failed over from the (now-gone) WG
+    /// adapter's DNS to the physical NIC's. Matches HostNotFound /
+    /// TryAgain socket errors and broad HttpRequestException with a
+    /// SocketException inner cause.
+    /// </summary>
+    private static bool IsTransientDnsOrNetworkFailure(Exception e)
+    {
+        // Unwrap one level if it's an HttpRequestException wrapping a SocketException.
+        var sockEx = e as SocketException ?? e.InnerException as SocketException;
+        if (sockEx is not null)
+        {
+            return sockEx.SocketErrorCode is
+                SocketError.HostNotFound or
+                SocketError.TryAgain or
+                SocketError.NetworkUnreachable or
+                SocketError.HostUnreachable;
+        }
+        // Some flavours surface only as HttpRequestException with the text
+        // in Message — match the canonical Windows messages as a fallback.
+        var msg = e.Message;
+        return msg.Contains("No such host is known", StringComparison.OrdinalIgnoreCase)
+            || msg.Contains("Name or service not known", StringComparison.OrdinalIgnoreCase);
+    }
 
     private static ILogger Logger
     {
@@ -274,31 +303,70 @@ public class GRDGateway
             hostname);
         request.Content = new StringContent(payloadString);
 
+        // SendAsync wrapped in a retry-on-DNS-failure loop. The Windows DNS
+        // resolver briefly returns "No such host is known" for a gateway
+        // hostname immediately after a previous WG tunnel teardown (the
+        // system resolver state hasn't fully recovered from the WG adapter's
+        // DNS = 1.1.1.1 having been the active resolver). Service-side
+        // we also flush the resolver cache in VpnTunnelManager.StopVPNTunnel;
+        // this client-side retry is defense in depth for the residual race.
+        // We retry ONCE (after 350ms) on host-not-found / network-unreachable
+        // style failures, and surface anything else immediately.
         HttpResponseMessage response;
         WireGuardRegistrationResponse? wgResponse;
-        try
+        const int maxAttempts = 2;
+        int attempt = 0;
+        Exception? lastException = null;
+        while (true)
         {
-            response = await HttpUtils.Client.SendAsync(request);
-            errorResponse.SetResponse(response);
-
-            if (!response.IsSuccessStatusCode)
+            attempt++;
+            try
             {
-                var body = await response.Content.ReadAsStringAsync();
-                Logger.LogError(
-                    "NegotiateWireGuardCredential: register failed {Status}: {Body}",
-                    (int)response.StatusCode, body);
-                return errorResponse.SetErrorMessage(
-                    $"WireGuard registration failed: {(int)response.StatusCode}");
-            }
+                // SendAsync consumes the HttpRequestMessage on first use; rebuild it on retry.
+                if (attempt > 1)
+                {
+                    request = new HttpRequestMessage(HttpMethod.Post, reqUri)
+                    {
+                        Content = new StringContent(payloadString),
+                    };
+                }
+                response = await HttpUtils.Client.SendAsync(request);
+                errorResponse.SetResponse(response);
 
-            var respContent = await response.Content.ReadAsStringAsync();
-            wgResponse = JsonSerializer.Deserialize(
-                respContent, WireGuardRegistrationResponseJsonContext.Default.WireGuardRegistrationResponse);
+                if (!response.IsSuccessStatusCode)
+                {
+                    var body = await response.Content.ReadAsStringAsync();
+                    Logger.LogError(
+                        "NegotiateWireGuardCredential: register failed {Status}: {Body}",
+                        (int)response.StatusCode, body);
+                    return errorResponse.SetErrorMessage(
+                        $"WireGuard registration failed: {(int)response.StatusCode}");
+                }
+
+                var respContent = await response.Content.ReadAsStringAsync();
+                wgResponse = JsonSerializer.Deserialize(
+                    respContent, WireGuardRegistrationResponseJsonContext.Default.WireGuardRegistrationResponse);
+                break;
+            }
+            catch (Exception e) when (IsTransientDnsOrNetworkFailure(e) && attempt < maxAttempts)
+            {
+                Logger.LogWarning(
+                    "NegotiateWireGuardCredential: transient DNS/network failure on attempt {Attempt}/{Max} for host '{Host}'; retrying after 350ms. {Msg}",
+                    attempt, maxAttempts, hostname, e.Message);
+                lastException = e;
+                await Task.Delay(350);
+            }
+            catch (Exception e)
+            {
+                Logger.LogError(e, "NegotiateWireGuardCredential: HTTP/parse failure");
+                return errorResponse.SetException(e);
+            }
         }
-        catch (Exception e)
+        if (lastException is not null)
         {
-            Logger.LogError(e, "NegotiateWireGuardCredential: HTTP/parse failure");
-            return errorResponse.SetException(e);
+            Logger.LogInformation(
+                "NegotiateWireGuardCredential: retry succeeded for host '{Host}' after transient failure '{Msg}'",
+                hostname, lastException.Message);
         }
 
         if (wgResponse is null
