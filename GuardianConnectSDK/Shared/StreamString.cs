@@ -49,11 +49,22 @@ public class StreamString
         }
 
         var inBuffer = new byte[len];
-        var readAsync = await ioStream.ReadAsync(inBuffer, 0, len);
 
-        var s = streamEncoding.GetString(inBuffer);
+        // ReadExactlyAsync (NOT ReadAsync): a named-pipe ReadAsync is
+        // allowed to return fewer bytes than requested on a single call,
+        // and earlier this method ignored the actual byte count and
+        // decoded the whole buffer anyway. Any unread bytes from the
+        // short read stayed in the pipe and were then mis-interpreted as
+        // the two-byte length prefix of the next message, throwing the
+        // framing permanently off (UTF-16 reads of off-by-N stream
+        // positions produce garbled high-codepoint characters and
+        // bogus message lengths). Short reads were rare with small
+        // IKEv2-era responses but reliably broke the WG-disconnect
+        // flow once WG actually connected end-to-end. ReadExactlyAsync
+        // loops internally until the requested byte count is satisfied.
+        await ioStream.ReadExactlyAsync(inBuffer, 0, len).ConfigureAwait(false);
 
-        return Task.FromResult(s).Result;
+        return streamEncoding.GetString(inBuffer);
     }
 
     public int WriteString(string outString)
