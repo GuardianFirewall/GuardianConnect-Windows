@@ -169,8 +169,14 @@ public class ClientPipeImpl : IGuardianNPContract
     {
         var cmdPayload = JsonSerializer.Serialize(composite);
         var cmdString = $"{Hexify(IGuardianNPContract.NPCommands.GetDataUsingDataContract)}.{cmdPayload}";
-        ss.WriteString(cmdString);
-        var response = ss.ReadStringAsync().Result;
+        string response;
+        _pipeIO.Wait();
+        try
+        {
+            ss.WriteString(cmdString);
+            response = ss.ReadStringAsync().Result;
+        }
+        finally { _pipeIO.Release(); }
         var value = JsonSerializer.Deserialize<CompositeType>(response);
 
         if (value == null) throw new InvalidOperationException("Service returned null");
@@ -288,9 +294,15 @@ public class ClientPipeImpl : IGuardianNPContract
     {
         ClientPipe.Logger.LogInformation("Pinging service");
         var cmdString = $"{Hexify(IGuardianNPContract.NPCommands.Ping)}.";
-        ss.WriteString(cmdString);
-        ClientPipe.Logger.LogInformation("Reading status...");
-        var ping = await ss.ReadStringAsync();
+        string ping;
+        await _pipeIO.WaitAsync().ConfigureAwait(false);
+        try
+        {
+            ss.WriteString(cmdString);
+            ClientPipe.Logger.LogInformation("Reading status...");
+            ping = await ss.ReadStringAsync().ConfigureAwait(false);
+        }
+        finally { _pipeIO.Release(); }
         ClientPipe.Logger.LogInformation($"Service returned {ping}");
         return ping;
     }
@@ -305,14 +317,18 @@ public class ClientPipeImpl : IGuardianNPContract
         var msg = Common.LogFilterOn ? "OFF" : "ON";
         ClientPipe.Logger.LogInformation($"Telling Service to turn Logging {msg}");
         var cmdString = $"{Hexify(IGuardianNPContract.NPCommands.ToggleLogging)}.{whetherToDeleteLogFiles.ToString()}";
-        ss.WriteString(cmdString);
+        _pipeIO.Wait();
+        try { ss.WriteString(cmdString); }
+        finally { _pipeIO.Release(); }
     }
 
     public void SwitchServiceLoggingLevel(Common.LoggingLevels loggingLevel)
     {
         ClientPipe.Logger.LogWarning($"Sending command to service to switch logging level to {loggingLevel}");
         var cmdString = $"{Hexify(IGuardianNPContract.NPCommands.SwitchLoggingLevel)}.{loggingLevel}";
-        ss.WriteString(cmdString);
+        _pipeIO.Wait();
+        try { ss.WriteString(cmdString); }
+        finally { _pipeIO.Release(); }
     }
 
     // -- Kill Switch IPC (i221) ----------------------------------------------------
@@ -489,9 +505,15 @@ public class ClientPipeImpl : IGuardianNPContract
         ClientPipe.Logger.LogInformation(
             $"Requesting GuardianFirewall Service's last {maxNumberOfLinesToGet} log lines...");
         var cmdString = $"{Hexify(IGuardianNPContract.NPCommands.RequestLogLines)}.{maxNumberOfLinesToGet}";
-        ss.WriteString(cmdString);
-        ClientPipe.Logger.LogInformation("Reading response...");
-        var serializedServiceLogs = await ss.ReadStringAsync();
+        string serializedServiceLogs;
+        await _pipeIO.WaitAsync().ConfigureAwait(false);
+        try
+        {
+            ss.WriteString(cmdString);
+            ClientPipe.Logger.LogInformation("Reading response...");
+            serializedServiceLogs = await ss.ReadStringAsync().ConfigureAwait(false);
+        }
+        finally { _pipeIO.Release(); }
         var jsonLines =
             JsonSerializer.Deserialize<List<string>>(serializedServiceLogs, LogLinesJsonContext.Default.ListString);
         var serviceLogLines = jsonLines ?? new List<string>();
@@ -552,11 +574,19 @@ public class ClientPipeImpl : IGuardianNPContract
                 break;
         }
         var cmdString = $"{Hexify(IGuardianNPContract.NPCommands.SendPowerAndNetworkEvents)}{senderEventType}.{cmdPayload}";
-        ss.WriteString(cmdString);
-        // Don't think we need a response from Service on what we threw over to it - basically a fire and forget
-        //var response = ss.ReadStringAsync().Result;
-        //ClientPipe.Logger.Log(LogLevel.Information, $"ClientPipe: string from service: '{response}'");
-        //var value = JsonSerializer.Deserialize<CompositeType>(response);
+
+        // "Fire and forget" but NOT "lock-free": this write still goes onto the
+        // same shared NamedPipeClientStream as every other IPC command, so it
+        // MUST hold _pipeIO across the WriteString. Without the lock, a network-
+        // change notification fired between two serialized request/response pairs
+        // (very common path: WG tunnel teardown raises NetworkAddressChanged on
+        // the same scheduler tick that wakes the conn-state notifier thread)
+        // interleaves its length-prefixed bytes with whichever thread holds the
+        // semaphore, throwing the framing off and stranding the next reader on
+        // a response that will never arrive.
+        _pipeIO.Wait();
+        try { ss.WriteString(cmdString); }
+        finally { _pipeIO.Release(); }
 
         return new ErrorResponse();
     }
