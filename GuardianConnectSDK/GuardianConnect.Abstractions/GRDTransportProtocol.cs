@@ -1,0 +1,78 @@
+using GuardianConnect.Shared;
+
+namespace GuardianConnect.Abstractions;
+
+/// <summary>
+/// Single source of truth for the user-selected VPN transport protocol.
+/// Replaces both the previous inline enum on <see cref="ITransportProvider"/>
+/// and the raw <c>RegistrySettings.RetrieveGuardianUserSettings(Common.kGuardianTransportProtocol)</c>
+/// + magic-string comparison pattern that was duplicated across every
+/// dispatch site (GRDVPNHelper, GeneralPageViewModel, AdvancedContentViewModel,
+/// DeveloperContentPage, ...).
+///
+/// The nested <see cref="TransportProtocol"/> enum is identical in shape to
+/// the prior <c>ITransportProvider.TransportProtocol</c> — same member
+/// names, same ordinal values — so on-disk JSON serialization of
+/// <c>GRDCredential.TransportProtocol</c> stays wire-compatible. Credentials
+/// persisted by older builds deserialize unchanged after this refactor.
+///
+/// Lives in <c>GuardianConnect.Abstractions</c> (same assembly as
+/// <see cref="ITransportProvider"/>) so the interface property
+/// <c>ITransportProvider.ProtocolType</c> can return this type without
+/// creating an upward dependency on the Helpers layer. The Get/Set
+/// methods are safe to use from Abstractions because
+/// <c>GuardianConnect.Shared</c> (which hosts <c>RegistrySettings</c>
+/// and <c>Common</c>) is already a dependency of Abstractions.
+/// </summary>
+public static class GRDTransportProtocol
+{
+    public enum TransportProtocol
+    {
+        TransportUnknown,
+        TransportIKEv2,
+        TransportWireGuard,
+    }
+
+    // Registry string values written by the UI radio toggle in
+    // AdvancedContentPage and read here. The on-disk format
+    // ("IKEv2", "WireGuard") is preserved verbatim from prior versions
+    // so this refactor doesn't require a migration step on upgrade.
+    private const string IKEv2String     = "IKEv2";
+    private const string WireGuardString = "WireGuard";
+
+    /// <summary>
+    /// Reads the user's preferred transport from
+    /// HKCU\Software\GuardianFirewall\Settings\kGuardianTransportProtocol.
+    /// Falls back to <see cref="TransportProtocol.TransportIKEv2"/> when
+    /// the value is missing or unrecognised — matching the prior implicit
+    /// default at every dispatch site (every previous reader fell through
+    /// to the IKEv2 branch whenever the registry value wasn't literally
+    /// the string "WireGuard").
+    /// </summary>
+    public static TransportProtocol GetPreferred()
+    {
+        var raw = RegistrySettings.RetrieveGuardianUserSettings(Common.kGuardianTransportProtocol);
+        if (string.Equals(raw, WireGuardString, StringComparison.OrdinalIgnoreCase))
+            return TransportProtocol.TransportWireGuard;
+        // Missing / "IKEv2" / unknown → IKEv2.
+        return TransportProtocol.TransportIKEv2;
+    }
+
+    /// <summary>
+    /// Persists the user's preferred transport. Called from the
+    /// AdvancedContentPage transport-radio handler and from the Dev
+    /// tab's forced-demotion paths (when a WG file-based override has
+    /// no valid wg-quick file). Writes the canonical string form
+    /// expected by <see cref="GetPreferred"/>.
+    /// </summary>
+    public static void SetPreferred(TransportProtocol p)
+    {
+        var s = p switch
+        {
+            TransportProtocol.TransportWireGuard => WireGuardString,
+            TransportProtocol.TransportIKEv2     => IKEv2String,
+            _                                    => IKEv2String,
+        };
+        RegistrySettings.UpdateGuardianUserSettings(Common.kGuardianTransportProtocol, s);
+    }
+}

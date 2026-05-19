@@ -174,7 +174,7 @@ public class GuardianNPCommandDispatcher : IGuardianNPContract
         try { active = _activeTransport; }
         finally { _transportGate.Release(); }
 
-        if (active is { ProtocolType: ITransportProvider.TransportProtocol.TransportWireGuard })
+        if (active is { ProtocolType: GRDTransportProtocol.TransportProtocol.TransportWireGuard })
         {
             status.ConnectionState = ConnectionStateEnum.Connected;
             status.EntryName = string.IsNullOrEmpty(NotificationHandler.LastKnownConnectedEntry)

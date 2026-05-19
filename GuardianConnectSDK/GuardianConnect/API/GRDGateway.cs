@@ -67,7 +67,7 @@ public class GRDGateway
         get
         {
             var mainCreds = GRDCredentialManager.GetMainCredentials();
-            if (mainCreds is { TransportProtocol: ITransportProvider.TransportProtocol.TransportIKEv2 })
+            if (mainCreds is { TransportProtocol: GRDTransportProtocol.TransportProtocol.TransportIKEv2 })
                 return mainCreds.UserName;
 
             return mainCreds?.ClientId ?? string.Empty;
@@ -186,7 +186,7 @@ public class GRDGateway
     /// @param options Optional non-standard values which should be passed to the VPN node via the JSON body of the request
     /// @param completion The completion handler called once the task is compeleted
     public static async Task<ErrorResponse> RegisterDeviceForTransportProtocol(
-        ITransportProvider.TransportProtocol transportProtocol, string hostname, string subscriberCredentialJWT,
+        GRDTransportProtocol.TransportProtocol transportProtocol, string hostname, string subscriberCredentialJWT,
         int validForDays)
     {
         var errorResponse = new ErrorResponse();
@@ -206,22 +206,21 @@ public class GRDGateway
         Logger.LogInformation($"RegisterDeviceForTransportProtocol: payload for call is '{payLoadString}");
         request.Content = new StringContent(payLoadString);
 
+        GRDCredential cred = new GRDCredential();
         try
         {
             response = await HttpUtils.Client.SendAsync(request);
-            errorResponse.SetResponse(response).SetData(new List<GRDCredential>());
+            errorResponse.SetResponse(response).SetData(new GRDCredential());
             var respContent = await response.Content.ReadAsStringAsync();
-            var cred = JsonSerializer.Deserialize<GRDCredential>(respContent,
+            cred = JsonSerializer.Deserialize<GRDCredential>(respContent,
                 GRDCredentialJsonContext.Default.GRDCredential);
             // 0.40.1 - sets ClientId from EapUser if IKEv2
             if (cred != null)
             {
-                if (cred.TransportProtocol == ITransportProvider.TransportProtocol.TransportIKEv2)
+                if (cred.TransportProtocol == GRDTransportProtocol.TransportProtocol.TransportIKEv2)
                 {
                     cred.ClientId = cred.UserName;
                 }
-                
-                credsList.Add(cred);
             }
         }
         catch (Exception e)
@@ -229,7 +228,7 @@ public class GRDGateway
             errorResponse.SetException(e);
         }
 
-        errorResponse.SetData(credsList);
+        errorResponse.SetData(cred);
 
         return errorResponse;
     }
@@ -240,10 +239,10 @@ public class GRDGateway
     /// (<c>GRDTransportProtocol transportProtocolStringFor</c>): "ikev2" or
     /// "wireguard".
     /// </summary>
-    public static string TransportProtocolStringFor(ITransportProvider.TransportProtocol protocol) =>
+    public static string TransportProtocolStringFor(GRDTransportProtocol.TransportProtocol protocol) =>
         protocol switch
         {
-            ITransportProvider.TransportProtocol.TransportWireGuard => "wireguard",
+            GRDTransportProtocol.TransportProtocol.TransportWireGuard => "wireguard",
             _ => "ikev2"
         };
 
@@ -289,7 +288,7 @@ public class GRDGateway
         var payload = new RegisterDevicePayload
         {
             subscriberCredential = subscriberCredentialJWT,
-            transportProtocol    = TransportProtocolStringFor(ITransportProvider.TransportProtocol.TransportWireGuard),
+            transportProtocol    = TransportProtocolStringFor(GRDTransportProtocol.TransportProtocol.TransportWireGuard),
             PublicKey            = publicKey.ToBase64()
         };
 
@@ -380,7 +379,7 @@ public class GRDGateway
 
         var credential = new GRDCredential
         {
-            TransportProtocol  = ITransportProvider.TransportProtocol.TransportWireGuard,
+            TransportProtocol  = GRDTransportProtocol.TransportProtocol.TransportWireGuard,
             Identifer          = "main",
             MainCredential     = true,
             HostName           = hostname,
@@ -400,7 +399,7 @@ public class GRDGateway
             Password           = "wireguard-creds",
         };
 
-        errorResponse.SetData(new List<GRDCredential> { credential });
+        errorResponse.SetData(credential);
         Logger.LogInformation(
             "NegotiateWireGuardCredential: success — clientId={ClientId}, ipv4={IPv4}",
             credential.ClientId, credential.IPv4Address);

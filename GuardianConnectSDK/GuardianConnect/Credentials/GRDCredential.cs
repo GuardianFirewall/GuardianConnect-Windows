@@ -64,7 +64,7 @@ public class GRDCredential
     public GRDCredential(Dictionary<string, object> credDict, string hostname, DateTime expirationDate)
     {
         var self = new GRDCredential(credDict);
-        self.TransportProtocol = ITransportProvider.TransportProtocol.TransportIKEv2;
+        self.TransportProtocol = GRDTransportProtocol.TransportProtocol.TransportIKEv2;
         HostName = hostname;
         ExpirationDate = expirationDate;
         _checkedExpiration = false;
@@ -77,7 +77,7 @@ public class GRDCredential
     public bool MainCredential { get; set; }
 
     //[JsonIgnore]
-    public ITransportProvider.TransportProtocol TransportProtocol { get; set; }
+    public GRDTransportProtocol.TransportProtocol TransportProtocol { get; set; }
     public string HostnameDisplayValue { get; set; } = string.Empty;
     public DateTime ExpirationDate { get; set; }
     public string HostName { get; set; } = string.Empty;
@@ -111,28 +111,28 @@ public class GRDCredential
         throw new NotImplementedException();
     }
 
-    public GRDCredential InitWithFullDictionary(Dictionary<string, object> credDict, int validForDays, bool isMain)
-    {
-        var self = new GRDCredential(credDict);
-        self.TransportProtocol = ITransportProvider.TransportProtocol.TransportIKEv2;
-        self.Identifer = isMain ? "main" : Guid.NewGuid().ToString();
-        self.UserName = (string)credDict[IGRDKeychain.kKeychainStr_EapUsername];
-        self.Password = (string)credDict[IGRDKeychain.kKeychainStr_EapPassword];
-        self.ApiAuthToken = (string)credDict[IGRDKeychain.kKeychainStr_AuthToken];
-        self.HostName = (string)credDict[Common.kGRDHostnameOverride];
-        self.ExpirationDate = DateTime.Now.AddDays(validForDays);
-        self.HostnameDisplayValue = (string)credDict[Common.kGRDVPNHostLocation];
-        self.Name = (string)credDict[Common.kGRDVPNHostLocation];
-
-        _checkedExpiration = false;
-        _checkedExpiration = false;
-        _expired = false;
-
-        self.CheckExpiration();
-        return self;
-    }
-
-    public GRDCredential InitWithTransportProtocol(ITransportProvider.TransportProtocol protocol,
+    // public GRDCredential InitWithFullDictionary(Dictionary<string, object> credDict, int validForDays, bool isMain)
+    // {
+    //     var self = new GRDCredential(credDict);
+    //     self.TransportProtocol = GRDTransportProtocol.TransportProtocol.TransportIKEv2;
+    //     self.Identifer = isMain ? "main" : Guid.NewGuid().ToString();
+    //     self.UserName = (string)credDict[IGRDKeychain.kKeychainStr_EapUsername];
+    //     self.Password = (string)credDict[IGRDKeychain.kKeychainStr_EapPassword];
+    //     self.ApiAuthToken = (string)credDict[IGRDKeychain.kKeychainStr_AuthToken];
+    //     self.HostName = (string)credDict[Common.kGRDHostnameOverride];
+    //     self.ExpirationDate = DateTime.Now.AddDays(validForDays);
+    //     self.HostnameDisplayValue = (string)credDict[Common.kGRDVPNHostLocation];
+    //     self.Name = (string)credDict[Common.kGRDVPNHostLocation];
+    //
+    //     _checkedExpiration = false;
+    //     _checkedExpiration = false;
+    //     _expired = false;
+    //
+    //     self.CheckExpiration();
+    //     return self;
+    // }
+    //
+    public GRDCredential InitWithTransportProtocol(GRDTransportProtocol.TransportProtocol protocol,
         Dictionary<string, object> credDict, int validForDays, bool areMainCreds)
     {
         var self = new GRDCredential(credDict);
@@ -148,7 +148,7 @@ public class GRDCredential
         _checkedExpiration = false;
         _expired = false;
 
-        if (protocol == ITransportProvider.TransportProtocol.TransportIKEv2)
+        if (protocol == GRDTransportProtocol.TransportProtocol.TransportIKEv2)
         {
             self.UserName = (string)credDict[IGRDKeychain.kKeychainStr_EapUsername];
             self.Password = (string)credDict[IGRDKeychain.kKeychainStr_EapPassword];
@@ -156,7 +156,7 @@ public class GRDCredential
             self.ClientId = self.UserName;
         }
 
-        if (protocol == ITransportProvider.TransportProtocol.TransportWireGuard)
+        if (protocol == GRDTransportProtocol.TransportProtocol.TransportWireGuard)
         {
             self.DevicePublicKey = (string)credDict[Common.kGRDWGDevicePublicKey];
             self.DevicePrivateKey = (string)credDict[Common.kGRDWGDevicePrivateKey];

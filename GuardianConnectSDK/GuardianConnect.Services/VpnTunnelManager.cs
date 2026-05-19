@@ -34,8 +34,8 @@ public sealed class VpnTunnelManager : ITransportProvider, IDisposable
     private ITransportProvider.VPNConnectionError _lastError;
     private DateTime _connectedDate = DateTime.MinValue;
 
-    public ITransportProvider.TransportProtocol ProtocolType =>
-        ITransportProvider.TransportProtocol.TransportWireGuard;
+    public GRDTransportProtocol.TransportProtocol ProtocolType =>
+        GRDTransportProtocol.TransportProtocol.TransportWireGuard;
 
     public ITransportProvider.VPNProviderStatus VPNStatus
     {

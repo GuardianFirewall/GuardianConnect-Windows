@@ -128,7 +128,7 @@ public class GRDVPNHelper
             return false;
         }
 
-        if (mainCreds.TransportProtocol == ITransportProvider.TransportProtocol.TransportIKEv2
+        if (mainCreds.TransportProtocol == GRDTransportProtocol.TransportProtocol.TransportIKEv2
             && !string.IsNullOrEmpty(mainCreds.HostName)
             && !string.IsNullOrEmpty(mainCreds.ApiAuthToken)
             && !string.IsNullOrEmpty(mainCreds.UserName))
@@ -141,27 +141,15 @@ public class GRDVPNHelper
         return false;
     }
 
-    /// <summary>
-    ///     Used to wipe out portion of MainCredentials to cause re-obtain when a new region is selected
-    /// </summary>
-    public static void ResetMainCredentials()
-    {
-        _logger.LogInformation("In ResetMainCredentials()");
-        GRDCredentialManager.ClearMainCredentials();
-    }
-
     /// Used to clear all of our current VPN configuration details from user defaults and the keychain
     public async void ClearVpnConfiguration()
     {
         ErrorResponse errorResponse;
         var mainCreds = GRDCredentialManager.GetMainCredentials();
-        if (mainCreds != null
-//                &&
-//                !string.IsNullOrEmpty(mainCreds.ClientId)
-           )
+        if (mainCreds != null )
         {
             var clientId = string.Empty;
-            if (mainCreds.TransportProtocol == ITransportProvider.TransportProtocol.TransportIKEv2)
+            if (mainCreds.TransportProtocol == GRDTransportProtocol.TransportProtocol.TransportIKEv2)
                 clientId = mainCreds.UserName;
             (var subCreds, errorResponse) = await GetValidSubscriberCredentialWithCompletion();
             if (subCreds == null || errorResponse.Message.Equals(Common.kPETOKENNOTSET))
@@ -206,16 +194,16 @@ public class GRDVPNHelper
     }
 
     public async Task<ErrorResponse> ConnectVpnWithNewUserCredentialsForProtocol(
-        ITransportProvider.TransportProtocol protocol)
+        GRDTransportProtocol.TransportProtocol protocol)
     {
         var errorResponse = new ErrorResponse();
 
         errorResponse = await CreateStandaloneCredentialsForTransportProtocol(protocol);
         if (errorResponse.IsError) return errorResponse;
 
-        var credentials = (List<GRDCredential>)errorResponse.Data!;
+        var credentials = (GRDCredential)errorResponse.Data!;
 
-        var mainCredential = credentials[0];
+        var mainCredential = credentials;
         mainCredential.TransportProtocol = protocol;
         mainCredential.MainCredential = true;
         GRDCredentialManager.AddOrUpdateCredential(mainCredential);
@@ -241,8 +229,7 @@ public class GRDVPNHelper
         //   2. A user-picked wg-quick file (developer override).
         // The toggle lives in HKCU/kGuardianUseFileBasedWireGuardConfig and is
         // surfaced in AdvancedSettings.
-        var selectedTransport = RegistrySettings.RetrieveGuardianUserSettings(Common.kGuardianTransportProtocol);
-        if (string.Equals(selectedTransport, "WireGuard", StringComparison.OrdinalIgnoreCase))
+        if (GRDTransportProtocol.GetPreferred() == GRDTransportProtocol.TransportProtocol.TransportWireGuard)
         {
             var useFileBased = string.Equals(
                 RegistrySettings.RetrieveGuardianUserSettings(Common.kGuardianUseFileBasedWireGuardConfig),
@@ -286,9 +273,9 @@ public class GRDVPNHelper
             _logger.LogInformation(
                 "ConnectVpnWithConfiguredCredentials (IKEv2): host override '{Override}' differs from MainCredential.HostName '{Current}'; refreshing credentials",
                 hostOverrideIke, existingMainCreds.HostName);
-            ResetMainCredentials();
+            GRDCredentialManager.ClearMainCredentials();
             return await ConnectVpnWithNewUserCredentialsForProtocol(
-                ITransportProvider.TransportProtocol.TransportIKEv2);
+                GRDTransportProtocol.TransportProtocol.TransportIKEv2);
         }
 
         // Need to check if we've set our local copy of credentials and if null then grab from GRDCM
@@ -306,7 +293,7 @@ public class GRDVPNHelper
             return errorResponse;
         }
 
-        if (mainCredentials!.TransportProtocol != ITransportProvider.TransportProtocol.TransportIKEv2)
+        if (mainCredentials!.TransportProtocol != GRDTransportProtocol.TransportProtocol.TransportIKEv2)
         {
             errorResponse.SetException(new InvalidOperationException("MainCredential.TransportProtocol not set!"))
                 .SetErrorMessage("WHY CALLING StartIKEv2Connection WITH PROTOCOL NOT SET??");
@@ -393,7 +380,7 @@ public class GRDVPNHelper
     }
 
     public async Task<ErrorResponse> CreateStandaloneCredentialsForTransportProtocol(
-        ITransportProvider.TransportProtocol protocol, int validForDays = 30)
+        GRDTransportProtocol.TransportProtocol protocol, int validForDays = 30)
     {
         var errorResponse = new ErrorResponse();
 
@@ -441,13 +428,14 @@ public class GRDVPNHelper
             hostDisplay = defDisplay;
         }
 
+        // PROTOPICK
         errorResponse = await CreateStandaloneCredentialsForTransportProtocol(protocol, validForDays, host);
         if (errorResponse.IsError) return errorResponse;
 
         // adding in host info here instead of above in caller
-        var credentials = (List<GRDCredential>)errorResponse.Data!;
-        credentials[0].HostName = host;
-        credentials[0].HostnameDisplayValue = hostDisplay;
+        var credentials = (GRDCredential)errorResponse.Data!;
+        credentials.HostName = host;
+        credentials.HostnameDisplayValue = hostDisplay;
         return new ErrorResponse().SetData(credentials);
     }
 
@@ -459,7 +447,7 @@ public class GRDVPNHelper
     /// @param hostname NSString hostname to connect to ie: saopaulo-ipsec-4.sudosecuritygroup.com
     /// @param completion block Completion block that will contain an NSDictionary of credentials upon success
     public async Task<ErrorResponse> CreateStandaloneCredentialsForTransportProtocol(
-        ITransportProvider.TransportProtocol protocol, int days, string hostname)
+        GRDTransportProtocol.TransportProtocol protocol, int days, string hostname)
     {
         ErrorResponse errorResponse;
         (var subCreds, errorResponse) = await GetValidSubscriberCredentialWithCompletion();
@@ -609,7 +597,7 @@ public class GRDVPNHelper
         }
 
         var negResult = await GRDGateway.NegotiateWireGuardCredential(host, subCred.Jwt, validForDays: 30);
-        if (negResult.IsError || negResult.Data is not List<GRDCredential> creds || creds.Count == 0)
+        if (negResult.IsError || negResult.Data is not GRDCredential cred )
         {
             _logger.LogError(
                 "StartWireGuardConnectionWithNegotiation: NegotiateWireGuardCredential failed: {Msg}",
@@ -617,13 +605,12 @@ public class GRDVPNHelper
             return negResult;
         }
 
-        var cred = creds[0];
         cred.HostName             = host;
         cred.HostnameDisplayValue = hostDisplay;
         cred.Name                 = hostDisplay;
         cred.MainCredential       = true;
         cred.Identifer            = "main";
-        cred.TransportProtocol    = ITransportProvider.TransportProtocol.TransportWireGuard;
+        cred.TransportProtocol    = GRDTransportProtocol.TransportProtocol.TransportWireGuard;
 
         // Persist the credential so subsequent connects can reuse it without
         // re-negotiating; an explicit "rotate keys" path can clear it later.

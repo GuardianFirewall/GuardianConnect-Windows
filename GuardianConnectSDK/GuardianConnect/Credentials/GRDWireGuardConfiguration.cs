@@ -42,7 +42,7 @@ public static class GRDWireGuardConfiguration
     /// </summary>
     public static string? WireGuardQuickConfigForCredential(GRDCredential credential, string? dnsServers = null)
     {
-        if (credential.TransportProtocol != ITransportProvider.TransportProtocol.TransportWireGuard)
+        if (credential.TransportProtocol != GRDTransportProtocol.TransportProtocol.TransportWireGuard)
         {
             Logger.LogError("WireGuardQuickConfigForCredential: credential is not a WireGuard credential.");
             return null;
