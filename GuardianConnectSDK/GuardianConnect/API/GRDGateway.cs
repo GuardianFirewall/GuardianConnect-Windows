@@ -407,7 +407,7 @@ public class GRDGateway
             ServerPublicKey    = wgResponse.ServerPublicKey,
             IPv4Address        = wgResponse.MappedIPv4Address,
             IPv6Address        = wgResponse.MappedIPv6Address,
-            // Per CJ pattern from GRDCredential.InitWithTransportProtocol — populate
+            // Per Tech Lead pattern from GRDCredential.InitWithTransportProtocol — populate
             // UserName/Password so older code paths that key off them don't break.
             UserName           = wgResponse.ClientId,
             Password           = "wireguard-creds",

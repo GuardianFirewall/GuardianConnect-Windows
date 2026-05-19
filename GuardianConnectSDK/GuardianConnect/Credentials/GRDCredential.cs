@@ -165,7 +165,7 @@ public class GRDCredential
             self.IPv6Address = (string)credDict[Common.kGRDWGIPv6Address];
             self.ClientId = (string)credDict[Common.kGRDClientId];
 
-            // Per CJ - for backwards compatibility
+            // Per Tech Lead - for backwards compatibility
             self.Password = @"wireguard-creds";
             self.UserName = (string)credDict[Common.kGRDClientId];
         }

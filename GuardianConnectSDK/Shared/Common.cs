@@ -173,7 +173,7 @@ public class Common
 
     public const string kGRDDeviceFilterConfigBlocklist = "GRDDeviceFilterConfigBlocklist";
 
-    // Note from CJ 2023-03-23
+    // Note from Tech Lead 2023-03-23
     // These are now deprecated, but we may want to use them in the future. They can be deleted at any time
     public const string kGRDDeviceFilterConfigBlockNone = "kGRDDeviceFilterConfigBlockNone";
     public const string kGRDDeviceFilterConfigBlockAds = "kGRDDeviceFilterConfigBlockAds";

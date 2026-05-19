@@ -102,7 +102,7 @@ public sealed unsafe class WireGuardTunnel : IDisposable
                        + sizeof(WireGuardPeer)
                        + sizeof(WireGuardAllowedIp) * allowedIpCount;
 
-        // Bounded by config size; ~280 bytes for the Tim-NY config. Safe to stackalloc.
+        // Bounded by config size; ~280 bytes for the test config. Safe to stackalloc.
         byte* buffer = stackalloc byte[totalBytes];
 
         BuildConfigBuffer(config, buffer);

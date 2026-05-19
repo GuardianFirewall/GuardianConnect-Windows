@@ -89,7 +89,7 @@ public class GRDSubscriberCredential
         var jwtSplit = Jwt.Split('.');
         var payloadString = jwtSplit[1];
 
-        // Note from CJ:
+        // Note from Tech Lead:
         // This is Base64 magic that I only partly understand because I am not entirely familiar with
         // the Base64 spec.
         // This just makes sure that the string can be read by removing invalid characters
