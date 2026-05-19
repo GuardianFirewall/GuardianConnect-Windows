@@ -1,81 +1,72 @@
 @echo off
-REM Build curve25519.dll for win-x64 and win-arm64 with the STATIC CRT (/MT)
-REM so the resulting dll has zero runtime dependency on vcruntime140.dll /
-REM ucrtbase.dll / msvcp140.dll. Earlier dynamic-CRT (/MD) builds shipped
-REM fine on dev boxes but failed to LoadLibrary on clean Windows installs
-REM that don't have the VC++ 2015-2022 Redistributable.
+REM Build curve25519.dll for win-x64 and win-arm64 using Go's crypto/ecdh
+REM (BSD-3-Clause). This replaced an earlier C-based build that pulled in
+REM the wireguard-tools curve25519 implementation under SPDX dual license
+REM GPL-2.0 OR MIT — even though MIT was electable, the GPL clause was
+REM unacceptable to legal review, so the implementation was swapped out
+REM for Go's standard library which is unambiguously BSD-3-Clause.
 REM
-REM Outputs the dll into win-x64\curve25519.dll and win-arm64\curve25519.dll
-REM (overwriting any prior build). Source = src\curve25519.c (upstream
-REM wireguard-tools, unmodified) + src\curve25519_windows.c (Windows
-REM BCryptGenRandom wrapper, exports the two-function API).
+REM Source: src\curve25519.go (a thin //export wrapper around
+REM   crypto/ecdh.X25519 + crypto/rand). Two C-ABI exports are produced:
+REM       curve25519_generate_private_key(unsigned char private_key[32])
+REM       curve25519_derive_public_key(unsigned char public_key[32],
+REM                                    const unsigned char private_key[32])
+REM matching the API the consumer's Curve25519Interop.cs P/Invokes against.
 REM
-REM Run from a regular cmd prompt — the script invokes VsDevCmd itself for
-REM each target arch. Verifies via dumpbin /imports that the result has no
-REM CRT dll imports before declaring success.
+REM Prerequisites:
+REM   - Go 1.21+ installed (default path: C:\Program Files\Go\bin\go.exe).
+REM   - llvm-mingw cross-toolchain at C:\llvm-mingw\<version>\bin\ with
+REM     x86_64-w64-mingw32-gcc.exe and aarch64-w64-mingw32-gcc.exe.
+REM     Download from https://github.com/mstorsjo/llvm-mingw/releases —
+REM     pick the ucrt-x86_64 variant (single zip, ~250MB, no installer).
+REM   - Override GO_EXE and LLVM_MINGW_BIN env vars if your paths differ.
 
 setlocal EnableDelayedExpansion
 
-set "VSROOT=C:\Program Files\Microsoft Visual Studio\18\Professional"
-if not exist "%VSROOT%\Common7\Tools\VsDevCmd.bat" (
-    echo ERROR: VsDevCmd.bat not found at "%VSROOT%". Edit VSROOT in this script.
+if "%GO_EXE%"==""        set "GO_EXE=C:\Program Files\Go\bin\go.exe"
+if "%LLVM_MINGW_BIN%"==""(
+    for /d %%D in (C:\llvm-mingw\llvm-mingw-*) do set "LLVM_MINGW_BIN=%%D\bin"
+)
+
+if not exist "%GO_EXE%" (
+    echo ERROR: Go not found at "%GO_EXE%". Install from https://go.dev/dl/ or set GO_EXE.
+    exit /b 1
+)
+if not exist "%LLVM_MINGW_BIN%\x86_64-w64-mingw32-gcc.exe" (
+    echo ERROR: llvm-mingw not found at "%LLVM_MINGW_BIN%".
+    echo Download from https://github.com/mstorsjo/llvm-mingw/releases
+    echo or set LLVM_MINGW_BIN to the directory containing
+    echo x86_64-w64-mingw32-gcc.exe and aarch64-w64-mingw32-gcc.exe.
     exit /b 1
 )
 
 set "HERE=%~dp0"
 set "SRC=%HERE%src"
-set "BUILD=%HERE%build"
-
-if not exist "%BUILD%" mkdir "%BUILD%"
 
 REM ===== x64 =====
-echo === Building x64 curve25519.dll with /MT (static CRT) ===
-if not exist "%BUILD%\x64" mkdir "%BUILD%\x64"
-pushd "%BUILD%\x64"
-call "%VSROOT%\Common7\Tools\VsDevCmd.bat" -arch=x64 -host_arch=x64 >nul
-if errorlevel 1 ( popd & echo VsDevCmd x64 init failed & exit /b 1 )
-
-clang-cl --target=x86_64-pc-windows-msvc /MT /O2 /LD ^
-    /Fe:curve25519.dll ^
-    "%SRC%\curve25519.c" "%SRC%\curve25519_windows.c"
-if errorlevel 1 ( popd & echo x64 build failed & exit /b 1 )
-
-echo --- x64 imports ---
-dumpbin /imports curve25519.dll | findstr /i "\.dll$\|^.....Image has the following dependencies" || ver >nul
-dumpbin /imports curve25519.dll | findstr /i "vcruntime msvcp ucrt" >nul
-if not errorlevel 1 (
-    echo ERROR: x64 dll still imports CRT dlls. /MT did not take effect.
-    popd
-    exit /b 1
-)
-copy /Y curve25519.dll "%HERE%win-x64\curve25519.dll" >nul
-echo OK: %HERE%win-x64\curve25519.dll updated.
+echo === Building x64 curve25519.dll (Go + crypto/ecdh) ===
+pushd "%SRC%"
+set GOOS=windows
+set GOARCH=amd64
+set CGO_ENABLED=1
+set "CC=%LLVM_MINGW_BIN%\x86_64-w64-mingw32-gcc.exe"
+"%GO_EXE%" build -buildmode=c-shared -trimpath -ldflags="-s -w" -o "%HERE%win-x64\curve25519.dll" .
+if errorlevel 1 ( popd & echo x64 build FAILED & exit /b 1 )
 popd
+echo OK: %HERE%win-x64\curve25519.dll
 
-REM ===== arm64 (cross-compile from x64 host) =====
-echo === Building arm64 curve25519.dll with /MT (static CRT) ===
-if not exist "%BUILD%\arm64" mkdir "%BUILD%\arm64"
-pushd "%BUILD%\arm64"
-call "%VSROOT%\Common7\Tools\VsDevCmd.bat" -arch=arm64 -host_arch=x64 >nul
-if errorlevel 1 ( popd & echo VsDevCmd arm64 init failed & exit /b 1 )
-
-clang-cl --target=aarch64-pc-windows-msvc /MT /O2 /LD ^
-    /Fe:curve25519.dll ^
-    "%SRC%\curve25519.c" "%SRC%\curve25519_windows.c"
-if errorlevel 1 ( popd & echo arm64 build failed & exit /b 1 )
-
-echo --- arm64 imports ---
-dumpbin /imports curve25519.dll | findstr /i "\.dll$\|^.....Image has the following dependencies" || ver >nul
-dumpbin /imports curve25519.dll | findstr /i "vcruntime msvcp ucrt" >nul
-if not errorlevel 1 (
-    echo ERROR: arm64 dll still imports CRT dlls. /MT did not take effect.
-    popd
-    exit /b 1
-)
-copy /Y curve25519.dll "%HERE%win-arm64\curve25519.dll" >nul
-echo OK: %HERE%win-arm64\curve25519.dll updated.
+REM ===== arm64 (cross-compile from x64 host using aarch64-w64-mingw32-gcc) =====
+echo === Building arm64 curve25519.dll (Go + crypto/ecdh) ===
+pushd "%SRC%"
+set GOOS=windows
+set GOARCH=arm64
+set CGO_ENABLED=1
+set "CC=%LLVM_MINGW_BIN%\aarch64-w64-mingw32-gcc.exe"
+"%GO_EXE%" build -buildmode=c-shared -trimpath -ldflags="-s -w" -o "%HERE%win-arm64\curve25519.dll" .
+if errorlevel 1 ( popd & echo arm64 build FAILED & exit /b 1 )
 popd
+echo OK: %HERE%win-arm64\curve25519.dll
 
 echo.
-echo === BUILD SUCCESS — both dlls rebuilt with /MT ===
+echo === BUILD SUCCESS — both dlls rebuilt with Go (BSD-3-Clause) ===
 endlocal
