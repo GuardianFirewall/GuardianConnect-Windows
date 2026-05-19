@@ -1,0 +1,18 @@
+# curve25519.dll and its companion C header are produced by build.cmd
+# (locally) and the SDK CI workflow (canonical). Never committed —
+# proper provenance requires the binary to trace back to source built
+# by the trusted CI runner at that commit, not whatever a dev had on
+# disk at push time.
+win-x64/curve25519.dll
+win-x64/curve25519.h
+win-arm64/curve25519.dll
+win-arm64/curve25519.h
+
+# Go's c-shared build can also produce a static-library archive
+# alongside the DLL — same reasoning.
+win-x64/curve25519.a
+win-arm64/curve25519.a
+
+# Intermediate build artifacts from any local experimentation.
+build/
+src/build/

@@ -23,13 +23,18 @@ REM   - Override GO_EXE and LLVM_MINGW_BIN env vars if your paths differ.
 
 setlocal EnableDelayedExpansion
 
-if "%GO_EXE%"==""        set "GO_EXE=C:\Program Files\Go\bin\go.exe"
-if "%LLVM_MINGW_BIN%"==""(
+if "%GO_EXE%"=="" set "GO_EXE=C:\Program Files\Go\bin\go.exe"
+if "%LLVM_MINGW_BIN%"=="" (
     for /d %%D in (C:\llvm-mingw\llvm-mingw-*) do set "LLVM_MINGW_BIN=%%D\bin"
 )
 
-if not exist "%GO_EXE%" (
-    echo ERROR: Go not found at "%GO_EXE%". Install from https://go.dev/dl/ or set GO_EXE.
+REM Validate Go by INVOCATION (not file-existence) so the CI flow that
+REM uses actions/setup-go can pass GO_EXE=go (bare name resolved from
+REM PATH) and the local-dev flow can pass an absolute path like
+REM C:\Program Files\Go\bin\go.exe.
+"%GO_EXE%" version >nul 2>&1
+if errorlevel 1 (
+    echo ERROR: Go not callable as "%GO_EXE%". Install from https://go.dev/dl/ or set GO_EXE.
     exit /b 1
 )
 if not exist "%LLVM_MINGW_BIN%\x86_64-w64-mingw32-gcc.exe" (
