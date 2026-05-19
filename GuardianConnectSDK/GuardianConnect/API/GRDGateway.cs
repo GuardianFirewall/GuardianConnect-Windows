@@ -66,11 +66,10 @@ public class GRDGateway
     {
         get
         {
-            var mainCreds = GRDCredentialManager.GetMainCredentials();
-            if (mainCreds is { TransportProtocol: GRDTransportProtocol.TransportProtocol.TransportIKEv2 })
-                return mainCreds.UserName;
-
-            return mainCreds?.ClientId ?? string.Empty;
+            // ClientId is populated symmetrically by GRDCredential.InitWithTransportProtocol
+            // (IKEv2 copies UserName into ClientId; WG sets it from the negotiate response).
+            // No protocol special-case needed.
+            return GRDCredentialManager.GetMainCredentials()?.ClientId ?? string.Empty;
         }
     }
 
@@ -189,6 +188,21 @@ public class GRDGateway
         GRDTransportProtocol.TransportProtocol transportProtocol, string hostname, string subscriberCredentialJWT,
         int validForDays)
     {
+        // WireGuard requires a curve25519 public-key in the request and parses
+        // a different response shape (server-public-key, mapped-ipv4, etc.).
+        // Dispatch to the WG-specific implementation; otherwise fall through
+        // to the IKEv2 registration below. Previously the WG branch silently
+        // sent the IKEv2-shaped payload and returned an incomplete credential
+        // — that worked only because no caller actually used this method's WG
+        // result (StartWireGuardConnectionWithNegotiation called Negotiate
+        // WireGuardCredential directly). Now ConnectVpnWithNewUserCredentials
+        // ForProtocol(WG) routes through this method too, so it must work
+        // symmetrically for both protocols.
+        if (transportProtocol == GRDTransportProtocol.TransportProtocol.TransportWireGuard)
+        {
+            return await NegotiateWireGuardCredential(hostname, subscriberCredentialJWT, validForDays);
+        }
+
         var errorResponse = new ErrorResponse();
         var response = new HttpResponseMessage();
         var credsList = new List<GRDCredential>();
