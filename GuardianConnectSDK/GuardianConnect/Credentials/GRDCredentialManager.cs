@@ -86,6 +86,10 @@ public static class GRDCredentialManager
 
     public static void ClearMainCredentials()
     {
-        GRDKeychain.RemoveKeychainItemForAccount(IGRDKeychain.kGuardianCredentialsList);
+        var credentialsList = GetCredentialsListFromStorage();
+        var removed = credentialsList.RemoveAll(c => c.MainCredential);
+        Logger.LogInformation(
+            $"ClearMainCredentials(): removed {removed} main credential(s); {credentialsList.Count} remain in keychain list");
+        GRDKeychain.StoreData(IGRDKeychain.kGuardianCredentialsList, CredentialsToToData(credentialsList));
     }
 }

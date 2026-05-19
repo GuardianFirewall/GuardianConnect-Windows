@@ -206,12 +206,12 @@ public class GRDVPNHelper
                 _logger.LogError(
                     $"Failed to invalidate VPN credentials: {responseMessage?.ReasonPhrase ?? errorResponse.Message})");
             }
+            GRDCredentialManager.ClearMainCredentials();
         }
     }
 
     public void ClearAllGuardianRegistrySettings()
     {
-        GRDCredentialManager.ClearMainCredentials();
         GRDKeychain.RemoveGuardianKeychainItems();
     }
 
