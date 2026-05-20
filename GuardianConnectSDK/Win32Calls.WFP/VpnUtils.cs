@@ -17,8 +17,13 @@ public class VpnUtils
     private const string GRD_VPN_DNSSUBLAYER_GUID = "754b7cbd-cad3-474e-8d2c-054413fd4509";
 
     private const string kGuardianVpnHelperRegistryStoragePath = "Software\\GuardianSoftware\\Vpn\\HelperService";
-    private static ulong TAP_IPv4_Id;
-    private static ulong TAP_IPv6_Id;
+    // The four LUID-scoped permit filter IDs (UDP/TCP × V4/V6) installed by
+    // PermitQueriesFromTAP, tracked here so RemoveWpmFilters can delete them
+    // on disconnect. Was previously two static ulongs (TAP_IPv4_Id /
+    // TAP_IPv6_Id) backing the old unscoped-permit implementation; the
+    // permit pipeline now installs four LUID-scoped permits via
+    // WireGuardDnsPermit.AddAll so we need a list.
+    private static List<ulong> TAP_PermitIds = new();
     private static ulong QBlock_IPv6_Id;
     private static ulong QBlock_IPv4_Id;
 
@@ -271,9 +276,25 @@ public class VpnUtils
     }
 
 
-    // TODO: IPv6 ...
     internal static unsafe uint BlockIPv6Queries(HANDLE engineHandle)
     {
+        // Mirror BlockIPv4Queries: scope to port 53 explicitly. Pre wg-alpha.30
+        // this filter had numFilterConditions = 0, which would mean "block
+        // every V6 packet at this layer in this sublayer" — only worked
+        // because the V6 permit alongside it was equally unscoped and
+        // cancelled it via higher weight. With the V6 permit now properly
+        // LUID-scoped (PermitQueriesFromTAP -> WireGuardDnsPermit.AddAll),
+        // the V6 block also needs its own scoping so it doesn't break all
+        // V6 traffic in this sublayer.
+        var cv = new FWP_CONDITION_VALUE0();
+        cv.type = FWP_DATA_TYPE.FWP_UINT16;
+        cv.Anonymous.uint16 = 53; // DNS port
+
+        var condition = new FWPM_FILTER_CONDITION0();
+        condition.fieldKey = PInvoke.FWPM_CONDITION_IP_REMOTE_PORT;
+        condition.matchType = FWP_MATCH_TYPE.FWP_MATCH_EQUAL;
+        condition.conditionValue = cv;
+
         var filter = new FWPM_FILTER0();
         filter.subLayerKey = kVpnDnsSublayerGUID;
         fixed (char* p = GuardianVPNServiceFilterName)
@@ -283,7 +304,9 @@ public class VpnUtils
         }
 
         filter.weight.type = FWP_DATA_TYPE.FWP_EMPTY;
-        //filter.weight.Anonymous.uint8 = 0xF;
+        filter.filterCondition = &condition;
+        filter.numFilterConditions = 1;
+
         /* Block all IPv6 DNS queries */
         filter.layerKey = PInvoke.FWPM_LAYER_ALE_AUTH_CONNECT_V6;
         filter.action.type = FWP_ACTION_TYPE.FWP_ACTION_BLOCK;
@@ -302,62 +325,68 @@ public class VpnUtils
     }
 
 
-    // Permit IPv4 DNS queries from TAP.
-    // Use a non-zero weight so that the permit filters get higher priority
-    // over the block filter added with automatic weighting */
-    internal static unsafe uint PermitQueriesFromTAP(HANDLE engineHandle, string connectionName)
+    // Install LUID-scoped DNS permits for the IKEv2 tunnel adapter. Pre
+    // wg-alpha.30 this added two unscoped permits (V4 + V6) with
+    // numFilterConditions = 0 and a higher weight than the matching
+    // block filters — i.e. the permits fired for every packet at the
+    // layer, not just DNS, and not just on the tunnel adapter. The WFP
+    // pipeline contributed zero leak protection; IKEv2 stayed leak-free
+    // only because the Windows RAS PPP connection raises the physical
+    // adapter's interface metric to ~4245, which makes the multi-homed
+    // DNS resolver skip it. See WorkProgression/IKEv2DnsLeakFix.md for
+    // the full postmortem.
+    //
+    // The fix uses the existing WireGuardDnsPermit.AddAll primitive —
+    // it's name-flavoured but generic: four 3-condition permits (UDP/TCP
+    // x V4/V6) scoped to FWPM_CONDITION_IP_LOCAL_INTERFACE = <tunnel
+    // LUID> + IP_REMOTE_PORT = 53 + IP_PROTOCOL = UDP|TCP. WFP arbitration
+    // prefers the more-specific (3 conditions) permit over the
+    // less-specific (1 condition: port-53) block at equal weight.
+    internal static uint PermitQueriesFromTAP(HANDLE engineHandle, string connectionName)
     {
-        // Filter
-        var filter = new FWPM_FILTER0();
+        // Resolve the IKEv2 tunnel adapter LUID by name first, then fall
+        // back to the same description / IF_TYPE_PPP strategies
+        // KillSwitchService uses. The IKEv2 RAS connection is up by the
+        // time SetFilters runs (called from VpnDnsFilteringHandler.UpdateFiltersState
+        // on the CONNECTED branch), so at least one strategy should match.
         Log.Information(
-            $"PermitQueriesFromTAP: Setting filter.subLayerKey to kVpnDnsSublayerGUID {kVpnDnsSublayerGUID}");
-        filter.subLayerKey = kVpnDnsSublayerGUID;
-        fixed (char* p = GuardianVPNServiceFilterName)
+            "PermitQueriesFromTAP: resolving IKEv2 tunnel LUID (RAS entry='{Entry}')",
+            connectionName);
+
+        ulong? tunnelLuid = null;
+        if (!string.IsNullOrEmpty(connectionName))
+            tunnelLuid = AdapterLuidResolver.FindTunnelLuidByEntryName(connectionName);
+        tunnelLuid ??= AdapterLuidResolver.FindFirstUpAdapterByDescriptionContains("WAN Miniport (IKEv2)");
+        tunnelLuid ??= AdapterLuidResolver.FindFirstUpPppAdapter();
+
+        if (tunnelLuid == null)
         {
-            var pSubLayerName = new PWSTR(p);
-            filter.displayData.name = pSubLayerName;
+            Log.Error(
+                "PermitQueriesFromTAP: tunnel LUID not resolved by any strategy. " +
+                "Refusing to install unscoped permits — IKEv2 connect will fail closed. " +
+                "Diagnostic dump of up adapters follows.");
+            Log.Error(AdapterLuidResolver.DumpUpAdapters());
+            return 1; // non-zero = failure; AddWpmFilters returns false; SetFilters reports failure
         }
 
-        filter.weight.type = FWP_DATA_TYPE.FWP_UINT8;
-        filter.weight.Anonymous.uint8 = 0xE; // Higher priority than block filter
+        Log.Information(
+            "PermitQueriesFromTAP: resolved IKEv2 tunnel LUID 0x{Luid:X16}", tunnelLuid.Value);
 
-        /* Permit all IPv4 DNS queries from TAP adapter */
-        filter.layerKey = PInvoke.FWPM_LAYER_ALE_AUTH_CONNECT_V4;
-        filter.action.type = FWP_ACTION_TYPE.FWP_ACTION_PERMIT;
-        // Filter created - continue with conditions...
-
-
-        filter.numFilterConditions = 0;
-
-        ulong filterId = 0;
-        Log.Debug("PermitQueriesFromTAP: Calling FwpmFilterAdd0() to Permit IPv4 DNS queries from TAP...");
-        var retVal = PInvoke.FwpmFilterAdd0(engineHandle, &filter, PSECURITY_DESCRIPTOR.Null, &filterId);
-        if (retVal != 0)
+        var ids = WireGuardDnsPermit.AddAll(engineHandle, tunnelLuid.Value);
+        if (ids.Count != 4)
         {
-            if (retVal == 0x80320007)
-                Log.Error(
-                    $"PermitQueriesFromTAP: Failed to add IPv4 DNS permit filter. Error: {retVal:X8} [FWP_E_SUBLAYER_NOT_FOUND]");
-            else
-                Log.Error($"PermitQueriesFromTAP: Failed to add IPv4 DNS permit filter. Error: {retVal:X8}");
-            return retVal;
+            Log.Error(
+                "PermitQueriesFromTAP: WireGuardDnsPermit.AddAll installed {Count}/4 permits; " +
+                "rolling back partial install.", ids.Count);
+            WireGuardDnsPermit.RemoveAll(engineHandle, ids);
+            return 1;
         }
 
-        TAP_IPv4_Id = filterId;
-        Log.Information("PermitQueriesFromTAP: FwpmFilterAdd0 successfully added PermitIPv4 filter.");
-
-        // Permit IPv6 DNS queries from TAP. Use same weight as IPv4 filter.
-        filter.layerKey = PInvoke.FWPM_LAYER_ALE_AUTH_CONNECT_V6;
-        Log.Debug("PermitQueriesFromTAP: Calling FwpmFilterAdd0() to Permit IPv6 DNS queries from TAP...");
-        retVal = PInvoke.FwpmFilterAdd0(engineHandle, &filter, PSECURITY_DESCRIPTOR.Null, &filterId);
-        if (retVal != 0)
-        {
-            Log.Error($"PermitQueriesFromTAP: Failed to add IPv6 DNS permit filter. Error: {retVal}");
-            return retVal;
-        }
-
-        TAP_IPv6_Id = filterId;
-
-        return retVal;
+        TAP_PermitIds = ids;
+        Log.Information(
+            "PermitQueriesFromTAP: installed 4 LUID-scoped DNS permits (luid=0x{Luid:X16}).",
+            tunnelLuid.Value);
+        return 0;
     }
 
     public static bool AddWpmFilters(HANDLE engine_handle, string name)
@@ -422,32 +451,23 @@ public class VpnUtils
 
             uint result = 0;
 
-            // Remove TAP IPv4 filter
-            if (TAP_IPv4_Id != 0)
+            // Remove the four LUID-scoped DNS permits installed by
+            // PermitQueriesFromTAP via WireGuardDnsPermit.AddAll
+            // (UDP/TCP × V4/V6). Pre wg-alpha.30 this section removed two
+            // static TAP_IPv4_Id / TAP_IPv6_Id filter IDs (unscoped
+            // permits). The new install path returns a list; RemoveAll
+            // walks it and continues past individual failures.
+            if (TAP_PermitIds.Count > 0)
             {
-                Log.Debug("RemoveWpmFilters: Removing TAP IPv4 filter...");
-                result = PInvoke.FwpmFilterDeleteById0(engine_handle, TAP_IPv4_Id);
-                if (result != 0)
+                Log.Debug(
+                    "RemoveWpmFilters: Removing {Count} LUID-scoped DNS permit filters...",
+                    TAP_PermitIds.Count);
+                if (!WireGuardDnsPermit.RemoveAll(engine_handle, TAP_PermitIds))
                 {
-                    Log.Error($"RemoveWpmFilters: Failed to remove TAP IPv4 filter. Error: {result}");
+                    Log.Error("RemoveWpmFilters: at least one LUID-scoped DNS permit removal failed.");
                     whetherSuccessful = false;
                 }
-
-                TAP_IPv4_Id = 0;
-            }
-
-            // Remove TAP IPv6 filter
-            if (TAP_IPv6_Id != 0)
-            {
-                Log.Debug("RemoveWpmFilters: Removing TAP IPv6 filter...");
-                result = PInvoke.FwpmFilterDeleteById0(engine_handle, TAP_IPv6_Id);
-                if (result != 0)
-                {
-                    Log.Error($"RemoveWpmFilters: Failed to remove TAP IPv6 filter. Error: {result}");
-                    whetherSuccessful = false;
-                }
-
-                TAP_IPv6_Id = 0;
+                TAP_PermitIds = new List<ulong>();
             }
 
             Log.Information("RemoveWpmFilters: Removing QBlock_IPv6...");
