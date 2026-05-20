@@ -21,19 +21,6 @@ The compiled DLL statically incorporates:
 
 **There is no GPL, LGPL, or other copyleft code in the resulting DLL.**
 
-## History
-
-An earlier version of this directory contained a C implementation
-imported from `wireguard-tools` (`curve25519.c`, `curve25519-fiat32.h`,
-`curve25519-hacl64.h`) which carried the SPDX dual-license expression
-`GPL-2.0 OR MIT`. While the dual-license model permits a downstream
-recipient to elect MIT alone (and we would have done so), the presence
-of the GPL clause in the source files was deemed unacceptable by legal
-review. Those files have been removed from the repository entirely
-(commit-level removal, not just a license election) and replaced with
-the Go-based implementation documented here. No code path in the
-shipping DLL traces back to the dual-licensed sources.
-
 ## License attribution required when redistributing
 
 The MIT-licensed portions of the runtime require the standard MIT
