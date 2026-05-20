@@ -140,13 +140,13 @@ public class GRDVPNHelper
             return false;
         }
 
-        if (mainCreds.TransportProtocol != protocol)
-        {
-            _logger.LogInformation(
-                "ActiveConnectionPossible({Protocol}): MainCredential.TransportProtocol={Stored}; mismatch",
-                protocol, mainCreds.TransportProtocol);
-            return false;
-        }
+        // No explicit mainCreds.TransportProtocol == protocol gate: the app
+        // disconnect -> ClearVpnConfiguration -> SetPreferred -> reconnect
+        // sequence on transport toggle guarantees stored creds match the
+        // active protocol. And even in the absence of that guarantee, the
+        // protocol-specific field validation below (UserName/Password/ApiAuthToken
+        // for IKEv2; DevicePrivateKey/DevicePublicKey/etc. for WG) implicitly
+        // catches a stale-other-protocol cred — the two field sets don't overlap.
 
         if (string.IsNullOrEmpty(mainCreds.HostName))
         {
@@ -183,8 +183,12 @@ public class GRDVPNHelper
     public static bool ActiveConnectionPossible() =>
         ActiveConnectionPossible(GRDTransportProtocol.GetPreferred());
 
-    /// Used to clear all of our current VPN configuration details from user defaults and the keychain
-    public async void ClearVpnConfiguration()
+    /// Used to clear all of our current VPN configuration details from user defaults and the keychain.
+    /// Returns a Task (was async void) so consumers can await the server-side
+    /// credential invalidate + local keychain wipe before flipping state that
+    /// the invalidate depends on (e.g., the transport-protocol toggle's
+    /// disconnect -> clear -> SetPreferred -> reconnect sequence).
+    public async Task ClearVpnConfiguration()
     {
         ErrorResponse errorResponse;
         var mainCreds = GRDCredentialManager.GetMainCredentials();
@@ -315,40 +319,52 @@ public class GRDVPNHelper
             GRDCredentialManager.ClearMainCredentials();
         }
 
-        // Protocol-specific dispatch.
-        switch (protocol)
+        // No valid stored creds for this protocol? Route to the protocol's
+        // negotiate path. Negotiate routines contact the server during
+        // negotiation, so no separate pre-flight server-status call is needed
+        // on those paths.
+        if (!ActiveConnectionPossible(protocol))
         {
-            case GRDTransportProtocol.TransportProtocol.TransportIKEv2:
+            return protocol switch
             {
-                if (!ActiveConnectionPossible(GRDTransportProtocol.TransportProtocol.TransportIKEv2))
-                    return await ConnectVpnWithNewUserCredentialsForProtocol(
-                        GRDTransportProtocol.TransportProtocol.TransportIKEv2);
-
-                // IKEv2 pre-flight against the configured host before dialing the
-                // RAS connection. WG doesn't need this — its host is contacted
-                // directly by the service when it starts the Wintun tunnel.
-                var statusErr = await GRDGateway.GetServerStatus();
-                if (statusErr.IsError)
-                {
-                    return statusErr.SetErrorMessage(
-                        $"ConnectVpnWithConfiguredCredentials: GetServerStatus returned: {statusErr.GetReasonPhrase()}");
-                }
-                return await StartIKEv2Connection();
-            }
-
-            case GRDTransportProtocol.TransportProtocol.TransportWireGuard:
-            {
-                return ActiveConnectionPossible(GRDTransportProtocol.TransportProtocol.TransportWireGuard)
-                    ? await StartWireGuardFromStoredCreds()
-                    : await NegotiateAndStartWireGuard();
-            }
-
-            default:
-                return new ErrorResponse()
+                GRDTransportProtocol.TransportProtocol.TransportIKEv2 =>
+                    await ConnectVpnWithNewUserCredentialsForProtocol(
+                        GRDTransportProtocol.TransportProtocol.TransportIKEv2),
+                GRDTransportProtocol.TransportProtocol.TransportWireGuard =>
+                    await NegotiateAndStartWireGuard(),
+                _ => new ErrorResponse()
                     .SetException(new InvalidOperationException(
                         $"Unsupported transport protocol: {protocol}"))
-                    .SetErrorMessage("Unsupported transport protocol.");
+                    .SetErrorMessage("Unsupported transport protocol."),
+            };
         }
+
+        // Stored creds exist for this protocol. Pre-flight the host's
+        // server-status endpoint before dialing — same call for both
+        // protocols, using cred.HostName directly so both branches share
+        // a single source of truth for the host (previously IKEv2 used
+        // the ApiHostname static-property indirection while WG didn't
+        // pre-flight at all).
+        var cred = GRDCredentialManager.GetMainCredentials()!;
+        var statusErr = await GRDGateway.GetServerStatus(cred.HostName, clientCall: true);
+        if (statusErr.IsError)
+        {
+            return statusErr.SetErrorMessage(
+                $"ConnectVpnWithConfiguredCredentials: GetServerStatus returned: {statusErr.GetReasonPhrase()}");
+        }
+
+        // Dial using stored creds.
+        return protocol switch
+        {
+            GRDTransportProtocol.TransportProtocol.TransportIKEv2 =>
+                await StartIKEv2Connection(),
+            GRDTransportProtocol.TransportProtocol.TransportWireGuard =>
+                await StartWireGuardFromStoredCreds(),
+            _ => new ErrorResponse()
+                .SetException(new InvalidOperationException(
+                    $"Unsupported transport protocol: {protocol}"))
+                .SetErrorMessage("Unsupported transport protocol."),
+        };
     }
 
     /// <summary>
@@ -783,7 +799,7 @@ public class GRDVPNHelper
         // irrelevant on this code path.
         var vpnValues = new VPNCallParameters
         {
-            EntryName = "Guardian WireGuard",
+            EntryName = "Guardian FirewallWireGuard",
             WireGuardConfigPath = configPath,
         };
 
