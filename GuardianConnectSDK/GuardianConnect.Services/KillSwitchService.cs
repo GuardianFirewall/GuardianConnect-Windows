@@ -165,6 +165,13 @@ public sealed class KillSwitchService : BackgroundService
 
     protected override Task ExecuteAsync(CancellationToken stoppingToken)
     {
+        // Restore user-intent state from HKLM BEFORE the initial logging
+        // line so the "Initial mode: X" output reflects what we'll
+        // actually operate with — not the field defaults. SignalStatusChanged
+        // writes these on every state change, so any prior session's intent
+        // survives service restart / install / boot.
+        RestorePersistedStateFromHklm();
+
         _logger.LogInformation("KillSwitchService running. Initial mode: {Mode}, AllowLan: {AllowLan}",
             Mode, AllowLan);
 
@@ -279,6 +286,41 @@ public sealed class KillSwitchService : BackgroundService
     // -------------------------------------------------------------------------------
     // State machine — must be called under _stateLock.
     // -------------------------------------------------------------------------------
+
+    /// <summary>
+    /// Reads the user-intent values (KillSwitchActiveMode + KillSwitchActiveAllowLan)
+    /// the service published to HKLM\Software\GuardianFirewall on its last
+    /// SignalStatusChanged. Without this, _mode resets to KillSwitchMode.Off
+    /// on every service restart (install / reboot / crash recovery) and the
+    /// user's Kill Switch silently downgrades to off until they re-toggle.
+    /// We only restore intent fields (_mode, _allowLan); _isActive is recomputed
+    /// by ReevaluateUnsafe from the current connection state.
+    /// </summary>
+    private void RestorePersistedStateFromHklm()
+    {
+        try
+        {
+            var modeText = RegistrySettings.RetrieveGuardianMachineSetting(Common.kKillSwitchModeRegValue);
+            if (!string.IsNullOrEmpty(modeText) && Enum.TryParse<KillSwitchMode>(modeText, out var mode))
+            {
+                _mode = mode;
+                _logger.LogInformation(
+                    "KillSwitchService: restored persisted mode '{Mode}' from HKLM", mode);
+            }
+
+            var allowLanText = RegistrySettings.RetrieveGuardianMachineSetting(Common.kKillSwitchAllowLanRegValue);
+            if (!string.IsNullOrEmpty(allowLanText))
+            {
+                _allowLan = allowLanText == "1";
+                _logger.LogInformation(
+                    "KillSwitchService: restored persisted AllowLan '{AllowLan}' from HKLM", _allowLan);
+            }
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "KillSwitchService: failed to restore persisted state from HKLM");
+        }
+    }
 
     /// <summary>
     /// True if either the RAS connection table reports an active connection
