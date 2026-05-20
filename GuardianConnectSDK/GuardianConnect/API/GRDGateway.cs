@@ -210,7 +210,7 @@ public class GRDGateway
         var payload = new RegisterDevicePayload
         {
             subscriberCredential = subscriberCredentialJWT,
-            transportProtocol = TransportProtocolStringFor(transportProtocol)
+            transportProtocol = GRDTransportProtocol.TransportProtocolStringFor(transportProtocol)
         };
 
         var reqUri = new Uri($"https://{hostname}/api/v1.3/device");
@@ -246,19 +246,6 @@ public class GRDGateway
 
         return errorResponse;
     }
-
-    /// <summary>
-    /// Wire-format string used in the <c>transport-protocol</c> JSON field for
-    /// <c>POST /api/v1.3/device</c>. Matches the strings the iOS/macOS SDK uses
-    /// (<c>GRDTransportProtocol transportProtocolStringFor</c>): "ikev2" or
-    /// "wireguard".
-    /// </summary>
-    public static string TransportProtocolStringFor(GRDTransportProtocol.TransportProtocol protocol) =>
-        protocol switch
-        {
-            GRDTransportProtocol.TransportProtocol.TransportWireGuard => "wireguard",
-            _ => "ikev2"
-        };
 
     /// <summary>
     /// Generate a fresh Curve25519 keypair, register the device for the
@@ -302,7 +289,7 @@ public class GRDGateway
         var payload = new RegisterDevicePayload
         {
             subscriberCredential = subscriberCredentialJWT,
-            transportProtocol    = TransportProtocolStringFor(GRDTransportProtocol.TransportProtocol.TransportWireGuard),
+            transportProtocol    = GRDTransportProtocol.TransportProtocolStringFor(GRDTransportProtocol.TransportProtocol.TransportWireGuard),
             PublicKey            = publicKey.ToBase64()
         };
 

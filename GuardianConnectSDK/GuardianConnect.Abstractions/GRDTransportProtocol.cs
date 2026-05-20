@@ -75,4 +75,19 @@ public static class GRDTransportProtocol
         };
         RegistrySettings.UpdateGuardianUserSettings(Common.kGuardianTransportProtocol, s);
     }
+
+    /// <summary>
+    /// Wire-format string used in the <c>transport-protocol</c> JSON field
+    /// for <c>POST /api/v1.3/device</c>. Matches the strings the iOS/macOS
+    /// SDK uses (<c>GRDTransportProtocol transportProtocolStringFor</c>):
+    /// <c>"ikev2"</c> or <c>"wireguard"</c>. Lowercase by design — distinct
+    /// from the registry-format strings (<c>"IKEv2"</c> / <c>"WireGuard"</c>)
+    /// used by <see cref="GetPreferred"/> / <see cref="SetPreferred"/>.
+    /// </summary>
+    public static string TransportProtocolStringFor(TransportProtocol protocol) =>
+        protocol switch
+        {
+            TransportProtocol.TransportWireGuard => "wireguard",
+            _                                    => "ikev2",
+        };
 }
