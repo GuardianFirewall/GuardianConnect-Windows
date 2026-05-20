@@ -54,6 +54,23 @@ public static unsafe class AdapterLuidResolver
         }, $"alias contains '{rasEntryName}'");
     }
 
+    /// <summary>
+    /// Exact alias match on an Up adapter. Used for the WireGuard transport,
+    /// whose Wintun adapter is created with a deterministic alias
+    /// ("GuardianWireGuard") by VpnTunnelManager — distinct from the
+    /// RAS-decorated aliases the IKEv2 strategies look for.
+    /// </summary>
+    public static ulong? FindFirstUpAdapterByAlias(string aliasExact)
+    {
+        if (string.IsNullOrEmpty(aliasExact)) return null;
+
+        return WalkUpAdapters(row =>
+        {
+            var alias = ReadFixedString(row.Alias.AsSpan());
+            return string.Equals(alias, aliasExact, StringComparison.OrdinalIgnoreCase);
+        }, $"alias == '{aliasExact}' (exact, WG)");
+    }
+
     /// <summary>Substring match on the description field of an Up adapter.</summary>
     public static ulong? FindFirstUpAdapterByDescriptionContains(string descriptionSubstring)
     {

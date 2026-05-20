@@ -189,11 +189,13 @@ public sealed class KillSwitchService : BackgroundService
         }
 
         NotificationHandler.RasConnectionStateChanged += OnRasConnectionStateChanged;
+        NotificationHandler.WireGuardConnectionStateChanged += OnWireGuardConnectionStateChanged;
 
         stoppingToken.Register(() =>
         {
             _logger.LogInformation("KillSwitchService stopping; tearing down filters.");
             NotificationHandler.RasConnectionStateChanged -= OnRasConnectionStateChanged;
+            NotificationHandler.WireGuardConnectionStateChanged -= OnWireGuardConnectionStateChanged;
             lock (_stateLock) RemoveFiltersUnsafe();
             try { _statusChangedEvent?.Dispose(); } catch { /* best-effort */ }
             _statusChangedEvent = null;
@@ -202,7 +204,7 @@ public sealed class KillSwitchService : BackgroundService
         // Initial sync: handle the boot-with-VPN-already-connected case.
         try
         {
-            var connected = ConnectionRoutines.IsAnyConnectionActive(out _);
+            var connected = IsAnyTransportConnected();
             _lastObservedConnected = connected;
             _logger.LogInformation(
                 "KillSwitchService initial state: VPN connected={Connected}", connected);
@@ -220,13 +222,43 @@ public sealed class KillSwitchService : BackgroundService
             TaskContinuationOptions.OnlyOnCanceled | TaskContinuationOptions.ExecuteSynchronously);
     }
 
+    /// <summary>
+    /// WireGuard-side analog of OnRasConnectionStateChanged. Fired by
+    /// VpnTunnelManager via NotificationHandler.WireGuardConnectionStateChanged
+    /// on tunnel up / tunnel down. Re-evaluates filter state the same way the
+    /// RAS handler does.
+    /// </summary>
+    private void OnWireGuardConnectionStateChanged(bool wgConnected)
+    {
+        try
+        {
+            var connected = IsAnyTransportConnected();
+            if (connected == _lastObservedConnected) return;
+
+            var planned = NotificationHandler.WasDisconnectPlanned;
+            _logger.LogInformation(
+                "KillSwitchService observed VPN connected={Old} -> {New} (WG event, wgConnected={Wg}, WasDisconnectPlanned={Planned})",
+                _lastObservedConnected, connected, wgConnected, planned);
+            _lastObservedConnected = connected;
+
+            lock (_stateLock) ReevaluateUnsafe();
+            SignalStatusChanged();
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "KillSwitchService WG event handler error");
+        }
+    }
+
     private void OnRasConnectionStateChanged(Utility.CheckConnectionResult state)
     {
         try
         {
             // CheckConnectionResult covers more than two values, so resolve to a clean
-            // up/down via IsAnyConnectionActive (cheap; just walks RAS connection table).
-            var connected = ConnectionRoutines.IsAnyConnectionActive(out _);
+            // up/down. Use IsAnyTransportConnected so a concurrent WG tunnel still
+            // counts as connected when a RAS transition is fired (e.g., a stale
+            // RAS notification firing while WG is the active transport).
+            var connected = IsAnyTransportConnected();
             if (connected == _lastObservedConnected) return;
 
             var planned = NotificationHandler.WasDisconnectPlanned;
@@ -248,6 +280,19 @@ public sealed class KillSwitchService : BackgroundService
     // State machine — must be called under _stateLock.
     // -------------------------------------------------------------------------------
 
+    /// <summary>
+    /// True if either the RAS connection table reports an active connection
+    /// (IKEv2 path) OR NotificationHandler.IsWireGuardConnected is set
+    /// (WireGuard path). The RAS table never sees Wintun adapters so a bare
+    /// IsAnyConnectionActive() returns false when only WG is up; we'd miss
+    /// installing kill-switch filters entirely.
+    /// </summary>
+    private static bool IsAnyTransportConnected()
+    {
+        return ConnectionRoutines.IsAnyConnectionActive(out _)
+            || NotificationHandler.IsWireGuardConnected;
+    }
+
     private void ReevaluateUnsafe()
     {
         if (_mode == KillSwitchMode.Off)
@@ -256,14 +301,14 @@ public sealed class KillSwitchService : BackgroundService
             return;
         }
 
-        // Mode == OnConnected. Always read fresh state from RAS — _lastObservedConnected
-        // can lag reality because the C# event (RasConnectionStateChanged) only fires on
-        // transitions AFTER the watcher arms, and the watcher doesn't arm until either
-        // service-startup-with-VPN-connected OR a manual Connect command. The flow
-        // "service starts disconnected → user connects → user toggles KS on" produces no
-        // C# event yet, so without this fresh read SetMode would see stale state and
-        // skip the install.
-        var connected = ConnectionRoutines.IsAnyConnectionActive(out _);
+        // Mode == OnConnected. Always read fresh state — _lastObservedConnected
+        // can lag reality because the C# events (RasConnectionStateChanged /
+        // WireGuardConnectionStateChanged) only fire on transitions AFTER the
+        // respective watcher arms. The flow "service starts disconnected →
+        // user connects → user toggles KS on" produces no event yet, so
+        // without this fresh read SetMode would see stale state and skip
+        // the install.
+        var connected = IsAnyTransportConnected();
         _lastObservedConnected = connected;
 
         // Treat power-transition drops (suspend / resume) as planned, even if the RAS
@@ -324,6 +369,11 @@ public sealed class KillSwitchService : BackgroundService
             tunnelLuid = AdapterLuidResolver.FindTunnelLuidByEntryName(entryName);
         tunnelLuid ??= AdapterLuidResolver.FindFirstUpAdapterByDescriptionContains("WAN Miniport (IKEv2)");
         tunnelLuid ??= AdapterLuidResolver.FindFirstUpPppAdapter();
+        // WG adapter: VpnTunnelManager creates it with a deterministic alias.
+        // Tried last so the IKEv2 strategies above keep priority when both
+        // protocols' adapters happen to coexist briefly (e.g., during a
+        // transport-switch handoff).
+        tunnelLuid ??= AdapterLuidResolver.FindFirstUpAdapterByAlias("GuardianWireGuard");
 
         if (tunnelLuid == null)
         {

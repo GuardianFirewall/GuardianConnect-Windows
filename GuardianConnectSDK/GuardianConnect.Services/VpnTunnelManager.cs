@@ -162,6 +162,11 @@ public sealed class VpnTunnelManager : ITransportProvider, IDisposable
         NotificationHandler.WasDisconnectPlanned = false;
         NotificationHandler.VPNClientNotifierHandle?.Set();
 
+        // Tell KillSwitchService (and anyone else listening) that a WG tunnel
+        // came up. RAS-only subscribers (NotificationHandler.RasConnectionStateChanged)
+        // never see this transition because Wintun isn't a RAS connection.
+        NotificationHandler.RaiseWireGuardConnectionStateChanged(true);
+
         Log.Information(
             "VpnTunnelManager: adapter '{Name}' up. LUID={Luid:X16}", AdapterName, tunnel.AdapterLuid);
         return new ErrorResponse();
@@ -277,6 +282,11 @@ public sealed class VpnTunnelManager : ITransportProvider, IDisposable
         NotificationHandler.WasDisconnectPlanned = wasDisconnectPlanned;
         NotificationHandler.LastKnownConnectedEntry = string.Empty;
         NotificationHandler.VPNClientNotifierHandle?.Set();
+
+        // Symmetric with the connect-side hook. KillSwitchService listens for
+        // this to evaluate whether filters should stay up (unplanned drop) or
+        // be torn down (planned disconnect) on the WG path.
+        NotificationHandler.RaiseWireGuardConnectionStateChanged(false);
 
         Log.Information(
             "VpnTunnelManager: tunnel torn down (wasDisconnectPlanned={Planned})", wasDisconnectPlanned);
