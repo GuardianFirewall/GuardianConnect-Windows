@@ -244,6 +244,24 @@ public sealed class VpnTunnelManager : ITransportProvider, IDisposable
             return ErrorResponse.FromException(ex);
         }
 
+        // Post-Dispose quiet period: give WireGuardNT (wireguard.sys) time
+        // to drain any DPCs (deferred procedure calls) queued by the
+        // adapter's packet-processing path before we proceed to subsequent
+        // teardown steps (DNS flush, status flip, event notification) or
+        // — more importantly — let any new Activate call land that creates
+        // a fresh adapter. Without this, rapid teardown+create cycles
+        // (transport-switch testing, stale-cred-cleanup-induced reconnects,
+        // multi-click radio toggles) can race the driver's DPC drain and
+        // trigger bugcheck 0xCE
+        // (DRIVER_UNLOADED_WITHOUT_CANCELLING_PENDING_OPERATIONS, arg2=0x10
+        // = orphaned DPC pointer) when the kernel later tries to follow a
+        // DPC pointer into an image range that's been unmapped. Empirically
+        // observed on 0.40.21 + 0.40.22 testing during rapid transport
+        // switches. 150ms is a band-aid; root cause is upstream in
+        // wireguard.sys and needs minidump-level confirmation (no WinDbg
+        // analysis yet at write time).
+        System.Threading.Thread.Sleep(150);
+
         // Flush the Windows DNS resolver cache: when the WG adapter was up
         // wg-quick configured it with DNS = 1.1.1.1 / 1.0.0.1 and Windows
         // stamped those as the system resolvers for the WG adapter. Tearing
