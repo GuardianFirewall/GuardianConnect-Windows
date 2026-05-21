@@ -19,7 +19,7 @@ namespace Win32Calls.WFP;
 /// NIC's interface metric so far that Windows multi-homed DNS skips it.
 /// Wintun (used by WireGuard) doesn't trigger that side effect, so the WG
 /// path needs the real LUID-scoped permit primitives from
-/// <see cref="WireGuardDnsPermit"/>.
+/// <see cref="TunnelDnsPermit"/>.
 /// </summary>
 public static unsafe class WireGuardDnsBlockPermit
 {
@@ -71,7 +71,7 @@ public static unsafe class WireGuardDnsBlockPermit
 
             // LUID-scoped permits — beat the block via more-specific conditions
             // (3 conditions vs 1) at equal weight (FWP_EMPTY).
-            install.FilterIds.AddRange(WireGuardDnsPermit.AddAll(engine, adapterLuid));
+            install.FilterIds.AddRange(TunnelDnsPermit.AddAll(engine, adapterLuid));
 
             Log.Information(
                 "WireGuardDnsBlockPermit.Install: {Count} filters installed for LUID 0x{Luid:X16}",
@@ -136,7 +136,7 @@ public static unsafe class WireGuardDnsBlockPermit
         filter.action.type = FWP_ACTION_TYPE.FWP_ACTION_BLOCK;
         filter.numFilterConditions = 1;
         filter.filterCondition = &condition;
-        // weight stays at default FWP_EMPTY — WireGuardDnsPermit's more-specific
+        // weight stays at default FWP_EMPTY — TunnelDnsPermit's more-specific
         // 3-condition permits (proto + port + local-interface) win arbitration.
 
         fixed (char* pName = BlockFilterName)

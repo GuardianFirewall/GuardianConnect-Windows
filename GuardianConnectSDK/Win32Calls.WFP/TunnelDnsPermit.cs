@@ -7,36 +7,39 @@ using Serilog;
 namespace Win32Calls.WFP;
 
 /// <summary>
-/// LUID-keyed DNS permit filters for the WireGuard transport. Lives in the
-/// VPN DNS sublayer (<see cref="VpnDnsSublayerGuid"/>, the same one
-/// <c>VpnUtils.PermitQueriesFromTAP</c> uses) so that it composes correctly
-/// with the existing IKEv2 DNS filtering path.
+/// LUID-keyed DNS permit filters for the active VPN tunnel adapter,
+/// regardless of transport. Lives in the VPN DNS sublayer
+/// (<see cref="VpnDnsSublayerGuid"/>) so the filters it installs compose
+/// correctly with the matching block-all-DNS filters that
+/// <c>VpnUtils.AddWpmFilters</c> (IKEv2) and
+/// <c>WireGuardDnsBlockPermit.Install</c> (WireGuard) install in the
+/// same sublayer.
 ///
-/// Filters added here match: UDP/TCP traffic to remote port 53 leaving on
-/// the supplied LUID's interface — i.e. DNS queries the host sends out
-/// through the WireGuard adapter. They are permits, intended to coexist
-/// with a separate "block all DNS" filter at the same layer (which
-/// <c>VpnUtils</c> installs during a VPN connection); the permits' more
-/// specific conditions cause WFP to prefer them over the block.
+/// Filters added here match: UDP/TCP traffic to remote port 53 leaving
+/// on the supplied LUID's interface — i.e. DNS queries the host sends
+/// out through the VPN tunnel adapter. They are permits, intended to
+/// coexist with a separate "block all DNS" filter at the same layer;
+/// the permits' more specific conditions (3 conditions: protocol +
+/// port + interface) cause WFP to prefer them over the block (1
+/// condition: port) at equal weight.
 ///
-/// Scope (Step 5): primitives only. Wiring — i.e. the call from a
-/// VpnDnsFilteringHandler-equivalent path when WireGuard is the active
-/// transport — lands when GuardianFirewallService grows a WG-aware DNS
-/// filtering pipeline. At present, <c>VpnTunnelManager</c> configures the
-/// adapter's DNS via <c>SetInterfaceDnsSettings</c>; that's enough for
-/// apps using the WG adapter, but not for a global "block any DNS that
-/// doesn't egress through the tunnel" policy.
+/// Renamed from <c>WireGuardDnsPermit</c> in wg-alpha.31 — the
+/// primitive has always been generic LUID-scoped DNS permitting; only
+/// the call site was WG-only until wg-alpha.30 wired it in from the
+/// IKEv2 path too (<c>VpnUtils.PermitQueriesFromTAP</c>). Filter
+/// display name + description + label strings are also generalized
+/// away from "WireGuard"-named text.
 ///
-/// Modelled on KillSwitchFilters.AddPermitDnsXxxOnTunnelVx (same condition
-/// shape: FWPM_CONDITION_IP_PROTOCOL + IP_REMOTE_PORT=53 +
-/// IP_LOCAL_INTERFACE=LUID at ALE_AUTH_CONNECT_{V4,V6}); the difference
-/// is the sublayer.
+/// Modelled on KillSwitchFilters.AddPermitDnsXxxOnTunnelVx (same
+/// condition shape: FWPM_CONDITION_IP_PROTOCOL + IP_REMOTE_PORT=53 +
+/// IP_LOCAL_INTERFACE=LUID at ALE_AUTH_CONNECT_{V4,V6}); the
+/// difference is the sublayer.
 /// </summary>
-public static unsafe class WireGuardDnsPermit
+public static unsafe class TunnelDnsPermit
 {
     /// <summary>
     /// VPN DNS sublayer GUID. Must match <c>VpnUtils.kVpnDnsSublayerGUID</c>
-    /// so these filters live next to the existing TAP-based permits.
+    /// so these filters live next to the matching block-all-DNS filters.
     /// </summary>
     internal static readonly Guid VpnDnsSublayerGuid =
         new("754b7cbd-cad3-474e-8d2c-054413fd4509");
@@ -46,9 +49,9 @@ public static unsafe class WireGuardDnsPermit
     private const byte ProtocolTcp = 6;
 
     private static readonly char[] FilterName =
-        "Guardian WireGuard DNS Permit\0".ToCharArray();
+        "Guardian Tunnel DNS Permit\0".ToCharArray();
     private static readonly char[] FilterDesc =
-        "Permit DNS leaving on the WireGuard tunnel adapter\0".ToCharArray();
+        "Permit DNS leaving on the VPN tunnel adapter\0".ToCharArray();
 
     // -----------------------------------------------------------------------------
     // Public API — four wrappers, one per (family, protocol) combination.
@@ -58,19 +61,19 @@ public static unsafe class WireGuardDnsPermit
 
     public static ulong AddPermitDnsUdpV4(HANDLE engine, ulong luid) =>
         AddFilter(engine, PInvoke.FWPM_LAYER_ALE_AUTH_CONNECT_V4, ProtocolUdp,
-                  luid, "PermitDnsUdpOnWireGuardV4");
+                  luid, "PermitDnsUdpOnTunnelV4");
 
     public static ulong AddPermitDnsTcpV4(HANDLE engine, ulong luid) =>
         AddFilter(engine, PInvoke.FWPM_LAYER_ALE_AUTH_CONNECT_V4, ProtocolTcp,
-                  luid, "PermitDnsTcpOnWireGuardV4");
+                  luid, "PermitDnsTcpOnTunnelV4");
 
     public static ulong AddPermitDnsUdpV6(HANDLE engine, ulong luid) =>
         AddFilter(engine, PInvoke.FWPM_LAYER_ALE_AUTH_CONNECT_V6, ProtocolUdp,
-                  luid, "PermitDnsUdpOnWireGuardV6");
+                  luid, "PermitDnsUdpOnTunnelV6");
 
     public static ulong AddPermitDnsTcpV6(HANDLE engine, ulong luid) =>
         AddFilter(engine, PInvoke.FWPM_LAYER_ALE_AUTH_CONNECT_V6, ProtocolTcp,
-                  luid, "PermitDnsTcpOnWireGuardV6");
+                  luid, "PermitDnsTcpOnTunnelV6");
 
     /// <summary>
     /// Install all four (UDP/TCP × V4/V6) permits in one call. Returns the
@@ -100,7 +103,7 @@ public static unsafe class WireGuardDnsPermit
             var rv = PInvoke.FwpmFilterDeleteById0(engine, id);
             if (rv != 0)
             {
-                Log.Warning("WireGuardDnsPermit.RemoveAll: FwpmFilterDeleteById0({Id}) failed: 0x{Code:X8}", id, rv);
+                Log.Warning("TunnelDnsPermit.RemoveAll: FwpmFilterDeleteById0({Id}) failed: 0x{Code:X8}", id, rv);
                 allOk = false;
             }
         }
@@ -177,10 +180,10 @@ public static unsafe class WireGuardDnsPermit
             var rv = PInvoke.FwpmFilterAdd0(engine, &filter, PSECURITY_DESCRIPTOR.Null, &filterId);
             if (rv != 0)
             {
-                Log.Error("WireGuardDnsPermit.AddFilter[{Label}]: FwpmFilterAdd0 failed: 0x{Code:X8}", label, rv);
+                Log.Error("TunnelDnsPermit.AddFilter[{Label}]: FwpmFilterAdd0 failed: 0x{Code:X8}", label, rv);
                 return 0;
             }
-            Log.Debug("WireGuardDnsPermit.AddFilter[{Label}]: id={Id}, luid=0x{Luid:X16}", label, filterId, luid);
+            Log.Debug("TunnelDnsPermit.AddFilter[{Label}]: id={Id}, luid=0x{Luid:X16}", label, filterId, luid);
             return filterId;
         }
     }

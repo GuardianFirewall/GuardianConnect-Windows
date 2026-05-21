@@ -22,7 +22,7 @@ public class VpnUtils
     // on disconnect. Was previously two static ulongs (TAP_IPv4_Id /
     // TAP_IPv6_Id) backing the old unscoped-permit implementation; the
     // permit pipeline now installs four LUID-scoped permits via
-    // WireGuardDnsPermit.AddAll so we need a list.
+    // TunnelDnsPermit.AddAll so we need a list.
     private static List<ulong> TAP_PermitIds = new();
     private static ulong QBlock_IPv6_Id;
     private static ulong QBlock_IPv4_Id;
@@ -283,7 +283,7 @@ public class VpnUtils
         // every V6 packet at this layer in this sublayer" — only worked
         // because the V6 permit alongside it was equally unscoped and
         // cancelled it via higher weight. With the V6 permit now properly
-        // LUID-scoped (PermitQueriesFromTAP -> WireGuardDnsPermit.AddAll),
+        // LUID-scoped (PermitQueriesFromTAP -> TunnelDnsPermit.AddAll),
         // the V6 block also needs its own scoping so it doesn't break all
         // V6 traffic in this sublayer.
         var cv = new FWP_CONDITION_VALUE0();
@@ -336,7 +336,7 @@ public class VpnUtils
     // DNS resolver skip it. See WorkProgression/IKEv2DnsLeakFix.md for
     // the full postmortem.
     //
-    // The fix uses the existing WireGuardDnsPermit.AddAll primitive —
+    // The fix uses the existing TunnelDnsPermit.AddAll primitive —
     // it's name-flavoured but generic: four 3-condition permits (UDP/TCP
     // x V4/V6) scoped to FWPM_CONDITION_IP_LOCAL_INTERFACE = <tunnel
     // LUID> + IP_REMOTE_PORT = 53 + IP_PROTOCOL = UDP|TCP. WFP arbitration
@@ -372,13 +372,13 @@ public class VpnUtils
         Log.Information(
             "PermitQueriesFromTAP: resolved IKEv2 tunnel LUID 0x{Luid:X16}", tunnelLuid.Value);
 
-        var ids = WireGuardDnsPermit.AddAll(engineHandle, tunnelLuid.Value);
+        var ids = TunnelDnsPermit.AddAll(engineHandle, tunnelLuid.Value);
         if (ids.Count != 4)
         {
             Log.Error(
-                "PermitQueriesFromTAP: WireGuardDnsPermit.AddAll installed {Count}/4 permits; " +
+                "PermitQueriesFromTAP: TunnelDnsPermit.AddAll installed {Count}/4 permits; " +
                 "rolling back partial install.", ids.Count);
-            WireGuardDnsPermit.RemoveAll(engineHandle, ids);
+            TunnelDnsPermit.RemoveAll(engineHandle, ids);
             return 1;
         }
 
@@ -452,7 +452,7 @@ public class VpnUtils
             uint result = 0;
 
             // Remove the four LUID-scoped DNS permits installed by
-            // PermitQueriesFromTAP via WireGuardDnsPermit.AddAll
+            // PermitQueriesFromTAP via TunnelDnsPermit.AddAll
             // (UDP/TCP × V4/V6). Pre wg-alpha.30 this section removed two
             // static TAP_IPv4_Id / TAP_IPv6_Id filter IDs (unscoped
             // permits). The new install path returns a list; RemoveAll
@@ -462,7 +462,7 @@ public class VpnUtils
                 Log.Debug(
                     "RemoveWpmFilters: Removing {Count} LUID-scoped DNS permit filters...",
                     TAP_PermitIds.Count);
-                if (!WireGuardDnsPermit.RemoveAll(engine_handle, TAP_PermitIds))
+                if (!TunnelDnsPermit.RemoveAll(engine_handle, TAP_PermitIds))
                 {
                     Log.Error("RemoveWpmFilters: at least one LUID-scoped DNS permit removal failed.");
                     whetherSuccessful = false;
