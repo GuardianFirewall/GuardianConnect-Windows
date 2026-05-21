@@ -446,7 +446,10 @@ public class GRDGateway
         throw new NotImplementedException();
     }
 
-    public static async void SetDeviceFilterConfigsForDeviceId()
+    // Why Task (not void): an async void here re-throws unobserved exceptions
+    // onto the calling SynchronizationContext (Avalonia UI dispatcher), which
+    // crashed the app when BaseHostName failed DNS during region churn.
+    public static async Task SetDeviceFilterConfigsForDeviceId()
     {
         if (!GRDVPNHelper.Singleton.IsConnected(out _)) return;
         if (string.IsNullOrEmpty(BaseHostName))
@@ -455,30 +458,37 @@ public class GRDGateway
             return;
         }
 
-        // Get DeviceFilterConfig object
-        var dfcCurrent = GRDVPNHelper.Singleton.CurrentDeviceBlocklistConfig;
-        if (dfcCurrent != null) dfcCurrent.Api_auth_token = ApiAuthToken;
+        try
+        {
+            // Get DeviceFilterConfig object
+            var dfcCurrent = GRDVPNHelper.Singleton.CurrentDeviceBlocklistConfig;
+            if (dfcCurrent != null) dfcCurrent.Api_auth_token = ApiAuthToken;
 
-        Logger.LogInformation("SetDeviceFilterConfigsForDevice: Updating CurrentDeviceBlocklistConfig api_auth_token");
-        if (GRDVPNHelper.Singleton.CurrentDeviceBlocklistConfig != null)
-            GRDVPNHelper.Singleton.CurrentDeviceBlocklistConfig.Api_auth_token = ApiAuthToken;
+            Logger.LogInformation("SetDeviceFilterConfigsForDevice: Updating CurrentDeviceBlocklistConfig api_auth_token");
+            if (GRDVPNHelper.Singleton.CurrentDeviceBlocklistConfig != null)
+                GRDVPNHelper.Singleton.CurrentDeviceBlocklistConfig.Api_auth_token = ApiAuthToken;
 
-        var dfcJson = JsonSerializer.Serialize(dfcCurrent, DeviceFilterConfigJsonContext.Default.DeviceFilterConfig);
-        var clientId = DeviceIdentifier;
+            var dfcJson = JsonSerializer.Serialize(dfcCurrent, DeviceFilterConfigJsonContext.Default.DeviceFilterConfig);
+            var clientId = DeviceIdentifier;
 
-        // build request
-        var reqUri = new Uri($"https://{BaseHostName}/api/v1.3/device/{clientId}/config/filters");
-        var request = new HttpRequestMessage(HttpMethod.Post, reqUri);
-        request.Content = new StringContent(dfcJson);
+            // build request
+            var reqUri = new Uri($"https://{BaseHostName}/api/v1.3/device/{clientId}/config/filters");
+            var request = new HttpRequestMessage(HttpMethod.Post, reqUri);
+            request.Content = new StringContent(dfcJson);
 
-        var response = await HttpUtils.Client.SendAsync(request);
+            var response = await HttpUtils.Client.SendAsync(request);
 
-        if (!response.IsSuccessStatusCode)
-            Logger.LogError(
-                $"SetDeviceFilterConfigsForDeviceId: Error returned when syncing with host: {response.StatusCode}");
-        else
-            Logger.LogInformation(
-                $"SetDeviceFilterConfigsForDeviceId: Syncing with host successful: {response.StatusCode}");
+            if (!response.IsSuccessStatusCode)
+                Logger.LogError(
+                    $"SetDeviceFilterConfigsForDeviceId: Error returned when syncing with host: {response.StatusCode}");
+            else
+                Logger.LogInformation(
+                    $"SetDeviceFilterConfigsForDeviceId: Syncing with host successful: {response.StatusCode}");
+        }
+        catch (Exception ex)
+        {
+            Logger.LogError($"SetDeviceFilterConfigsForDeviceId: Exception during sync: {ex.GetType().Name}: {ex.Message}");
+        }
     }
 
     #endregion - Device Filter Configs

@@ -91,8 +91,9 @@ public class DeviceFilterConfig
         if (GRDVPNHelper.Singleton.CurrentDeviceBlocklistConfig != null)
             Preferences.Set(Common.kGRDDeviceFilterConfigBlocklist,
                 GRDVPNHelper.Singleton.CurrentDeviceBlocklistConfig.ToString());
-        // Call GRDGateway setter.
-        GRDGateway.SetDeviceFilterConfigsForDeviceId();
+        // Call GRDGateway setter. Fire-and-forget by design: the UI doesn't
+        // wait for the remote sync; the discard makes the unawaited Task explicit.
+        _ = GRDGateway.SetDeviceFilterConfigsForDeviceId();
     }
 
     public override string ToString()

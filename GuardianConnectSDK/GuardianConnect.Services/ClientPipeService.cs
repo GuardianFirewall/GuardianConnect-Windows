@@ -153,6 +153,11 @@ public class ClientPipeService : BackgroundService
 
         var threadId = Thread.CurrentThread.ManagedThreadId;
 
+        // Outer try wraps the listener loop. The async-void signature is fixed
+        // by Thread.Start's delegate shape; any escape here would re-throw onto
+        // the ThreadPool and crash the service. We absorb it and exit cleanly.
+        try
+        {
         while (!_cancellationToken.IsCancellationRequested && !AdministrativeShutdownRequested)
         {
             var pipeSecurity = new PipeSecurity();
@@ -330,5 +335,10 @@ public class ClientPipeService : BackgroundService
         }
 
         _logger.Log(LogLevel.Information, "ClientPipeService.End -- outer While()...");
+        }
+        catch (Exception ex)
+        {
+            _logger.Log(LogLevel.Error, $"ClientPipeService[{threadId}]: ServerThread terminated by unhandled exception: {ex.GetType().Name}: {ex.Message}");
+        }
     }
 }
