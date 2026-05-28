@@ -153,9 +153,17 @@ public class ClientPipeService : BackgroundService
 
         var threadId = Thread.CurrentThread.ManagedThreadId;
 
-        // Outer try wraps the listener loop. The async-void signature is fixed
-        // by Thread.Start's delegate shape; any escape here would re-throw onto
-        // the ThreadPool and crash the service. We absorb it and exit cleanly.
+        // Outer try logs an unhandled escape with a diagnostic-rich message,
+        // then re-throws so the exception propagates out to the ThreadPool's
+        // unhandled-exception handler and Windows Service Recovery restarts
+        // the service. This is the self-healing path. The wg-alpha.33
+        // version of this catch swallowed the exception silently, which
+        // left the service alive-but-dead with no functional pipe listeners
+        // after a quick stop+start (pipe-bind hit "All pipe instances are
+        // busy" while the OS was still releasing the prior instance's
+        // handles, all listener threads exited cleanly, service stayed up
+        // accepting no clients). Re-throwing restores the pre-wg-alpha.33
+        // self-heal while keeping the diagnostic log.
         try
         {
         while (!_cancellationToken.IsCancellationRequested && !AdministrativeShutdownRequested)
@@ -166,10 +174,54 @@ public class ClientPipeService : BackgroundService
                     PipeAccessRights.FullControl,
                     AccessControlType.Allow));
 
-            //NamedPipeServerStream pipeServer = new NamedPipeServerStream("GuardianFirewallService", PipeDirection.InOut, numThreads);
-            var pipeServer = NamedPipeServerStreamAcl.Create("GuardianFirewallService",
-                PipeDirection.InOut, numThreads, PipeTransmissionMode.Byte, PipeOptions.Asynchronous,
-                65536, 65536, pipeSecurity);
+            // Pipe bind with retry. NamedPipeServerStreamAcl.Create can throw
+            // IOException("All pipe instances are busy.") when the service
+            // restarts quickly after a prior instance: the OS has not yet
+            // released the previous service's named-pipe instance count.
+            // 15 seconds is empirically not enough; the failure mode was
+            // observed in the 2026-05-28 reboot-test logs (PID 260 took over
+            // from PID 5464 and ALL ~20 listener threads died on bind).
+            //
+            // Recoverable in-process via backoff. We retry up to N times with
+            // increasing delay before giving up and letting the outer catch
+            // tear the service down for restart. The other listener threads
+            // are competing for the same pipe-instance pool, so a few of them
+            // will succeed earlier and the others later as old instances
+            // release one at a time.
+            NamedPipeServerStream? pipeServer = null;
+            const int maxBindAttempts = 12;
+            var bindAttempt = 0;
+            while (pipeServer is null && !_cancellationToken.IsCancellationRequested && !AdministrativeShutdownRequested)
+            {
+                try
+                {
+                    pipeServer = NamedPipeServerStreamAcl.Create("GuardianFirewallService",
+                        PipeDirection.InOut, numThreads, PipeTransmissionMode.Byte, PipeOptions.Asynchronous,
+                        65536, 65536, pipeSecurity);
+                }
+                catch (IOException ex) when (ex.Message.Contains("All pipe instances are busy", StringComparison.OrdinalIgnoreCase))
+                {
+                    bindAttempt++;
+                    if (bindAttempt >= maxBindAttempts)
+                    {
+                        _logger.Log(LogLevel.Error,
+                            $"ClientPipeService[{threadId}]: pipe bind still failing after {maxBindAttempts} attempts. Giving up — outer catch will tear the service down for Windows Service Recovery restart.");
+                        throw;
+                    }
+                    var delayMs = Math.Min(bindAttempt * 2000, 10000);
+                    _logger.Log(LogLevel.Warning,
+                        $"ClientPipeService[{threadId}]: pipe bind failed (attempt {bindAttempt}/{maxBindAttempts}, prior service handles still releasing). Retrying in {delayMs} ms.");
+                    Thread.Sleep(delayMs);
+                }
+            }
+
+            if (pipeServer is null)
+            {
+                // Cancelled or shutdown during retry — exit the listener loop cleanly.
+                _logger.Log(LogLevel.Information,
+                    $"ClientPipeService[{threadId}]: pipe bind aborted by cancellation/shutdown.");
+                break;
+            }
 
             // Wait for a client to connect
             _logger.Log(LogLevel.Information,
@@ -339,6 +391,11 @@ public class ClientPipeService : BackgroundService
         catch (Exception ex)
         {
             _logger.Log(LogLevel.Error, $"ClientPipeService[{threadId}]: ServerThread terminated by unhandled exception: {ex.GetType().Name}: {ex.Message}");
+            // Re-throw: lets the exception escape to the ThreadPool unhandled-exception
+            // handler, which terminates the service. Windows Service Recovery then
+            // restarts us. This restores the pre-wg-alpha.33 self-heal behavior; the
+            // outer catch is now diagnostic-only, not a swallow.
+            throw;
         }
     }
 }

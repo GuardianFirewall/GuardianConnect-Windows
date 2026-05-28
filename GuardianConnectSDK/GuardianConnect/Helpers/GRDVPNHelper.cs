@@ -349,8 +349,18 @@ public class GRDVPNHelper
         var statusErr = await GRDGateway.GetServerStatus(cred.HostName, clientCall: true);
         if (statusErr.IsError)
         {
+            // When GetServerStatus throws (DNS failure, socket-block from KS,
+            // connection refused, etc.) there's no HttpResponseMessage at all
+            // and GetReasonPhrase() returns "OK" — the default reason phrase
+            // on a fresh HttpResponseMessage. That produced the user-facing
+            // lie "GetServerStatus returned: OK" while the actual cause was
+            // a network failure. Surface the exception's message when present
+            // so the error string reflects reality.
+            var detail = statusErr.ThrownException is { } ex
+                ? $"{ex.GetType().Name}: {ex.Message}"
+                : $"HTTP {statusErr.GetReasonPhrase()}";
             return statusErr.SetErrorMessage(
-                $"ConnectVpnWithConfiguredCredentials: GetServerStatus returned: {statusErr.GetReasonPhrase()}");
+                $"ConnectVpnWithConfiguredCredentials: GetServerStatus failed: {detail}");
         }
 
         // Dial using stored creds.

@@ -368,11 +368,32 @@ public sealed class KillSwitchService : BackgroundService
             return;
         }
 
-        // Disconnected:
-        // - If the disconnect was planned (user-initiated), remove filters.
-        // - If unplanned (drop), keep filters installed — the kill switch is doing its
-        //   job: block traffic until the user reconnects or explicitly turns KS off.
-        if (_isActive && wasPlanned) RemoveFiltersUnsafe();
+        // Disconnected — remove filters whether the disconnect was planned or
+        // not (changed 2026-05-28). The prior "keep filters on unplanned drop"
+        // behavior created an unrecoverable rock-and-hard-place: with the
+        // filter set including a tunnel-LUID-scoped DNS-permit AND a generic
+        // DNS-block, an unplanned drop left a stale LUID matching nothing,
+        // the DNS-block winning, and the next Connect attempt's
+        // credential-negotiate HTTP call failed with "No such host" because
+        // the OS could not resolve any Guardian API hostname. The user could
+        // only escape by toggling KS off, which is poor UX and surprises new
+        // users (CJ + TJE reproduced 2026-05-28).
+        //
+        // This matches Proton's "Soft" / Standard kill switch (kill switch
+        // de-engages when tunnel is not connected). We lose a small leak
+        // window on the drop itself — but we can't match Apple's kernel-
+        // level instant-block from user space (no includeAllNetworks
+        // equivalent on Windows). The usability win — recoverable state —
+        // is worth the trade.
+        //
+        // Filters reinstall automatically on the next successful Connect via
+        // the wgConnected / RasConnected event paths above.
+        //
+        // A future "Hard" kill switch mode (matching Proton Advanced /
+        // Permanent KS, with persistent WFP filters surviving reboot) would
+        // bring back the always-block behavior as an explicit user opt-in.
+        // See WorkProgression/KillSwitch-AutoReconnect-Analysis.md.
+        if (_isActive) RemoveFiltersUnsafe();
     }
 
     private void ReinstallUnsafe()
