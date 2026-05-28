@@ -45,6 +45,16 @@ public sealed class KillSwitchService : BackgroundService
     private readonly List<ulong> _installedFilterIds = new();
     private bool _isActive;
 
+    // Connecting-overlay state (wg-alpha.35) — separate ID list so the overlay can be
+    // installed / removed independently of the base KS filter set. Watchdog timer
+    // auto-exits the overlay if EnterConnectingMode isn't paired with an explicit
+    // ExitConnectingMode call (e.g., client process crashes mid-negotiate).
+    private readonly List<ulong> _connectingOverlayFilterIds = new();
+    private bool _isConnecting;
+    private DateTime _connectingDeadlineUtc = DateTime.MaxValue;
+    private System.Threading.Timer? _connectingWatchdog;
+    private const int ConnectingOverlayTimeoutSeconds = 60;
+
     // Last observed connected/disconnected state. Refreshed by:
     //   - one-shot evaluation at service start (in case VPN is already connected at boot)
     //   - NotificationHandler.RasConnectionStateChanged event on every RAS state change
@@ -364,36 +374,46 @@ public sealed class KillSwitchService : BackgroundService
 
         if (connected)
         {
-            if (!_isActive) InstallFiltersUnsafe();
+            if (!_isActive)
+            {
+                InstallFiltersUnsafe();
+            }
+            else
+            {
+                // Already-active path: tunnel came up while KS was already
+                // engaged from a prior session (unplanned-drop-then-reconnect).
+                // The current filter set is scoped to the PRIOR tunnel's LUID,
+                // which is now stale (adapter destroyed). The tunnel-LUID-scoped
+                // permits match nothing → new tunnel's traffic gets caught by
+                // block-all. Rebuild filters with the fresh LUID.
+                _logger.LogInformation(
+                    "KillSwitchService: tunnel came up while KS already active; rebuilding filter set with fresh tunnel LUID.");
+                ReinstallUnsafe();
+            }
+            // Connecting-overlay (if any) is now redundant — the new filter set's
+            // tunnel-LUID-scoped DNS permit handles DNS via the tunnel. Clear it
+            // promptly rather than waiting for the watchdog.
+            if (_isConnecting) ExitConnectingModeUnsafe();
             return;
         }
 
-        // Disconnected — remove filters whether the disconnect was planned or
-        // not (changed 2026-05-28). The prior "keep filters on unplanned drop"
-        // behavior created an unrecoverable rock-and-hard-place: with the
-        // filter set including a tunnel-LUID-scoped DNS-permit AND a generic
-        // DNS-block, an unplanned drop left a stale LUID matching nothing,
-        // the DNS-block winning, and the next Connect attempt's
-        // credential-negotiate HTTP call failed with "No such host" because
-        // the OS could not resolve any Guardian API hostname. The user could
-        // only escape by toggling KS off, which is poor UX and surprises new
-        // users (CJ + TJE reproduced 2026-05-28).
+        // Disconnected:
+        // - If the disconnect was planned (user clicked Disconnect, or
+        //   transitive equivalents via transport-switch / region-change /
+        //   logout), remove filters. Power-transition suspend is also
+        //   treated as planned for this purpose (see comment above).
+        // - If unplanned (drop / server outage / network blip), KEEP filters
+        //   installed. This is the kill switch doing its job — block all
+        //   traffic until the user explicitly opts out (Disconnect / KS off /
+        //   service restart / system reboot).
         //
-        // This matches Proton's "Soft" / Standard kill switch (kill switch
-        // de-engages when tunnel is not connected). We lose a small leak
-        // window on the drop itself — but we can't match Apple's kernel-
-        // level instant-block from user space (no includeAllNetworks
-        // equivalent on Windows). The usability win — recoverable state —
-        // is worth the trade.
-        //
-        // Filters reinstall automatically on the next successful Connect via
-        // the wgConnected / RasConnected event paths above.
-        //
-        // A future "Hard" kill switch mode (matching Proton Advanced /
-        // Permanent KS, with persistent WFP filters surviving reboot) would
-        // bring back the always-block behavior as an explicit user opt-in.
-        // See WorkProgression/KillSwitch-AutoReconnect-Analysis.md.
-        if (_isActive) RemoveFiltersUnsafe();
+        // The rock-and-hard-place bug (CJ+TJE 2026-05-28) — where the next
+        // Connect attempt failed because the DNS-block + stale-LUID DNS-permit
+        // left no DNS path for the negotiate call — is solved by the new
+        // EnterConnectingMode / ExitConnectingMode overlay below, NOT by
+        // tearing down filters on unplanned drop. wg-alpha.34 mistakenly
+        // tore down filters; backed out in wg-alpha.35.
+        if (_isActive && wasPlanned) RemoveFiltersUnsafe();
     }
 
     private void ReinstallUnsafe()
@@ -552,6 +572,15 @@ public sealed class KillSwitchService : BackgroundService
 
         _logger.LogInformation("KillSwitchService.RemoveFiltersUnsafe: tearing down kill switch.");
 
+        // Overlay rides on top of the base filter set in the same dynamic engine,
+        // so closing the engine kills overlay filters too. Clear overlay tracking
+        // state explicitly so a subsequent EnterConnectingMode (with KS off) doesn't
+        // think there are stale overlay filters to remove.
+        if (_isConnecting || _connectingOverlayFilterIds.Count > 0)
+        {
+            ExitConnectingModeUnsafe();
+        }
+
         if (_engine != HANDLE.Null)
         {
             // Closing the dynamic engine is enough — all filters tear down with the session.
@@ -580,5 +609,171 @@ public sealed class KillSwitchService : BackgroundService
     private void Track(ulong filterId)
     {
         if (filterId != 0) _installedFilterIds.Add(filterId);
+    }
+
+    // -------------------------------------------------------------------------------
+    // Connecting-mode overlay (wg-alpha.35) — temporary DNS + HTTPS permits installed
+    // during a user-initiated Connect attempt so the credential-negotiate machinery in
+    // the client process can resolve Guardian API hostnames and complete HTTP calls
+    // while the regular KS filter set (block-all + DNS-block) keeps protecting the
+    // rest of traffic.
+    //
+    // Lifecycle:
+    //   - Client calls EnterConnectingMode IPC before its first negotiate HTTP call
+    //     (ConnectButtonCommand path in the UI).
+    //   - Service installs overlay permits (UDP/TCP/53 + TCP/443 outbound, unscoped)
+    //     at WeightSpecificPermit (4), beating the DNS-block (3) and block-all (1).
+    //   - Negotiate completes, client sends StartVPNConnection, tunnel comes up.
+    //   - ReevaluateUnsafe detects connected=true and the InstallFiltersUnsafe path
+    //     rebuilds the base set; ExitConnectingModeUnsafe runs implicitly to remove
+    //     overlay since tunnel-LUID permits handle DNS naturally from here.
+    //   - On client-side failure (negotiate threw, user closed app, etc.), the
+    //     watchdog timer auto-exits the overlay after ConnectingOverlayTimeoutSeconds.
+    //   - Client can also call ExitConnectingMode IPC explicitly on error paths for
+    //     prompt teardown without waiting for the watchdog.
+    //
+    // Leak surface during the open window: DNS + HTTPS to any destination via any
+    // local interface. Bounded by the negotiate's natural duration (typically
+    // seconds) and capped by the watchdog. The user explicitly clicked Connect,
+    // so they've signaled "I want connectivity to come back" — consistent with
+    // intent. The block-all WFP filter still catches non-DNS, non-443 traffic, so
+    // general apps stay blocked.
+    // -------------------------------------------------------------------------------
+
+    public void EnterConnectingMode()
+    {
+        lock (_stateLock)
+        {
+            EnterConnectingModeUnsafe();
+        }
+        SignalStatusChanged();
+    }
+
+    public void ExitConnectingMode()
+    {
+        lock (_stateLock)
+        {
+            ExitConnectingModeUnsafe();
+        }
+        SignalStatusChanged();
+    }
+
+    private void EnterConnectingModeUnsafe()
+    {
+        // Idempotent: if overlay already installed, refresh the deadline so a fresh
+        // EnterConnectingMode call extends the window. (Useful if the client retries
+        // the negotiate after a transient failure within the same connect session.)
+        _connectingDeadlineUtc = DateTime.UtcNow.AddSeconds(ConnectingOverlayTimeoutSeconds);
+
+        if (_isConnecting)
+        {
+            _logger.LogInformation("KillSwitchService.EnterConnectingMode: overlay already installed; deadline refreshed to {Deadline:o}.", _connectingDeadlineUtc);
+            return;
+        }
+
+        // No overlay needed when KS isn't blocking anything anyway.
+        if (!_isActive)
+        {
+            _logger.LogInformation("KillSwitchService.EnterConnectingMode: KS not active; no overlay needed.");
+            return;
+        }
+
+        if (_engine == HANDLE.Null)
+        {
+            _logger.LogWarning("KillSwitchService.EnterConnectingMode: _isActive but engine handle is null. Skipping overlay install.");
+            return;
+        }
+
+        _logger.LogInformation("KillSwitchService.EnterConnectingMode: installing DNS + HTTPS overlay permits (deadline {Deadline:o}).", _connectingDeadlineUtc);
+
+        try
+        {
+            if (KillSwitchFilters.BeginTransaction(_engine) != 0)
+            {
+                _logger.LogError("KillSwitchService.EnterConnectingMode: BeginTransaction failed; overlay not installed.");
+                return;
+            }
+
+            TrackOverlay(KillSwitchFilters.AddPermitDnsUdpAnyOutboundV4(_engine));
+            TrackOverlay(KillSwitchFilters.AddPermitDnsTcpAnyOutboundV4(_engine));
+            TrackOverlay(KillSwitchFilters.AddPermitDnsUdpAnyOutboundV6(_engine));
+            TrackOverlay(KillSwitchFilters.AddPermitDnsTcpAnyOutboundV6(_engine));
+            TrackOverlay(KillSwitchFilters.AddPermitHttpsAnyOutboundV4(_engine));
+            TrackOverlay(KillSwitchFilters.AddPermitHttpsAnyOutboundV6(_engine));
+
+            if (KillSwitchFilters.CommitTransaction(_engine) != 0)
+            {
+                _logger.LogError("KillSwitchService.EnterConnectingMode: CommitTransaction failed; overlay aborted.");
+                _connectingOverlayFilterIds.Clear();
+                return;
+            }
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "KillSwitchService.EnterConnectingMode: exception during overlay install. Aborting.");
+            try { KillSwitchFilters.AbortTransaction(_engine); } catch { /* best-effort */ }
+            _connectingOverlayFilterIds.Clear();
+            return;
+        }
+
+        _isConnecting = true;
+        _logger.LogInformation("KillSwitchService.EnterConnectingMode: {Count} overlay filters installed.", _connectingOverlayFilterIds.Count);
+
+        // Arm watchdog. Single-shot Timer; we dispose+re-arm on each EnterConnectingMode call so a
+        // refreshed deadline (idempotent re-entry) doesn't fire prematurely from a stale schedule.
+        _connectingWatchdog?.Dispose();
+        _connectingWatchdog = new System.Threading.Timer(WatchdogFire, null,
+            TimeSpan.FromSeconds(ConnectingOverlayTimeoutSeconds), Timeout.InfiniteTimeSpan);
+    }
+
+    private void ExitConnectingModeUnsafe()
+    {
+        if (!_isConnecting && _connectingOverlayFilterIds.Count == 0)
+        {
+            _connectingDeadlineUtc = DateTime.MaxValue;
+            return;
+        }
+
+        _logger.LogInformation("KillSwitchService.ExitConnectingMode: removing overlay permits ({Count} filters).", _connectingOverlayFilterIds.Count);
+
+        if (_engine != HANDLE.Null && _connectingOverlayFilterIds.Count > 0)
+        {
+            try
+            {
+                KillSwitchFilters.DeleteFiltersById(_engine, _connectingOverlayFilterIds);
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "KillSwitchService.ExitConnectingMode: DeleteFiltersById threw. Overlay IDs cleared anyway; remaining filters will tear down with the engine.");
+            }
+        }
+
+        _connectingOverlayFilterIds.Clear();
+        _isConnecting = false;
+        _connectingDeadlineUtc = DateTime.MaxValue;
+
+        _connectingWatchdog?.Dispose();
+        _connectingWatchdog = null;
+    }
+
+    private void TrackOverlay(ulong filterId)
+    {
+        if (filterId != 0) _connectingOverlayFilterIds.Add(filterId);
+    }
+
+    private void WatchdogFire(object? state)
+    {
+        // Timer fires on a thread-pool thread; re-acquire the state lock before
+        // touching shared state. If ExitConnectingMode was called in the meantime,
+        // _isConnecting is false and ExitConnectingModeUnsafe is a no-op.
+        lock (_stateLock)
+        {
+            if (!_isConnecting) return;
+            _logger.LogWarning(
+                "KillSwitchService: connecting-overlay watchdog fired after {Timeout}s — no ExitConnectingMode received. Auto-removing overlay.",
+                ConnectingOverlayTimeoutSeconds);
+            ExitConnectingModeUnsafe();
+        }
+        SignalStatusChanged();
     }
 }

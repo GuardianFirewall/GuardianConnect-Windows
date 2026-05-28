@@ -128,6 +128,26 @@ public static class ClientPipe
         if (!Instance.IsConnected) Instance.ReopenNamedPipe();
         return Instance.GetKillSwitchStatus();
     }
+
+    /// <summary>
+    /// Open the kill-switch connecting-overlay (wg-alpha.35). UI calls this
+    /// before issuing the credential-negotiate HTTP calls in
+    /// GeneralPageViewModel.ConnectButtonCommand so the negotiate isn't
+    /// blocked by the DNS-block + block-all when KS is engaged with no
+    /// active tunnel (rock-and-hard-place). Idempotent; service-side
+    /// watchdog auto-closes after 60s if no paired ExitConnectingMode.
+    /// </summary>
+    public static ErrorResponse EnterConnectingMode()
+    {
+        if (!Instance.IsConnected) Instance.ReopenNamedPipe();
+        return Instance.EnterConnectingMode();
+    }
+
+    public static ErrorResponse ExitConnectingMode()
+    {
+        if (!Instance.IsConnected) Instance.ReopenNamedPipe();
+        return Instance.ExitConnectingMode();
+    }
 }
 
 public class ClientPipeImpl : IGuardianNPContract
@@ -409,6 +429,39 @@ public class ClientPipeImpl : IGuardianNPContract
             ClientPipe.Logger.LogError(e, $"ClientPipe.GetKillSwitchStatus: Exception {e.Message}");
             return new KillSwitchStatus();
         }
+    }
+
+    public ErrorResponse EnterConnectingMode() => SendVoidCommand(IGuardianNPContract.NPCommands.EnterConnectingMode);
+    public ErrorResponse ExitConnectingMode()  => SendVoidCommand(IGuardianNPContract.NPCommands.ExitConnectingMode);
+
+    /// <summary>
+    /// Shared helper for IPC commands that take no payload and return an ErrorResponse.
+    /// </summary>
+    private ErrorResponse SendVoidCommand(IGuardianNPContract.NPCommands cmd)
+    {
+        var resp = new ErrorResponse();
+        try
+        {
+            string responseJson;
+            _pipeIO.Wait();
+            try
+            {
+                var cmdString = $"{Hexify(cmd)}.";
+                ss.WriteString(cmdString);
+                responseJson = ss.ReadStringAsync().Result.TrimEnd('\0');
+            }
+            finally { _pipeIO.Release(); }
+            if (!responseJson.StartsWith('{')) responseJson = "{ " + responseJson;
+            resp = JsonSerializer.Deserialize<ErrorResponse>(responseJson,
+                ErrorResponseJsonContext.Default.ErrorResponse) ?? new ErrorResponse();
+        }
+        catch (Exception e)
+        {
+            ClientPipe.Logger.LogError(e, $"ClientPipe.{cmd}: Exception {e.Message}");
+            resp.SetException(e);
+            if (e is IOException) resp.Message = "PIPE BROKEN";
+        }
+        return resp;
     }
 
     internal void OpenNamedPipe(string servicePipeName = Common.kGRDServicePipeName)

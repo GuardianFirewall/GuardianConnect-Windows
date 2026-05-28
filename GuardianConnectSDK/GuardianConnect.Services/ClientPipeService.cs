@@ -362,6 +362,16 @@ public class ClientPipeService : BackgroundService
                             var ksStatus = cmdDispatcher.GetKillSwitchStatus();
                             ss.WriteString(JsonSerializer.Serialize(ksStatus, KillSwitchStatusJsonContext.Default.KillSwitchStatus));
                             break;
+                        case IGuardianNPContract.NPCommands.EnterConnectingMode:
+                            _logger.Log(LogLevel.Information, $"ClientPipeService[{threadId}]: Performing EnterConnectingMode");
+                            var enterResp = cmdDispatcher.EnterConnectingMode();
+                            ss.WriteString(JsonSerializer.Serialize(enterResp, ErrorResponseJsonContext.Default.ErrorResponse));
+                            break;
+                        case IGuardianNPContract.NPCommands.ExitConnectingMode:
+                            _logger.Log(LogLevel.Information, $"ClientPipeService[{threadId}]: Performing ExitConnectingMode");
+                            var exitResp = cmdDispatcher.ExitConnectingMode();
+                            ss.WriteString(JsonSerializer.Serialize(exitResp, ErrorResponseJsonContext.Default.ErrorResponse));
+                            break;
                         default:
                             _logger.Log(LogLevel.Information, "WHY ARE WE HERE?");
                             break;

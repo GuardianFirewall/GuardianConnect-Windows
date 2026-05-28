@@ -258,4 +258,31 @@ public class GuardianNPCommandDispatcher : IGuardianNPContract
         }
         return svc.GetStatus();
     }
+
+    public ErrorResponse EnterConnectingMode()
+    {
+        var svc = KillSwitchService.Current;
+        if (svc == null)
+        {
+            // Service not running. The overlay can't be installed because there's
+            // no engine — and there's no filter set to escape from either, so this
+            // is benign. Return success.
+            Logger.LogInformation("GuardianNPCommandDispatcher.EnterConnectingMode: KillSwitchService.Current is null; no overlay needed.");
+            return new ErrorResponse();
+        }
+        svc.EnterConnectingMode();
+        return new ErrorResponse();
+    }
+
+    public ErrorResponse ExitConnectingMode()
+    {
+        var svc = KillSwitchService.Current;
+        if (svc == null)
+        {
+            Logger.LogInformation("GuardianNPCommandDispatcher.ExitConnectingMode: KillSwitchService.Current is null; no overlay to remove.");
+            return new ErrorResponse();
+        }
+        svc.ExitConnectingMode();
+        return new ErrorResponse();
+    }
 }

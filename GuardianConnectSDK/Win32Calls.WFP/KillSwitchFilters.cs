@@ -46,6 +46,7 @@ public static unsafe class KillSwitchFilters
     private const ushort DnsPort = 53;
     private const ushort IkePort = 500;       // IKEv2 negotiation
     private const ushort IkeNatTPort = 4500;  // IKEv2 NAT-Traversal
+    private const ushort HttpsPort = 443;     // Connecting-overlay HTTPS permit (wg-alpha.35)
 
     private static readonly char[] SessionName  = "Guardian Kill Switch Session\0".ToCharArray();
     private static readonly char[] SessionDesc  = "Dynamic WFP session for Guardian Kill Switch (OnConnected mode)\0".ToCharArray();
@@ -415,6 +416,84 @@ public static unsafe class KillSwitchFilters
     public static ulong AddPermitDnsTcpOnTunnelV6(HANDLE engine, ulong luid) =>
         AddDnsTunnelPermitFilter(engine, PInvoke.FWPM_LAYER_ALE_AUTH_CONNECT_V6, ProtocolTcp,
                                  luid, "PermitDnsTcpOnTunnelV6");
+
+    // -----------------------------------------------------------------------------------
+    // Connecting-mode overlay (weight 4) — temporary permits installed during a user-
+    // initiated Connect attempt by KillSwitchService.EnterConnectingMode. Open up DNS
+    // and HTTPS on any local interface (typically the physical NIC since the tunnel
+    // adapter doesn't exist yet) so the client's credential-negotiate machinery can
+    // resolve Guardian API hostnames and complete the HTTP round-trip. Regular KS
+    // filters (block-all + DNS-block) keep blocking everything else.
+    //
+    // Weight = WeightSpecificPermit (4) so these permits beat the DNS-block (3) and
+    // block-all (1). Brief leak window during the connect attempt — bounded by the
+    // negotiate's natural duration plus a watchdog timeout in KillSwitchService.
+    // Removed automatically when the tunnel comes up (filter set rebuilds with
+    // tunnel-LUID-scoped permits taking over) or when the watchdog timeout fires.
+    //
+    // Added in wg-alpha.35 to fix the KS-on rock-and-hard-place after tunnel drop.
+    // -----------------------------------------------------------------------------------
+
+    public static ulong AddPermitDnsUdpAnyOutboundV4(HANDLE engine) =>
+        AddPortPermitFilter(engine, PInvoke.FWPM_LAYER_ALE_AUTH_CONNECT_V4, ProtocolUdp,
+                            DnsPort, "PermitDnsUdpAnyOutboundV4 (connecting overlay)");
+
+    public static ulong AddPermitDnsTcpAnyOutboundV4(HANDLE engine) =>
+        AddPortPermitFilter(engine, PInvoke.FWPM_LAYER_ALE_AUTH_CONNECT_V4, ProtocolTcp,
+                            DnsPort, "PermitDnsTcpAnyOutboundV4 (connecting overlay)");
+
+    public static ulong AddPermitDnsUdpAnyOutboundV6(HANDLE engine) =>
+        AddPortPermitFilter(engine, PInvoke.FWPM_LAYER_ALE_AUTH_CONNECT_V6, ProtocolUdp,
+                            DnsPort, "PermitDnsUdpAnyOutboundV6 (connecting overlay)");
+
+    public static ulong AddPermitDnsTcpAnyOutboundV6(HANDLE engine) =>
+        AddPortPermitFilter(engine, PInvoke.FWPM_LAYER_ALE_AUTH_CONNECT_V6, ProtocolTcp,
+                            DnsPort, "PermitDnsTcpAnyOutboundV6 (connecting overlay)");
+
+    public static ulong AddPermitHttpsAnyOutboundV4(HANDLE engine) =>
+        AddPortPermitFilter(engine, PInvoke.FWPM_LAYER_ALE_AUTH_CONNECT_V4, ProtocolTcp,
+                            HttpsPort, "PermitHttpsAnyOutboundV4 (connecting overlay)");
+
+    public static ulong AddPermitHttpsAnyOutboundV6(HANDLE engine) =>
+        AddPortPermitFilter(engine, PInvoke.FWPM_LAYER_ALE_AUTH_CONNECT_V6, ProtocolTcp,
+                            HttpsPort, "PermitHttpsAnyOutboundV6 (connecting overlay)");
+
+    /// <summary>
+    /// Generic outbound permit filter scoped only by IP protocol + remote port.
+    /// Used by the connecting-overlay primitives above. Installed at
+    /// WeightSpecificPermit so the permit beats the DNS-block (weight 3) and
+    /// block-all (weight 1).
+    /// </summary>
+    private static ulong AddPortPermitFilter(HANDLE engine, Guid layerKey, byte protocol,
+                                              ushort remotePort, string label)
+    {
+        var protoVal = new FWP_CONDITION_VALUE0
+        {
+            type = FWP_DATA_TYPE.FWP_UINT8,
+            Anonymous = { uint8 = protocol }
+        };
+        var portVal = new FWP_CONDITION_VALUE0
+        {
+            type = FWP_DATA_TYPE.FWP_UINT16,
+            Anonymous = { uint16 = remotePort }
+        };
+        var conditions = stackalloc FWPM_FILTER_CONDITION0[2];
+        conditions[0] = new FWPM_FILTER_CONDITION0
+        {
+            fieldKey = PInvoke.FWPM_CONDITION_IP_PROTOCOL,
+            matchType = FWP_MATCH_TYPE.FWP_MATCH_EQUAL,
+            conditionValue = protoVal
+        };
+        conditions[1] = new FWPM_FILTER_CONDITION0
+        {
+            fieldKey = PInvoke.FWPM_CONDITION_IP_REMOTE_PORT,
+            matchType = FWP_MATCH_TYPE.FWP_MATCH_EQUAL,
+            conditionValue = portVal
+        };
+
+        return AddFilterWithConditions(engine, layerKey, FWP_ACTION_TYPE.FWP_ACTION_PERMIT,
+                                       WeightSpecificPermit, conditions, 2, label);
+    }
 
     // -----------------------------------------------------------------------------------
     // LAN permits (weight 2) — opt-in. Installs permit filters for the standard private +
