@@ -494,6 +494,48 @@ public class GRDServerManager
         RegionHostsRetrievalWaiter.Set();
     }
 
+    /// <summary>
+    /// GET <c>/api/v1.1/servers/all-hostnames</c> — full flat list of every
+    /// host record across every region, in one round-trip. Used by the
+    /// developer-window host-picker so the user can scan all hosts (with
+    /// their <c>offline</c> flag) without expanding region-by-region. Does
+    /// not cache; caller owns the lifetime of the returned list.
+    ///
+    /// Returns an empty list on any HTTP / parse / network failure rather
+    /// than throwing — the dev window's failure mode is "empty list, try
+    /// again" rather than crashing the dialog.
+    /// </summary>
+    public static async Task<List<RegionalHostRecord>> GetAllHostnamesAsync()
+    {
+        var url = $"https://{Common.DefaultConnectAPIHostname}/api/v1.1/servers/all-hostnames";
+        var uri = new Uri(url);
+
+        try
+        {
+            Logger.LogInformation("GetAllHostnamesAsync: GET {Url}", url);
+            var response = await (HttpUtils.Client?.GetAsync(uri)
+                                  ?? throw new InvalidOperationException("HttpUtils.Client is null"));
+
+            if (!response.IsSuccessStatusCode)
+            {
+                Logger.LogError(
+                    "GetAllHostnamesAsync: non-success status {Status} from {Url}",
+                    response.StatusCode, url);
+                return new List<RegionalHostRecord>();
+            }
+
+            var body = await response.Content.ReadAsStringAsync();
+            var list = JsonSerializer.Deserialize<List<RegionalHostRecord>>(
+                body, RegionalHostRecordJsonContext.Default.ListRegionalHostRecord);
+            return list ?? new List<RegionalHostRecord>();
+        }
+        catch (Exception ex)
+        {
+            Logger.LogError(ex, "GetAllHostnamesAsync: failed");
+            return new List<RegionalHostRecord>();
+        }
+    }
+
     internal static RegionalHostRecord SelectBestHostInRegion(string regionKey)
     {
         RegionHostsRetrievalWaiter.Reset();
