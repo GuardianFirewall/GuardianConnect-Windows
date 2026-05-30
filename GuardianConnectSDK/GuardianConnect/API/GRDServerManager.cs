@@ -516,17 +516,49 @@ public class GRDServerManager
             var response = await (HttpUtils.Client?.GetAsync(uri)
                                   ?? throw new InvalidOperationException("HttpUtils.Client is null"));
 
+            var body = await response.Content.ReadAsStringAsync();
+            // Log status + body-length so the caller can tell hung-call (no log)
+            // from empty-list (logs 200 + small body) from wrong-path (logs 404)
+            // from wrong-shape (logs 200 + body that fails to parse below).
+            Logger.LogInformation(
+                "GetAllHostnamesAsync: response status={Status}, body length={Len}",
+                (int)response.StatusCode, body?.Length ?? 0);
+
             if (!response.IsSuccessStatusCode)
             {
+                // Log first 500 chars of body so error responses (HTML page,
+                // JSON error envelope, etc.) are visible.
+                var snippet = body is null ? "(null)"
+                            : body.Length > 500 ? body[..500] + "…(truncated)"
+                            : body;
                 Logger.LogError(
-                    "GetAllHostnamesAsync: non-success status {Status} from {Url}",
-                    response.StatusCode, url);
+                    "GetAllHostnamesAsync: non-success status {Status}. Body: {Body}",
+                    response.StatusCode, snippet);
                 return new List<RegionalHostRecord>();
             }
 
-            var body = await response.Content.ReadAsStringAsync();
-            var list = JsonSerializer.Deserialize<List<RegionalHostRecord>>(
-                body, RegionalHostRecordJsonContext.Default.ListRegionalHostRecord);
+            List<RegionalHostRecord>? list;
+            try
+            {
+                list = JsonSerializer.Deserialize<List<RegionalHostRecord>>(
+                    body ?? string.Empty, RegionalHostRecordJsonContext.Default.ListRegionalHostRecord);
+            }
+            catch (Exception parseEx)
+            {
+                // Shape mismatch — log the body's first chunk so the caller can
+                // see whether it's a wrapper object like {"hosts":[...]} vs a
+                // bare array. Surface as failure (empty list).
+                var snippet = body is null ? "(null)"
+                            : body.Length > 500 ? body[..500] + "…(truncated)"
+                            : body;
+                Logger.LogError(parseEx,
+                    "GetAllHostnamesAsync: response parsed as List<RegionalHostRecord> failed. Body: {Body}",
+                    snippet);
+                return new List<RegionalHostRecord>();
+            }
+
+            var count = list?.Count ?? 0;
+            Logger.LogInformation("GetAllHostnamesAsync: parsed {Count} hosts", count);
             return list ?? new List<RegionalHostRecord>();
         }
         catch (Exception ex)
