@@ -165,6 +165,18 @@ public class ClientPipeImpl : IGuardianNPContract
     // thread-affine monitor cannot do.
     private static readonly SemaphoreSlim _pipeIO = new(1, 1);
 
+    // Upper bound on how long a void command (EnterConnectingMode /
+    // ExitConnectingMode) waits for the service ACK. ReadStringAsync begins with
+    // two synchronous ReadByte() calls (the 2-byte length prefix) that block in
+    // ReadFile with no timeout; if the service never answers — or the response
+    // framing desynced after an overlapping command — that read hangs forever
+    // AND holds _pipeIO, wedging every later IPC call. EnterConnectingMode is the
+    // first command in the UI Connect path, so an unbounded hang there freezes
+    // the whole UI ("not responding"). The overlay commands are best-effort and
+    // service-side idempotent, so degrading to a broken-pipe error on timeout is
+    // safe.
+    private static readonly TimeSpan VoidCommandTimeout = TimeSpan.FromSeconds(10);
+
     internal ClientPipeImpl()
     {
     }
@@ -448,7 +460,39 @@ public class ClientPipeImpl : IGuardianNPContract
             {
                 var cmdString = $"{Hexify(cmd)}.";
                 ss.WriteString(cmdString);
-                responseJson = ss.ReadStringAsync().Result.TrimEnd('\0');
+
+                // Bounded read. Run the synchronously-blocking response read on a
+                // worker (the length-prefix ReadByte() calls block inline, so we
+                // can't keep them on the caller's thread) and cap the wait at
+                // VoidCommandTimeout. On timeout, tear the pipe down so the next
+                // call reopens it clean and return a broken-pipe error the caller
+                // can degrade on. Without the cap this read can hang forever while
+                // holding _pipeIO, freezing all IPC and the UI.
+                var readTask = Task.Run(() => ss.ReadStringAsync());
+                if (!readTask.Wait(VoidCommandTimeout))
+                {
+                    ClientPipe.Logger.LogError(
+                        "ClientPipe.{Cmd}: no service response within {Seconds}s — resetting pipe.",
+                        cmd, VoidCommandTimeout.TotalSeconds);
+
+                    // Observe the abandoned read so its eventual fault (from the
+                    // Dispose below) doesn't escape as an UnobservedTaskException —
+                    // the process-level handler exits the app on those.
+                    _ = readTask.ContinueWith(t => { _ = t.Exception; },
+                        TaskContinuationOptions.OnlyOnFaulted | TaskContinuationOptions.ExecuteSynchronously);
+
+                    // Disposing the stream unblocks the leaked ReadFile (it faults
+                    // and the worker unwinds) and forces ReopenNamedPipe — and a
+                    // fresh service-side pipe connection — on the next call.
+                    try { _clientStream.Dispose(); } catch { /* best effort */ }
+
+                    resp.Message = "PIPE BROKEN";
+                    resp.SetException(new TimeoutException(
+                        $"No service response to {cmd} within {VoidCommandTimeout.TotalSeconds:0}s"));
+                    return resp;
+                }
+
+                responseJson = readTask.Result.TrimEnd('\0');
             }
             finally { _pipeIO.Release(); }
             if (!responseJson.StartsWith('{')) responseJson = "{ " + responseJson;
