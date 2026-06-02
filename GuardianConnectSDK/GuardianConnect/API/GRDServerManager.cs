@@ -201,7 +201,33 @@ public class GRDServerManager
 
     public static GRDRegion GetGRDRegionByKey(string regionKey)
     {
-        return Live.regionLookup[regionKey];
+        // Resilient lookup — a missing key must NEVER crash the connect flow.
+        // A failed/empty regions refresh (e.g. a transient post-disconnect DNS
+        // hiccup) can leave regionLookup degenerate, and region auto-pick
+        // defaults to "us-east"; an unguarded indexer here threw
+        // KeyNotFoundException out of SelectGuardianHostWithCompletion.
+        if (!string.IsNullOrEmpty(regionKey) && Live.regionLookup.TryGetValue(regionKey, out var region))
+            return region;
+
+        // Try the Standby cache (last-good) for the same key, then any concrete
+        // (non-Automatic) region, then Automatic as a final non-throwing default.
+        if (!string.IsNullOrEmpty(regionKey) && Alternate.regionLookup.TryGetValue(regionKey, out var alt))
+            return alt;
+
+        var fallback = Live.regionLookup.Values.FirstOrDefault(r => r.RegionName != "Automatic")
+                       ?? Alternate.regionLookup.Values.FirstOrDefault(r => r.RegionName != "Automatic");
+        if (fallback != null)
+        {
+            Logger.LogWarning(
+                $"GetGRDRegionByKey: region key '{regionKey}' not found; falling back to '{fallback.RegionName}'.");
+            return fallback;
+        }
+
+        Logger.LogWarning(
+            $"GetGRDRegionByKey: region key '{regionKey}' not found and no concrete regions loaded; returning Automatic.");
+        return Live.regionLookup.TryGetValue("Automatic", out var auto)
+            ? auto
+            : new GRDRegion { RegionName = "Automatic", DisplayName = "Automatic" };
     }
 
     /// <summary>
@@ -337,6 +363,24 @@ public class GRDServerManager
         {
             Logger.LogError(ex,
                 $"RefreshStandbyRegionsLists(): Exception thrown when calling all-server-regions...: {ex.Message}. (STATIC) Using GRDRegion.StaticRegions list data");
+        }
+
+        // If we couldn't fetch real regions (failed call or empty body), don't
+        // build a degenerate Standby cache that a later swap would promote over
+        // good Live data. That clobber is what corrupted region selection after
+        // a post-disconnect DNS hiccup: regionLookup was left with only
+        // "Automatic", so the "us-east" auto-pick threw KeyNotFoundException.
+        // Carry forward the current Live regions as last-good instead.
+        // (GRDRegion.StaticRegions is an empty list, so it is NOT a usable
+        // fallback despite the log messages elsewhere.)
+        if (regionsList == null || regionsList.Count == 0)
+        {
+            var carried = Live.regionLookup.Values
+                .Where(r => r.RegionName != "Automatic")
+                .ToList();
+            Logger.LogWarning(
+                $"RefreshStandbyRegionsLists: no regions fetched; carrying forward {carried.Count} last-good region(s) from the active cache.");
+            regionsList = carried;
         }
 
         // Populate region lookup collections
