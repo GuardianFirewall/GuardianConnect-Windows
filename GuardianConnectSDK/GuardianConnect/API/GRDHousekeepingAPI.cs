@@ -260,6 +260,9 @@ public static class GRDHousekeepingAPI
         {
             Logger.LogError(ex, $"Exception thrown - RequestLatestTimeZonesForRegions: {ex.Message}");
             errorResponse.SetException(ex);
+            // Same phantom-200 guard as RequestServerRegions: keep HttpResponse
+            // consistent with the IsError/ThrownException failure signal.
+            errorResponse.HttpResponse = new HttpResponseMessage(HttpStatusCode.ServiceUnavailable);
         }
 
         return errorResponse;
@@ -303,8 +306,14 @@ public static class GRDHousekeepingAPI
         catch (Exception ex)
         {
             Logger.LogError(ex,
-                $"RequestServerRegions(): Exception thrown when calling all-server-regions...: {ex.Message}. (STATIC) Using GRDRegion.StaticRegions list data");
+                $"RequestServerRegions(): Exception thrown when calling all-server-regions...: {ex.Message}");
             errorResponse.SetException(ex);
+            // Stamp a non-success status. A defaulted ErrorResponse.HttpResponse is
+            // 200 OK, which let a thrown failure (e.g. DNS "No such host is known")
+            // masquerade as a successful empty response to any caller checking
+            // HttpResponse.IsSuccessStatusCode. IsError/ThrownException are already
+            // set by SetException; this keeps the status consistent with them.
+            errorResponse.HttpResponse = new HttpResponseMessage(HttpStatusCode.ServiceUnavailable);
         }
 
         return errorResponse;

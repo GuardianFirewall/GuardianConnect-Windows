@@ -56,6 +56,12 @@ public class GRDServerManager
     private static int Active;
     private static int Standby => Active ^ 1;
 
+    // Minimum fraction of the active concrete-region count a refreshed cache must
+    // retain to be promoted by the swap gate. 0.8 tolerates a deliberate backend
+    // removal of up to ~20% of regions while rejecting a collapse from a failed /
+    // empty refresh. Tune up toward 0.9 for stricter, down for more tolerant.
+    private const double RegionRetentionThreshold = 0.8;
+
     private static readonly Dictionary<int, GRDRegionCache> _geoInfoCaches = new()
     {
         { 0, new GRDRegionCache() },
@@ -102,7 +108,21 @@ public class GRDServerManager
             {
                 await RefreshDataAsync(); // sub-second - no need to pass cancellation token
                 Logger.LogInformation("GRDServerManager.LongRunningRefreshTask: RefreshDataAsync completed. ");
-                if (_geoInfoCaches[Standby].Checksum() != _geoInfoCaches[Active].Checksum())
+                var changed = _geoInfoCaches[Standby].Checksum() != _geoInfoCaches[Active].Checksum();
+
+                // Swap gate: promote the freshly-refreshed cache only if it has
+                // changes AND isn't a collapse. Never swap in a cache with zero
+                // concrete (non-"Automatic") regions, or one that lost more than
+                // (1 - RegionRetentionThreshold) of the active region set. A
+                // deliberate backend removal of a region or two passes; a refresh
+                // that came back empty/degenerate (e.g. a masked failed call) does
+                // not — that clobber is what wiped 'us-east' out of Live.
+                var standbyConcrete = _geoInfoCaches[Standby].regionLookup.Count(kv => kv.Key != "Automatic");
+                var activeConcrete = _geoInfoCaches[Active].regionLookup.Count(kv => kv.Key != "Automatic");
+                var isCollapse = standbyConcrete == 0
+                                 || (activeConcrete > 0 && standbyConcrete < activeConcrete * RegionRetentionThreshold);
+
+                if (changed && !isCollapse)
                 {
                     Logger.LogInformation(
                         "GRDServerManager.LongRunningRefreshTask: The latest refresh has changes. Toggling ACTIVE to point LIVE to newest data.");
@@ -111,6 +131,11 @@ public class GRDServerManager
                     SetActiveToLatest();
                     Logger.LogInformation(
                         $"Active Switched (to index {Active}): Latest (now on index {Standby}): {Alternate.Checksum()}, Active: {Live.Checksum()}");
+                }
+                else if (changed)
+                {
+                    Logger.LogWarning(
+                        $"GRDServerManager.LongRunningRefreshTask: NOT promoting refreshed cache — concrete regions {standbyConcrete} vs active {activeConcrete} (zero, or below {RegionRetentionThreshold:P0} retention). Keeping current active cache.");
                 }
 
                 InitialGeoInformationLoadComplete.Set();
@@ -322,11 +347,24 @@ public class GRDServerManager
         try
         {
             errorResponse = await GRDHousekeepingAPI.RequestServerRegions();
-            var response = errorResponse.HttpResponse;
-            if (response.IsSuccessStatusCode)
+
+            // One-time re-solicit. Branch on IsError / ThrownException — the
+            // authoritative failure signal — NOT on HttpResponse.IsSuccessStatusCode:
+            // a defaulted ErrorResponse carries a 200-OK HttpResponse, which
+            // previously masked a failed call (e.g. a transient post-disconnect DNS
+            // failure) as a successful EMPTY response. The first attempt can fail on
+            // that transient, so retry once before falling back to last-good.
+            if (errorResponse.IsError || errorResponse.ThrownException != null)
             {
-                Logger.LogInformation(
-                    $"RefreshStandbyRegionsLists: Return from RequestServerRegions: Response statusCode = {response.StatusCode}");
+                Logger.LogWarning(
+                    $"RefreshStandbyRegionsLists: regions fetch failed ('{errorResponse.Message}'); re-soliciting once...");
+                await Task.Delay(500);
+                errorResponse = await GRDHousekeepingAPI.RequestServerRegions();
+            }
+
+            if (!errorResponse.IsError && errorResponse.ThrownException == null)
+            {
+                responseCode = (int)errorResponse.HttpResponse.StatusCode;
                 var content = errorResponse.Data?.ToString() ?? string.Empty;
                 if (string.IsNullOrEmpty(content))
                 {
@@ -337,32 +375,26 @@ public class GRDServerManager
                     Logger.LogInformation(
                         "RefreshStandbyRegionsLists: Successfully retrieved latest regions from backend.");
                     Alternate.contentstrings.Add(content);
-                    var jsonOptions = new JsonSerializerOptions
-                    {
-                        AllowOutOfOrderMetadataProperties = true,
-                        AllowTrailingCommas = true,
-                        DefaultIgnoreCondition = JsonIgnoreCondition.Never
-                    };
                     regionsList =
                         JsonSerializer.Deserialize<List<GRDRegion>>(content,
                             GRDRegionJsonContext.Default.ListGRDRegion);
                     Logger.LogInformation(
                         $"RefreshStandbyRegionsLists: Regions Collection loaded with (ACTUAL) {regionsList?.Count} items");
                 }
-
-                responseCode = (int)response.StatusCode;
             }
             else
             {
-                Logger.LogInformation(
-                    $"RefreshStandbyRegionsLists: Response for getting latest regions is {response.StatusCode}");
-                regionsList = GRDRegion.StaticRegions;
+                // Genuine failure after the re-solicit. Leave regionsList empty and
+                // let the carry-forward below preserve the last-good regions rather
+                // than building a degenerate cache.
+                Logger.LogWarning(
+                    $"RefreshStandbyRegionsLists: regions fetch still failing after re-solicit ('{errorResponse.Message}'); will carry forward last-good.");
             }
         }
         catch (Exception ex)
         {
             Logger.LogError(ex,
-                $"RefreshStandbyRegionsLists(): Exception thrown when calling all-server-regions...: {ex.Message}. (STATIC) Using GRDRegion.StaticRegions list data");
+                $"RefreshStandbyRegionsLists(): Exception thrown processing all-server-regions response: {ex.Message}");
         }
 
         // If we couldn't fetch real regions (failed call or empty body), don't
@@ -435,34 +467,44 @@ public class GRDServerManager
 
         var response = await GRDHousekeepingAPI.RequestLatestTimeZonesForRegions();
 
-        if (response.IsError)
+        if (response.IsError || response.ThrownException != null)
         {
-            Logger.LogError(
-                $"GetLatestTimeZonesForRegions: Error retrieving latest timezones for regions: {response.Response}");
-            geoDataCollection = GeoData.StaticGeoDataCollection;
-        }
-        else
-        {
-            Logger.LogInformation(
-                "GetLatestTimeZonesForRegions: Successfully retrieved latest timezones for regions from backend.");
-            var content = response.Data?.ToString() ?? string.Empty;
-            Alternate.contentstrings.Add(content);
-            geoDataCollection =
-                JsonSerializer.Deserialize<List<GeoData>>(content, GeoDataJsonContext.Default.ListGeoData);
-            Logger.LogInformation(
-                $"GetLatestTimeZonesForRegions: Timezones Collection loaded with (ACTUAL) {geoDataCollection?.Count} items");
+            // Transient failure — do NOT clobber good timezone data with the empty
+            // GeoData.StaticGeoDataCollection (which is what blanked timezonesLookup,
+            // forcing every user to the 'us-east' default). Carry forward the
+            // current Live timezones as last-good and bail.
+            Logger.LogWarning(
+                $"GetLatestTimeZonesForRegions: fetch failed ('{response.Message}'); carrying forward {Live.timezonesLookup.Count} last-good timezone entr(ies).");
+            Alternate.timezonesLookup = new Dictionary<string, List<string>>(Live.timezonesLookup);
+            return;
         }
 
         Logger.LogInformation(
-            $"GetLatestTimeZonesForRegions: now populating timezonesLookup dictionary with {geoDataCollection?.Count} entries...");
-        Alternate.timezonesLookup = new Dictionary<string, List<string>>();
-        foreach (var geoRec in geoDataCollection ?? GeoData.StaticGeoDataCollection)
+            "GetLatestTimeZonesForRegions: Successfully retrieved latest timezones for regions from backend.");
+        var content = response.Data?.ToString() ?? string.Empty;
+        geoDataCollection = string.IsNullOrEmpty(content)
+            ? new List<GeoData>()
+            : JsonSerializer.Deserialize<List<GeoData>>(content, GeoDataJsonContext.Default.ListGeoData)
+              ?? new List<GeoData>();
+
+        if (geoDataCollection.Count == 0)
         {
-            Logger.LogDebug(
-                $"GetLatestTimeZonesForRegions: Adding '{geoRec.KeyName}' with {geoRec.Timezones.Count} timezones");
+            // Empty/unparseable payload — carry forward rather than blanking.
+            Logger.LogWarning(
+                $"GetLatestTimeZonesForRegions: empty/unparseable timezone payload; carrying forward {Live.timezonesLookup.Count} last-good entr(ies).");
+            Alternate.timezonesLookup = new Dictionary<string, List<string>>(Live.timezonesLookup);
+            return;
+        }
+
+        Alternate.contentstrings.Add(content);
+        Logger.LogInformation(
+            $"GetLatestTimeZonesForRegions: Timezones Collection loaded with (ACTUAL) {geoDataCollection.Count} items; populating timezonesLookup...");
+        Alternate.timezonesLookup = new Dictionary<string, List<string>>();
+        foreach (var geoRec in geoDataCollection)
+        {
             if (!Alternate.timezonesLookup.TryAdd(geoRec.KeyName, geoRec.Timezones))
                 Logger.LogWarning(
-                    $"GetLatestTimeZonesForRegions: Could not add timezones for region key '{geoRec.KeyName}");
+                    $"GetLatestTimeZonesForRegions: Could not add timezones for region key '{geoRec.KeyName}'");
         }
     }
 
