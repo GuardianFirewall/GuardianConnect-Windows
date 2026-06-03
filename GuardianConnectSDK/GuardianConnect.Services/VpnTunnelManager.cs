@@ -162,6 +162,14 @@ public sealed class VpnTunnelManager : ITransportProvider, IDisposable
         NotificationHandler.WasDisconnectPlanned = false;
         NotificationHandler.VPNClientNotifierHandle?.Set();
 
+        // Publish the resolved server endpoint BEFORE raising the connected event:
+        // KillSwitchService.InstallFiltersUnsafe runs synchronously inside the
+        // RaiseWireGuardConnectionStateChanged fan-out and reads this to install the
+        // WG carrier permit (UDP to exactly this server IP:port). If it's not set
+        // first, KS would block WireGuard's own encrypted carrier and kill all
+        // connectivity. See NotificationHandler.WireGuardServerEndpoint.
+        NotificationHandler.WireGuardServerEndpoint = config.Peer.Endpoint;
+
         // Tell KillSwitchService (and anyone else listening) that a WG tunnel
         // came up. RAS-only subscribers (NotificationHandler.RasConnectionStateChanged)
         // never see this transition because Wintun isn't a RAS connection.
@@ -304,6 +312,7 @@ public sealed class VpnTunnelManager : ITransportProvider, IDisposable
         // Symmetric with the connect-side hook. KillSwitchService listens for
         // this to evaluate whether filters should stay up (unplanned drop) or
         // be torn down (planned disconnect) on the WG path.
+        NotificationHandler.WireGuardServerEndpoint = null;
         NotificationHandler.RaiseWireGuardConnectionStateChanged(false);
 
         Log.Information(

@@ -1,3 +1,5 @@
+using System.Net;
+using System.Net.Sockets;
 using System.Security.AccessControl;
 using System.Security.Principal;
 using GuardianConnect.Abstractions;
@@ -524,6 +526,13 @@ public sealed class KillSwitchService : BackgroundService
             Track(KillSwitchFilters.AddPermitIpInIpOutboundV4(_engine));
             Track(KillSwitchFilters.AddPermitEspOutboundV4(_engine));
 
+            // WireGuard carrier permit — the WG analog of the IKE/ESP permits above.
+            // WG encrypts in user/kernel mode and sends the encrypted UDP to the server
+            // endpoint out the PHYSICAL NIC, where block-all drops it unless permitted.
+            // Scope it as tight as possible: UDP to exactly the resolved server IP:port
+            // (published by VpnTunnelManager). Without this, KS-on + WG = no internet.
+            AddWireGuardCarrierPermitUnsafe();
+
             if (tunnelLuid is { } luid)
             {
                 Track(KillSwitchFilters.AddPermitTunnelLuidOutboundV4(_engine, luid));
@@ -564,6 +573,53 @@ public sealed class KillSwitchService : BackgroundService
 
         _isActive = true;
         _logger.LogInformation("KillSwitchService: kill switch ACTIVE. {Count} filters installed.", _installedFilterIds.Count);
+    }
+
+    /// <summary>
+    /// Install the WireGuard encrypted-carrier permit when a WG tunnel is active.
+    /// Must be called inside the install transaction (uses _engine + Track). No-op
+    /// for the IKEv2 transport (no WG endpoint published). Scopes the permit to UDP
+    /// to exactly the resolved server IP:port — the only off-tunnel traffic the kill
+    /// switch allows is the carrier reaching the VPN server.
+    /// </summary>
+    private void AddWireGuardCarrierPermitUnsafe()
+    {
+        var endpoint = NotificationHandler.WireGuardServerEndpoint;
+        if (endpoint is null)
+        {
+            // Expected for IKEv2. But if WG reports connected with no endpoint, the
+            // carrier permit is missing and the tunnel will be blocked — loud warning.
+            if (NotificationHandler.IsWireGuardConnected)
+                _logger.LogWarning(
+                    "KillSwitchService: WG is connected but WireGuardServerEndpoint is null; " +
+                    "carrier permit NOT installed — tunnel traffic will be blocked. This is a bug.");
+            return;
+        }
+
+        var port = (ushort)endpoint.Port;
+        var addrBytes = endpoint.Address.GetAddressBytes(); // network byte order
+
+        if (endpoint.Address.AddressFamily == AddressFamily.InterNetwork)
+        {
+            // Host byte order for FWP_V4_ADDR_AND_MASK (matches AddPermitV4Subnet convention).
+            uint hostOrder = (uint)((addrBytes[0] << 24) | (addrBytes[1] << 16) |
+                                    (addrBytes[2] << 8) | addrBytes[3]);
+            Track(KillSwitchFilters.AddPermitWireGuardCarrierOutboundV4(_engine, hostOrder, port));
+            _logger.LogInformation(
+                "KillSwitchService: installed WireGuard carrier permit (UDP -> {Endpoint}).", endpoint);
+        }
+        else if (endpoint.Address.AddressFamily == AddressFamily.InterNetworkV6)
+        {
+            Track(KillSwitchFilters.AddPermitWireGuardCarrierOutboundV6(_engine, addrBytes, port));
+            _logger.LogInformation(
+                "KillSwitchService: installed WireGuard carrier permit (UDP -> {Endpoint}).", endpoint);
+        }
+        else
+        {
+            _logger.LogWarning(
+                "KillSwitchService: WireGuardServerEndpoint has unexpected address family {Family}; " +
+                "carrier permit NOT installed.", endpoint.Address.AddressFamily);
+        }
     }
 
     private void RemoveFiltersUnsafe()

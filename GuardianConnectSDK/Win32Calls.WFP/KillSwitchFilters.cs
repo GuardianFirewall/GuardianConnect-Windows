@@ -346,6 +346,37 @@ public static unsafe class KillSwitchFilters
                                 "PermitEspOutboundV4 (proto 50 — IPSec ESP)");
 
     // -----------------------------------------------------------------------------------
+    // WireGuard carrier permit (weight 4) — the WG analog of the IKE/ESP permits above.
+    //
+    // WireGuard encrypts its payload (in user/kernel mode, not via Windows RAS) and sends
+    // the encrypted packets as plain UDP to the server's endpoint OUT THE PHYSICAL NIC.
+    // That carrier hits ALE_AUTH_CONNECT_V4/V6 with LOCAL_INTERFACE=physical-NIC and is
+    // dropped by block-all unless permitted — at which point the tunnel can't carry
+    // anything and the user has no internet. (The comment on AddPermitEspOutboundV4 above
+    // wrongly assumed WG's carrier flows through a path block-all doesn't gate; it does.
+    // That assumption was never caught because pre-wg-alpha.28 the kill switch was a no-op
+    // on WG and never installed filters at all. Fixed in wg-alpha.41.)
+    //
+    // Scoped as tightly as possible: UDP to EXACTLY the resolved server IP (/32 or /128)
+    // AND the server's endpoint port. Unlike the IKEv2 ports (500/4500), the WG endpoint
+    // is known precisely at install time (NotificationHandler.WireGuardServerEndpoint),
+    // so we don't fall back to any-remote — the only thing allowed off-tunnel is the
+    // encrypted carrier going to the VPN server itself. Zero leak surface.
+    // -----------------------------------------------------------------------------------
+
+    /// <param name="serverAddrHostOrder">Server IPv4 address in host byte order (e.g. 0x0A000001 == 10.0.0.1).</param>
+    public static ulong AddPermitWireGuardCarrierOutboundV4(HANDLE engine, uint serverAddrHostOrder, ushort serverPort) =>
+        AddRemoteUdpHostPermitV4(engine, PInvoke.FWPM_LAYER_ALE_AUTH_CONNECT_V4,
+                                 serverAddrHostOrder, serverPort,
+                                 $"PermitWireGuardCarrierOutboundV4 (UDP -> server :{serverPort})");
+
+    /// <param name="serverAddr16">Server IPv6 address, 16 bytes in network order (IPAddress.GetAddressBytes()).</param>
+    public static ulong AddPermitWireGuardCarrierOutboundV6(HANDLE engine, byte[] serverAddr16, ushort serverPort) =>
+        AddRemoteUdpHostPermitV6(engine, PInvoke.FWPM_LAYER_ALE_AUTH_CONNECT_V6,
+                                 serverAddr16, serverPort,
+                                 $"PermitWireGuardCarrierOutboundV6 (UDP -> server :{serverPort})");
+
+    // -----------------------------------------------------------------------------------
     // ICMP non-tunnel block at OUTBOUND_IPPACKET layer.
     //
     // ALE_AUTH_CONNECT only fires reliably for stateful protocols (TCP, UDP). ICMP often
@@ -684,6 +715,108 @@ public static unsafe class KillSwitchFilters
 
         return AddFilterWithConditions(engine, layerKey, FWP_ACTION_TYPE.FWP_ACTION_PERMIT,
                                        WeightSpecificPermit, conditions, 2, label);
+    }
+
+    // Permit UDP to a single remote IPv4 host (/32) on a specific remote port — the
+    // WireGuard encrypted carrier to the server endpoint. Three conditions: protocol +
+    // remote address (host /32) + remote port.
+    private static ulong AddRemoteUdpHostPermitV4(HANDLE engine, Guid layerKey,
+                                                  uint addrHostOrder, ushort remotePort, string label)
+    {
+        FWP_V4_ADDR_AND_MASK addrMask;
+        addrMask.addr = addrHostOrder;
+        addrMask.mask = 0xFFFFFFFFu; // /32 — exactly this host
+
+        var protoVal = new FWP_CONDITION_VALUE0
+        {
+            type = FWP_DATA_TYPE.FWP_UINT8,
+            Anonymous = { uint8 = ProtocolUdp }
+        };
+        var addrVal = new FWP_CONDITION_VALUE0
+        {
+            type = FWP_DATA_TYPE.FWP_V4_ADDR_MASK,
+            Anonymous = { v4AddrMask = &addrMask }
+        };
+        var portVal = new FWP_CONDITION_VALUE0
+        {
+            type = FWP_DATA_TYPE.FWP_UINT16,
+            Anonymous = { uint16 = remotePort }
+        };
+        var conditions = stackalloc FWPM_FILTER_CONDITION0[3];
+        conditions[0] = new FWPM_FILTER_CONDITION0
+        {
+            fieldKey = PInvoke.FWPM_CONDITION_IP_PROTOCOL,
+            matchType = FWP_MATCH_TYPE.FWP_MATCH_EQUAL,
+            conditionValue = protoVal
+        };
+        conditions[1] = new FWPM_FILTER_CONDITION0
+        {
+            fieldKey = PInvoke.FWPM_CONDITION_IP_REMOTE_ADDRESS,
+            matchType = FWP_MATCH_TYPE.FWP_MATCH_EQUAL,
+            conditionValue = addrVal
+        };
+        conditions[2] = new FWPM_FILTER_CONDITION0
+        {
+            fieldKey = PInvoke.FWPM_CONDITION_IP_REMOTE_PORT,
+            matchType = FWP_MATCH_TYPE.FWP_MATCH_EQUAL,
+            conditionValue = portVal
+        };
+
+        return AddFilterWithConditions(engine, layerKey, FWP_ACTION_TYPE.FWP_ACTION_PERMIT,
+                                       WeightSpecificPermit, conditions, 3, label);
+    }
+
+    // IPv6 counterpart of AddRemoteUdpHostPermitV4 (/128 host scope).
+    private static ulong AddRemoteUdpHostPermitV6(HANDLE engine, Guid layerKey,
+                                                  byte[] addr16, ushort remotePort, string label)
+    {
+        if (addr16 is null || addr16.Length != 16)
+        {
+            Log.Error($"KillSwitchFilters.{label}: IPv6 address must be 16 bytes; skipping carrier permit.");
+            return 0;
+        }
+
+        FWP_V6_ADDR_AND_MASK v6;
+        v6.prefixLength = 128; // /128 — exactly this host
+        for (int i = 0; i < 16; i++) v6.addr[i] = addr16[i];
+
+        var protoVal = new FWP_CONDITION_VALUE0
+        {
+            type = FWP_DATA_TYPE.FWP_UINT8,
+            Anonymous = { uint8 = ProtocolUdp }
+        };
+        var addrVal = new FWP_CONDITION_VALUE0
+        {
+            type = FWP_DATA_TYPE.FWP_V6_ADDR_MASK,
+            Anonymous = { v6AddrMask = &v6 }
+        };
+        var portVal = new FWP_CONDITION_VALUE0
+        {
+            type = FWP_DATA_TYPE.FWP_UINT16,
+            Anonymous = { uint16 = remotePort }
+        };
+        var conditions = stackalloc FWPM_FILTER_CONDITION0[3];
+        conditions[0] = new FWPM_FILTER_CONDITION0
+        {
+            fieldKey = PInvoke.FWPM_CONDITION_IP_PROTOCOL,
+            matchType = FWP_MATCH_TYPE.FWP_MATCH_EQUAL,
+            conditionValue = protoVal
+        };
+        conditions[1] = new FWPM_FILTER_CONDITION0
+        {
+            fieldKey = PInvoke.FWPM_CONDITION_IP_REMOTE_ADDRESS,
+            matchType = FWP_MATCH_TYPE.FWP_MATCH_EQUAL,
+            conditionValue = addrVal
+        };
+        conditions[2] = new FWPM_FILTER_CONDITION0
+        {
+            fieldKey = PInvoke.FWPM_CONDITION_IP_REMOTE_PORT,
+            matchType = FWP_MATCH_TYPE.FWP_MATCH_EQUAL,
+            conditionValue = portVal
+        };
+
+        return AddFilterWithConditions(engine, layerKey, FWP_ACTION_TYPE.FWP_ACTION_PERMIT,
+                                       WeightSpecificPermit, conditions, 3, label);
     }
 
     private static ulong AddDnsBlockFilter(HANDLE engine, Guid layerKey, byte protocol, string label)

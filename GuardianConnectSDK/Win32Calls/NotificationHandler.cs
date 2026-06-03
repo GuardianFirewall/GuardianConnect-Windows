@@ -1,4 +1,5 @@
-﻿using System.Security.AccessControl;
+﻿using System.Net;
+using System.Security.AccessControl;
 using System.Security.Principal;
 using Windows.Win32.Foundation;
 using Windows.Win32.NetworkManagement.Rras;
@@ -40,6 +41,23 @@ public static class NotificationHandler
     /// ConnectionRoutines.IsAnyConnectionActive can't see WG.
     /// </summary>
     public static bool IsWireGuardConnected;
+
+    /// <summary>
+    /// The resolved WireGuard server endpoint (IP + port) of the active tunnel,
+    /// or null when no WG tunnel is up. Set by VpnTunnelManager on tunnel up,
+    /// cleared on tunnel down.
+    ///
+    /// KillSwitchService reads this to install a tightly-scoped carrier permit:
+    /// WireGuard encrypts its payload and sends the encrypted UDP to the server
+    /// FROM THE PHYSICAL NIC, where it hits ALE_AUTH_CONNECT and is dropped by
+    /// the kill switch's block-all unless explicitly permitted (the WG analog of
+    /// the IKE/ESP/IP-in-IP permits the IKEv2 path already has). Permitting only
+    /// UDP to this exact server IP:port keeps the off-tunnel leak surface at zero.
+    /// Without it, KS-on + WG blocks the tunnel's own carrier and the user loses
+    /// all connectivity (regression: wg-alpha.28 made KS install on WG but added
+    /// no carrier permit; fixed in wg-alpha.41).
+    /// </summary>
+    public static IPEndPoint? WireGuardServerEndpoint;
 
     /// <summary>
     /// Fired by VpnTunnelManager when the WG tunnel comes up or down. Parallel
