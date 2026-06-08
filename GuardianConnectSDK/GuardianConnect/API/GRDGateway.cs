@@ -174,6 +174,17 @@ public class GRDGateway
         [JsonPropertyName("api-auth-token")]         public string ApiAuthToken { get; set; } = string.Empty;
     }
 
+    /// <summary>
+    /// Request body for the device alerts endpoint. The device is identified by
+    /// its client id in the URL; the api-auth-token in the body authorizes the
+    /// fetch (mirrors the iOS/macOS <c>getEvents</c> request).
+    /// </summary>
+    public class AlertsRequestPayload
+    {
+        [JsonPropertyName("api-auth-token")]
+        public string ApiAuthToken { get; set; } = string.Empty;
+    }
+
 
     #region v1.3 APIs
 
@@ -494,4 +505,66 @@ public class GRDGateway
     #endregion - Device Filter Configs
 
     #endregion - v1.3 APIs
+
+    #region Alerts
+
+    /// <summary>
+    /// Fetch this device's privacy alerts (trackers / page hijackers the node
+    /// blocked or detected). POSTs the api-auth-token to the device alerts
+    /// endpoint and returns the parsed list in <see cref="ErrorResponse.Data"/>
+    /// as a <c>List&lt;GRDAlert&gt;</c>. The Windows analog of the iOS/macOS
+    /// <c>GRDGatewayAPI.getEvents</c>.
+    ///
+    /// Endpoint version: iOS/macOS use <c>/api/v1.2</c>; revisit if the device
+    /// endpoints ever consolidate to v1.3.
+    /// </summary>
+    public static async Task<ErrorResponse> GetAlerts()
+    {
+        var errorResponse = new ErrorResponse();
+
+        if (!CanMakeApiRequests)
+            return errorResponse.SetErrorMessage("Cannot make API requests: no API hostname.");
+
+        var clientId = DeviceIdentifier;
+        var apiToken = ApiAuthToken;
+        if (string.IsNullOrEmpty(clientId) || string.IsNullOrEmpty(apiToken))
+            return errorResponse.SetErrorMessage(
+                "Cannot fetch alerts: missing client id or api-auth-token.");
+
+        var payload = new AlertsRequestPayload { ApiAuthToken = apiToken };
+        var payloadString = JsonSerializer.Serialize(
+            payload, GRDAlertJsonContext.Default.AlertsRequestPayload);
+
+        var reqUri = new Uri($"https://{BaseHostName}/api/v1.2/device/{clientId}/alerts");
+        var request = new HttpRequestMessage(HttpMethod.Post, reqUri)
+        {
+            Content = new StringContent(payloadString),
+        };
+
+        try
+        {
+            var response = await HttpUtils.Client.SendAsync(request);
+            errorResponse.SetResponse(response);
+
+            if (!response.IsSuccessStatusCode)
+            {
+                Logger.LogError("GetAlerts: failed {Status}", (int)response.StatusCode);
+                return errorResponse.SetErrorMessage(
+                    $"Alerts fetch failed: {(int)response.StatusCode}");
+            }
+
+            var body = await response.Content.ReadAsStringAsync();
+            var alerts = JsonSerializer.Deserialize(
+                body, GRDAlertJsonContext.Default.ListGRDAlert) ?? new List<GRDAlert>();
+            Logger.LogInformation("GetAlerts: fetched {Count} alert(s).", alerts.Count);
+            return errorResponse.SetData(alerts);
+        }
+        catch (Exception e)
+        {
+            Logger.LogError(e, "GetAlerts: HTTP/parse failure");
+            return errorResponse.SetException(e).SetErrorMessage(e.Message);
+        }
+    }
+
+    #endregion - Alerts
 }
