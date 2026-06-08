@@ -13,8 +13,10 @@
         <Version>0.46.0</Version>
         <!-- Set this for prerelease builds (e.g., "alpha.1", "beta.1", "rc.1"); remove or leave empty for stable releases.
              "wg-alpha.N" labels SDK packages emitted from the WireGuard transport branch (i196-add-wireguard-transport)
-             so they can't be confused with KS-line packages also on 0.46.0-alpha.N. -->
-        <VersionSuffix>wg-alpha.41</VersionSuffix>
+             so they can't be confused with KS-line packages also on 0.46.0-alpha.N.
+             "wg-alerts-alpha.N" labels the experimental alerts-feature builds (alerts-implementation branch,
+             off the WG lineage) so they're distinct from the plain wg-alpha.N counter. -->
+        <VersionSuffix>wg-alerts-alpha.1</VersionSuffix>
     </PropertyGroup>
 
     <PropertyGroup>
