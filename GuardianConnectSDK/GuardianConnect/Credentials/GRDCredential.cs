@@ -96,6 +96,17 @@ public class GRDCredential
     public string IPv4Address { get; set; } = string.Empty;
     public string IPv6Address { get; set; } = string.Empty;
 
+    /// <summary>
+    /// The host's <c>POST /api/v1.3/device</c> reply, carried verbatim. This is
+    /// the authoritative source for the server-provided fields; the flat fields
+    /// above (UserName/Password/ServerPublicKey/IPv4Address/IPv6Address/ClientId/
+    /// ApiAuthToken) are kept in sync for persistence back-compat and for the
+    /// out-of-process consumer, but new code should pluck from <c>Device</c>.
+    /// Null only on a legacy credential loaded from a pre-Device persisted blob;
+    /// <see cref="EnsureDeviceFromLegacyFields"/> backfills it on load.
+    /// </summary>
+    public VPNDeviceResponse? Device { get; set; }
+
     public bool CanRevoke()
     {
         throw new NotImplementedException();
@@ -111,68 +122,102 @@ public class GRDCredential
         throw new NotImplementedException();
     }
 
-    // public GRDCredential InitWithFullDictionary(Dictionary<string, object> credDict, int validForDays, bool isMain)
-    // {
-    //     var self = new GRDCredential(credDict);
-    //     self.TransportProtocol = GRDTransportProtocol.TransportProtocol.TransportIKEv2;
-    //     self.Identifer = isMain ? "main" : Guid.NewGuid().ToString();
-    //     self.UserName = (string)credDict[IGRDKeychain.kKeychainStr_EapUsername];
-    //     self.Password = (string)credDict[IGRDKeychain.kKeychainStr_EapPassword];
-    //     self.ApiAuthToken = (string)credDict[IGRDKeychain.kKeychainStr_AuthToken];
-    //     self.HostName = (string)credDict[Common.kGRDHostnameOverride];
-    //     self.ExpirationDate = DateTime.Now.AddDays(validForDays);
-    //     self.HostnameDisplayValue = (string)credDict[Common.kGRDVPNHostLocation];
-    //     self.Name = (string)credDict[Common.kGRDVPNHostLocation];
-    //
-    //     _checkedExpiration = false;
-    //     _checkedExpiration = false;
-    //     _expired = false;
-    //
-    //     self.CheckExpiration();
-    //     return self;
-    // }
-    //
-    public GRDCredential InitWithTransportProtocol(GRDTransportProtocol.TransportProtocol protocol,
-        Dictionary<string, object> credDict, int validForDays, bool areMainCreds)
+    /// <summary>
+    /// Single, protocol-parameterized credential factory. Carries the host's
+    /// <paramref name="device"/> reply verbatim and fills the flat fields that
+    /// the active protocol uses (kept in sync for persistence/consumer
+    /// back-compat). For WireGuard the device keypair is generated client-side
+    /// and passed in (it is NOT part of the host reply).
+    ///
+    /// No cross-protocol field-stuffing: a WireGuard credential leaves
+    /// UserName/Password empty, so the IKEv2 predicate in
+    /// <c>ActiveConnectionPossible</c> is false on it by construction. This
+    /// replaces the per-protocol inline build sites and the former
+    /// (dead, stuffing) InitWithTransportProtocol. Mirrors the Android SDK's
+    /// <c>createGRDCredential</c>.
+    /// </summary>
+    public static GRDCredential CreateFromDeviceResponse(
+        GRDTransportProtocol.TransportProtocol protocol,
+        VPNDeviceResponse device,
+        string hostName,
+        string hostnameDisplayValue,
+        bool mainCredential,
+        int validForDays,
+        string? devicePrivateKey = null,
+        string? devicePublicKey = null)
     {
-        var self = new GRDCredential(credDict);
-        self.Name = (string)credDict[Common.kGRDVPNHostLocation];
-        self.Identifer = areMainCreds ? "main" : Guid.NewGuid().ToString();
-        self.MainCredential = areMainCreds;
-
-        self.ApiAuthToken = (string)credDict[IGRDKeychain.kKeychainStr_AuthToken];
-        self.HostName = (string)credDict[Common.kGRDHostnameOverride];
-        self.ExpirationDate = DateTime.Now.AddDays(validForDays);
-        self.HostnameDisplayValue = (string)credDict[Common.kGRDVPNHostLocation];
-
-        _checkedExpiration = false;
-        _expired = false;
-
-        if (protocol == GRDTransportProtocol.TransportProtocol.TransportIKEv2)
+        var self = new GRDCredential
         {
-            self.UserName = (string)credDict[IGRDKeychain.kKeychainStr_EapUsername];
-            self.Password = (string)credDict[IGRDKeychain.kKeychainStr_EapPassword];
+            TransportProtocol    = protocol,
+            Device               = device,
+            Identifer            = mainCredential ? "main" : Guid.NewGuid().ToString(),
+            MainCredential       = mainCredential,
+            HostName             = hostName,
+            HostnameDisplayValue = hostnameDisplayValue,
+            Name                 = hostnameDisplayValue,
+            ExpirationDate       = DateTime.UtcNow.AddDays(validForDays),
+            ApiAuthToken         = device.ApiAuthToken ?? string.Empty,
+        };
 
-            self.ClientId = self.UserName;
-        }
-
-        if (protocol == GRDTransportProtocol.TransportProtocol.TransportWireGuard)
+        switch (protocol)
         {
-            self.DevicePublicKey = (string)credDict[Common.kGRDWGDevicePublicKey];
-            self.DevicePrivateKey = (string)credDict[Common.kGRDWGDevicePrivateKey];
-            self.ServerPublicKey = (string)credDict[Common.kGRDWGServerPublicKey];
-            self.IPv4Address = (string)credDict[Common.kGRDWGIPv4Address];
-            self.IPv6Address = (string)credDict[Common.kGRDWGIPv6Address];
-            self.ClientId = (string)credDict[Common.kGRDClientId];
+            case GRDTransportProtocol.TransportProtocol.TransportIKEv2:
+                self.UserName = device.EapUsername ?? string.Empty;
+                self.Password = device.EapPassword ?? string.Empty;
+                self.ClientId = device.EapUsername ?? string.Empty; // IKEv2: clientId == EAP user
+                break;
 
-            // Per Tech Lead - for backwards compatibility
-            self.Password = @"wireguard-creds";
-            self.UserName = (string)credDict[Common.kGRDClientId];
+            case GRDTransportProtocol.TransportProtocol.TransportWireGuard:
+                self.ServerPublicKey  = device.ServerPublicKey ?? string.Empty;
+                self.IPv4Address      = device.MappedIPv4Address ?? string.Empty;
+                self.IPv6Address      = device.MappedIPv6Address ?? string.Empty;
+                self.ClientId         = device.ClientId ?? string.Empty;
+                self.DevicePrivateKey = devicePrivateKey ?? string.Empty;
+                self.DevicePublicKey  = devicePublicKey ?? string.Empty;
+                // No UserName/Password stuffing — see factory remarks.
+                break;
         }
 
         self.CheckExpiration();
         return self;
     }
+
+    /// <summary>
+    /// Back-compat for credentials loaded from a pre-<see cref="Device"/>
+    /// persisted blob (only the flat fields are populated). Reconstructs the
+    /// <see cref="Device"/> DTO from the flat fields relevant to this
+    /// credential's <see cref="TransportProtocol"/>, so usage points can read
+    /// from <c>Device</c> uniformly. No-op when <c>Device</c> is already set.
+    ///
+    /// Protocol-scoped on purpose: a legacy WireGuard credential has its
+    /// UserName/Password stuffed ("wireguard-creds"/clientId) for old back-compat
+    /// — we must NOT surface those as Device.EapUsername/EapPassword, or the
+    /// IKEv2 predicate would wrongly pass on a WG cred.
+    /// </summary>
+    public void EnsureDeviceFromLegacyFields()
+    {
+        if (Device is not null) return;
+
+        var d = new VPNDeviceResponse { ApiAuthToken = NullIfEmpty(ApiAuthToken) };
+        switch (TransportProtocol)
+        {
+            case GRDTransportProtocol.TransportProtocol.TransportIKEv2:
+                d.EapUsername = NullIfEmpty(UserName);
+                d.EapPassword = NullIfEmpty(Password);
+                d.ClientId    = NullIfEmpty(ClientId);
+                break;
+            case GRDTransportProtocol.TransportProtocol.TransportWireGuard:
+                d.ServerPublicKey   = NullIfEmpty(ServerPublicKey);
+                d.MappedIPv4Address = NullIfEmpty(IPv4Address);
+                d.MappedIPv6Address = NullIfEmpty(IPv6Address);
+                d.ClientId          = NullIfEmpty(ClientId);
+                break;
+        }
+
+        Device = d;
+    }
+
+    private static string? NullIfEmpty(string? s) => string.IsNullOrEmpty(s) ? null : s;
 
     private void CheckExpiration()
     {

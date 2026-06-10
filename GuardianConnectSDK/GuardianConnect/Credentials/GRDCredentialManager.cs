@@ -38,6 +38,12 @@ public static class GRDCredentialManager
             JsonSerializer.Deserialize<List<GRDCredential>>(dataFromKeychain,
                 GRDCredentialJsonContext.Default.ListGRDCredential) ?? new List<GRDCredential>();
 
+        // Back-compat: credentials persisted before the Device DTO existed have
+        // only the flat fields populated. Backfill Device on load so every
+        // usage point can pluck from it uniformly. Idempotent / no-op once set.
+        foreach (var cred in CredentialsList)
+            cred.EnsureDeviceFromLegacyFields();
+
         Logger.LogInformation(
             $"GRDCredentialsManager.DataToCredentials(): CredentialsList has {CredentialsList.Count}");
 

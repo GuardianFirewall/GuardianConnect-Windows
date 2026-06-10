@@ -154,18 +154,25 @@ public class GRDVPNHelper
             return false;
         }
 
+        // Predicates pluck from the device-response DTO (disjoint field sets by
+        // construction — the host only fills the negotiated protocol's subset,
+        // so the IKEv2 predicate is false on a WG cred without any stuffing).
+        // The WG device keypair stays on the flat fields: it's client-side, not
+        // part of the host reply.
+        mainCreds.EnsureDeviceFromLegacyFields();
+        var device = mainCreds.Device!;
         bool valid = protocol switch
         {
             GRDTransportProtocol.TransportProtocol.TransportIKEv2 =>
-                !string.IsNullOrEmpty(mainCreds.ApiAuthToken) &&
-                !string.IsNullOrEmpty(mainCreds.UserName) &&
-                !string.IsNullOrEmpty(mainCreds.Password),
+                !string.IsNullOrEmpty(device.ApiAuthToken) &&
+                !string.IsNullOrEmpty(device.EapUsername) &&
+                !string.IsNullOrEmpty(device.EapPassword),
             GRDTransportProtocol.TransportProtocol.TransportWireGuard =>
                 !string.IsNullOrEmpty(mainCreds.DevicePrivateKey) &&
                 !string.IsNullOrEmpty(mainCreds.DevicePublicKey) &&
-                !string.IsNullOrEmpty(mainCreds.ServerPublicKey) &&
-                !string.IsNullOrEmpty(mainCreds.IPv4Address) &&
-                !string.IsNullOrEmpty(mainCreds.ClientId),
+                !string.IsNullOrEmpty(device.ServerPublicKey) &&
+                !string.IsNullOrEmpty(device.MappedIPv4Address) &&
+                !string.IsNullOrEmpty(device.ClientId),
             _ => false,
         };
 
@@ -194,9 +201,9 @@ public class GRDVPNHelper
         var mainCreds = GRDCredentialManager.GetMainCredentials();
         if (mainCreds != null )
         {
-            // ClientId is populated symmetrically by GRDCredential.InitWithTransportProtocol
-            // for both protocols: IKEv2 copies UserName into ClientId; WG sets it from the
-            // server's negotiate response. No protocol-discriminated branch needed.
+            // ClientId is populated symmetrically by GRDCredential.CreateFromDeviceResponse
+            // for both protocols: IKEv2 copies the EAP user into ClientId; WG sets it from
+            // the server's negotiate response. No protocol-discriminated branch needed.
             var clientId = mainCreds.ClientId;
             (var subCreds, errorResponse) = await GetValidSubscriberCredentialWithCompletion();
             if (subCreds == null || errorResponse.Message.Equals(Common.kPETOKENNOTSET))
@@ -275,8 +282,8 @@ public class GRDVPNHelper
     ///       <see cref="StartWireGuardFromStoredCreds"/>).</item>
     /// <item>No stored creds for this protocol (or host-override mismatch) →
     ///       go through the "negotiate then start" path
-    ///       (<see cref="ConnectVpnWithNewUserCredentialsForProtocol"/> for IKEv2,
-    ///       <see cref="NegotiateAndStartWireGuard"/> for WG).</item>
+    ///       (<see cref="ConnectVpnWithNewUserCredentialsForProtocol"/> for both
+    ///       protocols).</item>
     /// </list>
     /// Replaces the prior asymmetric dispatch (IKEv2 had a credentials check +
     /// GetServerStatus pre-flight + host-override sync; WG had none of those).
@@ -319,24 +326,24 @@ public class GRDVPNHelper
             GRDCredentialManager.ClearMainCredentials();
         }
 
-        // No valid stored creds for this protocol? Route to the protocol's
-        // negotiate path. Negotiate routines contact the server during
-        // negotiation, so no separate pre-flight server-status call is needed
-        // on those paths.
+        // No valid stored creds for this protocol? Route to the single,
+        // protocol-parameterized negotiate path for BOTH protocols. It
+        // negotiates a fresh credential, persists it as the main credential,
+        // then re-enters this method, which dials via the stored-creds path
+        // below. (WireGuard previously had its own negotiate-and-dial method,
+        // NegotiateAndStartWireGuard, that duplicated host-pick and tunnel
+        // bring-up; removed in favor of this symmetric route.)
         if (!ActiveConnectionPossible(protocol))
         {
-            return protocol switch
+            if (protocol is not (GRDTransportProtocol.TransportProtocol.TransportIKEv2
+                              or GRDTransportProtocol.TransportProtocol.TransportWireGuard))
             {
-                GRDTransportProtocol.TransportProtocol.TransportIKEv2 =>
-                    await ConnectVpnWithNewUserCredentialsForProtocol(
-                        GRDTransportProtocol.TransportProtocol.TransportIKEv2),
-                GRDTransportProtocol.TransportProtocol.TransportWireGuard =>
-                    await NegotiateAndStartWireGuard(),
-                _ => new ErrorResponse()
+                return new ErrorResponse()
                     .SetException(new InvalidOperationException(
                         $"Unsupported transport protocol: {protocol}"))
-                    .SetErrorMessage("Unsupported transport protocol."),
-            };
+                    .SetErrorMessage("Unsupported transport protocol.");
+            }
+            return await ConnectVpnWithNewUserCredentialsForProtocol(protocol);
         }
 
         // Stored creds exist for this protocol. Pre-flight the host's
@@ -482,9 +489,16 @@ public class GRDVPNHelper
             {
                 host = hostRecord.Hostname;
                 hostDisplay = hostRecord.HostLocation();
+                // Snap PreferredRegion to the override host's region so the rest
+                // of the app (RegionPicker etc.) reflects the chosen region.
+                // Ported from the former NegotiateAndStartWireGuard so the WG
+                // path keeps this behavior now that it routes through here.
+                var regionKey = GRDServerManager.FindRegionKeyForHostname(hostOverride);
+                if (!string.IsNullOrWhiteSpace(regionKey))
+                    PreferredRegion = regionKey;
                 _logger.LogInformation(
-                    "CreateStandaloneCredentialsForTransportProtocol: using host override '{Host}' (display='{Display}')",
-                    host, hostDisplay);
+                    "CreateStandaloneCredentialsForTransportProtocol: using host override '{Host}' (display='{Display}', region='{Region}')",
+                    host, hostDisplay, regionKey ?? "<unknown>");
             }
             else
             {
@@ -503,7 +517,13 @@ public class GRDVPNHelper
         }
         else
         {
-            var (defHost, defDisplay, _) = GRDServerManager.SelectGuardianHostWithCompletion(PreferredRegion);
+            var (defHost, defDisplay, hostErr) = GRDServerManager.SelectGuardianHostWithCompletion(PreferredRegion);
+            if (hostErr.IsError)
+            {
+                _logger.LogError(
+                    "CreateStandaloneCredentialsForTransportProtocol: host selection failed: {Msg}", hostErr.Message);
+                return hostErr;
+            }
             host = defHost;
             hostDisplay = defDisplay;
         }
@@ -558,13 +578,18 @@ public class GRDVPNHelper
         var errorResponse = new ErrorResponse();
 
         var mainCredential = GRDCredentialManager.GetMainCredentials();
+        // Pluck EAP creds from the device-response DTO (EnsureDevice backfills
+        // it for legacy creds). Host stays on the flat field — it's the chosen
+        // host, not part of the device reply.
+        mainCredential!.EnsureDeviceFromLegacyFields();
+        var device = mainCredential.Device!;
         // Make WCF call to GuardianWindowsService to start the connection
         var vpnValues = new VPNCallParameters
         {
-            VpnHostName = mainCredential!.HostName,
+            VpnHostName = mainCredential.HostName,
             VpnHostDisplay = mainCredential.HostnameDisplayValue,
-            EapuserName = mainCredential.UserName,
-            Eappassword = mainCredential.Password,
+            EapuserName = device.EapUsername ?? string.Empty,
+            Eappassword = device.EapPassword ?? string.Empty,
             EntryName = $"Guardian Firewall - {mainCredential.HostnameDisplayValue}"
         };
 
@@ -653,151 +678,6 @@ public class GRDVPNHelper
         return errorResponse;
     }
 
-    /// <summary>
-    /// Negotiates a fresh WireGuard credential with the chosen host (Curve25519
-    /// keypair generated locally, public key + subscriber JWT POSTed to
-    /// /api/v1.3/device), persists the credential as the main one, materialises
-    /// a wg-quick text from it, and asks the service to bring up the tunnel.
-    /// Mirrors the iOS/macOS pattern: createStandaloneCredentialsForTransport
-    /// Protocol + wireguardQuickConfigForCredential + start the tunnel with
-    /// the resulting text.
-    ///
-    /// Renamed from StartWireGuardConnectionWithNegotiation for symmetry with
-    /// <see cref="StartWireGuardFromStoredCreds"/> — the two are picked by the
-    /// dispatcher in <see cref="ConnectVpnWithConfiguredCredentials"/>:
-    /// stored-creds path when valid cached cred exists, this one when not.
-    /// </summary>
-    private async Task<ErrorResponse> NegotiateAndStartWireGuard()
-    {
-        _logger.LogInformation("NegotiateAndStartWireGuard: entry");
-
-        // Host pick: prefer the user's explicit selection from the Developer
-        // tab's host tree (persisted to HKCU\kGuardianPreferredHost). If
-        // present and the host is in the cache, use it verbatim and snap
-        // PreferredRegion to the host's region so the rest of the app
-        // (RegionPicker etc.) reflects the chosen region. Fall through to
-        // the usual SelectBestHostInRegion auto-pick when no override is
-        // set or the override host isn't in the cache.
-        string host;
-        string hostDisplay;
-
-        var hostOverride = RegistrySettings.RetrieveGuardianUserSettings(Common.kGuardianPreferredHost);
-        if (!string.IsNullOrWhiteSpace(hostOverride))
-        {
-            var hostRecord = GRDServerManager.FindHostRecord(hostOverride);
-            if (hostRecord is not null)
-            {
-                host = hostRecord.Hostname;
-                hostDisplay = hostRecord.HostLocation();
-                var regionKey = GRDServerManager.FindRegionKeyForHostname(hostOverride);
-                if (!string.IsNullOrWhiteSpace(regionKey))
-                {
-                    PreferredRegion = regionKey;
-                }
-                _logger.LogInformation(
-                    "NegotiateAndStartWireGuard: using host override '{Host}' (display='{Display}', region='{Region}')",
-                    host, hostDisplay, regionKey ?? "<unknown>");
-            }
-            else
-            {
-                // Cache miss: the Live._hostLookup that held this region's
-                // hosts has likely been wiped by a SwapActiveGeoInfoCache
-                // (LongRunningRefreshTask kicks off a fresh Alternate cache
-                // every refresh interval and swaps Live to point at it; the
-                // newly-active cache won't have on-demand host lists until
-                // someone re-fetches per region). The user's explicit
-                // selection trumps cache state, so use the hostname verbatim
-                // — the negotiate API doesn't require a local cache hit and
-                // will simply reject if the hostname is invalid. Display
-                // falls back to the hostname (we lose the pretty
-                // HostLocation string until the user re-browses the region).
-                host = hostOverride;
-                hostDisplay = hostOverride;
-                _logger.LogWarning(
-                    "NegotiateAndStartWireGuard: host override '{Host}' not in local cache; using hostname directly (display will lack region info until host cache is repopulated)",
-                    hostOverride);
-            }
-        }
-        else
-        {
-            // No override — default region-based pick.
-            var (defHost, defDisplay, hostErr) =
-                GRDServerManager.SelectGuardianHostWithCompletion(PreferredRegion);
-            if (hostErr.IsError)
-            {
-                _logger.LogError(
-                    "NegotiateAndStartWireGuard: host selection failed: {Msg}", hostErr.Message);
-                return hostErr;
-            }
-            host = defHost;
-            hostDisplay = defDisplay;
-        }
-
-        var (subCred, jwtErr) = await GetValidSubscriberCredentialWithCompletion();
-        if (jwtErr.IsError || subCred is null)
-        {
-            _logger.LogError(
-                "NegotiateAndStartWireGuard: subscriber JWT unavailable: {Msg}", jwtErr.Message);
-            return jwtErr;
-        }
-
-        var negResult = await GRDGateway.NegotiateWireGuardCredential(host, subCred.Jwt, validForDays: 30);
-        if (negResult.IsError || negResult.Data is not GRDCredential cred )
-        {
-            _logger.LogError(
-                "NegotiateAndStartWireGuard: NegotiateWireGuardCredential failed: {Msg}",
-                negResult.Message);
-            return negResult;
-        }
-
-        cred.HostName             = host;
-        cred.HostnameDisplayValue = hostDisplay;
-        cred.Name                 = hostDisplay;
-        cred.MainCredential       = true;
-        cred.Identifer            = "main";
-        cred.TransportProtocol    = GRDTransportProtocol.TransportProtocol.TransportWireGuard;
-
-        // Persist the credential so subsequent connects can reuse it without
-        // re-negotiating; an explicit "rotate keys" path can clear it later.
-        GRDCredentialManager.AddOrUpdateCredential(cred);
-
-        var configText = GRDWireGuardConfiguration.WireGuardQuickConfigForCredential(cred);
-        if (string.IsNullOrEmpty(configText))
-        {
-            return new ErrorResponse()
-                .SetException(new InvalidOperationException(
-                    "WireGuardQuickConfigForCredential returned null — negotiated credential is incomplete."))
-                .SetErrorMessage("Failed to build WireGuard config from negotiated credential.");
-        }
-
-        var vpnValues = new VPNCallParameters
-        {
-            EntryName            = $"Guardian WireGuard - {hostDisplay}",
-            WireGuardConfigText  = configText,
-            VpnHostName          = host,
-            VpnHostDisplay       = hostDisplay,
-        };
-
-        var errorResponse = new ErrorResponse();
-        try
-        {
-            errorResponse = await ClientPipe.StartVPNConnection(vpnValues);
-            if (errorResponse.IsError)
-                _logger.LogError(
-                    "NegotiateAndStartWireGuard: service refused start: {Msg}",
-                    errorResponse.Message);
-            else
-                _logger.LogInformation(
-                    "NegotiateAndStartWireGuard: tunnel up on host {Host}", host);
-        }
-        catch (Exception e)
-        {
-            errorResponse.SetException(e).SetErrorMessage(e.Message);
-            _logger.LogError(e, "NegotiateAndStartWireGuard: ClientPipe threw");
-        }
-
-        return errorResponse;
-    }
 
     private async Task<ErrorResponse> StartWireGuardConnection(string configPath)
     {

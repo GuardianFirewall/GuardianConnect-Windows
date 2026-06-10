@@ -48,10 +48,17 @@ public static class GRDWireGuardConfiguration
             return null;
         }
 
+        // Pluck the server-provided fields from the device response DTO; the
+        // device keypair (private/public key) is client-side and stays on the
+        // flat fields. EnsureDeviceFromLegacyFields makes Device non-null for
+        // any credential, including legacy persisted ones.
+        credential.EnsureDeviceFromLegacyFields();
+        var device = credential.Device!;
+
         if (string.IsNullOrEmpty(credential.DevicePrivateKey)
             || string.IsNullOrEmpty(credential.DevicePublicKey)
-            || string.IsNullOrEmpty(credential.IPv4Address)
-            || string.IsNullOrEmpty(credential.ServerPublicKey)
+            || string.IsNullOrEmpty(device.MappedIPv4Address)
+            || string.IsNullOrEmpty(device.ServerPublicKey)
             || string.IsNullOrEmpty(credential.HostName))
         {
             Logger.LogError("WireGuardQuickConfigForCredential: required credential information missing.");
@@ -62,9 +69,9 @@ public static class GRDWireGuardConfiguration
 
         // Build the [Interface] address line. Include IPv6 when the server
         // assigned one (macOS drops this; see class-level remark).
-        var addresses = credential.IPv4Address;
-        if (!string.IsNullOrEmpty(credential.IPv6Address))
-            addresses = $"{credential.IPv4Address}, {credential.IPv6Address}";
+        var addresses = device.MappedIPv4Address;
+        if (!string.IsNullOrEmpty(device.MappedIPv6Address))
+            addresses = $"{device.MappedIPv4Address}, {device.MappedIPv6Address}";
 
         var sb = new StringBuilder();
         sb.AppendLine("[Interface]");
@@ -73,7 +80,7 @@ public static class GRDWireGuardConfiguration
         sb.AppendLine($"DNS = {dns}");
         sb.AppendLine();
         sb.AppendLine("[Peer]");
-        sb.AppendLine($"PublicKey = {credential.ServerPublicKey}");
+        sb.AppendLine($"PublicKey = {device.ServerPublicKey}");
         sb.AppendLine("AllowedIPs = 0.0.0.0/0, ::/0");
         sb.AppendLine($"Endpoint = {credential.HostName}:{WireGuardEndpointPort}");
 
