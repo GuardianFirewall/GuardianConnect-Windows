@@ -583,7 +583,7 @@ public class GRDVPNHelper
         // host, not part of the device reply.
         mainCredential!.EnsureDeviceFromLegacyFields();
         var device = mainCredential.Device!;
-        // Make WCF call to GuardianWindowsService to start the connection
+        // Make IPC call to GuardianWindowsService to start the connection
         var vpnValues = new VPNCallParameters
         {
             VpnHostName = mainCredential.HostName,
