@@ -143,7 +143,7 @@ public static class ConnectionRoutines
             szDeviceType = PInvoke.RASDT_Vpn,
             szDeviceName = "WAN Miniport (IKEv2)",
             dwType = PInvoke.RASET_Vpn,
-            dwEncryptionType = PInvoke.ET_Optional,
+            dwEncryptionType = PInvoke.ET_RequireMax,
             dwVpnStrategy = PInvoke.VS_Ikev2Only,
             dwfOptions2 = PInvoke.RASEO2_DontNegotiateMultilink | PInvoke.RASEO2_ReconnectIfDropped |
                           PInvoke.RASEO2_IPv6RemoteDefaultGateway | PInvoke.RASEO2_CacheCredentials,
@@ -193,11 +193,20 @@ public static class ConnectionRoutines
                 null, error);
         }
 
+        // ROUTER_CUSTOM_IKEv2_POLICY_0 = 6 little-endian DWORDs (MS-RRASM 2.2.1.2.236):
+        //   dwIntegrityMethod         = 3  SHA-384      (IKE/MM integrity)
+        //   dwEncryptionMethod        = 4  AES-256      (IKE/MM cipher)
+        //   dwCipherTransformConstant = 8  AES-256-GCM  (ESP/QM data cipher; was 2 = 3DES-CBC)
+        //   dwAuthTransformConstant   = 5  AES-256-GCM  (ESP/QM auth; GCM pairs with cipher 8)
+        //   dwPfsGroup                = 5  ECP-384      (QM PFS; was 2 = DH group 2 / 1024-bit MODP)
+        //   dwDhGroup                 = 5  ECP-384      (IKE/MM key exchange; was 0 = NONE)
+        // Prior blob (…02…05…02…00) decoded to a weak/inconsistent suite (3DES ESP + GCM auth +
+        // no MM DH group). The earlier "5 = ECP384 curve" note was a misread: in the 3rd DWORD,
+        // 5 is AES-256-CBC; ECP-384 lives in the PFS/DH fields (5th/6th), as set here.
+        // NOTE: gateway must offer AES-256-GCM / SHA-384 / ECP-384 or the (ET_RequireMax) dial
+        // will fail rather than downgrade — verify negotiated SA with Get-NetIPsecQuickModeSA.
         entryWasWritten = PInvoke.WritePrivateProfileString(entryName, "CustomIPSecPolicies",
-            "030000000400000002000000050000000200000000000000", phonebookPath);
-        /* given by BC/Brave - the 5 in the middle here could be the ECP384 curve specifier
-                   "030000000400000005000000050000000200000000000000",
-        */
+            "030000000400000008000000050000000500000005000000", phonebookPath);
         if (!entryWasWritten)
         {
             var error = Marshal.GetLastWin32Error();
