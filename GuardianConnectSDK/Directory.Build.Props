@@ -12,9 +12,10 @@
         <FileVersion>0.46.0</FileVersion>
         <Version>0.46.0</Version>
         <!-- Set this for prerelease builds (e.g., "alpha.1", "beta.1", "rc.1"); remove or leave empty for stable releases.
-             "wg-alpha.N" labels SDK packages emitted from the WireGuard transport branch (i196-add-wireguard-transport)
-             so they can't be confused with KS-line packages also on 0.46.0-alpha.N. -->
-        <VersionSuffix>wg-alpha.41</VersionSuffix>
+             "wg-alpha.N" labels SDK packages emitted from the WireGuard transport branch (i196-add-wireguard-transport).
+             "wg-poc.N" labels the IKEv2 encryption-hardening proof-of-concept (branch ikev2-encryption-hardening),
+             kept off the wg-alpha.N line so the experimental IPsec-suite build can't be confused with it. -->
+        <VersionSuffix>wg-poc.1</VersionSuffix>
     </PropertyGroup>
 
     <PropertyGroup>
