@@ -193,20 +193,23 @@ public static class ConnectionRoutines
                 null, error);
         }
 
-        // ROUTER_CUSTOM_IKEv2_POLICY_0 = 6 little-endian DWORDs (MS-RRASM 2.2.1.2.236):
-        //   dwIntegrityMethod         = 3  SHA-384      (IKE/MM integrity)
-        //   dwEncryptionMethod        = 4  AES-256      (IKE/MM cipher)
-        //   dwCipherTransformConstant = 8  AES-256-GCM  (ESP/QM data cipher; was 2 = 3DES-CBC)
-        //   dwAuthTransformConstant   = 5  AES-256-GCM  (ESP/QM auth; GCM pairs with cipher 8)
-        //   dwPfsGroup                = 5  ECP-384      (QM PFS; was 2 = DH group 2 / 1024-bit MODP)
-        //   dwDhGroup                 = 5  ECP-384      (IKE/MM key exchange; was 0 = NONE)
-        // Prior blob (…02…05…02…00) decoded to a weak/inconsistent suite (3DES ESP + GCM auth +
-        // no MM DH group). The earlier "5 = ECP384 curve" note was a misread: in the 3rd DWORD,
-        // 5 is AES-256-CBC; ECP-384 lives in the PFS/DH fields (5th/6th), as set here.
-        // NOTE: gateway must offer AES-256-GCM / SHA-384 / ECP-384 or the (ET_RequireMax) dial
-        // will fail rather than downgrade — verify negotiated SA with Get-NetIPsecQuickModeSA.
+        // CustomIPSecPolicies = 6 little-endian DWORDs. AES-256-GCM / SHA-384 / ECP-384.
+        //   [0] dwIntegrityMethod         = 3  SHA-384      (IKE/MM integrity)
+        //   [1] dwEncryptionMethod        = 4  AES-256      (IKE/MM cipher)
+        //   [2] dwCipherTransformConstant = 5  AES-256-GCM  (ESP/QM data cipher)
+        //   [3] dwAuthTransformConstant   = 8  AES-256-GCM  (ESP/QM auth)
+        //   [4] dwPfsGroup                = 5  ECP-384      (QM PFS)
+        //   [5] dwDhGroup                 = 5  ECP-384      (IKE/MM key exchange)
+        // IMPORTANT: the CLIENT phonebook encodes GCM-256 as cipher=5 / auth=8 — the OPPOSITE of
+        // the MS-RRASM *server* enum (ROUTER_CUSTOM_IKEv2_POLICY_0 lists GCM-256 cipher=8/auth=5).
+        // Using the server values here produced FWP_E_INVALID_ENUMERATOR (0x8032001D) at RasDial.
+        // This hex is what Set-VpnConnectionIPsecConfiguration (the authoritative client API)
+        // emits for -CipherTransformConstants GCMAES256 -AuthenticationTransformConstants GCMAES256
+        // -EncryptionMethod AES256 -IntegrityCheckMethod SHA384 -DHGroup ECP384 -PfsGroup ECP384.
+        // NOTE: with ET_RequireMax the dial fails (no downgrade) if the gateway can't offer this
+        // suite — verify a successful SA with Get-NetIPsecQuickModeSA.
         entryWasWritten = PInvoke.WritePrivateProfileString(entryName, "CustomIPSecPolicies",
-            "030000000400000008000000050000000500000005000000", phonebookPath);
+            "030000000400000005000000080000000500000005000000", phonebookPath);
         if (!entryWasWritten)
         {
             var error = Marshal.GetLastWin32Error();
