@@ -3,9 +3,8 @@ using System.Text.Json.Serialization;
 namespace GuardianConnect.Abstractions;
 
 /// <summary>
-/// Kill switch mode. v1 ships only Off and OnConnected. Always-On (persistent
-/// filters that survive process exit and reboot) is in §8 Future Experimental of
-/// the design doc and not implemented in v1.
+/// Kill switch mode. v1 ships only Off and OnConnected. Any other mode (e.g. Always-On - here meaning
+/// survive process exit and reboot), is not implemented at this time.
 /// </summary>
 public enum KillSwitchMode
 {

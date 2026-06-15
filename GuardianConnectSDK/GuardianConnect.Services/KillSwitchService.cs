@@ -458,7 +458,7 @@ public sealed class KillSwitchService : BackgroundService
         // Tried last so the IKEv2 strategies above keep priority when both
         // protocols' adapters happen to coexist briefly (e.g., during a
         // transport-switch handoff).
-        tunnelLuid ??= AdapterLuidResolver.FindFirstUpAdapterByAlias("GuardianWireGuard");
+        tunnelLuid ??= AdapterLuidResolver.FindFirstUpAdapterByAlias(VpnTunnelManager.AdapterName);
 
         if (tunnelLuid == null)
         {

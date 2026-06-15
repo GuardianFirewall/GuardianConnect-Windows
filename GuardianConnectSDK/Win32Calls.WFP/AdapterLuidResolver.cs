@@ -57,7 +57,7 @@ public static unsafe class AdapterLuidResolver
     /// <summary>
     /// Exact alias match on an Up adapter. Used for the WireGuard transport,
     /// whose Wintun adapter is created with a deterministic alias
-    /// ("GuardianWireGuard") by VpnTunnelManager — distinct from the
+    /// ("GuardianFirewall-WireGuard") by VpnTunnelManager — distinct from the
     /// RAS-decorated aliases the IKEv2 strategies look for.
     /// </summary>
     public static ulong? FindFirstUpAdapterByAlias(string aliasExact)

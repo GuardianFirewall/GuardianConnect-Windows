@@ -1,10 +1,8 @@
-using GuardianConnect.Shared;
-
-namespace GuardianConnect.Abstractions;
+namespace GuardianConnect.Shared;
 
 /// <summary>
 /// Single source of truth for the user-selected VPN transport protocol.
-/// Replaces both the previous inline enum on <see cref="ITransportProvider"/>
+/// Replaces both the previous inline enum on <c>ITransportProvider</c>
 /// and the raw <c>RegistrySettings.RetrieveGuardianUserSettings(Common.kGuardianTransportProtocol)</c>
 /// + magic-string comparison pattern that was duplicated across every
 /// dispatch site (GRDVPNHelper, GeneralPageViewModel, AdvancedContentViewModel,
@@ -16,13 +14,13 @@ namespace GuardianConnect.Abstractions;
 /// <c>GRDCredential.TransportProtocol</c> stays wire-compatible. Credentials
 /// persisted by older builds deserialize unchanged after this refactor.
 ///
-/// Lives in <c>GuardianConnect.Abstractions</c> (same assembly as
-/// <see cref="ITransportProvider"/>) so the interface property
-/// <c>ITransportProvider.ProtocolType</c> can return this type without
-/// creating an upward dependency on the Helpers layer. The Get/Set
-/// methods are safe to use from Abstractions because
-/// <c>GuardianConnect.Shared</c> (which hosts <c>RegistrySettings</c>
-/// and <c>Common</c>) is already a dependency of Abstractions.
+/// Lives in <c>GuardianConnect.Shared</c> — the lowest-level project, which
+/// hosts <c>RegistrySettings</c> and <c>Common</c> (the only dependencies of
+/// the Get/Set methods). Placing it here lets types in Shared (such as
+/// <c>VPNCallParameters</c>) name the transport directly, while higher layers
+/// like <c>GuardianConnect.Abstractions</c> (e.g. <c>ITransportProvider</c>)
+/// still reference it without an upward dependency, since they already
+/// depend on Shared.
 /// </summary>
 public static class GRDTransportProtocol
 {

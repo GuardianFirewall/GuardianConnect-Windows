@@ -74,7 +74,7 @@ public class Common
     /// <summary>
     /// HKCU user setting. "true" means the app uses a wg-quick config file
     /// the user picked locally (developer override). "false" or absent
-    /// (default) means the app negotiates the WireGuard config with the
+    /// (default) means the app key-exchanges the WireGuard config with the
     /// backend on every connect, matching the iOS/macOS SDK pattern.
     /// </summary>
     public const string kGuardianUseFileBasedWireGuardConfig = "kGuardianUseFileBasedWireGuardConfig";
@@ -83,7 +83,7 @@ public class Common
     /// HKCU user setting holding a specific server hostname the user picked
     /// via the Developer tab's host tree. Non-empty means "use this exact
     /// host for the next WG connect; ignore the usual SelectBestHostInRegion
-    /// pick". GRDVPNHelper.StartWireGuardConnectionWithNegotiation reads
+    /// pick". GRDVPNHelper.StartWireGuardConnectionWithKeyExchange reads
     /// this; if the host exists in the cache it's used verbatim and
     /// PreferredRegion is updated to match. Empty / absent = default
     /// behaviour (region-based auto-pick).

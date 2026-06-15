@@ -111,27 +111,6 @@ public class GRDCredential
         throw new NotImplementedException();
     }
 
-    // public GRDCredential InitWithFullDictionary(Dictionary<string, object> credDict, int validForDays, bool isMain)
-    // {
-    //     var self = new GRDCredential(credDict);
-    //     self.TransportProtocol = GRDTransportProtocol.TransportProtocol.TransportIKEv2;
-    //     self.Identifer = isMain ? "main" : Guid.NewGuid().ToString();
-    //     self.UserName = (string)credDict[IGRDKeychain.kKeychainStr_EapUsername];
-    //     self.Password = (string)credDict[IGRDKeychain.kKeychainStr_EapPassword];
-    //     self.ApiAuthToken = (string)credDict[IGRDKeychain.kKeychainStr_AuthToken];
-    //     self.HostName = (string)credDict[Common.kGRDHostnameOverride];
-    //     self.ExpirationDate = DateTime.Now.AddDays(validForDays);
-    //     self.HostnameDisplayValue = (string)credDict[Common.kGRDVPNHostLocation];
-    //     self.Name = (string)credDict[Common.kGRDVPNHostLocation];
-    //
-    //     _checkedExpiration = false;
-    //     _checkedExpiration = false;
-    //     _expired = false;
-    //
-    //     self.CheckExpiration();
-    //     return self;
-    // }
-    //
     public GRDCredential InitWithTransportProtocol(GRDTransportProtocol.TransportProtocol protocol,
         Dictionary<string, object> credDict, int validForDays, bool areMainCreds)
     {

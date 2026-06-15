@@ -156,14 +156,14 @@ public class ClientPipeService : BackgroundService
         // Outer try logs an unhandled escape with a diagnostic-rich message,
         // then re-throws so the exception propagates out to the ThreadPool's
         // unhandled-exception handler and Windows Service Recovery restarts
-        // the service. This is the self-healing path. The wg-alpha.33
-        // version of this catch swallowed the exception silently, which
+        // the service. This is the self-healing path. Previous versions
+        // of this catch swallowed the exception silently, which
         // left the service alive-but-dead with no functional pipe listeners
         // after a quick stop+start (pipe-bind hit "All pipe instances are
         // busy" while the OS was still releasing the prior instance's
         // handles, all listener threads exited cleanly, service stayed up
-        // accepting no clients). Re-throwing restores the pre-wg-alpha.33
-        // self-heal while keeping the diagnostic log.
+        // accepting no clients). Re-throwing restores the self-heal while
+        // keeping the diagnostic log.
         try
         {
         while (!_cancellationToken.IsCancellationRequested && !AdministrativeShutdownRequested)
@@ -179,8 +179,7 @@ public class ClientPipeService : BackgroundService
             // restarts quickly after a prior instance: the OS has not yet
             // released the previous service's named-pipe instance count.
             // 15 seconds is empirically not enough; the failure mode was
-            // observed in the 2026-05-28 reboot-test logs (PID 260 took over
-            // from PID 5464 and ALL ~20 listener threads died on bind).
+            // observed in test logs.
             //
             // Recoverable in-process via backoff. We retry up to N times with
             // increasing delay before giving up and letting the outer catch
@@ -403,7 +402,7 @@ public class ClientPipeService : BackgroundService
             _logger.Log(LogLevel.Error, $"ClientPipeService[{threadId}]: ServerThread terminated by unhandled exception: {ex.GetType().Name}: {ex.Message}");
             // Re-throw: lets the exception escape to the ThreadPool unhandled-exception
             // handler, which terminates the service. Windows Service Recovery then
-            // restarts us. This restores the pre-wg-alpha.33 self-heal behavior; the
+            // restarts us. This restores previous self-heal behavior; the
             // outer catch is now diagnostic-only, not a swallow.
             throw;
         }
