@@ -668,27 +668,27 @@ public sealed class KillSwitchService : BackgroundService
 
     // -------------------------------------------------------------------------------
     // Connecting-mode overlay — temporary DNS + HTTPS permits installed
-    // during a user-initiated Connect attempt so the credential-negotiate machinery in
+    // during a user-initiated Connect attempt so the credential-registration machinery in
     // the client process can resolve Guardian API hostnames and complete HTTP calls
     // while the regular KS filter set (block-all + DNS-block) keeps protecting the
     // rest of traffic.
     //
     // Lifecycle:
-    //   - Client calls EnterConnectingMode IPC before its first negotiate HTTP call
+    //   - Client calls EnterConnectingMode IPC before its first registration HTTP call
     //     (ConnectButtonCommand path in the UI).
     //   - Service installs overlay permits (UDP/TCP/53 + TCP/443 outbound, unscoped)
     //     at WeightSpecificPermit (4), beating the DNS-block (3) and block-all (1).
-    //   - Negotiate completes, client sends StartVPNConnection, tunnel comes up.
+    //   - Registration completes, client sends StartVPNConnection, tunnel comes up.
     //   - ReevaluateUnsafe detects connected=true and the InstallFiltersUnsafe path
     //     rebuilds the base set; ExitConnectingModeUnsafe runs implicitly to remove
     //     overlay since tunnel-LUID permits handle DNS naturally from here.
-    //   - On client-side failure (negotiate threw, user closed app, etc.), the
+    //   - On client-side failure (registration threw, user closed app, etc.), the
     //     watchdog timer auto-exits the overlay after ConnectingOverlayTimeoutSeconds.
     //   - Client can also call ExitConnectingMode IPC explicitly on error paths for
     //     prompt teardown without waiting for the watchdog.
     //
     // Leak surface during the open window: DNS + HTTPS to any destination via any
-    // local interface. Bounded by the negotiate's natural duration (typically
+    // local interface. Bounded by the registration's natural duration (typically
     // seconds) and capped by the watchdog. The user explicitly clicked Connect,
     // so they've signaled "I want connectivity to come back" — consistent with
     // intent. The block-all WFP filter still catches non-DNS, non-443 traffic, so
@@ -717,7 +717,7 @@ public sealed class KillSwitchService : BackgroundService
     {
         // Idempotent: if overlay already installed, refresh the deadline so a fresh
         // EnterConnectingMode call extends the window. (Useful if the client retries
-        // the negotiate after a transient failure within the same connect session.)
+        // the registration after a transient failure within the same connect session.)
         _connectingDeadlineUtc = DateTime.UtcNow.AddSeconds(ConnectingOverlayTimeoutSeconds);
 
         if (_isConnecting)

@@ -60,7 +60,7 @@ public interface IGuardianNPContract
 
     /// <summary>
     /// Tell the service "I'm about to attempt a Connect; open the kill-switch
-    /// connecting-overlay so my credential-negotiate HTTP calls can escape
+    /// connecting-overlay so my credential-registration HTTP calls can escape
     /// the DNS-block + block-all set". Idempotent; watchdog auto-exits after
     /// 60s if no paired ExitConnectingMode arrives. See KillSwitchService.cs
     /// for full lifecycle notes.
@@ -68,7 +68,7 @@ public interface IGuardianNPContract
     ErrorResponse EnterConnectingMode();
 
     /// <summary>
-    /// Optional explicit teardown of the connecting-overlay (e.g., negotiate
+    /// Optional explicit teardown of the connecting-overlay (e.g., registration
     /// failed in the client and we don't want to wait for the watchdog).
     /// Idempotent. Normally not needed — the overlay is cleared automatically
     /// when the tunnel comes up via the wgConnected / RasConnected event paths.
