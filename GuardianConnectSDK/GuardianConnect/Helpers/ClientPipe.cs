@@ -130,9 +130,9 @@ public static class ClientPipe
     }
 
     /// <summary>
-    /// Open the kill-switch connecting-overlay (wg-alpha.35). UI calls this
-    /// before issuing the credential-negotiate HTTP calls in
-    /// GeneralPageViewModel.ConnectButtonCommand so the negotiate isn't
+    /// Open the kill-switch connecting-overlay. UI calls this
+    /// before issuing the credential-construction HTTP calls in
+    /// GeneralPageViewModel.ConnectButtonCommand so the construction isn't
     /// blocked by the DNS-block + block-all when KS is engaged with no
     /// active tunnel (rock-and-hard-place). Idempotent; service-side
     /// watchdog auto-closes after 60s if no paired ExitConnectingMode.

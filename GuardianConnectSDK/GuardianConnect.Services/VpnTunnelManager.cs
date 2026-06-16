@@ -18,7 +18,11 @@ namespace GuardianConnect.Services;
 /// </summary>
 public sealed class VpnTunnelManager : ITransportProvider, IDisposable
 {
-    private const string AdapterName = "GuardianWireGuard";
+    // Deterministic Wintun adapter alias. Exposed as internal so the kill
+    // switch (KillSwitchService) can resolve this adapter's LUID by the exact
+    // same alias instead of duplicating the string literal — a mismatch there
+    // would silently break tunnel-permit filtering under block-all.
+    internal const string AdapterName = "GuardianFirewall-WireGuard";
 
     // Interface metric to set on the WireGuard adapter so its routes are
     // preferred over the physical NIC's. Windows ranks routes by total cost

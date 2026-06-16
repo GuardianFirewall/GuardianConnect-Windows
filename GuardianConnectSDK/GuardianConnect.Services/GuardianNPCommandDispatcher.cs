@@ -69,6 +69,16 @@ public class GuardianNPCommandDispatcher : IGuardianNPContract
             }
 
             var transport = SelectTransport(protocolRequest);
+            if (transport is null)
+            {
+                Logger.LogWarning(
+                    "GuardianNPCommandDispatcher.StartVPNConnection: refused — no transport specified (Transport={Transport})",
+                    protocolRequest.Transport);
+                return new ErrorResponse().SetErrorMessage(
+                    "No VPN transport was specified in the connection request. " +
+                    "The request must explicitly set Transport to IKEv2 or WireGuard.");
+            }
+
             _activeTransport = transport;
 
             Logger.LogInformation(
@@ -127,21 +137,21 @@ public class GuardianNPCommandDispatcher : IGuardianNPContract
     }
 
     /// <summary>
-    /// Implicit protocol detection: if a WireGuard config payload (path or inline
-    /// text) is present on the VPNCallParameters, route to VpnTunnelManager;
-    /// otherwise default to IKEv2. Future protocols would either add another such
-    /// field or warrant an explicit TransportKind enum on VPNCallParameters.
+    /// Explicit protocol selection driven by <see cref="VPNCallParameters.Transport"/>.
+    /// The caller must state which transport to start; we never infer it from the
+    /// presence of a config payload. An unspecified transport
+    /// (<see cref="GRDTransportProtocol.TransportProtocol.TransportUnknown"/>)
+    /// returns <c>null</c> so the caller can refuse the request rather than
+    /// silently defaulting — a wrong default here would leave the host in a
+    /// confusing state (e.g. an IKEv2 tunnel when WireGuard was intended).
     /// </summary>
-    private static ITransportProvider SelectTransport(VPNCallParameters request)
-    {
-        var hasWireGuardConfig =
-            !string.IsNullOrWhiteSpace(request.WireGuardConfigPath)
-            || !string.IsNullOrWhiteSpace(request.WireGuardConfigText);
-
-        return hasWireGuardConfig
-            ? new GuardianConnect.Services.VpnTunnelManager()
-            : new VPNTransportIKEV2();
-    }
+    private static ITransportProvider? SelectTransport(VPNCallParameters request) =>
+        request.Transport switch
+        {
+            GRDTransportProtocol.TransportProtocol.TransportWireGuard => new GuardianConnect.Services.VpnTunnelManager(),
+            GRDTransportProtocol.TransportProtocol.TransportIKEv2     => new VPNTransportIKEV2(),
+            _                                                         => null,
+        };
 
     // Caller must hold _transportGate.
     private static void DisposeActiveTransportUnsafe()

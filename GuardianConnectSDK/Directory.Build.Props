@@ -8,13 +8,13 @@
         <Authors>DNSFilter, Inc.</Authors>
         <RepositoryUrl>https://github.com/GuardianFirewall/GuardianConnect-Windows</RepositoryUrl>
 
-        <AssemblyVersion>0.46.0</AssemblyVersion>
-        <FileVersion>0.46.0</FileVersion>
-        <Version>0.46.0</Version>
+        <AssemblyVersion>0.46.2</AssemblyVersion>
+        <FileVersion>0.46.2</FileVersion>
+        <Version>0.46.2</Version>
         <!-- Set this for prerelease builds (e.g., "alpha.1", "beta.1", "rc.1"); remove or leave empty for stable releases.
-             "wg-alpha.N" labels SDK packages emitted from the WireGuard transport branch (i196-add-wireguard-transport)
-             so they can't be confused with KS-line packages also on 0.46.0-alpha.N. -->
-        <VersionSuffix>wg-alpha.42</VersionSuffix>
+             "wg-alpha.N" labels SDK packages emitted from the WireGuard transport-negotiate-consolidation branch
+             so they can't be confused with the released 0.46.2 packages off main. -->
+        <VersionSuffix>wg-alpha.43</VersionSuffix>
     </PropertyGroup>
 
     <PropertyGroup>

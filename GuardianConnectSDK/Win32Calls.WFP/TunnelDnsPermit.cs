@@ -23,11 +23,7 @@ namespace Win32Calls.WFP;
 /// port + interface) cause WFP to prefer them over the block (1
 /// condition: port) at equal weight.
 ///
-/// Renamed from <c>WireGuardDnsPermit</c> in wg-alpha.31 — the
-/// primitive has always been generic LUID-scoped DNS permitting; only
-/// the call site was WG-only until wg-alpha.30 wired it in from the
-/// IKEv2 path too (<c>VpnUtils.PermitQueriesFromTAP</c>). Filter
-/// display name + description + label strings are also generalized
+/// Filter display name + description + label strings are also generalized
 /// away from "WireGuard"-named text.
 ///
 /// Modelled on KillSwitchFilters.AddPermitDnsXxxOnTunnelVx (same

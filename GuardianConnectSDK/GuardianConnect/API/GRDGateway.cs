@@ -67,7 +67,7 @@ public class GRDGateway
         get
         {
             // ClientId is populated symmetrically by GRDCredential.InitWithTransportProtocol
-            // (IKEv2 copies UserName into ClientId; WG sets it from the negotiate response).
+            // (IKEv2 copies UserName into ClientId; WG sets it from the public key exchange response).
             // No protocol special-case needed.
             return GRDCredentialManager.GetMainCredentials()?.ClientId ?? string.Empty;
         }
@@ -182,13 +182,13 @@ public class GRDGateway
         // to the IKEv2 registration below. Previously the WG branch silently
         // sent the IKEv2-shaped payload and returned an incomplete credential
         // — that worked only because no caller actually used this method's WG
-        // result (StartWireGuardConnectionWithNegotiation called Negotiate
+        // result (StartWireGuardConnectionWithKeyExchange called Establish
         // WireGuardCredential directly). Now ConnectVpnWithNewUserCredentials
         // ForProtocol(WG) routes through this method too, so it must work
         // symmetrically for both protocols.
         if (transportProtocol == GRDTransportProtocol.TransportProtocol.TransportWireGuard)
         {
-            return await NegotiateWireGuardCredential(hostname, subscriberCredentialJWT, validForDays);
+            return await EstablishWireGuardCredential(hostname, subscriberCredentialJWT, validForDays);
         }
 
         var errorResponse = new ErrorResponse();
@@ -251,7 +251,7 @@ public class GRDGateway
     /// once the higher-level workflow decides it should become the main
     /// credential or a saved alternate.
     /// </summary>
-    public static async Task<ErrorResponse> NegotiateWireGuardCredential(
+    public static async Task<ErrorResponse> EstablishWireGuardCredential(
         string hostname, string subscriberCredentialJWT, int validForDays)
     {
         var errorResponse = new ErrorResponse();
@@ -270,7 +270,7 @@ public class GRDGateway
         }
         catch (Exception ex)
         {
-            Logger.LogError(ex, "NegotiateWireGuardCredential: curve25519 keygen failed");
+            Logger.LogError(ex, "EstablishWireGuardCredential: curve25519 keygen failed");
             return errorResponse.SetException(ex);
         }
 
@@ -287,7 +287,7 @@ public class GRDGateway
             payload, RegisterDevicePayloadJsonContext.Default.RegisterDevicePayload);
         // Don't log the JWT or public key — both are sensitive. Log shape only.
         Logger.LogInformation(
-            "NegotiateWireGuardCredential: POST /api/v1.3/device transport=wireguard host={Host}",
+            "EstablishWireGuardCredential: POST /api/v1.3/device transport=wireguard host={Host}",
             hostname);
         request.Content = new StringContent(payloadString);
 
@@ -325,7 +325,7 @@ public class GRDGateway
                 {
                     var body = await response.Content.ReadAsStringAsync();
                     Logger.LogError(
-                        "NegotiateWireGuardCredential: register failed {Status}: {Body}",
+                        "EstablishWireGuardCredential: register failed {Status}: {Body}",
                         (int)response.StatusCode, body);
                     return errorResponse.SetErrorMessage(
                         $"WireGuard registration failed: {(int)response.StatusCode}");
@@ -339,21 +339,21 @@ public class GRDGateway
             catch (Exception e) when (IsTransientDnsOrNetworkFailure(e) && attempt < maxAttempts)
             {
                 Logger.LogWarning(
-                    "NegotiateWireGuardCredential: transient DNS/network failure on attempt {Attempt}/{Max} for host '{Host}'; retrying after 350ms. {Msg}",
+                    "EstablishWireGuardCredential: transient DNS/network failure on attempt {Attempt}/{Max} for host '{Host}'; retrying after 350ms. {Msg}",
                     attempt, maxAttempts, hostname, e.Message);
                 lastException = e;
                 await Task.Delay(350);
             }
             catch (Exception e)
             {
-                Logger.LogError(e, "NegotiateWireGuardCredential: HTTP/parse failure");
+                Logger.LogError(e, "EstablishWireGuardCredential: HTTP/parse failure");
                 return errorResponse.SetException(e);
             }
         }
         if (lastException is not null)
         {
             Logger.LogInformation(
-                "NegotiateWireGuardCredential: retry succeeded for host '{Host}' after transient failure '{Msg}'",
+                "EstablishWireGuardCredential: retry succeeded for host '{Host}' after transient failure '{Msg}'",
                 hostname, lastException.Message);
         }
 
@@ -382,7 +382,7 @@ public class GRDGateway
 
         errorResponse.SetData(credential);
         Logger.LogInformation(
-            "NegotiateWireGuardCredential: success — clientId={ClientId}, ipv4={IPv4}",
+            "EstablishWireGuardCredential: success — clientId={ClientId}, ipv4={IPv4}",
             credential.ClientId, credential.IPv4Address);
         return errorResponse;
     }

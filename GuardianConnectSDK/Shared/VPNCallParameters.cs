@@ -2,6 +2,9 @@ namespace GuardianConnect.Shared;
 
 public class VPNCallParameters
 {
+    public GRDTransportProtocol.TransportProtocol Transport { get; set; } =
+        GRDTransportProtocol.TransportProtocol.TransportWireGuard;
+
     public string EapuserName { get; set; } = string.Empty;
     public string Eappassword { get; set; } = string.Empty;
     public string VpnHostName { get; set; } = string.Empty;

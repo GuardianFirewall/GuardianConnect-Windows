@@ -115,7 +115,7 @@ jobs:
     - name: Set up Go (for curve25519.dll build)
       uses: actions/setup-go@v5
       with:
-        go-version: '1.25'
+        go-version: '1.26.4'
 
     - name: Cache llvm-mingw cross-toolchain
       id: cache-llvm-mingw

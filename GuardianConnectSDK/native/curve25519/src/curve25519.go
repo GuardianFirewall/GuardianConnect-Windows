@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: BSD-3-Clause
 //
-// Curve25519 keypair generation for the WireGuard credential negotiation
+// Curve25519 keypair generation for the WireGuard credential key-exchange
 // path. Compiled with `go build -buildmode=c-shared` to produce a
 // stand-alone curve25519.dll that exports two C-ABI entry points matching
 // the WireGuardKit framework's iOS/macOS API:

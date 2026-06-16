@@ -56,12 +56,6 @@ public class GRDServerManager
     private static int Active;
     private static int Standby => Active ^ 1;
 
-    // Minimum fraction of the active concrete-region count a refreshed cache must
-    // retain to be promoted by the swap gate. 0.8 tolerates a deliberate backend
-    // removal of up to ~20% of regions while rejecting a collapse from a failed /
-    // empty refresh. Tune up toward 0.9 for stricter, down for more tolerant.
-    private const double RegionRetentionThreshold = 0.8;
-
     private static readonly Dictionary<int, GRDRegionCache> _geoInfoCaches = new()
     {
         { 0, new GRDRegionCache() },
@@ -110,19 +104,13 @@ public class GRDServerManager
                 Logger.LogInformation("GRDServerManager.LongRunningRefreshTask: RefreshDataAsync completed. ");
                 var changed = _geoInfoCaches[Standby].Checksum() != _geoInfoCaches[Active].Checksum();
 
-                // Swap gate: promote the freshly-refreshed cache only if it has
-                // changes AND isn't a collapse. Never swap in a cache with zero
-                // concrete (non-"Automatic") regions, or one that lost more than
-                // (1 - RegionRetentionThreshold) of the active region set. A
-                // deliberate backend removal of a region or two passes; a refresh
-                // that came back empty/degenerate (e.g. a masked failed call) does
-                // not — that clobber is what wiped 'us-east' out of Live.
-                var standbyConcrete = _geoInfoCaches[Standby].regionLookup.Count(kv => kv.Key != "Automatic");
-                var activeConcrete = _geoInfoCaches[Active].regionLookup.Count(kv => kv.Key != "Automatic");
-                var isCollapse = standbyConcrete == 0
-                                 || (activeConcrete > 0 && standbyConcrete < activeConcrete * RegionRetentionThreshold);
-
-                if (changed && !isCollapse)
+                // Swap gate: promote the freshly-refreshed cache whenever it
+                // differs from the active one. We intentionally do NOT gate on
+                // region count — a valid 200 OK that returns an empty region list
+                // is still promoted, so the empty result surfaces to the caller as
+                // a visible symptom of a server-side fault rather than being masked
+                // by retaining stale regions.
+                if (changed)
                 {
                     Logger.LogInformation(
                         "GRDServerManager.LongRunningRefreshTask: The latest refresh has changes. Toggling ACTIVE to point LIVE to newest data.");
@@ -131,11 +119,6 @@ public class GRDServerManager
                     SetActiveToLatest();
                     Logger.LogInformation(
                         $"Active Switched (to index {Active}): Latest (now on index {Standby}): {Alternate.Checksum()}, Active: {Live.Checksum()}");
-                }
-                else if (changed)
-                {
-                    Logger.LogWarning(
-                        $"GRDServerManager.LongRunningRefreshTask: NOT promoting refreshed cache — concrete regions {standbyConcrete} vs active {activeConcrete} (zero, or below {RegionRetentionThreshold:P0} retention). Keeping current active cache.");
                 }
 
                 InitialGeoInformationLoadComplete.Set();
@@ -256,29 +239,6 @@ public class GRDServerManager
     }
 
     /// <summary>
-    /// Returns the list of hosts for a given region. Used by the Windows
-    /// client's Developer-tab tree to populate a region's expandable host
-    /// list. If the host cache for this region is empty, triggers
-    /// GetHostsForRegion to fetch (blocks up to ~5s). If the region key
-    /// isn't in our region lookup at all, returns an empty list rather
-    /// than throwing.
-    /// </summary>
-    public static async Task<List<RegionalHostRecord>> EnumerateHostsForRegion(string regionKey)
-    {
-        if (string.IsNullOrWhiteSpace(regionKey)) return new List<RegionalHostRecord>();
-        if (!Live.regionLookup.ContainsKey(regionKey)) return new List<RegionalHostRecord>();
-
-        if (!Live._hostLookup.ContainsKey(regionKey) || Live._hostLookup[regionKey].Count == 0)
-        {
-            await GetHostsForRegion(regionKey).ConfigureAwait(false);
-        }
-
-        return Live._hostLookup.TryGetValue(regionKey, out var hosts)
-            ? hosts.ToList()
-            : new List<RegionalHostRecord>();
-    }
-
-    /// <summary>
     /// Looks up the region key (internal name) that owns the given hostname
     /// by scanning loaded host caches. Returns null if not found —
     /// typically means the host's region's host list hasn't been loaded
@@ -299,7 +259,7 @@ public class GRDServerManager
     /// <summary>
     /// Returns the cached RegionalHostRecord for the given hostname, or
     /// null if not found across any loaded region's host list. Used by
-    /// the WireGuard negotiate flow to pull DisplayName for an
+    /// the WireGuard key-exchange flow to pull DisplayName for an
     /// override host.
     /// </summary>
     public static RegionalHostRecord? FindHostRecord(string hostname)
@@ -580,17 +540,6 @@ public class GRDServerManager
         RegionHostsRetrievalWaiter.Set();
     }
 
-    /// <summary>
-    /// GET <c>/api/v1.1/servers/all-hostnames</c> — full flat list of every
-    /// host record across every region, in one round-trip. Used by the
-    /// developer-window host-picker so the user can scan all hosts (with
-    /// their <c>offline</c> flag) without expanding region-by-region. Does
-    /// not cache; caller owns the lifetime of the returned list.
-    ///
-    /// Returns an empty list on any HTTP / parse / network failure rather
-    /// than throwing — the dev window's failure mode is "empty list, try
-    /// again" rather than crashing the dialog.
-    /// </summary>
     public static async Task<List<RegionalHostRecord>> GetAllHostnamesAsync()
     {
         var url = $"https://{Common.DefaultConnectAPIHostname}/api/v1.1/servers/all-hostnames";

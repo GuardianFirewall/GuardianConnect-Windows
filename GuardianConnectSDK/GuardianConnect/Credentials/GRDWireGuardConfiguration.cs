@@ -6,19 +6,6 @@ using Microsoft.Extensions.Logging.Abstractions;
 
 namespace GuardianConnect.Credentials;
 
-/// <summary>
-/// Builds a wg-quick text config from a negotiated <see cref="GRDCredential"/>.
-/// Mirrors <c>GRDWireGuardConfiguration.wireguardQuickConfigForCredential</c>
-/// in the iOS/macOS SDK (Classes/Credentials/GRDWireGuardConfiguration.m)
-/// line-for-line — same field order, same default DNS, same hardcoded
-/// endpoint port (51821), same AllowedIPs (0.0.0.0/0, ::/0).
-///
-/// One intentional difference from macOS: when <c>IPv6Address</c> is
-/// populated on the credential, it is included in the [Interface] Address
-/// line. macOS drops it (line 31 of the Objective-C version uses
-/// IPv4Address only); Windows handles dual-stack fine and there's no
-/// reason to suppress it.
-/// </summary>
 public static class GRDWireGuardConfiguration
 {
     private const int WireGuardEndpointPort = 51821;

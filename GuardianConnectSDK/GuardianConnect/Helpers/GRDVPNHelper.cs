@@ -203,7 +203,7 @@ public class GRDVPNHelper
         {
             // ClientId is populated symmetrically by GRDCredential.CreateFromDeviceResponse
             // for both protocols: IKEv2 copies the EAP user into ClientId; WG sets it from
-            // the server's negotiate response. No protocol-discriminated branch needed.
+            // the server's key-exchange response. No protocol-discriminated branch needed.
             var clientId = mainCreds.ClientId;
             (var subCreds, errorResponse) = await GetValidSubscriberCredentialWithCompletion();
             if (subCreds == null || errorResponse.Message.Equals(Common.kPETOKENNOTSET))
@@ -281,7 +281,7 @@ public class GRDVPNHelper
     ///       (<see cref="StartIKEv2Connection"/> or
     ///       <see cref="StartWireGuardFromStoredCreds"/>).</item>
     /// <item>No stored creds for this protocol (or host-override mismatch) →
-    ///       go through the "negotiate then start" path
+    ///       go through the "exchange keys then start" path
     ///       (<see cref="ConnectVpnWithNewUserCredentialsForProtocol"/> for both
     ///       protocols).</item>
     /// </list>
@@ -314,21 +314,21 @@ public class GRDVPNHelper
         // MainCredential's HostName differs from kGuardianPreferredHost, the
         // user picked a different host since the last connect and the saved
         // cred is stale. Clear so the dispatch below routes to a fresh
-        // negotiate. RegionPicker only resets on region change, so same-
+        // key-exchange. RegionPicker only resets on region change, so same-
         // region / different-host picks (vienna10 → vienna7 → vienna4) would
         // otherwise reuse the stale cred and connect to the PREVIOUS host.
         var existing = GRDCredentialManager.GetMainCredentials();
         if (existing is not null && HostOverrideMismatchAgainst(existing))
         {
             _logger.LogInformation(
-                "ConnectVpnWithConfiguredCredentials: host override mismatches stored MainCredential.HostName '{Stored}'; clearing for fresh negotiate",
+                "ConnectVpnWithConfiguredCredentials: host override mismatches stored MainCredential.HostName '{Stored}'; clearing for fresh key-exchange",
                 existing.HostName);
             GRDCredentialManager.ClearMainCredentials();
         }
 
         // No valid stored creds for this protocol? Route to the single,
-        // protocol-parameterized negotiate path for BOTH protocols. It
-        // negotiates a fresh credential, persists it as the main credential,
+        // protocol-parameterized key-exchange path for BOTH protocols. It
+        // establishes a fresh credential, persists it as the main credential,
         // then re-enters this method, which dials via the stored-creds path
         // below. (WireGuard previously had its own negotiate-and-dial method,
         // NegotiateAndStartWireGuard, that duplicated host-pick and tunnel
@@ -387,7 +387,7 @@ public class GRDVPNHelper
     /// <summary>
     /// True when HKCU\Software\GuardianFirewall\Settings\kGuardianUseFileBasedWireGuardConfig
     /// is "true" — i.e., the user has opted into supplying their own wg-quick file
-    /// rather than letting the SDK negotiate one with the backend. Inverse default.
+    /// rather than letting the SDK establish one with the backend. Inverse default.
     /// </summary>
     private static bool IsFileBasedWireGuardEnabled() =>
         string.Equals(
@@ -471,7 +471,7 @@ public class GRDVPNHelper
     {
         var errorResponse = new ErrorResponse();
 
-        // Host pick: same precedence as the WireGuard negotiate path.
+        // Host pick: same precedence as the WireGuard key-exchange path.
         // 1) explicit kGuardianPreferredHost override from the Developer
         //    tab's host tree (cache hit → use record; cache miss → use
         //    the hostname verbatim so a swapped Live._hostLookup doesn't
@@ -502,7 +502,7 @@ public class GRDVPNHelper
             }
             else
             {
-                // See NegotiateAndStartWireGuard for context —
+                // See ExchangePublicKeysAndStartWireGuard for context —
                 // a SwapActiveGeoInfoCache in LongRunningRefreshTask can
                 // wipe the on-demand _hostLookup between Developer-tab
                 // selection and connect. The user's selection wins
@@ -586,7 +586,8 @@ public class GRDVPNHelper
         // Make IPC call to GuardianWindowsService to start the connection
         var vpnValues = new VPNCallParameters
         {
-            VpnHostName = mainCredential.HostName,
+            Transport = GRDTransportProtocol.TransportProtocol.TransportIKEv2,
+            VpnHostName = mainCredential!.HostName,
             VpnHostDisplay = mainCredential.HostnameDisplayValue,
             EapuserName = device.EapUsername ?? string.Empty,
             Eappassword = device.EapPassword ?? string.Empty,
@@ -624,7 +625,7 @@ public class GRDVPNHelper
     /// dispatcher in <see cref="ConnectVpnWithConfiguredCredentials"/> when
     /// <see cref="ActiveConnectionPossible(GRDTransportProtocol.TransportProtocol)"/>
     /// returns true for WireGuard — i.e., we have a valid cached cred and don't
-    /// need to renegotiate keys.
+    /// need to exchange keys.
     /// </summary>
     private async Task<ErrorResponse> StartWireGuardFromStoredCreds()
     {
@@ -652,6 +653,7 @@ public class GRDVPNHelper
 
         var vpnValues = new VPNCallParameters
         {
+            Transport            = GRDTransportProtocol.TransportProtocol.TransportWireGuard,
             EntryName            = $"Guardian WireGuard - {cred.HostnameDisplayValue}",
             WireGuardConfigText  = configText,
             VpnHostName          = cred.HostName,
@@ -678,17 +680,15 @@ public class GRDVPNHelper
         return errorResponse;
     }
 
-
     private async Task<ErrorResponse> StartWireGuardConnection(string configPath)
     {
         var errorResponse = new ErrorResponse();
         _logger.LogInformation($"StartWireGuardConnection: configPath='{configPath}'");
 
-        // Dispatcher selects the WireGuard transport implicitly when the request
-        // carries a WireGuardConfigPath. EAP/IKEv2 fields stay empty — they're
-        // irrelevant on this code path.
+        // EAP/IKEv2 fields stay empty — they're irrelevant on this code path.
         var vpnValues = new VPNCallParameters
         {
+            Transport = GRDTransportProtocol.TransportProtocol.TransportWireGuard,
             EntryName = "Guardian FirewallWireGuard",
             WireGuardConfigPath = configPath,
         };
