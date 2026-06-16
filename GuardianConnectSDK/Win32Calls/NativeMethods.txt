@@ -38,6 +38,7 @@ RASFP_Ppp
 RASDT_Vpn
 RASET_Vpn
 ET_Optional
+ET_RequireMax
 VS_Ikev2Only
 RASEO2_DontNegotiateMultilink
 RASEO2_ReconnectIfDropped

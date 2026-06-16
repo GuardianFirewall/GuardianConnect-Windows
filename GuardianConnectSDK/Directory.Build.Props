@@ -8,13 +8,13 @@
         <Authors>DNSFilter, Inc.</Authors>
         <RepositoryUrl>https://github.com/GuardianFirewall/GuardianConnect-Windows</RepositoryUrl>
 
-        <AssemblyVersion>0.46.2</AssemblyVersion>
-        <FileVersion>0.46.2</FileVersion>
-        <Version>0.46.2</Version>
+        <AssemblyVersion>0.46.3</AssemblyVersion>
+        <FileVersion>0.46.3</FileVersion>
+        <Version>0.46.3</Version>
         <!-- Set this for prerelease builds (e.g., "alpha.1", "beta.1", "rc.1"); remove or leave empty for stable releases.
-             "wg-alpha.N" labels SDK packages emitted from the WireGuard transport-negotiate-consolidation branch
-             so they can't be confused with the released 0.46.2 packages off main. -->
-        <VersionSuffix>wg-alpha.43</VersionSuffix>
+             alpha.N labels the consolidation-and-cleanup line: the WireGuard negotiate-consolidation work
+             plus the IKEv2 encryption-hardening (AES-256-GCM/SHA-384/ECP-384) suite, merged on top of 0.46.2. -->
+        <VersionSuffix>alpha.1</VersionSuffix>
     </PropertyGroup>
 
     <PropertyGroup>
