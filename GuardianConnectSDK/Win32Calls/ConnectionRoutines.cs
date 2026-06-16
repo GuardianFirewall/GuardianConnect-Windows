@@ -218,10 +218,222 @@ public static class ConnectionRoutines
             return new ErrorResponse("Call to WritePrivateProfileString returned false", null, true, null, error);
         }
 
+        // EAP-MSCHAPv2 user data (iOS parity). See ConfigureEapMschapV2UserData.
+        // Non-fatal in the prototype: if it fails we log and continue so we can
+        // compare a dial WITH vs WITHOUT the EAP user-data blob.
+        var eapResp = ConfigureEapMschapV2UserData(entryName, userName, password, phonebookPath);
+        if (eapResp.IsError)
+            Logger.LogWarning(
+                $"CreateOrUpdateEntry: ConfigureEapMschapV2UserData failed (continuing): {eapResp.Message}");
+
         ActiveConnectionEntryName = entryName;
         ActiveConnectionCredentials = credentials;
         return new ErrorResponse("Success", null, false, null, 0);
     }
+
+    /// <summary>
+    /// PROTOTYPE — iOS parity for the IKEv2 EAP user-auth phase.
+    ///
+    /// iOS (<c>GRDVPNHelper._prepareIKEv2ParametersForServer</c>) sets
+    /// <c>useExtendedAuthentication = YES</c> with <c>username</c> +
+    /// <c>passwordReference</c>: the gateway authenticates with its (LetsEncrypt)
+    /// certificate — validated via <c>serverCertificateCommonName = hostname</c> —
+    /// and the USER authenticates with EAP-MSCHAPv2.
+    ///
+    /// On Windows the gateway-certificate validation is already automatic: the
+    /// IKEv2 client validates the server cert against the dialed hostname
+    /// (<c>szLocalPhoneNumber</c>) and the machine Trusted Root store (which carries
+    /// the LetsEncrypt ISRG root), so there is no Windows knob to mirror
+    /// <c>serverCertificateCommonName</c> — it happens by virtue of dialing by name.
+    ///
+    /// What was MISSING is the EAP user-auth half. The entry sets
+    /// <c>RASEO_RequireEAP</c> + <c>dwCustomAuthKey = 26</c> (EAP-MSCHAPv2), but the
+    /// credentials were only supplied the legacy way (<c>RasSetCredentials</c> /
+    /// <c>RASDIALPARAMS</c>). Under EAP, the EAPHost MSCHAPv2 peer reads its
+    /// credentials from the per-entry EAP user-data blob; with none set, a
+    /// non-interactive SYSTEM-service dial has no way to answer the EAP challenge
+    /// and the auth fails in a way that looks like an MSCHAPv2/server problem.
+    ///
+    /// This asks EAPHost to materialise the EAP user-identity blob for the entry's
+    /// configured EAP type (26) NON-INTERACTIVELY — seeded from the credentials we
+    /// just stored via RasSetCredentials — and writes it back with
+    /// <c>RasSetEapUserData</c>, which is the EAP analog of iOS handing
+    /// username/passwordReference to NEVPNProtocolIKEv2.
+    ///
+    /// NOTE: untested against a live gateway — validate end-to-end with a real dial
+    /// and confirm a Quick-Mode SA via <c>Get-NetIPsecQuickModeSA</c>. The exact
+    /// non-interactive flag / blob round-trip is the part to verify.
+    /// </summary>
+    private static unsafe ErrorResponse ConfigureEapMschapV2UserData(
+        string entryName, string userName, string password, string phonebookPath)
+    {
+        // RASEAPF_NonInteractive (0x2): never raise UI — required in a service.
+        const uint RASEAPF_NonInteractive = 0x00000002;
+
+        RASEAPUSERIDENTITYW* pIdentity = null;
+        var rc = PInvoke.RasGetEapUserIdentity(
+            phonebookPath, entryName, RASEAPF_NonInteractive, default, out pIdentity);
+        if (rc != 0 || pIdentity is null)
+        {
+            // EAPHost wouldn't synthesize the identity blob without UI. Fall back to
+            // installing an explicit EAP-MSCHAPv2 *configuration* on the entry so the
+            // method is fully described and the dial can proceed from stored creds.
+            Logger.LogWarning(
+                "ConfigureEapMschapV2UserData: RasGetEapUserIdentity failed (0x{Rc:X8}); falling back to XML EAP config.",
+                rc);
+            return ConfigureEapViaXmlConfig(entryName, phonebookPath);
+        }
+
+        try
+        {
+            // pbEapInfo/dwSizeofEapInfo is the opaque EAP-method blob EAPHost built
+            // for EAP type 26 using the entry's stored credentials. Hand it straight
+            // back as this entry's EAP user data so RasDial can answer the challenge
+            // without a UI prompt.
+            if (pIdentity->dwSizeofEapInfo == 0)
+            {
+                return new ErrorResponse(
+                    "RasGetEapUserIdentity returned an empty EAP blob", null, true, null, 0);
+            }
+
+            // hToken = null: apply to the entry (per-machine phonebook), not a
+            // specific logon token. Arg 4 is the first byte of the inline blob;
+            // dwSizeofEapInfo bounds it.
+            rc = PInvoke.RasSetEapUserData(
+                null, phonebookPath, entryName,
+                in pIdentity->pbEapInfo[0], pIdentity->dwSizeofEapInfo);
+            if (rc != 0)
+            {
+                return new ErrorResponse(
+                    $"RasSetEapUserData failed (0x{rc:X8})", null, true, null, rc);
+            }
+        }
+        finally
+        {
+            PInvoke.RasFreeEapUserIdentity(pIdentity);
+        }
+
+        Logger.LogInformation(
+            "ConfigureEapMschapV2UserData: EAP-MSCHAPv2 user data set for entry '{Entry}' (user '{User}')",
+            entryName, userName);
+        return new ErrorResponse();
+    }
+
+    // eappcfg.dll EAPHost config APIs — converting an EapHostConfig XML document to
+    // the binary config blob that RAS stores. Declared by hand (not CsWin32) because
+    // the XML node is a live MSXML COM object we marshal as IUnknown.
+    [DllImport("eappcfg.dll", CharSet = CharSet.Unicode)]
+    private static extern uint EapHostPeerConfigXml2Blob(
+        uint dwFlags, IntPtr pConfigDoc, out uint pdwSizeOfConfigOut, out IntPtr ppConfigOut, out IntPtr ppEapError);
+
+    [DllImport("eappcfg.dll")]
+    private static extern void EapHostPeerFreeMemory(IntPtr pData);
+
+    [DllImport("eappcfg.dll")]
+    private static extern void EapHostPeerFreeErrorMemory(IntPtr pEapError);
+
+    /// <summary>
+    /// PROTOTYPE FALLBACK for <see cref="ConfigureEapMschapV2UserData"/>.
+    ///
+    /// When EAPHost won't synthesize the user-identity blob non-interactively, install
+    /// an explicit EAP-MSCHAPv2 (<c>&lt;Type&gt;26&lt;/Type&gt;</c>) configuration on the
+    /// entry instead. We build the standard <c>EapHostConfig</c> XML, convert it to the
+    /// binary config blob with <c>EapHostPeerConfigXml2Blob</c>, and store it with
+    /// <c>RasSetCustomAuthData</c> — the same blob <c>Set-VpnConnection -EapConfigXmlStream</c>
+    /// writes. With the method fully described, RasDial can answer EAP-MSCHAPv2 from the
+    /// credentials stored via RasSetCredentials, no UI prompt.
+    ///
+    /// Note: EAP-MSCHAPv2's own config surface is minimal (no cert-validation knobs — that
+    /// is PEAP). The IKEv2 gateway-cert validation that mirrors iOS's
+    /// <c>serverCertificateCommonName</c> is handled at the IKEv2 layer (dialed hostname +
+    /// machine Trusted Root store), not here.
+    ///
+    /// UNTESTED. Verify the eappcfg.dll export name/host and the MSXML marshaling on a real
+    /// machine; confirm a successful dial + Quick-Mode SA.
+    /// </summary>
+    private static unsafe ErrorResponse ConfigureEapViaXmlConfig(string entryName, string phonebookPath)
+    {
+        var xml = BuildEapMschapV2ConfigXml();
+
+        // Load the XML into an MSXML DOM (late-bound COM) and hand its IUnknown to
+        // EapHostPeerConfigXml2Blob, which QIs it for IXMLDOMNode.
+        object? domDoc = null;
+        IntPtr pUnk = IntPtr.Zero, pBlob = IntPtr.Zero, pErr = IntPtr.Zero;
+        try
+        {
+            var domType = Type.GetTypeFromProgID("MSXML2.DOMDocument.6.0");
+            if (domType is null)
+                return new ErrorResponse("MSXML2.DOMDocument.6.0 not available", null, true, null, 0);
+
+            domDoc = Activator.CreateInstance(domType);
+            if ((bool)domType.InvokeMember("loadXML",
+                    System.Reflection.BindingFlags.InvokeMethod, null, domDoc, new object[] { xml })! == false)
+                return new ErrorResponse("MSXML failed to parse the EAP config XML", null, true, null, 0);
+
+            pUnk = Marshal.GetIUnknownForObject(domDoc);
+
+            var rc = EapHostPeerConfigXml2Blob(0, pUnk, out var blobSize, out pBlob, out pErr);
+            if (rc != 0 || pBlob == IntPtr.Zero || blobSize == 0)
+                return new ErrorResponse($"EapHostPeerConfigXml2Blob failed (0x{rc:X8})", null, true, null, rc);
+
+            var blob = new byte[blobSize];
+            Marshal.Copy(pBlob, blob, 0, (int)blobSize);
+
+            // RasSetCustomAuthData(pszPhonebook, pszEntry, pbCustomAuthData, dwSizeofCustomAuthData).
+            // This CsWin32 overload is the raw form: PCWSTR strings + byte* blob.
+            uint setRc;
+            fixed (char* pPb = phonebookPath)
+            fixed (char* pEntry = entryName)
+            fixed (byte* pBlobBytes = blob)
+            {
+                setRc = PInvoke.RasSetCustomAuthData(
+                    new PCWSTR(pPb), new PCWSTR(pEntry), pBlobBytes, blobSize);
+            }
+            if (setRc != 0)
+                return new ErrorResponse($"RasSetCustomAuthData failed (0x{setRc:X8})", null, true, null, setRc);
+
+            Logger.LogInformation(
+                "ConfigureEapViaXmlConfig: installed EAP-MSCHAPv2 XML config ({Size} bytes) on entry '{Entry}'",
+                blobSize, entryName);
+            return new ErrorResponse();
+        }
+        catch (Exception ex)
+        {
+            return new ErrorResponse($"ConfigureEapViaXmlConfig threw: {ex.Message}", null, true, null, 0);
+        }
+        finally
+        {
+            if (pErr != IntPtr.Zero) EapHostPeerFreeErrorMemory(pErr);
+            if (pBlob != IntPtr.Zero) EapHostPeerFreeMemory(pBlob);
+            if (pUnk != IntPtr.Zero) Marshal.Release(pUnk);
+            if (domDoc is not null) Marshal.FinalReleaseComObject(domDoc);
+        }
+    }
+
+    /// <summary>
+    /// EapHostConfig XML for EAP-MSCHAPv2 (EAP type 26). This is the minimal valid
+    /// document EAPHost accepts for the method; MSCHAPv2 carries only
+    /// UseWinLogonCredentials (false — we supply our own creds via RasSetCredentials).
+    /// </summary>
+    private static string BuildEapMschapV2ConfigXml() =>
+        """
+        <EapHostConfig xmlns="http://www.microsoft.com/provisioning/EapHostConfig">
+          <EapMethod>
+            <Type xmlns="http://www.microsoft.com/provisioning/EapCommon">26</Type>
+            <VendorId xmlns="http://www.microsoft.com/provisioning/EapCommon">0</VendorId>
+            <VendorType xmlns="http://www.microsoft.com/provisioning/EapCommon">0</VendorType>
+            <AuthorId xmlns="http://www.microsoft.com/provisioning/EapCommon">0</AuthorId>
+          </EapMethod>
+          <Config xmlns="http://www.microsoft.com/provisioning/EapHostConfig">
+            <Eap xmlns="http://www.microsoft.com/provisioning/BaseEapConnectionPropertiesV1">
+              <Type>26</Type>
+              <EapType xmlns="http://www.microsoft.com/provisioning/MsChapV2ConnectionPropertiesV1">
+                <UseWinLogonCredentials>false</UseWinLogonCredentials>
+              </EapType>
+            </Eap>
+          </Config>
+        </EapHostConfig>
+        """;
 
     public static unsafe ErrorResponse ConnectEntry()
     {
