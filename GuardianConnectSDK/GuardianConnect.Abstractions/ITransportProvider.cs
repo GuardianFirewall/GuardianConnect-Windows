@@ -4,7 +4,13 @@ namespace GuardianConnect.Abstractions;
 
 public interface ITransportProvider
 {
-    public TransportProtocol ProtocolType { get; }
+    // TransportProtocol enum moved to GRDTransportProtocol.cs (still in
+    // this Abstractions assembly) as part of the consolidation that put
+    // the registry Get/Set helpers and the enum into one canonical
+    // location. Property type below is now
+    // GRDTransportProtocol.TransportProtocol; on-disk ordinal values are
+    // unchanged so credential serialization stays wire-compatible.
+    public GRDTransportProtocol.TransportProtocol ProtocolType { get; }
     public VPNProviderStatus VPNStatus { get; }
     public VPNConnectionError LastVPNError { get; }
 
@@ -18,13 +24,6 @@ public interface ITransportProvider
     public static bool IsConnected { get; private set; }
 
     #region CommonEnumerations
-
-    public enum TransportProtocol
-    {
-        TransportUnknown,
-        TransportIKEv2,
-        TransportWireGuard
-    }
 
     public enum VPNProviderStatus
     {

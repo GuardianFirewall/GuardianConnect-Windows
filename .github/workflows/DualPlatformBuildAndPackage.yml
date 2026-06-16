@@ -98,7 +98,52 @@ jobs:
       
     - name: Build GuardianConnectSDK.Services.Abstractions for any CPU
       run: msbuild /t:restore /t:Build /p:Configuration=Release GuardianConnect.Abstractions\GuardianConnect.Abstractions.csproj
-      
+
+    ##############################################################################
+    # curve25519.dll — built from Go source on every SDK CI run for proper
+    # provenance. The .nuspec at the SDK root expects the DLLs at
+    #   native/curve25519/win-x64/curve25519.dll
+    #   native/curve25519/win-arm64/curve25519.dll
+    # so this step must run BEFORE the SignPath zip step (which packs per
+    # ListOfGuardianConnectSDKFilesToSign.fls) and the nuget pack steps further
+    # down. Source is `native/curve25519/src/curve25519.go` (Go's BSD-3-Clause
+    # crypto/ecdh.X25519 wrapped with cgo //export). build.cmd handles both
+    # arches; we feed it the runner's Go (PATH-resolved) and llvm-mingw via
+    # GO_EXE and LLVM_MINGW_BIN env vars.
+    ##############################################################################
+
+    - name: Set up Go (for curve25519.dll build)
+      uses: actions/setup-go@v5
+      with:
+        go-version: '1.26.4'
+
+    - name: Cache llvm-mingw cross-toolchain
+      id: cache-llvm-mingw
+      uses: actions/cache@v4
+      with:
+        path: C:\llvm-mingw
+        key: llvm-mingw-20250709-ucrt-x86_64
+
+    - name: Download llvm-mingw (only if cache miss)
+      if: steps.cache-llvm-mingw.outputs.cache-hit != 'true'
+      shell: pwsh
+      run: |
+        $url = 'https://github.com/mstorsjo/llvm-mingw/releases/download/20250709/llvm-mingw-20250709-ucrt-x86_64.zip'
+        $dl = "$env:RUNNER_TEMP\llvm-mingw.zip"
+        $ProgressPreference = 'SilentlyContinue'
+        Write-Host "Downloading llvm-mingw..."
+        Invoke-WebRequest -Uri $url -OutFile $dl -UseBasicParsing
+        Write-Host "Downloaded $((Get-Item $dl).Length / 1MB) MB; extracting..."
+        if (Test-Path C:\llvm-mingw) { Remove-Item C:\llvm-mingw -Recurse -Force }
+        Expand-Archive -Path $dl -DestinationPath C:\llvm-mingw -Force
+
+    - name: Build curve25519.dll (x64 + arm64) from Go source
+      shell: cmd
+      run: |
+        for /d %%D in (C:\llvm-mingw\llvm-mingw-*) do set "LLVM_MINGW_BIN=%%D\bin"
+        set "GO_EXE=go"
+        call native\curve25519\build.cmd
+
 ####    - name: Build GuardianFirewall Service for x64 CPU
 ####      run: |
 ####            msbuild /t:restore /t:Build /p:Configuration=Release /p:Platform=x64 /p:WarningLevel=0 /p:RuntimeIdentifier=win-x64 GuardianFirewallService\GuardianFirewallService.csproj

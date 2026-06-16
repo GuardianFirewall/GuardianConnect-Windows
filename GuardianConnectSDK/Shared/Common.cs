@@ -69,6 +69,26 @@ public class Common
     public const string kGRDRefreshProxySettings = "kGRDRefreshProxySettings";
     public const string kGRDTunnelEnabled = "kGRDTunnelEnabled";
     public const string kGuardianTransportProtocol = "kGuardianTransportProtocol";
+    public const string kGuardianWireGuardConfigPath = "kGuardianWireGuardConfigPath";
+
+    /// <summary>
+    /// HKCU user setting. "true" means the app uses a wg-quick config file
+    /// the user picked locally (developer override). "false" or absent
+    /// (default) means the app key-exchanges the WireGuard config with the
+    /// backend on every connect, matching the iOS/macOS SDK pattern.
+    /// </summary>
+    public const string kGuardianUseFileBasedWireGuardConfig = "kGuardianUseFileBasedWireGuardConfig";
+
+    /// <summary>
+    /// HKCU user setting holding a specific server hostname the user picked
+    /// via the Developer tab's host tree. Non-empty means "use this exact
+    /// host for the next WG connect; ignore the usual SelectBestHostInRegion
+    /// pick". GRDVPNHelper.StartWireGuardConnectionWithKeyExchange reads
+    /// this; if the host exists in the cache it's used verbatim and
+    /// PreferredRegion is updated to match. Empty / absent = default
+    /// behaviour (region-based auto-pick).
+    /// </summary>
+    public const string kGuardianPreferredHost = "kGuardianPreferredHost";
 
     public const string kGRDWGDevicePublicKey = "wg-device-public-key";
     public const string kGRDWGDevicePrivateKey = "wg-device-private-key";
@@ -153,7 +173,7 @@ public class Common
 
     public const string kGRDDeviceFilterConfigBlocklist = "GRDDeviceFilterConfigBlocklist";
 
-    // Note from CJ 2023-03-23
+    // Note from Tech Lead 2023-03-23
     // These are now deprecated, but we may want to use them in the future. They can be deleted at any time
     public const string kGRDDeviceFilterConfigBlockNone = "kGRDDeviceFilterConfigBlockNone";
     public const string kGRDDeviceFilterConfigBlockAds = "kGRDDeviceFilterConfigBlockAds";
@@ -200,6 +220,23 @@ public class Common
     public const string VPNEVT_NAME_CLIENTSIDE = "Global\\GRDRASCONNCLIENTSIGNAL";
 
     public const string VPNEVT_NAME_SVRSIDE = "Global\\GRDRASCONNSERVICESIGNAL";
+
+    // Signaled by KillSwitchService whenever its observable state changes (install,
+    // remove, mode flip, allow-LAN flip). UI subscribes and reads the corresponding
+    // HKLM machine values below — no IPC on the auto-refresh path. Separate from the
+    // VPN-state events so AdvancedContentPage doesn't race GeneralPageViewModel on
+    // Reset.
+    public const string KSEVT_NAME_STATUSCHANGED = "Global\\GRDKILLSWITCHSTATUSCHANGED";
+
+    // HKLM\Software\GuardianFirewall values written by the service alongside the
+    // KSEVT_NAME_STATUSCHANGED signal. UI reads after WaitOne returns. "1"/"0" for
+    // bools, the KillSwitchMode enum name for the mode. (Moved from the historical
+    // HKLM\Software\GuardianVPN location to align with the GuardianFirewall naming
+    // the installer already uses for its Installation subtree — see
+    // RegistrySettings.GRDMachineKeyPath for the migration note.)
+    public const string kKillSwitchActiveRegValue = "KillSwitchIsActive";
+    public const string kKillSwitchModeRegValue   = "KillSwitchActiveMode";
+    public const string kKillSwitchAllowLanRegValue = "KillSwitchActiveAllowLan";
 
     public static JsonSerializerOptions DefaultJsonSerializerOptions = new()
     {

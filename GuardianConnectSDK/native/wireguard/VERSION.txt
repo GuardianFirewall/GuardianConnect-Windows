@@ -1,0 +1,10 @@
+Source:     https://download.wireguard.com/wireguard-nt/
+Version:    1.1
+Downloaded: 2026-05-12
+
+SHA256 (win-x64/wireguard.dll):   B1B85E072C45D81358BE29D94C599DC76652F912BE8C0F0A41E2D5D89A6461D3
+SHA256 (win-arm64/wireguard.dll): 75BCDC025D6C00E8315AF5D62B869D760CA6A253FC82D70F146E789F059A3E0C
+
+Original archive paths:
+  win-x64   <- wireguard-nt-1.1\wireguard-nt\bin\amd64\wireguard.dll
+  win-arm64 <- wireguard-nt-1.1\wireguard-nt\bin\arm64\wireguard.dll

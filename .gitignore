@@ -10,6 +10,7 @@
 /GuardianConnectSDK/x64
 /GuardianConnectSDK/ARM64
 /GuardianConnectSDK/BuildOutput
+/GuardianConnectSDK/**/BuildOutput
 /GuardianConnectSDK/GuardianConnect/BuildOutput
 /GuardianConnectSDK/.vs
 /GuardianConnectSDK/NativeRoutinesLoadTest/obj

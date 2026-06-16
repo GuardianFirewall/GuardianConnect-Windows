@@ -102,7 +102,15 @@ public class GRDServerManager
             {
                 await RefreshDataAsync(); // sub-second - no need to pass cancellation token
                 Logger.LogInformation("GRDServerManager.LongRunningRefreshTask: RefreshDataAsync completed. ");
-                if (_geoInfoCaches[Standby].Checksum() != _geoInfoCaches[Active].Checksum())
+                var changed = _geoInfoCaches[Standby].Checksum() != _geoInfoCaches[Active].Checksum();
+
+                // Swap gate: promote the freshly-refreshed cache whenever it
+                // differs from the active one. We intentionally do NOT gate on
+                // region count — a valid 200 OK that returns an empty region list
+                // is still promoted, so the empty result surfaces to the caller as
+                // a visible symptom of a server-side fault rather than being masked
+                // by retaining stale regions.
+                if (changed)
                 {
                     Logger.LogInformation(
                         "GRDServerManager.LongRunningRefreshTask: The latest refresh has changes. Toggling ACTIVE to point LIVE to newest data.");
@@ -201,7 +209,69 @@ public class GRDServerManager
 
     public static GRDRegion GetGRDRegionByKey(string regionKey)
     {
-        return Live.regionLookup[regionKey];
+        // Resilient lookup — a missing key must NEVER crash the connect flow.
+        // A failed/empty regions refresh (e.g. a transient post-disconnect DNS
+        // hiccup) can leave regionLookup degenerate, and region auto-pick
+        // defaults to "us-east"; an unguarded indexer here threw
+        // KeyNotFoundException out of SelectGuardianHostWithCompletion.
+        if (!string.IsNullOrEmpty(regionKey) && Live.regionLookup.TryGetValue(regionKey, out var region))
+            return region;
+
+        // Try the Standby cache (last-good) for the same key, then any concrete
+        // (non-Automatic) region, then Automatic as a final non-throwing default.
+        if (!string.IsNullOrEmpty(regionKey) && Alternate.regionLookup.TryGetValue(regionKey, out var alt))
+            return alt;
+
+        var fallback = Live.regionLookup.Values.FirstOrDefault(r => r.RegionName != "Automatic")
+                       ?? Alternate.regionLookup.Values.FirstOrDefault(r => r.RegionName != "Automatic");
+        if (fallback != null)
+        {
+            Logger.LogWarning(
+                $"GetGRDRegionByKey: region key '{regionKey}' not found; falling back to '{fallback.RegionName}'.");
+            return fallback;
+        }
+
+        Logger.LogWarning(
+            $"GetGRDRegionByKey: region key '{regionKey}' not found and no concrete regions loaded; returning Automatic.");
+        return Live.regionLookup.TryGetValue("Automatic", out var auto)
+            ? auto
+            : new GRDRegion { RegionName = "Automatic", DisplayName = "Automatic" };
+    }
+
+    /// <summary>
+    /// Looks up the region key (internal name) that owns the given hostname
+    /// by scanning loaded host caches. Returns null if not found —
+    /// typically means the host's region's host list hasn't been loaded
+    /// yet. Caller should consider triggering a load first if it's
+    /// expecting a result.
+    /// </summary>
+    public static string? FindRegionKeyForHostname(string hostname)
+    {
+        if (string.IsNullOrWhiteSpace(hostname)) return null;
+        foreach (var kvp in Live._hostLookup)
+        {
+            if (kvp.Value.Any(h => string.Equals(h.Hostname, hostname, StringComparison.OrdinalIgnoreCase)))
+                return kvp.Key;
+        }
+        return null;
+    }
+
+    /// <summary>
+    /// Returns the cached RegionalHostRecord for the given hostname, or
+    /// null if not found across any loaded region's host list. Used by
+    /// the WireGuard key-exchange flow to pull DisplayName for an
+    /// override host.
+    /// </summary>
+    public static RegionalHostRecord? FindHostRecord(string hostname)
+    {
+        if (string.IsNullOrWhiteSpace(hostname)) return null;
+        foreach (var hosts in Live._hostLookup.Values)
+        {
+            var match = hosts.FirstOrDefault(h =>
+                string.Equals(h.Hostname, hostname, StringComparison.OrdinalIgnoreCase));
+            if (match != null) return match;
+        }
+        return null;
     }
 
     #endregion
@@ -237,11 +307,24 @@ public class GRDServerManager
         try
         {
             errorResponse = await GRDHousekeepingAPI.RequestServerRegions();
-            var response = errorResponse.HttpResponse;
-            if (response.IsSuccessStatusCode)
+
+            // One-time re-solicit. Branch on IsError / ThrownException — the
+            // authoritative failure signal — NOT on HttpResponse.IsSuccessStatusCode:
+            // a defaulted ErrorResponse carries a 200-OK HttpResponse, which
+            // previously masked a failed call (e.g. a transient post-disconnect DNS
+            // failure) as a successful EMPTY response. The first attempt can fail on
+            // that transient, so retry once before falling back to last-good.
+            if (errorResponse.IsError || errorResponse.ThrownException != null)
             {
-                Logger.LogInformation(
-                    $"RefreshStandbyRegionsLists: Return from RequestServerRegions: Response statusCode = {response.StatusCode}");
+                Logger.LogWarning(
+                    $"RefreshStandbyRegionsLists: regions fetch failed ('{errorResponse.Message}'); re-soliciting once...");
+                await Task.Delay(500);
+                errorResponse = await GRDHousekeepingAPI.RequestServerRegions();
+            }
+
+            if (!errorResponse.IsError && errorResponse.ThrownException == null)
+            {
+                responseCode = (int)errorResponse.HttpResponse.StatusCode;
                 var content = errorResponse.Data?.ToString() ?? string.Empty;
                 if (string.IsNullOrEmpty(content))
                 {
@@ -252,32 +335,44 @@ public class GRDServerManager
                     Logger.LogInformation(
                         "RefreshStandbyRegionsLists: Successfully retrieved latest regions from backend.");
                     Alternate.contentstrings.Add(content);
-                    var jsonOptions = new JsonSerializerOptions
-                    {
-                        AllowOutOfOrderMetadataProperties = true,
-                        AllowTrailingCommas = true,
-                        DefaultIgnoreCondition = JsonIgnoreCondition.Never
-                    };
                     regionsList =
                         JsonSerializer.Deserialize<List<GRDRegion>>(content,
                             GRDRegionJsonContext.Default.ListGRDRegion);
                     Logger.LogInformation(
                         $"RefreshStandbyRegionsLists: Regions Collection loaded with (ACTUAL) {regionsList?.Count} items");
                 }
-
-                responseCode = (int)response.StatusCode;
             }
             else
             {
-                Logger.LogInformation(
-                    $"RefreshStandbyRegionsLists: Response for getting latest regions is {response.StatusCode}");
-                regionsList = GRDRegion.StaticRegions;
+                // Genuine failure after the re-solicit. Leave regionsList empty and
+                // let the carry-forward below preserve the last-good regions rather
+                // than building a degenerate cache.
+                Logger.LogWarning(
+                    $"RefreshStandbyRegionsLists: regions fetch still failing after re-solicit ('{errorResponse.Message}'); will carry forward last-good.");
             }
         }
         catch (Exception ex)
         {
             Logger.LogError(ex,
-                $"RefreshStandbyRegionsLists(): Exception thrown when calling all-server-regions...: {ex.Message}. (STATIC) Using GRDRegion.StaticRegions list data");
+                $"RefreshStandbyRegionsLists(): Exception thrown processing all-server-regions response: {ex.Message}");
+        }
+
+        // If we couldn't fetch real regions (failed call or empty body), don't
+        // build a degenerate Standby cache that a later swap would promote over
+        // good Live data. That clobber is what corrupted region selection after
+        // a post-disconnect DNS hiccup: regionLookup was left with only
+        // "Automatic", so the "us-east" auto-pick threw KeyNotFoundException.
+        // Carry forward the current Live regions as last-good instead.
+        // (GRDRegion.StaticRegions is an empty list, so it is NOT a usable
+        // fallback despite the log messages elsewhere.)
+        if (regionsList == null || regionsList.Count == 0)
+        {
+            var carried = Live.regionLookup.Values
+                .Where(r => r.RegionName != "Automatic")
+                .ToList();
+            Logger.LogWarning(
+                $"RefreshStandbyRegionsLists: no regions fetched; carrying forward {carried.Count} last-good region(s) from the active cache.");
+            regionsList = carried;
         }
 
         // Populate region lookup collections
@@ -332,34 +427,44 @@ public class GRDServerManager
 
         var response = await GRDHousekeepingAPI.RequestLatestTimeZonesForRegions();
 
-        if (response.IsError)
+        if (response.IsError || response.ThrownException != null)
         {
-            Logger.LogError(
-                $"GetLatestTimeZonesForRegions: Error retrieving latest timezones for regions: {response.Response}");
-            geoDataCollection = GeoData.StaticGeoDataCollection;
-        }
-        else
-        {
-            Logger.LogInformation(
-                "GetLatestTimeZonesForRegions: Successfully retrieved latest timezones for regions from backend.");
-            var content = response.Data?.ToString() ?? string.Empty;
-            Alternate.contentstrings.Add(content);
-            geoDataCollection =
-                JsonSerializer.Deserialize<List<GeoData>>(content, GeoDataJsonContext.Default.ListGeoData);
-            Logger.LogInformation(
-                $"GetLatestTimeZonesForRegions: Timezones Collection loaded with (ACTUAL) {geoDataCollection?.Count} items");
+            // Transient failure — do NOT clobber good timezone data with the empty
+            // GeoData.StaticGeoDataCollection (which is what blanked timezonesLookup,
+            // forcing every user to the 'us-east' default). Carry forward the
+            // current Live timezones as last-good and bail.
+            Logger.LogWarning(
+                $"GetLatestTimeZonesForRegions: fetch failed ('{response.Message}'); carrying forward {Live.timezonesLookup.Count} last-good timezone entr(ies).");
+            Alternate.timezonesLookup = new Dictionary<string, List<string>>(Live.timezonesLookup);
+            return;
         }
 
         Logger.LogInformation(
-            $"GetLatestTimeZonesForRegions: now populating timezonesLookup dictionary with {geoDataCollection?.Count} entries...");
-        Alternate.timezonesLookup = new Dictionary<string, List<string>>();
-        foreach (var geoRec in geoDataCollection ?? GeoData.StaticGeoDataCollection)
+            "GetLatestTimeZonesForRegions: Successfully retrieved latest timezones for regions from backend.");
+        var content = response.Data?.ToString() ?? string.Empty;
+        geoDataCollection = string.IsNullOrEmpty(content)
+            ? new List<GeoData>()
+            : JsonSerializer.Deserialize<List<GeoData>>(content, GeoDataJsonContext.Default.ListGeoData)
+              ?? new List<GeoData>();
+
+        if (geoDataCollection.Count == 0)
         {
-            Logger.LogDebug(
-                $"GetLatestTimeZonesForRegions: Adding '{geoRec.KeyName}' with {geoRec.Timezones.Count} timezones");
+            // Empty/unparseable payload — carry forward rather than blanking.
+            Logger.LogWarning(
+                $"GetLatestTimeZonesForRegions: empty/unparseable timezone payload; carrying forward {Live.timezonesLookup.Count} last-good entr(ies).");
+            Alternate.timezonesLookup = new Dictionary<string, List<string>>(Live.timezonesLookup);
+            return;
+        }
+
+        Alternate.contentstrings.Add(content);
+        Logger.LogInformation(
+            $"GetLatestTimeZonesForRegions: Timezones Collection loaded with (ACTUAL) {geoDataCollection.Count} items; populating timezonesLookup...");
+        Alternate.timezonesLookup = new Dictionary<string, List<string>>();
+        foreach (var geoRec in geoDataCollection)
+        {
             if (!Alternate.timezonesLookup.TryAdd(geoRec.KeyName, geoRec.Timezones))
                 Logger.LogWarning(
-                    $"GetLatestTimeZonesForRegions: Could not add timezones for region key '{geoRec.KeyName}");
+                    $"GetLatestTimeZonesForRegions: Could not add timezones for region key '{geoRec.KeyName}'");
         }
     }
 
@@ -433,6 +538,69 @@ public class GRDServerManager
         }
 
         RegionHostsRetrievalWaiter.Set();
+    }
+
+    public static async Task<List<RegionalHostRecord>> GetAllHostnamesAsync()
+    {
+        var url = $"https://{Common.DefaultConnectAPIHostname}/api/v1.1/servers/all-hostnames";
+        var uri = new Uri(url);
+
+        try
+        {
+            Logger.LogInformation("GetAllHostnamesAsync: GET {Url}", url);
+            var response = await (HttpUtils.Client?.GetAsync(uri)
+                                  ?? throw new InvalidOperationException("HttpUtils.Client is null"));
+
+            var body = await response.Content.ReadAsStringAsync();
+            // Log status + body-length so the caller can tell hung-call (no log)
+            // from empty-list (logs 200 + small body) from wrong-path (logs 404)
+            // from wrong-shape (logs 200 + body that fails to parse below).
+            Logger.LogInformation(
+                "GetAllHostnamesAsync: response status={Status}, body length={Len}",
+                (int)response.StatusCode, body?.Length ?? 0);
+
+            if (!response.IsSuccessStatusCode)
+            {
+                // Log first 500 chars of body so error responses (HTML page,
+                // JSON error envelope, etc.) are visible.
+                var snippet = body is null ? "(null)"
+                            : body.Length > 500 ? body[..500] + "…(truncated)"
+                            : body;
+                Logger.LogError(
+                    "GetAllHostnamesAsync: non-success status {Status}. Body: {Body}",
+                    response.StatusCode, snippet);
+                return new List<RegionalHostRecord>();
+            }
+
+            List<RegionalHostRecord>? list;
+            try
+            {
+                list = JsonSerializer.Deserialize<List<RegionalHostRecord>>(
+                    body ?? string.Empty, RegionalHostRecordJsonContext.Default.ListRegionalHostRecord);
+            }
+            catch (Exception parseEx)
+            {
+                // Shape mismatch — log the body's first chunk so the caller can
+                // see whether it's a wrapper object like {"hosts":[...]} vs a
+                // bare array. Surface as failure (empty list).
+                var snippet = body is null ? "(null)"
+                            : body.Length > 500 ? body[..500] + "…(truncated)"
+                            : body;
+                Logger.LogError(parseEx,
+                    "GetAllHostnamesAsync: response parsed as List<RegionalHostRecord> failed. Body: {Body}",
+                    snippet);
+                return new List<RegionalHostRecord>();
+            }
+
+            var count = list?.Count ?? 0;
+            Logger.LogInformation("GetAllHostnamesAsync: parsed {Count} hosts", count);
+            return list ?? new List<RegionalHostRecord>();
+        }
+        catch (Exception ex)
+        {
+            Logger.LogError(ex, "GetAllHostnamesAsync: failed");
+            return new List<RegionalHostRecord>();
+        }
     }
 
     internal static RegionalHostRecord SelectBestHostInRegion(string regionKey)

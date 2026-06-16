@@ -153,6 +153,19 @@ public class ClientPipeService : BackgroundService
 
         var threadId = Thread.CurrentThread.ManagedThreadId;
 
+        // Outer try logs an unhandled escape with a diagnostic-rich message,
+        // then re-throws so the exception propagates out to the ThreadPool's
+        // unhandled-exception handler and Windows Service Recovery restarts
+        // the service. This is the self-healing path. Previous versions
+        // of this catch swallowed the exception silently, which
+        // left the service alive-but-dead with no functional pipe listeners
+        // after a quick stop+start (pipe-bind hit "All pipe instances are
+        // busy" while the OS was still releasing the prior instance's
+        // handles, all listener threads exited cleanly, service stayed up
+        // accepting no clients). Re-throwing restores the self-heal while
+        // keeping the diagnostic log.
+        try
+        {
         while (!_cancellationToken.IsCancellationRequested && !AdministrativeShutdownRequested)
         {
             var pipeSecurity = new PipeSecurity();
@@ -161,10 +174,53 @@ public class ClientPipeService : BackgroundService
                     PipeAccessRights.FullControl,
                     AccessControlType.Allow));
 
-            //NamedPipeServerStream pipeServer = new NamedPipeServerStream("GuardianFirewallService", PipeDirection.InOut, numThreads);
-            var pipeServer = NamedPipeServerStreamAcl.Create("GuardianFirewallService",
-                PipeDirection.InOut, numThreads, PipeTransmissionMode.Byte, PipeOptions.Asynchronous,
-                65536, 65536, pipeSecurity);
+            // Pipe bind with retry. NamedPipeServerStreamAcl.Create can throw
+            // IOException("All pipe instances are busy.") when the service
+            // restarts quickly after a prior instance: the OS has not yet
+            // released the previous service's named-pipe instance count.
+            // 15 seconds is empirically not enough; the failure mode was
+            // observed in test logs.
+            //
+            // Recoverable in-process via backoff. We retry up to N times with
+            // increasing delay before giving up and letting the outer catch
+            // tear the service down for restart. The other listener threads
+            // are competing for the same pipe-instance pool, so a few of them
+            // will succeed earlier and the others later as old instances
+            // release one at a time.
+            NamedPipeServerStream? pipeServer = null;
+            const int maxBindAttempts = 12;
+            var bindAttempt = 0;
+            while (pipeServer is null && !_cancellationToken.IsCancellationRequested && !AdministrativeShutdownRequested)
+            {
+                try
+                {
+                    pipeServer = NamedPipeServerStreamAcl.Create("GuardianFirewallService",
+                        PipeDirection.InOut, numThreads, PipeTransmissionMode.Byte, PipeOptions.Asynchronous,
+                        65536, 65536, pipeSecurity);
+                }
+                catch (IOException ex) when (ex.Message.Contains("All pipe instances are busy", StringComparison.OrdinalIgnoreCase))
+                {
+                    bindAttempt++;
+                    if (bindAttempt >= maxBindAttempts)
+                    {
+                        _logger.Log(LogLevel.Error,
+                            $"ClientPipeService[{threadId}]: pipe bind still failing after {maxBindAttempts} attempts. Giving up — outer catch will tear the service down for Windows Service Recovery restart.");
+                        throw;
+                    }
+                    var delayMs = Math.Min(bindAttempt * 2000, 10000);
+                    _logger.Log(LogLevel.Warning,
+                        $"ClientPipeService[{threadId}]: pipe bind failed (attempt {bindAttempt}/{maxBindAttempts}, prior service handles still releasing). Retrying in {delayMs} ms.");
+                    Thread.Sleep(delayMs);
+                }
+            }
+
+            if (pipeServer is null)
+            {
+                // Cancelled or shutdown during retry — exit the listener loop cleanly.
+                _logger.Log(LogLevel.Information,
+                    $"ClientPipeService[{threadId}]: pipe bind aborted by cancellation/shutdown.");
+                break;
+            }
 
             // Wait for a client to connect
             _logger.Log(LogLevel.Information,
@@ -288,6 +344,33 @@ public class ClientPipeService : BackgroundService
                             _logger.Log(LogLevel.Information, $"ClientPipeService[{threadId}]: Received PowerAndNetworkEvent: Event Type: {systemEventType}");
                             ServicePowerEventsHandler.HandleSystemEventsFromclient(systemEventType, cmdPayload);
                             break;
+                        case IGuardianNPContract.NPCommands.SetKillSwitchMode:
+                            _logger.Log(LogLevel.Information, $"ClientPipeService[{threadId}]: Performing SetKillSwitchMode (payload='{cmdPayload}')");
+                            var ksMode = (KillSwitchMode)int.Parse(cmdPayload);
+                            var ksModeResp = cmdDispatcher.SetKillSwitchMode(ksMode);
+                            ss.WriteString(JsonSerializer.Serialize(ksModeResp, ErrorResponseJsonContext.Default.ErrorResponse));
+                            break;
+                        case IGuardianNPContract.NPCommands.SetKillSwitchAllowLan:
+                            _logger.Log(LogLevel.Information, $"ClientPipeService[{threadId}]: Performing SetKillSwitchAllowLan (payload='{cmdPayload}')");
+                            var ksLan = bool.Parse(cmdPayload);
+                            var ksLanResp = cmdDispatcher.SetKillSwitchAllowLan(ksLan);
+                            ss.WriteString(JsonSerializer.Serialize(ksLanResp, ErrorResponseJsonContext.Default.ErrorResponse));
+                            break;
+                        case IGuardianNPContract.NPCommands.GetKillSwitchStatus:
+                            _logger.Log(LogLevel.Information, $"ClientPipeService[{threadId}]: Performing GetKillSwitchStatus");
+                            var ksStatus = cmdDispatcher.GetKillSwitchStatus();
+                            ss.WriteString(JsonSerializer.Serialize(ksStatus, KillSwitchStatusJsonContext.Default.KillSwitchStatus));
+                            break;
+                        case IGuardianNPContract.NPCommands.EnterConnectingMode:
+                            _logger.Log(LogLevel.Information, $"ClientPipeService[{threadId}]: Performing EnterConnectingMode");
+                            var enterResp = cmdDispatcher.EnterConnectingMode();
+                            ss.WriteString(JsonSerializer.Serialize(enterResp, ErrorResponseJsonContext.Default.ErrorResponse));
+                            break;
+                        case IGuardianNPContract.NPCommands.ExitConnectingMode:
+                            _logger.Log(LogLevel.Information, $"ClientPipeService[{threadId}]: Performing ExitConnectingMode");
+                            var exitResp = cmdDispatcher.ExitConnectingMode();
+                            ss.WriteString(JsonSerializer.Serialize(exitResp, ErrorResponseJsonContext.Default.ErrorResponse));
+                            break;
                         default:
                             _logger.Log(LogLevel.Information, "WHY ARE WE HERE?");
                             break;
@@ -313,5 +396,15 @@ public class ClientPipeService : BackgroundService
         }
 
         _logger.Log(LogLevel.Information, "ClientPipeService.End -- outer While()...");
+        }
+        catch (Exception ex)
+        {
+            _logger.Log(LogLevel.Error, $"ClientPipeService[{threadId}]: ServerThread terminated by unhandled exception: {ex.GetType().Name}: {ex.Message}");
+            // Re-throw: lets the exception escape to the ThreadPool unhandled-exception
+            // handler, which terminates the service. Windows Service Recovery then
+            // restarts us. This restores previous self-heal behavior; the
+            // outer catch is now diagnostic-only, not a swallow.
+            throw;
+        }
     }
 }

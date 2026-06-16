@@ -13,7 +13,10 @@ namespace GuardianConnect.Shared;
  */
 public static class Preferences
 {
-    private const string GRDKeyPath = @"Software\GuardianVPN";
+    // Aligned with RegistrySettings.GRDUserKeyPath — see that comment for
+    // the rationale. Legacy data at Software\GuardianVPN is migrated by
+    // CleanupUtil's BACKUP/RESTORE round-trip during MajorUpgrade.
+    private const string GRDKeyPath = @"Software\GuardianFirewall\Settings";
 
     private static readonly string SettingsPath = "UserPreferences";
     private static bool notLoadedYet = true;

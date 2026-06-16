@@ -109,6 +109,45 @@ public static class ClientPipe
         if (!Instance.IsConnected) Instance.ReopenNamedPipe();
         Instance.SendPowerAndNetworkChangeEvents(systemEventsDict);
     }
+
+    // Kill Switch (i221)
+    public static ErrorResponse SetKillSwitchMode(KillSwitchMode mode)
+    {
+        if (!Instance.IsConnected) Instance.ReopenNamedPipe();
+        return Instance.SetKillSwitchMode(mode);
+    }
+
+    public static ErrorResponse SetKillSwitchAllowLan(bool allow)
+    {
+        if (!Instance.IsConnected) Instance.ReopenNamedPipe();
+        return Instance.SetKillSwitchAllowLan(allow);
+    }
+
+    public static KillSwitchStatus GetKillSwitchStatus()
+    {
+        if (!Instance.IsConnected) Instance.ReopenNamedPipe();
+        return Instance.GetKillSwitchStatus();
+    }
+
+    /// <summary>
+    /// Open the kill-switch connecting-overlay. UI calls this
+    /// before issuing the credential-construction HTTP calls in
+    /// GeneralPageViewModel.ConnectButtonCommand so the construction isn't
+    /// blocked by the DNS-block + block-all when KS is engaged with no
+    /// active tunnel (rock-and-hard-place). Idempotent; service-side
+    /// watchdog auto-closes after 60s if no paired ExitConnectingMode.
+    /// </summary>
+    public static ErrorResponse EnterConnectingMode()
+    {
+        if (!Instance.IsConnected) Instance.ReopenNamedPipe();
+        return Instance.EnterConnectingMode();
+    }
+
+    public static ErrorResponse ExitConnectingMode()
+    {
+        if (!Instance.IsConnected) Instance.ReopenNamedPipe();
+        return Instance.ExitConnectingMode();
+    }
 }
 
 public class ClientPipeImpl : IGuardianNPContract
@@ -116,6 +155,27 @@ public class ClientPipeImpl : IGuardianNPContract
     private static NamedPipeClientStream _clientStream = new("NULL");
     private static StreamString ss = new(new NamedPipeClientStream("NULL"));
     private static int usingResource;
+
+    // Serializes every IPC command/response pair. The pipe + StreamString are a
+    // single shared stream — if the UI thread is mid-DisconnectVPNConnection
+    // when GPVM.MON wakes from the state-change event and tries to send a
+    // GetCurrentVpnConnectionStatus, their writes/reads interleave and each
+    // thread ends up consuming the other's response. SemaphoreSlim (not `lock`)
+    // because StartVPNConnection has to hold this across an `await`, which a
+    // thread-affine monitor cannot do.
+    private static readonly SemaphoreSlim _pipeIO = new(1, 1);
+
+    // Upper bound on how long a void command (EnterConnectingMode /
+    // ExitConnectingMode) waits for the service ACK. ReadStringAsync begins with
+    // two synchronous ReadByte() calls (the 2-byte length prefix) that block in
+    // ReadFile with no timeout; if the service never answers — or the response
+    // framing desynced after an overlapping command — that read hangs forever
+    // AND holds _pipeIO, wedging every later IPC call. EnterConnectingMode is the
+    // first command in the UI Connect path, so an unbounded hang there freezes
+    // the whole UI ("not responding"). The overlay commands are best-effort and
+    // service-side idempotent, so degrading to a broken-pipe error on timeout is
+    // safe.
+    private static readonly TimeSpan VoidCommandTimeout = TimeSpan.FromSeconds(10);
 
     internal ClientPipeImpl()
     {
@@ -141,8 +201,14 @@ public class ClientPipeImpl : IGuardianNPContract
     {
         var cmdPayload = JsonSerializer.Serialize(composite);
         var cmdString = $"{Hexify(IGuardianNPContract.NPCommands.GetDataUsingDataContract)}.{cmdPayload}";
-        ss.WriteString(cmdString);
-        var response = ss.ReadStringAsync().Result;
+        string response;
+        _pipeIO.Wait();
+        try
+        {
+            ss.WriteString(cmdString);
+            response = ss.ReadStringAsync().Result;
+        }
+        finally { _pipeIO.Release(); }
         var value = JsonSerializer.Deserialize<CompositeType>(response);
 
         if (value == null) throw new InvalidOperationException("Service returned null");
@@ -160,9 +226,14 @@ public class ClientPipeImpl : IGuardianNPContract
         {
             var cmdPayload = JsonSerializer.Serialize(protocolRequest, VPNCallParametersJsonContext.Default.VPNCallParameters);
             var cmdString = $"{Hexify(IGuardianNPContract.NPCommands.StartVPNConnection)}.{cmdPayload}";
-            ss.WriteString(cmdString);
-            ClientPipe.Logger.LogInformation("ClientPipeImpl.StartVPNConnection: command sent to service.");
-            startedJson = await ss.ReadStringAsync();
+            await _pipeIO.WaitAsync().ConfigureAwait(false);
+            try
+            {
+                ss.WriteString(cmdString);
+                ClientPipe.Logger.LogInformation("ClientPipeImpl.StartVPNConnection: command sent to service.");
+                startedJson = await ss.ReadStringAsync().ConfigureAwait(false);
+            }
+            finally { _pipeIO.Release(); }
             startedJson = startedJson.TrimEnd('\0');
             if (!startedJson.StartsWith('{')) startedJson = "{ " + startedJson;
             //ClientPipe.Logger.LogInformation("ClientPipeImpl.StartVPNConnection: Received response from service");
@@ -195,16 +266,29 @@ public class ClientPipeImpl : IGuardianNPContract
     public ErrorResponse DisconnectVPNConnection()
     {
         var errorResponse = new ErrorResponse();
+        var responseJson = string.Empty;
         try
         {
-            var cmdPayload = "";
-            var cmdString = $"{Hexify(IGuardianNPContract.NPCommands.DisconnectVPNConnection)}.{cmdPayload}";
-            ss.WriteString(cmdString);
+            _pipeIO.Wait();
+            try
+            {
+                var cmdString = $"{Hexify(IGuardianNPContract.NPCommands.DisconnectVPNConnection)}.";
+                ss.WriteString(cmdString);
+                // Service writes an ErrorResponse JSON in reply — must consume it
+                // or it gets stranded in the pipe buffer and the next ClientPipe
+                // call deserialises it as the wrong type.
+                responseJson = ss.ReadString().TrimEnd('\0');
+            }
+            finally { _pipeIO.Release(); }
+
+            if (!responseJson.StartsWith('{')) responseJson = "{ " + responseJson;
+            errorResponse = JsonSerializer.Deserialize<ErrorResponse>(responseJson,
+                ErrorResponseJsonContext.Default.ErrorResponse) ?? new ErrorResponse();
         }
         catch (Exception e)
         {
             ClientPipe.Logger.LogError(e,
-                $"ClientPipe.DisconnectVPNConnection: Exception when disconnecting VPN connection: {e.Message}");
+                $"ClientPipe.DisconnectVPNConnection: Exception when disconnecting VPN connection: {e.Message}. Raw json='{responseJson}'");
             errorResponse.SetException(e);
             if (e is IOException)
             {
@@ -219,10 +303,16 @@ public class ClientPipeImpl : IGuardianNPContract
     public CurrentVPNStatus GetCurrentVpnConnectionStatus()
     {
         ClientPipe.Logger.LogInformation("Calling service to GetCurrentVpnConnectionStatus...");
-        var cmdString = $"{Hexify(IGuardianNPContract.NPCommands.GetCurrentVpnConnectionStatus)}.";
-        ss.WriteString(cmdString);
-        ClientPipe.Logger.LogInformation("Reading status...");
-        var statusString = ss.ReadString();
+        string statusString;
+        _pipeIO.Wait();
+        try
+        {
+            var cmdString = $"{Hexify(IGuardianNPContract.NPCommands.GetCurrentVpnConnectionStatus)}.";
+            ss.WriteString(cmdString);
+            ClientPipe.Logger.LogInformation("Reading status...");
+            statusString = ss.ReadString();
+        }
+        finally { _pipeIO.Release(); }
         var status =
             JsonSerializer.Deserialize<CurrentVPNStatus>(statusString,
                 CurrentVPNStatusJsonConect.Default.CurrentVPNStatus)
@@ -236,9 +326,15 @@ public class ClientPipeImpl : IGuardianNPContract
     {
         ClientPipe.Logger.LogInformation("Pinging service");
         var cmdString = $"{Hexify(IGuardianNPContract.NPCommands.Ping)}.";
-        ss.WriteString(cmdString);
-        ClientPipe.Logger.LogInformation("Reading status...");
-        var ping = await ss.ReadStringAsync();
+        string ping;
+        await _pipeIO.WaitAsync().ConfigureAwait(false);
+        try
+        {
+            ss.WriteString(cmdString);
+            ClientPipe.Logger.LogInformation("Reading status...");
+            ping = await ss.ReadStringAsync().ConfigureAwait(false);
+        }
+        finally { _pipeIO.Release(); }
         ClientPipe.Logger.LogInformation($"Service returned {ping}");
         return ping;
     }
@@ -253,14 +349,163 @@ public class ClientPipeImpl : IGuardianNPContract
         var msg = Common.LogFilterOn ? "OFF" : "ON";
         ClientPipe.Logger.LogInformation($"Telling Service to turn Logging {msg}");
         var cmdString = $"{Hexify(IGuardianNPContract.NPCommands.ToggleLogging)}.{whetherToDeleteLogFiles.ToString()}";
-        ss.WriteString(cmdString);
+        _pipeIO.Wait();
+        try { ss.WriteString(cmdString); }
+        finally { _pipeIO.Release(); }
     }
 
     public void SwitchServiceLoggingLevel(Common.LoggingLevels loggingLevel)
     {
         ClientPipe.Logger.LogWarning($"Sending command to service to switch logging level to {loggingLevel}");
         var cmdString = $"{Hexify(IGuardianNPContract.NPCommands.SwitchLoggingLevel)}.{loggingLevel}";
-        ss.WriteString(cmdString);
+        _pipeIO.Wait();
+        try { ss.WriteString(cmdString); }
+        finally { _pipeIO.Release(); }
+    }
+
+    // -- Kill Switch IPC (i221) ----------------------------------------------------
+
+    public ErrorResponse SetKillSwitchMode(KillSwitchMode mode)
+    {
+        var resp = new ErrorResponse();
+        try
+        {
+            string responseJson;
+            _pipeIO.Wait();
+            try
+            {
+                var cmdString = $"{Hexify(IGuardianNPContract.NPCommands.SetKillSwitchMode)}.{(int)mode}";
+                ss.WriteString(cmdString);
+                responseJson = ss.ReadStringAsync().Result.TrimEnd('\0');
+            }
+            finally { _pipeIO.Release(); }
+            if (!responseJson.StartsWith('{')) responseJson = "{ " + responseJson;
+            resp = JsonSerializer.Deserialize<ErrorResponse>(responseJson,
+                ErrorResponseJsonContext.Default.ErrorResponse) ?? new ErrorResponse();
+        }
+        catch (Exception e)
+        {
+            ClientPipe.Logger.LogError(e, $"ClientPipe.SetKillSwitchMode: Exception {e.Message}");
+            resp.SetException(e);
+            if (e is IOException) resp.Message = "PIPE BROKEN";
+        }
+        return resp;
+    }
+
+    public ErrorResponse SetKillSwitchAllowLan(bool allow)
+    {
+        var resp = new ErrorResponse();
+        try
+        {
+            string responseJson;
+            _pipeIO.Wait();
+            try
+            {
+                var cmdString = $"{Hexify(IGuardianNPContract.NPCommands.SetKillSwitchAllowLan)}.{allow}";
+                ss.WriteString(cmdString);
+                responseJson = ss.ReadStringAsync().Result.TrimEnd('\0');
+            }
+            finally { _pipeIO.Release(); }
+            if (!responseJson.StartsWith('{')) responseJson = "{ " + responseJson;
+            resp = JsonSerializer.Deserialize<ErrorResponse>(responseJson,
+                ErrorResponseJsonContext.Default.ErrorResponse) ?? new ErrorResponse();
+        }
+        catch (Exception e)
+        {
+            ClientPipe.Logger.LogError(e, $"ClientPipe.SetKillSwitchAllowLan: Exception {e.Message}");
+            resp.SetException(e);
+            if (e is IOException) resp.Message = "PIPE BROKEN";
+        }
+        return resp;
+    }
+
+    public KillSwitchStatus GetKillSwitchStatus()
+    {
+        try
+        {
+            string statusJson;
+            _pipeIO.Wait();
+            try
+            {
+                var cmdString = $"{Hexify(IGuardianNPContract.NPCommands.GetKillSwitchStatus)}.";
+                ss.WriteString(cmdString);
+                statusJson = ss.ReadString();
+            }
+            finally { _pipeIO.Release(); }
+            return JsonSerializer.Deserialize<KillSwitchStatus>(statusJson,
+                       KillSwitchStatusJsonContext.Default.KillSwitchStatus)
+                   ?? new KillSwitchStatus();
+        }
+        catch (Exception e)
+        {
+            ClientPipe.Logger.LogError(e, $"ClientPipe.GetKillSwitchStatus: Exception {e.Message}");
+            return new KillSwitchStatus();
+        }
+    }
+
+    public ErrorResponse EnterConnectingMode() => SendVoidCommand(IGuardianNPContract.NPCommands.EnterConnectingMode);
+    public ErrorResponse ExitConnectingMode()  => SendVoidCommand(IGuardianNPContract.NPCommands.ExitConnectingMode);
+
+    /// <summary>
+    /// Shared helper for IPC commands that take no payload and return an ErrorResponse.
+    /// </summary>
+    private ErrorResponse SendVoidCommand(IGuardianNPContract.NPCommands cmd)
+    {
+        var resp = new ErrorResponse();
+        try
+        {
+            string responseJson;
+            _pipeIO.Wait();
+            try
+            {
+                var cmdString = $"{Hexify(cmd)}.";
+                ss.WriteString(cmdString);
+
+                // Bounded read. Run the synchronously-blocking response read on a
+                // worker (the length-prefix ReadByte() calls block inline, so we
+                // can't keep them on the caller's thread) and cap the wait at
+                // VoidCommandTimeout. On timeout, tear the pipe down so the next
+                // call reopens it clean and return a broken-pipe error the caller
+                // can degrade on. Without the cap this read can hang forever while
+                // holding _pipeIO, freezing all IPC and the UI.
+                var readTask = Task.Run(() => ss.ReadStringAsync());
+                if (!readTask.Wait(VoidCommandTimeout))
+                {
+                    ClientPipe.Logger.LogError(
+                        "ClientPipe.{Cmd}: no service response within {Seconds}s — resetting pipe.",
+                        cmd, VoidCommandTimeout.TotalSeconds);
+
+                    // Observe the abandoned read so its eventual fault (from the
+                    // Dispose below) doesn't escape as an UnobservedTaskException —
+                    // the process-level handler exits the app on those.
+                    _ = readTask.ContinueWith(t => { _ = t.Exception; },
+                        TaskContinuationOptions.OnlyOnFaulted | TaskContinuationOptions.ExecuteSynchronously);
+
+                    // Disposing the stream unblocks the leaked ReadFile (it faults
+                    // and the worker unwinds) and forces ReopenNamedPipe — and a
+                    // fresh service-side pipe connection — on the next call.
+                    try { _clientStream.Dispose(); } catch { /* best effort */ }
+
+                    resp.Message = "PIPE BROKEN";
+                    resp.SetException(new TimeoutException(
+                        $"No service response to {cmd} within {VoidCommandTimeout.TotalSeconds:0}s"));
+                    return resp;
+                }
+
+                responseJson = readTask.Result.TrimEnd('\0');
+            }
+            finally { _pipeIO.Release(); }
+            if (!responseJson.StartsWith('{')) responseJson = "{ " + responseJson;
+            resp = JsonSerializer.Deserialize<ErrorResponse>(responseJson,
+                ErrorResponseJsonContext.Default.ErrorResponse) ?? new ErrorResponse();
+        }
+        catch (Exception e)
+        {
+            ClientPipe.Logger.LogError(e, $"ClientPipe.{cmd}: Exception {e.Message}");
+            resp.SetException(e);
+            if (e is IOException) resp.Message = "PIPE BROKEN";
+        }
+        return resp;
     }
 
     internal void OpenNamedPipe(string servicePipeName = Common.kGRDServicePipeName)
@@ -306,6 +551,23 @@ public class ClientPipeImpl : IGuardianNPContract
         ClientPipe.Logger.LogWarning("!!!!!!!!!!!!!! REOPENING CLIENTPIPE TO SERVICE...");
         OpenNamedPipe();
         ss = new StreamString(_clientStream);
+
+        // Drain the service's startup ACK (`GuardianFirewallService#ACK#<wasConnectedAtSuspend>`).
+        // The service writes it unconditionally on every pipe connect — if we don't read it
+        // now, the next ss.ReadString() returns the ACK instead of the command response and
+        // JSON parsing trips. Connect() does this drain; ReopenNamedPipe (called by every
+        // public API when IsConnected is false) must too, otherwise the first call after a
+        // cold pipe open fails. Swallow ack-read errors so a broken handshake still surfaces
+        // as the caller's normal IOException, not a different exception here.
+        try
+        {
+            var ack = ss.ReadString();
+            ClientPipe.Logger.LogInformation($"ClientPipeImpl.ReopenNamedPipe: drained ACK '{ack}'");
+        }
+        catch (Exception e)
+        {
+            ClientPipe.Logger.LogWarning(e, $"ClientPipeImpl.ReopenNamedPipe: failed to drain ACK: {e.Message}");
+        }
     }
 
     internal bool Connect(string servicePipeName = Common.kGRDServicePipeName)
@@ -340,9 +602,15 @@ public class ClientPipeImpl : IGuardianNPContract
         ClientPipe.Logger.LogInformation(
             $"Requesting GuardianFirewall Service's last {maxNumberOfLinesToGet} log lines...");
         var cmdString = $"{Hexify(IGuardianNPContract.NPCommands.RequestLogLines)}.{maxNumberOfLinesToGet}";
-        ss.WriteString(cmdString);
-        ClientPipe.Logger.LogInformation("Reading response...");
-        var serializedServiceLogs = await ss.ReadStringAsync();
+        string serializedServiceLogs;
+        await _pipeIO.WaitAsync().ConfigureAwait(false);
+        try
+        {
+            ss.WriteString(cmdString);
+            ClientPipe.Logger.LogInformation("Reading response...");
+            serializedServiceLogs = await ss.ReadStringAsync().ConfigureAwait(false);
+        }
+        finally { _pipeIO.Release(); }
         var jsonLines =
             JsonSerializer.Deserialize<List<string>>(serializedServiceLogs, LogLinesJsonContext.Default.ListString);
         var serviceLogLines = jsonLines ?? new List<string>();
@@ -403,11 +671,19 @@ public class ClientPipeImpl : IGuardianNPContract
                 break;
         }
         var cmdString = $"{Hexify(IGuardianNPContract.NPCommands.SendPowerAndNetworkEvents)}{senderEventType}.{cmdPayload}";
-        ss.WriteString(cmdString);
-        // Don't think we need a response from Service on what we threw over to it - basically a fire and forget
-        //var response = ss.ReadStringAsync().Result;
-        //ClientPipe.Logger.Log(LogLevel.Information, $"ClientPipe: string from service: '{response}'");
-        //var value = JsonSerializer.Deserialize<CompositeType>(response);
+
+        // "Fire and forget" but NOT "lock-free": this write still goes onto the
+        // same shared NamedPipeClientStream as every other IPC command, so it
+        // MUST hold _pipeIO across the WriteString. Without the lock, a network-
+        // change notification fired between two serialized request/response pairs
+        // (very common path: WG tunnel teardown raises NetworkAddressChanged on
+        // the same scheduler tick that wakes the conn-state notifier thread)
+        // interleaves its length-prefixed bytes with whichever thread holds the
+        // semaphore, throwing the framing off and stranding the next reader on
+        // a response that will never arrive.
+        _pipeIO.Wait();
+        try { ss.WriteString(cmdString); }
+        finally { _pipeIO.Release(); }
 
         return new ErrorResponse();
     }

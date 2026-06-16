@@ -97,7 +97,7 @@ public class GRDPEToken
         if (IsExpired()) return true;
 
         //
-        // Note from CJ 2026-04-03
+        // Note from Tech Lead 2026-04-03
         // Allow for 7 day grace period to ensure that PETs 
         // can be rotated prior to expiring in the first place
         return ExpirationDate < DateTime.Now.AddDays(-7);

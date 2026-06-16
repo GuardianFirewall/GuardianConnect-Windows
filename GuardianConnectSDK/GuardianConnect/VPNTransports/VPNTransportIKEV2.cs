@@ -29,8 +29,8 @@ public class VPNTransportIKEV2 : ITransportProvider
     private readonly DateTime _connectedDate = DateTime.MinValue;
     private readonly ITransportProvider.VPNConnectionError _lastVpnError = 0;
 
-    private readonly ITransportProvider.TransportProtocol _protocolType =
-        ITransportProvider.TransportProtocol.TransportIKEv2;
+    private readonly GRDTransportProtocol.TransportProtocol _protocolType =
+        GRDTransportProtocol.TransportProtocol.TransportIKEv2;
 
     private Task? PollingTask;
     private ITransportProvider.VPNProviderStatus _vpnStatus;
@@ -46,7 +46,7 @@ public class VPNTransportIKEV2 : ITransportProvider
     }
 
 
-    public virtual ITransportProvider.TransportProtocol ProtocolType => _protocolType;
+    public virtual GRDTransportProtocol.TransportProtocol ProtocolType => _protocolType;
 
     public virtual ITransportProvider.VPNProviderStatus VPNStatus => _vpnStatus;
 
