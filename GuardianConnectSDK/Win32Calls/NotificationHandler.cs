@@ -54,8 +54,7 @@ public static class NotificationHandler
     /// the IKE/ESP/IP-in-IP permits the IKEv2 path already has). Permitting only
     /// UDP to this exact server IP:port keeps the off-tunnel leak surface at zero.
     /// Without it, KS-on + WG blocks the tunnel's own carrier and the user loses
-    /// all connectivity (regression: wg-alpha.28 made KS install on WG but added
-    /// no carrier permit; fixed in wg-alpha.41).
+    /// all connectivity 
     /// </summary>
     public static IPEndPoint? WireGuardServerEndpoint;
 

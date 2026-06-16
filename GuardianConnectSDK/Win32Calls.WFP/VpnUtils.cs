@@ -278,7 +278,7 @@ public class VpnUtils
 
     internal static unsafe uint BlockIPv6Queries(HANDLE engineHandle)
     {
-        // Mirror BlockIPv4Queries: scope to port 53 explicitly. Pre wg-alpha.30
+        // Mirror BlockIPv4Queries: scope to port 53 explicitly. Previously,
         // this filter had numFilterConditions = 0, which would mean "block
         // every V6 packet at this layer in this sublayer" — only worked
         // because the V6 permit alongside it was equally unscoped and
@@ -325,8 +325,8 @@ public class VpnUtils
     }
 
 
-    // Install LUID-scoped DNS permits for the IKEv2 tunnel adapter. Pre
-    // wg-alpha.30 this added two unscoped permits (V4 + V6) with
+    // Install LUID-scoped DNS permits for the IKEv2 tunnel adapter.
+    // Previously, this added two unscoped permits (V4 + V6) with
     // numFilterConditions = 0 and a higher weight than the matching
     // block filters — i.e. the permits fired for every packet at the
     // layer, not just DNS, and not just on the tunnel adapter. The WFP
@@ -453,7 +453,7 @@ public class VpnUtils
 
             // Remove the four LUID-scoped DNS permits installed by
             // PermitQueriesFromTAP via TunnelDnsPermit.AddAll
-            // (UDP/TCP × V4/V6). Pre wg-alpha.30 this section removed two
+            // (UDP/TCP × V4/V6). Previously, this section removed two
             // static TAP_IPv4_Id / TAP_IPv6_Id filter IDs (unscoped
             // permits). The new install path returns a list; RemoveAll
             // walks it and continues past individual failures.

@@ -259,7 +259,7 @@ public class GRDServerManager
     /// <summary>
     /// Returns the cached RegionalHostRecord for the given hostname, or
     /// null if not found across any loaded region's host list. Used by
-    /// the WireGuard negotiate flow to pull DisplayName for an
+    /// the WireGuard key-exchange flow to pull DisplayName for an
     /// override host.
     /// </summary>
     public static RegionalHostRecord? FindHostRecord(string hostname)

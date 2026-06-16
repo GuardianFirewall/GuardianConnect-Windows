@@ -31,8 +31,6 @@ namespace GuardianConnect.Services;
 ///     - WasDisconnectPlanned=true     → filters removed (user-initiated disconnect
 ///                                       is a clean exit)
 ///
-/// Always-On (persistent filters across reboots) is §8 Future Experimental and is
-/// not implemented here.
 /// </summary>
 public sealed class KillSwitchService : BackgroundService
 {
@@ -47,10 +45,10 @@ public sealed class KillSwitchService : BackgroundService
     private readonly List<ulong> _installedFilterIds = new();
     private bool _isActive;
 
-    // Connecting-overlay state (wg-alpha.35) — separate ID list so the overlay can be
+    // Connecting-overlay state — separate ID list so the overlay can be
     // installed / removed independently of the base KS filter set. Watchdog timer
     // auto-exits the overlay if EnterConnectingMode isn't paired with an explicit
-    // ExitConnectingMode call (e.g., client process crashes mid-negotiate).
+    // ExitConnectingMode call (e.g., client process crashes mid-credential-construction).
     private readonly List<ulong> _connectingOverlayFilterIds = new();
     private bool _isConnecting;
     private DateTime _connectingDeadlineUtc = DateTime.MaxValue;
@@ -216,7 +214,9 @@ public sealed class KillSwitchService : BackgroundService
             NotificationHandler.RasConnectionStateChanged -= OnRasConnectionStateChanged;
             NotificationHandler.WireGuardConnectionStateChanged -= OnWireGuardConnectionStateChanged;
             lock (_stateLock) RemoveFiltersUnsafe();
-            try { _statusChangedEvent?.Dispose(); } catch { /* best-effort */ }
+            try { _statusChangedEvent?.Dispose(); } catch (Exception e) { 
+                _logger.LogError(e, "KillSwitchService: failed to dispose status-changed event; UI auto-refresh will not work.");
+            }
             _statusChangedEvent = null;
         });
 
@@ -411,10 +411,9 @@ public sealed class KillSwitchService : BackgroundService
         //
         // The rock-and-hard-place bug (CJ+TJE 2026-05-28) — where the next
         // Connect attempt failed because the DNS-block + stale-LUID DNS-permit
-        // left no DNS path for the negotiate call — is solved by the new
+        // left no DNS path for the key-exchange/credentials call — is solved by the new
         // EnterConnectingMode / ExitConnectingMode overlay below, NOT by
-        // tearing down filters on unplanned drop. wg-alpha.34 mistakenly
-        // tore down filters; backed out in wg-alpha.35.
+        // tearing down filters on unplanned drop.
         if (_isActive && wasPlanned) RemoveFiltersUnsafe();
     }
 
@@ -668,7 +667,7 @@ public sealed class KillSwitchService : BackgroundService
     }
 
     // -------------------------------------------------------------------------------
-    // Connecting-mode overlay (wg-alpha.35) — temporary DNS + HTTPS permits installed
+    // Connecting-mode overlay — temporary DNS + HTTPS permits installed
     // during a user-initiated Connect attempt so the credential-negotiate machinery in
     // the client process can resolve Guardian API hostnames and complete HTTP calls
     // while the regular KS filter set (block-all + DNS-block) keeps protecting the

@@ -46,7 +46,7 @@ public static unsafe class KillSwitchFilters
     private const ushort DnsPort = 53;
     private const ushort IkePort = 500;       // IKEv2 negotiation
     private const ushort IkeNatTPort = 4500;  // IKEv2 NAT-Traversal
-    private const ushort HttpsPort = 443;     // Connecting-overlay HTTPS permit (wg-alpha.35)
+    private const ushort HttpsPort = 443;     // Connecting-overlay HTTPS permit
 
     private static readonly char[] SessionName  = "Guardian Kill Switch Session\0".ToCharArray();
     private static readonly char[] SessionDesc  = "Dynamic WFP session for Guardian Kill Switch (OnConnected mode)\0".ToCharArray();
@@ -354,8 +354,8 @@ public static unsafe class KillSwitchFilters
     // dropped by block-all unless permitted — at which point the tunnel can't carry
     // anything and the user has no internet. (The comment on AddPermitEspOutboundV4 above
     // wrongly assumed WG's carrier flows through a path block-all doesn't gate; it does.
-    // That assumption was never caught because pre-wg-alpha.28 the kill switch was a no-op
-    // on WG and never installed filters at all. Fixed in wg-alpha.41.)
+    // That assumption was never caught because previously, the kill switch was a no-op
+    // on WG and never installed filters at all.
     //
     // Scoped as tightly as possible: UDP to EXACTLY the resolved server IP (/32 or /128)
     // AND the server's endpoint port. Unlike the IKEv2 ports (500/4500), the WG endpoint
@@ -452,17 +452,17 @@ public static unsafe class KillSwitchFilters
     // Connecting-mode overlay (weight 4) — temporary permits installed during a user-
     // initiated Connect attempt by KillSwitchService.EnterConnectingMode. Open up DNS
     // and HTTPS on any local interface (typically the physical NIC since the tunnel
-    // adapter doesn't exist yet) so the client's credential-negotiate machinery can
+    // adapter doesn't exist yet) so the client's credential-construction machinery can
     // resolve Guardian API hostnames and complete the HTTP round-trip. Regular KS
     // filters (block-all + DNS-block) keep blocking everything else.
     //
     // Weight = WeightSpecificPermit (4) so these permits beat the DNS-block (3) and
     // block-all (1). Brief leak window during the connect attempt — bounded by the
-    // negotiate's natural duration plus a watchdog timeout in KillSwitchService.
+    // connection negotiation's natural duration plus a watchdog timeout in KillSwitchService.
     // Removed automatically when the tunnel comes up (filter set rebuilds with
     // tunnel-LUID-scoped permits taking over) or when the watchdog timeout fires.
     //
-    // Added in wg-alpha.35 to fix the KS-on rock-and-hard-place after tunnel drop.
+    // Added in recent commits to fix the KS-on rock-and-hard-place after tunnel drop.
     // -----------------------------------------------------------------------------------
 
     public static ulong AddPermitDnsUdpAnyOutboundV4(HANDLE engine) =>
