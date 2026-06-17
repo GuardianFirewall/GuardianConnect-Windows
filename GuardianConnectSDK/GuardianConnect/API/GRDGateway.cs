@@ -212,6 +212,20 @@ public class GRDGateway
             errorResponse.SetResponse(response);
             var respContent = await response.Content.ReadAsStringAsync();
 
+            // Surface the server's explanation on a non-2xx (e.g. 400 Bad Request).
+            // Without this the caller only saw the HTTP reason phrase ("Bad Request")
+            // and the response body — which carries the actual reason, e.g.
+            // {"error-message":"Guardian Firewall staff access restricted node"} — was
+            // silently discarded. Mirrors the WireGuard branch's failure logging.
+            if (!response.IsSuccessStatusCode)
+            {
+                Logger.LogError(
+                    "RegisterDeviceForTransportProtocol: device registration failed {Status}: {Body}",
+                    (int)response.StatusCode, respContent);
+                return errorResponse.SetErrorMessage(
+                    $"Device registration failed ({(int)response.StatusCode}): {respContent}");
+            }
+
             // Same VPNDeviceResponse DTO as the WireGuard branch — for IKEv2 the
             // host fills eap-username / eap-password / api-auth-token. The factory
             // plucks the fields this protocol needs (and sets ClientId = EAP user).

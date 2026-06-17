@@ -14,7 +14,7 @@
         <!-- Set this for prerelease builds (e.g., "alpha.1", "beta.1", "rc.1"); remove or leave empty for stable releases.
              alpha.N labels the consolidation-and-cleanup line: the WireGuard negotiate-consolidation work
              plus the IKEv2 encryption-hardening (AES-256-GCM/SHA-384/ECP-384) suite, merged on top of 0.46.2. -->
-        <VersionSuffix>alpha.1</VersionSuffix>
+        <VersionSuffix>alpha.2</VersionSuffix>
     </PropertyGroup>
 
     <PropertyGroup>
