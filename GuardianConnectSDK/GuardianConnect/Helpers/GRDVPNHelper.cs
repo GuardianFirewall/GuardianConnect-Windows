@@ -131,12 +131,17 @@ public class GRDVPNHelper
     /// IKEv2-only implementation that silently returned false for any WG
     /// credential.
     /// </summary>
-    public static bool ActiveConnectionPossible(GRDTransportProtocol.TransportProtocol protocol)
+    public static bool ActiveConnectionPossible(GRDTransportProtocol.TransportProtocol? protocol = null)
     {
+        // No protocol passed → use the user's current preferred protocol. (Optional
+        // params can't default to a method call, so resolve here rather than in the
+        // signature.) Callers may pass an explicit protocol to override.
+        var p = protocol ?? GRDTransportProtocol.GetPreferred();
+
         var mainCreds = GRDCredentialManager.GetMainCredentials();
         if (mainCreds == null)
         {
-            _logger.LogInformation("ActiveConnectionPossible({Protocol}): MainCredentials are not set", protocol);
+            _logger.LogInformation("ActiveConnectionPossible({Protocol}): MainCredentials are not set", p);
             return false;
         }
 
@@ -150,7 +155,7 @@ public class GRDVPNHelper
 
         if (string.IsNullOrEmpty(mainCreds.HostName))
         {
-            _logger.LogInformation("ActiveConnectionPossible({Protocol}): missing HostName", protocol);
+            _logger.LogInformation("ActiveConnectionPossible({Protocol}): missing HostName", p);
             return false;
         }
 
@@ -161,7 +166,7 @@ public class GRDVPNHelper
         // part of the host reply.
         mainCreds.EnsureDeviceFromLegacyFields();
         var device = mainCreds.Device!;
-        bool valid = protocol switch
+        bool valid = p switch
         {
             GRDTransportProtocol.TransportProtocol.TransportIKEv2 =>
                 !string.IsNullOrEmpty(device.ApiAuthToken) &&
@@ -177,18 +182,9 @@ public class GRDVPNHelper
         };
 
         _logger.LogInformation(
-            "ActiveConnectionPossible({Protocol}): result={Valid}", protocol, valid);
+            "ActiveConnectionPossible({Protocol}): result={Valid}", p, valid);
         return valid;
     }
-
-    /// <summary>
-    /// No-arg overload that reads the user's current preferred protocol from
-    /// HKCU and delegates to the protocol-aware overload. Kept for callers
-    /// that just want "can I connect with what's saved, given the current
-    /// transport preference."
-    /// </summary>
-    public static bool ActiveConnectionPossible() =>
-        ActiveConnectionPossible(GRDTransportProtocol.GetPreferred());
 
     /// Used to clear all of our current VPN configuration details from user defaults and the keychain.
     /// Returns a Task (was async void) so consumers can await the server-side
@@ -263,9 +259,9 @@ public class GRDVPNHelper
         GRDCredentialManager.AddOrUpdateCredential(mainCredential);
 
         // Do connection call here
-        errorResponse = await ConnectVpnWithConfiguredCredentials();
+        errorResponse = await ConnectVPNTunnel();
         _logger.LogInformation(
-            $"ConnectVpnWithNewUserCredentialsForProtocol: return from ConnectVpnWithConfiguredCredentials - errorResponse.IsError == {errorResponse.IsError}");
+            $"ConnectVpnWithNewUserCredentialsForProtocol: return from ConnectVPNTunnel - errorResponse.IsError == {errorResponse.IsError}");
 
         return errorResponse;
     }
@@ -287,10 +283,10 @@ public class GRDVPNHelper
     /// </list>
     /// Replaces the prior asymmetric dispatch (IKEv2 had a credentials check +
     /// GetServerStatus pre-flight + host-override sync; WG had none of those).
-    /// The credentials check (<see cref="ActiveConnectionPossible(GRDTransportProtocol.TransportProtocol)"/>)
+    /// The credentials check (<see cref="ActiveConnectionPossible(GRDTransportProtocol.TransportProtocol?)"/>)
     /// is now protocol-aware and applied symmetrically.
     /// </summary>
-    public async Task<ErrorResponse> ConnectVpnWithConfiguredCredentials()
+    public async Task<ErrorResponse> ConnectVPNTunnel()
     {
         var protocol = GRDTransportProtocol.GetPreferred();
 
@@ -321,7 +317,7 @@ public class GRDVPNHelper
         if (existing is not null && HostOverrideMismatchAgainst(existing))
         {
             _logger.LogInformation(
-                "ConnectVpnWithConfiguredCredentials: host override mismatches stored MainCredential.HostName '{Stored}'; clearing for fresh key-exchange",
+                "ConnectVPNTunnel: host override mismatches stored MainCredential.HostName '{Stored}'; clearing for fresh key-exchange",
                 existing.HostName);
             GRDCredentialManager.ClearMainCredentials();
         }
@@ -367,7 +363,7 @@ public class GRDVPNHelper
                 ? $"{ex.GetType().Name}: {ex.Message}"
                 : $"HTTP {statusErr.GetReasonPhrase()}";
             return statusErr.SetErrorMessage(
-                $"ConnectVpnWithConfiguredCredentials: GetServerStatus failed: {detail}");
+                $"ConnectVPNTunnel: GetServerStatus failed: {detail}");
         }
 
         // Dial using stored creds.
@@ -408,21 +404,21 @@ public class GRDVPNHelper
             && !string.Equals(mainCreds.HostName, hostOverride, StringComparison.OrdinalIgnoreCase);
     }
 
-    public async Task<ErrorResponse> DisconnectVPN()
+    public async Task<ErrorResponse> DisconnectVPNTunnel()
     {
         var errorResponse = new ErrorResponse();
-        _logger.LogInformation("In GRDVPNHelper.DisconnectVPN().");
+        _logger.LogInformation("In GRDVPNHelper.DisconnectVPNTunnel().");
 
         var entryName = GetNameOfConnectionEntry();
-        _logger.LogInformation($"GRDVPNHelper.DisconnectVPN(): Name of entry to disconnect is '{entryName}'");
+        _logger.LogInformation($"GRDVPNHelper.DisconnectVPNTunnel(): Name of entry to disconnect is '{entryName}'");
 
         _logger.LogInformation(
-            $"GRDVPNHelper.DisconnectVPN(): Calling ClientPipe.DisconnectVPNConnectionAsync() to disconnect '{entryName}'");
+            $"GRDVPNHelper.DisconnectVPNTunnel(): Calling ClientPipe.DisconnectVPNConnectionAsync() to disconnect '{entryName}'");
         try
         {
             await Task.Run(() =>
             {
-                _logger.LogInformation("GRDVPNHelper.DisconnectVPN(): Inside Task.Run()");
+                _logger.LogInformation("GRDVPNHelper.DisconnectVPNTunnel(): Inside Task.Run()");
                 ClientPipe.DisconnectVPNConnection(entryName);
                 errorResponse.Message = "Disconnected successfully";
             });
@@ -430,7 +426,7 @@ public class GRDVPNHelper
         catch (Exception e)
         {
             _logger.LogError(e,
-                $"GRDVPNHelper.DisconnectVPN(): Exception during ClientPipe.DisconnectVPNConnectionAsync() for entry '{entryName}'");
+                $"GRDVPNHelper.DisconnectVPNTunnel(): Exception during ClientPipe.DisconnectVPNConnectionAsync() for entry '{entryName}'");
             errorResponse.SetException(e);
             if (e.InnerException != null && e.InnerException is IOException)
                 errorResponse.SetErrorMessage("PIPE BROKEN. COMMUNICAION TO SERVICE LOST.");
@@ -438,7 +434,7 @@ public class GRDVPNHelper
                 errorResponse.SetErrorMessage(e.Message);
         }
 
-        _logger.LogInformation("GRDVPNHelper.DisconnectVPN(): Back from ClientPipe.DisconnectVPNConnectionAsync()");
+        _logger.LogInformation("GRDVPNHelper.DisconnectVPNTunnel(): Back from ClientPipe.DisconnectVPNConnectionAsync()");
 
         return errorResponse;
     }
@@ -622,8 +618,8 @@ public class GRDVPNHelper
     /// <summary>
     /// Bring up the WG tunnel from an already-persisted main credential. Parallels
     /// <see cref="StartIKEv2Connection"/> for the IKEv2 path. Selected by the
-    /// dispatcher in <see cref="ConnectVpnWithConfiguredCredentials"/> when
-    /// <see cref="ActiveConnectionPossible(GRDTransportProtocol.TransportProtocol)"/>
+    /// dispatcher in <see cref="ConnectVPNTunnel"/> when
+    /// <see cref="ActiveConnectionPossible(GRDTransportProtocol.TransportProtocol?)"/>
     /// returns true for WireGuard — i.e., we have a valid cached cred and don't
     /// need to exchange keys.
     /// </summary>
