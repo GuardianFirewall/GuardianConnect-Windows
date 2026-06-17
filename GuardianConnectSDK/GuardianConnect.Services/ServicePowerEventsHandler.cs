@@ -5,6 +5,7 @@ using GuardianConnect.Abstractions;
 using GuardianConnect.API;
 using GuardianConnect.Shared;
 using GuardianConnect.VPNTransports;
+using GuardianFirewallService;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Logging.Abstractions;
 using Microsoft.Win32;
@@ -258,6 +259,11 @@ public static class ServicePowerEventsHandler
                     "************** PowerChangeNotifyCallbackRoutine - Calling VPNTransportIKEV1.PowerSuspendVPNConnection...");
                 VPNTransportIKEV2.PowerSuspendVPNConnection(VPNStatusAtSuspendTime ==
                                                             ITransportProvider.VPNProviderStatus.VPNStatusDisconnected);
+
+                // The suspend path stopped the tunnel outside DisconnectVPNConnection,
+                // so the dispatcher's _activeTransport would otherwise go stale and
+                // block the next connect after resume. Tell it the transport is gone.
+                GuardianNPCommandDispatcher.NotifyTransportTornDownExternally();
             }
         }
     }

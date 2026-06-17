@@ -37,11 +37,11 @@ public class GRDServerManager
     private static GRDRegion? SelectedRegion { get; set; }
 
     /// Finds and returns the VPN server node we will connect to for the given region.
-    /// Returns the full <see cref="RegionalHostRecord"/> (the Windows analog of iOS's
-    /// GRDSGWServer) so the connect flow can carry the selected server as one object
-    /// rather than re-flattening to loose hostname/display strings. Callers read
-    /// <c>.Hostname</c> / <c>.HostLocation()</c> at the point of use.
-    public static (RegionalHostRecord, ErrorResponse) SelectGuardianHostWithCompletion(string? selectedRegionKey)
+    /// Returns the full <see cref="GRDSGWServer"/> so the connect flow can carry the
+    /// selected server as one object rather than re-flattening to loose
+    /// hostname/display strings. Callers read <c>.Hostname</c> / <c>.HostLocation()</c>
+    /// at the point of use.
+    public static (GRDSGWServer, ErrorResponse) SelectGuardianHostWithCompletion(string? selectedRegionKey)
     {
         SelectedRegion = GetGRDRegionByKey(selectedRegionKey ?? GetRegionForOurTimeZone());
 
@@ -259,12 +259,12 @@ public class GRDServerManager
     }
 
     /// <summary>
-    /// Returns the cached RegionalHostRecord for the given hostname, or
+    /// Returns the cached GRDSGWServer for the given hostname, or
     /// null if not found across any loaded region's host list. Used by
     /// the WireGuard key-exchange flow to pull DisplayName for an
     /// override host.
     /// </summary>
-    public static RegionalHostRecord? FindHostRecord(string hostname)
+    public static GRDSGWServer? FindHostRecord(string hostname)
     {
         if (string.IsNullOrWhiteSpace(hostname)) return null;
         foreach (var hosts in Live._hostLookup.Values)
@@ -514,9 +514,9 @@ public class GRDServerManager
             if (response.IsSuccessStatusCode)
             {
                 var respContent = await response.Content.ReadAsStringAsync();
-                var regionHosts = JsonSerializer.Deserialize<List<RegionalHostRecord>>(respContent,
-                    RegionalHostRecordJsonContext.Default.ListRegionalHostRecord)
-                    ?? new List<RegionalHostRecord>();
+                var regionHosts = JsonSerializer.Deserialize<List<GRDSGWServer>>(respContent,
+                    GRDSGWServerJsonContext.Default.ListGRDSGWServer)
+                    ?? new List<GRDSGWServer>();
 
                 // Populate the GRDSGWServer-style region back-ref. The per-region
                 // host-list endpoint omits the nested "region" object (region is the
@@ -551,7 +551,7 @@ public class GRDServerManager
         RegionHostsRetrievalWaiter.Set();
     }
 
-    public static async Task<List<RegionalHostRecord>> GetAllHostnamesAsync()
+    public static async Task<List<GRDSGWServer>> GetAllHostnamesAsync()
     {
         var url = $"https://{Common.DefaultConnectAPIHostname}/api/v1.1/servers/all-hostnames";
         var uri = new Uri(url);
@@ -580,14 +580,14 @@ public class GRDServerManager
                 Logger.LogError(
                     "GetAllHostnamesAsync: non-success status {Status}. Body: {Body}",
                     response.StatusCode, snippet);
-                return new List<RegionalHostRecord>();
+                return new List<GRDSGWServer>();
             }
 
-            List<RegionalHostRecord>? list;
+            List<GRDSGWServer>? list;
             try
             {
-                list = JsonSerializer.Deserialize<List<RegionalHostRecord>>(
-                    body ?? string.Empty, RegionalHostRecordJsonContext.Default.ListRegionalHostRecord);
+                list = JsonSerializer.Deserialize<List<GRDSGWServer>>(
+                    body ?? string.Empty, GRDSGWServerJsonContext.Default.ListGRDSGWServer);
             }
             catch (Exception parseEx)
             {
@@ -598,23 +598,23 @@ public class GRDServerManager
                             : body.Length > 500 ? body[..500] + "…(truncated)"
                             : body;
                 Logger.LogError(parseEx,
-                    "GetAllHostnamesAsync: response parsed as List<RegionalHostRecord> failed. Body: {Body}",
+                    "GetAllHostnamesAsync: response parsed as List<GRDSGWServer> failed. Body: {Body}",
                     snippet);
-                return new List<RegionalHostRecord>();
+                return new List<GRDSGWServer>();
             }
 
             var count = list?.Count ?? 0;
             Logger.LogInformation("GetAllHostnamesAsync: parsed {Count} hosts", count);
-            return list ?? new List<RegionalHostRecord>();
+            return list ?? new List<GRDSGWServer>();
         }
         catch (Exception ex)
         {
             Logger.LogError(ex, "GetAllHostnamesAsync: failed");
-            return new List<RegionalHostRecord>();
+            return new List<GRDSGWServer>();
         }
     }
 
-    internal static RegionalHostRecord SelectBestHostInRegion(string regionKey)
+    internal static GRDSGWServer SelectBestHostInRegion(string regionKey)
     {
         RegionHostsRetrievalWaiter.Reset();
         if (!Live._hostLookup.ContainsKey(regionKey) || Live._hostLookup[regionKey].Count == 0)

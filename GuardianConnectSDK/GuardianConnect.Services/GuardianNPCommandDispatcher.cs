@@ -55,17 +55,39 @@ public class GuardianNPCommandDispatcher : IGuardianNPContract
         await _transportGate.WaitAsync().ConfigureAwait(false);
         try
         {
-            // Connect/Disconnect are strictly paired. If a transport is already
-            // active, refuse the second Connect — the caller must Disconnect
-            // first. Silently tearing down would hide a client-side bug and
-            // disrupt a working tunnel without the user asking.
+            // Connect/Disconnect are strictly paired: refuse a second Connect while a
+            // tunnel is genuinely up. Decide that OS-authoritatively, NOT from the
+            // static _activeTransport — which can be stale (power-suspend tears the
+            // tunnel down outside DisconnectVPNConnection) OR null while a tunnel is up
+            // (power-resume reconnects without registering here). IKEv2 lives on a RAS
+            // connection, so the OS (IsAnyConnectionActive) is the source of truth even
+            // when _activeTransport is null. WG/Wintun is not a RAS connection, so
+            // detect it via the tracked transport's status.
+            bool ikev2Up = ConnectionRoutines.IsAnyConnectionActive(out _);
+            bool wgUp = _activeTransport is { ProtocolType: GRDTransportProtocol.TransportProtocol.TransportWireGuard }
+                        && _activeTransport.VPNStatus is ITransportProvider.VPNProviderStatus.VPNStatusConnected
+                                                      or ITransportProvider.VPNProviderStatus.VPNStatusConnecting;
+            if (ikev2Up || wgUp)
+            {
+                // RAS up but no tracked transport (resume-reconnect) → report IKEv2.
+                var activeProto = _activeTransport?.ProtocolType
+                                  ?? GRDTransportProtocol.TransportProtocol.TransportIKEv2;
+                Logger.LogWarning(
+                    "GuardianNPCommandDispatcher.StartVPNConnection: refused — a VPN is already connected (via {Transport})",
+                    activeProto);
+                return new ErrorResponse().SetErrorMessage(
+                    $"VPN is already connected via {activeProto}. Disconnect first.");
+            }
+
+            // Nothing is actually up. If a stale transport reference lingers (tunnel
+            // torn down by power-suspend or another external path without
+            // DisconnectVPNConnection), reclaim it before starting fresh.
             if (_activeTransport is not null)
             {
-                Logger.LogWarning(
-                    "GuardianNPCommandDispatcher.StartVPNConnection: refused — transport {Transport} already active",
+                Logger.LogInformation(
+                    "GuardianNPCommandDispatcher.StartVPNConnection: clearing stale _activeTransport {Transport} (no live tunnel)",
                     _activeTransport.ProtocolType);
-                return new ErrorResponse().SetErrorMessage(
-                    $"VPN is already connected via {_activeTransport.ProtocolType}. Disconnect first.");
+                DisposeActiveTransportUnsafe();
             }
 
             var transport = SelectTransport(protocolRequest);
@@ -165,6 +187,31 @@ public class GuardianNPCommandDispatcher : IGuardianNPContract
             }
         }
         _activeTransport = null;
+    }
+
+    /// <summary>
+    /// Clears the active-transport reference when a tunnel is torn down OUTSIDE the
+    /// normal DisconnectVPNConnection front door — e.g. the power-suspend path
+    /// (ServicePowerEventsHandler -> VPNTransportIKEV2.PowerSuspendVPNConnection),
+    /// which stops the RAS tunnel via a throwaway instance and never touches this
+    /// dispatcher. Without this, _activeTransport goes stale and blocks the next
+    /// connect ("VPN is already connected ... disconnect first"). No-op when nothing
+    /// is active. Acquires the gate, so never call it while already holding it.
+    /// </summary>
+    public static void NotifyTransportTornDownExternally()
+    {
+        _transportGate.Wait();
+        try
+        {
+            if (_activeTransport is not null)
+            {
+                Logger.LogInformation(
+                    "GuardianNPCommandDispatcher.NotifyTransportTornDownExternally: clearing _activeTransport {Transport}",
+                    _activeTransport.ProtocolType);
+                DisposeActiveTransportUnsafe();
+            }
+        }
+        finally { _transportGate.Release(); }
     }
 
     public CurrentVPNStatus GetCurrentVpnConnectionStatus()

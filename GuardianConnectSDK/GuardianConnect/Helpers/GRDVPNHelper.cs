@@ -237,11 +237,6 @@ public class GRDVPNHelper
         return isConnected;
     }
 
-    public void ConfigureFirstTimeUserPostCredential(Action mid, Action<bool, string> completion)
-    {
-        _ = GRDServerManager.SelectGuardianHostWithCompletion(PreferredRegion);
-    }
-
     public async Task<ErrorResponse> ConnectVpnWithNewUserCredentialsForProtocol(
         GRDTransportProtocol.TransportProtocol protocol)
     {
@@ -473,8 +468,9 @@ public class GRDVPNHelper
         //    silently discard the user's choice);
         // 2) otherwise the legacy region-based auto-pick via
         //    SelectGuardianHostWithCompletion(PreferredRegion).
-        string host;
-        string hostDisplay;
+        // Host pick produces the selected server (GRDSGWServer / GRDSGWServer),
+        // threaded into the credential-creation call below.
+        GRDSGWServer selectedServer;
 
         var hostOverride = RegistrySettings.RetrieveGuardianUserSettings(Common.kGuardianPreferredHost);
         if (!string.IsNullOrWhiteSpace(hostOverride))
@@ -482,27 +478,24 @@ public class GRDVPNHelper
             var hostRecord = GRDServerManager.FindHostRecord(hostOverride);
             if (hostRecord is not null)
             {
-                host = hostRecord.Hostname;
-                hostDisplay = hostRecord.HostLocation();
+                selectedServer = hostRecord;
                 // Snap PreferredRegion to the override host's region so the rest
                 // of the app (RegionPicker etc.) reflects the chosen region.
-                // Ported from the former NegotiateAndStartWireGuard so the WG
-                // path keeps this behavior now that it routes through here.
                 var regionKey = GRDServerManager.FindRegionKeyForHostname(hostOverride);
                 if (!string.IsNullOrWhiteSpace(regionKey))
                     PreferredRegion = regionKey;
                 _logger.LogInformation(
                     "CreateStandaloneCredentialsForTransportProtocol: using host override '{Host}' (display='{Display}', region='{Region}')",
-                    host, hostDisplay, regionKey ?? "<unknown>");
+                    selectedServer.Hostname, selectedServer.HostLocation(), regionKey ?? "<unknown>");
             }
             else
             {
                 // A SwapActiveGeoInfoCache in LongRunningRefreshTask can wipe the
                 // on-demand _hostLookup between the host-override selection and
                 // connect. The user's selection wins regardless; backend API will
-                // reject server-side if the hostname is invalid.
-                host = hostOverride;
-                hostDisplay = hostOverride;
+                // reject server-side if the hostname is invalid. Synthesize a minimal
+                // server record from the verbatim hostname.
+                selectedServer = new GRDSGWServer { Hostname = hostOverride, DisplayName = hostOverride };
                 _logger.LogWarning(
                     "CreateStandaloneCredentialsForTransportProtocol: host override '{Host}' not in local cache; using hostname directly",
                     hostOverride);
@@ -517,18 +510,17 @@ public class GRDVPNHelper
                     "CreateStandaloneCredentialsForTransportProtocol: host selection failed: {Msg}", hostErr.Message);
                 return hostErr;
             }
-            host = server.Hostname;
-            hostDisplay = server.HostLocation();
+            selectedServer = server;
         }
 
         // PROTOPICK
-        errorResponse = await CreateStandaloneCredentialsForTransportProtocol(protocol, validForDays, host);
+        errorResponse = await CreateStandaloneCredentialsForTransportProtocol(protocol, validForDays, selectedServer);
         if (errorResponse.IsError) return errorResponse;
 
         // adding in host info here instead of above in caller
         var credentials = (GRDCredential)errorResponse.Data!;
-        credentials.HostName = host;
-        credentials.HostnameDisplayValue = hostDisplay;
+        credentials.HostName = selectedServer.Hostname;
+        credentials.HostnameDisplayValue = selectedServer.HostLocation();
         return new ErrorResponse().SetData(credentials);
     }
 
@@ -537,15 +529,15 @@ public class GRDVPNHelper
     /// @param protocol The desired transport protocol to use to establish the connection. IKEv2 (builtin) as well as WireGuard via a
     /// PacketTunnelProvider are supported
     /// @param days NSInteger number of days these credentials will be valid for
-    /// @param hostname NSString hostname to connect to ie: saopaulo-ipsec-4.sudosecuritygroup.com
+    /// @param server the GRDSGWServer (GRDSGWServer) to create credentials for
     /// @param completion block Completion block that will contain an NSDictionary of credentials upon success
     public async Task<ErrorResponse> CreateStandaloneCredentialsForTransportProtocol(
-        GRDTransportProtocol.TransportProtocol protocol, int days, string hostname)
+        GRDTransportProtocol.TransportProtocol protocol, int days, GRDSGWServer server)
     {
         ErrorResponse errorResponse;
         (var subCreds, errorResponse) = await GetValidSubscriberCredentialWithCompletion();
         if (errorResponse.IsError) return errorResponse;
-        errorResponse = await GRDGateway.RegisterDeviceForTransportProtocol(protocol, hostname, subCreds!.Jwt, days);
+        errorResponse = await GRDGateway.RegisterDeviceForTransportProtocol(protocol, server.Hostname, subCreds!.Jwt, days);
 
         return errorResponse;
     }

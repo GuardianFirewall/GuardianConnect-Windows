@@ -3,9 +3,9 @@ using GuardianConnect.API;
 
 namespace GuardianConnect.API.Model;
 
-// Windows analog of iOS's GRDSGWServer.
+// Secure-gateway server record (SGW). Cross-platform parity with iOS/Android GRDSGWServer.
 
-// RegionalHostRecord myDeserializedClass = JsonSerializer.Deserialize<List<RegionalHostRecord>>(myJsonResponse);
+// GRDSGWServer myDeserializedClass = JsonSerializer.Deserialize<List<GRDSGWServer>>(myJsonResponse);
 /*
  * Sample json
  *  {
@@ -17,7 +17,7 @@ namespace GuardianConnect.API.Model;
 "beta-capable": false
 }
  */
-public class RegionalHostRecord
+public class GRDSGWServer
 {
     [JsonPropertyName("hostname")] public string Hostname { get; set; } = string.Empty;
 

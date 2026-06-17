@@ -7,9 +7,9 @@ namespace GuardianConnect.API.Model;
 // fields, not properties) deserializes — matching GRDRegionJsonContext.
 [JsonSourceGenerationOptions(GenerationMode = JsonSourceGenerationMode.Metadata, WriteIndented = true,
     PropertyNameCaseInsensitive = true, IncludeFields = true)]
-[JsonSerializable(typeof(RegionalHostRecord))]
-[JsonSerializable(typeof(List<RegionalHostRecord>))]
+[JsonSerializable(typeof(GRDSGWServer))]
+[JsonSerializable(typeof(List<GRDSGWServer>))]
 [JsonSerializable(typeof(GRDRegion))]
-public partial class RegionalHostRecordJsonContext : JsonSerializerContext
+public partial class GRDSGWServerJsonContext : JsonSerializerContext
 {
 }
