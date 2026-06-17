@@ -239,8 +239,7 @@ public class GRDVPNHelper
 
     public void ConfigureFirstTimeUserPostCredential(Action mid, Action<bool, string> completion)
     {
-        var (host, hostLocation, errorResponse) =
-            GRDServerManager.SelectGuardianHostWithCompletion(PreferredRegion);
+        _ = GRDServerManager.SelectGuardianHostWithCompletion(PreferredRegion);
     }
 
     public async Task<ErrorResponse> ConnectVpnWithNewUserCredentialsForProtocol(
@@ -498,12 +497,10 @@ public class GRDVPNHelper
             }
             else
             {
-                // See ExchangePublicKeysAndStartWireGuard for context —
-                // a SwapActiveGeoInfoCache in LongRunningRefreshTask can
-                // wipe the on-demand _hostLookup between Developer-tab
-                // selection and connect. The user's selection wins
-                // regardless; backend API will reject server-side if the
-                // hostname is invalid.
+                // A SwapActiveGeoInfoCache in LongRunningRefreshTask can wipe the
+                // on-demand _hostLookup between the host-override selection and
+                // connect. The user's selection wins regardless; backend API will
+                // reject server-side if the hostname is invalid.
                 host = hostOverride;
                 hostDisplay = hostOverride;
                 _logger.LogWarning(
@@ -513,15 +510,15 @@ public class GRDVPNHelper
         }
         else
         {
-            var (defHost, defDisplay, hostErr) = GRDServerManager.SelectGuardianHostWithCompletion(PreferredRegion);
+            var (server, hostErr) = GRDServerManager.SelectGuardianHostWithCompletion(PreferredRegion);
             if (hostErr.IsError)
             {
                 _logger.LogError(
                     "CreateStandaloneCredentialsForTransportProtocol: host selection failed: {Msg}", hostErr.Message);
                 return hostErr;
             }
-            host = defHost;
-            hostDisplay = defDisplay;
+            host = server.Hostname;
+            hostDisplay = server.HostLocation();
         }
 
         // PROTOPICK

@@ -36,10 +36,12 @@ public class GRDServerManager
     public bool BetaCapable { get; set; }
     private static GRDRegion? SelectedRegion { get; set; }
 
-    /// Used to find and return the VPN server node we will connect to based on the results of a call to 'getGuardianHostsWithCompletion:"
-    /// @param completion Completion block that will contain the selected host, hostLocation upon success or an error message upon failure.
-    // This is called from GRDVPNHelper.SelectAndSetBestGuardianHost
-    public static (string, string, ErrorResponse) SelectGuardianHostWithCompletion(string? selectedRegionKey)
+    /// Finds and returns the VPN server node we will connect to for the given region.
+    /// Returns the full <see cref="RegionalHostRecord"/> (the Windows analog of iOS's
+    /// GRDSGWServer) so the connect flow can carry the selected server as one object
+    /// rather than re-flattening to loose hostname/display strings. Callers read
+    /// <c>.Hostname</c> / <c>.HostLocation()</c> at the point of use.
+    public static (RegionalHostRecord, ErrorResponse) SelectGuardianHostWithCompletion(string? selectedRegionKey)
     {
         SelectedRegion = GetGRDRegionByKey(selectedRegionKey ?? GetRegionForOurTimeZone());
 
@@ -47,7 +49,7 @@ public class GRDServerManager
             $"GRDServerManager.SelectGuardianHostWithCompletion: Calling SelectBestHostInRegion for region '{SelectedRegion.RegionName}'");
         var regionHostRecord = SelectBestHostInRegion(SelectedRegion.RegionName);
 
-        return (regionHostRecord.Hostname, regionHostRecord.HostLocation(), new ErrorResponse());
+        return (regionHostRecord, new ErrorResponse());
     }
 
     #region GRDServerManager private stuff
@@ -513,9 +515,18 @@ public class GRDServerManager
             {
                 var respContent = await response.Content.ReadAsStringAsync();
                 var regionHosts = JsonSerializer.Deserialize<List<RegionalHostRecord>>(respContent,
-                    RegionalHostRecordJsonContext.Default.ListRegionalHostRecord);
+                    RegionalHostRecordJsonContext.Default.ListRegionalHostRecord)
+                    ?? new List<RegionalHostRecord>();
+
+                // Populate the GRDSGWServer-style region back-ref. The per-region
+                // host-list endpoint omits the nested "region" object (region is the
+                // query context), so stamp it from the known region key. Use ??= so we
+                // never clobber a region the JSON did provide (servers/all-hostnames).
+                var region = GetGRDRegionByKey(regionKey);
+                foreach (var h in regionHosts) h.Region ??= region;
+
                 if (!Live._hostLookup.ContainsKey(regionKey)) Live._hostLookup.Add(regionKey, null!);
-                Live._hostLookup[regionKey] = regionHosts ?? new List<RegionalHostRecord>();
+                Live._hostLookup[regionKey] = regionHosts;
                 message =
                     $"GRDServerManager.GetHostForRegion: Added {regionHosts?.Count} hosts for region '{regionKey}'";
                 Logger.LogInformation(message);
