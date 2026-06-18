@@ -218,13 +218,16 @@ public static class ConnectionRoutines
             return new ErrorResponse("Call to WritePrivateProfileString returned false", null, true, null, error);
         }
 
-        // EAP-MSCHAPv2 user data (iOS parity). See ConfigureEapMschapV2UserData.
-        // Non-fatal in the prototype: if it fails we log and continue so we can
-        // compare a dial WITH vs WITHOUT the EAP user-data blob.
-        var eapResp = ConfigureEapMschapV2UserData(entryName, userName, password, phonebookPath);
-        if (eapResp.IsError)
-            Logger.LogWarning(
-                $"CreateOrUpdateEntry: ConfigureEapMschapV2UserData failed (continuing): {eapResp.Message}");
+        // A/B TEST (Build A): EAP-MSCHAPv2 user-data prototype DISABLED. It fails in
+        // the AOT/SYSTEM service anyway (RasGetEapUserIdentity -> ERROR_INTERACTIVE_MODE;
+        // XML fallback -> COM unsupported under AOT), so this build dials EAP-MSCHAPv2
+        // purely from the RAS-entry config (RASEO_RequireEAP + dwCustomAuthKey=26) +
+        // RasSetCredentials/RASDIALPARAMS. If the IKEv2 EAP-MSCHAPv2 connect still
+        // authenticates here (no RasDial 645), the explicit EAP user-data is NOT needed.
+        // var eapResp = ConfigureEapMschapV2UserData(entryName, userName, password, phonebookPath);
+        // if (eapResp.IsError)
+        //     Logger.LogWarning(
+        //         $"CreateOrUpdateEntry: ConfigureEapMschapV2UserData failed (continuing): {eapResp.Message}");
 
         ActiveConnectionEntryName = entryName;
         ActiveConnectionCredentials = credentials;
