@@ -8,10 +8,6 @@ RasEnumEntries
 RasSetEntryProperties
 RasGetCredentials
 RasSetCredentials
-RasGetEapUserIdentityW
-RasFreeEapUserIdentityW
-RasSetEapUserData
-RasSetCustomAuthData
 RasDeleteEntry
 RasDial
 RasGetConnectStatus
@@ -26,7 +22,6 @@ RASCREDENTIALSW
 RASCONNSTATUSW
 RASDIALPARAMSW
 RASCONNW
-RASEAPUSERIDENTITYW
 
 // RRAS Enumerations
 RASCONNSUBSTATE
