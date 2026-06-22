@@ -283,6 +283,23 @@ public static class ConnectionRoutines
         return new ErrorResponse();
     }
 
+    /// <summary>
+    /// Tear down DNS-leak filters left installed when the tunnel dropped OUTSIDE the
+    /// planned-disconnect path — e.g. an unplanned RAS drop on network loss (wifi
+    /// deadspot). The filters permit DNS only on the (now-dead) tunnel adapter LUID
+    /// and block everything else, so an orphaned filter set leaves the machine unable
+    /// to resolve ANY hostname — every reconnect's GetServerStatus then fails with
+    /// "host unknown" and the only recovery is a reboot. UpdateFiltersState re-checks
+    /// the connection, sees it DISCONNECTED, and removes the filters. Safe no-op if the
+    /// entry is unknown or no filters are installed.
+    /// </summary>
+    public static void RemoveDnsFiltersAfterUnplannedDisconnect()
+    {
+        Logger.LogInformation(
+            $"RemoveDnsFiltersAfterUnplannedDisconnect: reconciling DNS filters for entry '{ActiveConnectionEntryName}' after unplanned disconnect");
+        VpnDnsFilteringHandler.UpdateFiltersState(ActiveConnectionEntryName);
+    }
+
     public static bool DisconnectEntryAndRemove()
     {
         Logger.LogInformation(
