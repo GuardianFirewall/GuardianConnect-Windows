@@ -29,8 +29,8 @@ public sealed class VPNDeviceResponse
     [JsonPropertyName("server-public-key")] public string? ServerPublicKey { get; set; }
     [JsonPropertyName("mapped-ipv4-address")] public string? MappedIPv4Address { get; set; }
     [JsonPropertyName("mapped-ipv6-address")] public string? MappedIPv6Address { get; set; }
-    [JsonPropertyName("client-id")] public string? ClientId { get; set; }
 
     // Shared
+    [JsonPropertyName("client-id")] public string? ClientId { get; set; }
     [JsonPropertyName("api-auth-token")] public string? ApiAuthToken { get; set; }
 }

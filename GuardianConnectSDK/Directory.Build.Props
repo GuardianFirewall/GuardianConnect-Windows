@@ -8,9 +8,9 @@
         <Authors>DNSFilter, Inc.</Authors>
         <RepositoryUrl>https://github.com/GuardianFirewall/GuardianConnect-Windows</RepositoryUrl>
 
-        <AssemblyVersion>1.1.0</AssemblyVersion>
-        <FileVersion>1.1.0</FileVersion>
-        <Version>1.1.0</Version>
+        <AssemblyVersion>1.1.1</AssemblyVersion>
+        <FileVersion>1.1.1</FileVersion>
+        <Version>1.1.1</Version>
         <!-- Prerelease suffix: "beta.N" for non-release NuGet packages; empty = stable release.
              VERSION POLICY (1.1.0+): bump the PATCH (third) digit for every fix/build. Carries the
              full consolidation line: WireGuard negotiate-consolidation, IKEv2 EAP-MSCHAPv2 + AES-256-GCM/
