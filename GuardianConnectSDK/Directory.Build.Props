@@ -8,11 +8,15 @@
         <Authors>DNSFilter, Inc.</Authors>
         <RepositoryUrl>https://github.com/GuardianFirewall/GuardianConnect-Windows</RepositoryUrl>
 
-        <AssemblyVersion>0.46.2</AssemblyVersion>
-        <FileVersion>0.46.2</FileVersion>
-        <Version>0.46.2</Version>
-        <!-- Set this for prerelease builds (e.g., "alpha.1", "beta.1", "rc.1"); remove or leave empty for stable releases.-->
-        <VersionSuffix></VersionSuffix>
+        <AssemblyVersion>1.1.1</AssemblyVersion>
+        <FileVersion>1.1.1</FileVersion>
+        <Version>1.1.1</Version>
+        <!-- Prerelease suffix: "beta.N" for non-release NuGet packages; empty = stable release.
+             VERSION POLICY (1.1.0+): bump the PATCH (third) digit for every fix/build. Carries the
+             full consolidation line: WireGuard negotiate-consolidation, IKEv2 EAP-MSCHAPv2 + AES-256-GCM/
+             SHA-384/ECP-384 hardening, GRDSGWServer parity, stale-_activeTransport fix, and the
+             orphaned-DNS-filter (wifi-loss) fix. -->
+        <VersionSuffix>beta.1</VersionSuffix>
     </PropertyGroup>
 
     <PropertyGroup>

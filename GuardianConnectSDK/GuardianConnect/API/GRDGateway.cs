@@ -159,21 +159,9 @@ public class GRDGateway
         public string? PublicKey { get; set; }
     }
 
-    /// <summary>
-    /// Deserialization target for the WireGuard branch of
-    /// <c>POST /api/v1.3/device</c>. Kept separate from <see cref="GRDCredential"/>
-    /// so adding wire-format JsonPropertyName attrs here doesn't change the
-    /// on-disk shape of persisted credentials.
-    /// </summary>
-    public class WireGuardRegistrationResponse
-    {
-        [JsonPropertyName("server-public-key")]      public string ServerPublicKey { get; set; } = string.Empty;
-        [JsonPropertyName("mapped-ipv4-address")]    public string MappedIPv4Address { get; set; } = string.Empty;
-        [JsonPropertyName("mapped-ipv6-address")]    public string MappedIPv6Address { get; set; } = string.Empty;
-        [JsonPropertyName("client-id")]              public string ClientId { get; set; } = string.Empty;
-        [JsonPropertyName("api-auth-token")]         public string ApiAuthToken { get; set; } = string.Empty;
-    }
-
+    // WireGuardRegistrationResponse retired: both protocols' POST /api/v1.3/device
+    // replies now deserialize into the shared VPNDeviceResponse DTO
+    // (GuardianConnect.Credentials), which is carried verbatim on the credential.
 
     #region v1.3 APIs
 
@@ -204,8 +192,6 @@ public class GRDGateway
         }
 
         var errorResponse = new ErrorResponse();
-        var response = new HttpResponseMessage();
-        var credsList = new List<GRDCredential>();
 
         var payload = new RegisterDevicePayload
         {
@@ -220,29 +206,45 @@ public class GRDGateway
         Logger.LogInformation($"RegisterDeviceForTransportProtocol: payload for call is '{payLoadString}");
         request.Content = new StringContent(payLoadString);
 
-        GRDCredential cred = new GRDCredential();
         try
         {
-            response = await HttpUtils.Client.SendAsync(request);
-            errorResponse.SetResponse(response).SetData(new GRDCredential());
+            var response = await HttpUtils.Client.SendAsync(request);
+            errorResponse.SetResponse(response);
             var respContent = await response.Content.ReadAsStringAsync();
-            cred = JsonSerializer.Deserialize<GRDCredential>(respContent,
-                GRDCredentialJsonContext.Default.GRDCredential);
-            // 0.40.1 - sets ClientId from EapUser if IKEv2
-            if (cred != null)
+
+            // Surface the server's explanation on a non-2xx (e.g. 400 Bad Request).
+            // Without this the caller only saw the HTTP reason phrase ("Bad Request")
+            // and the response body — which carries the actual reason, e.g.
+            // {"error-message":"Guardian Firewall staff access restricted node"} — was
+            // silently discarded. Mirrors the WireGuard branch's failure logging.
+            if (!response.IsSuccessStatusCode)
             {
-                if (cred.TransportProtocol == GRDTransportProtocol.TransportProtocol.TransportIKEv2)
-                {
-                    cred.ClientId = cred.UserName;
-                }
+                Logger.LogError(
+                    "RegisterDeviceForTransportProtocol: device registration failed {Status}: {Body}",
+                    (int)response.StatusCode, respContent);
+                return errorResponse.SetErrorMessage(
+                    $"Device registration failed ({(int)response.StatusCode}): {respContent}");
             }
+
+            // Same VPNDeviceResponse DTO as the WireGuard branch — for IKEv2 the
+            // host fills eap-username / eap-password / api-auth-token. The factory
+            // plucks the fields this protocol needs (and sets ClientId = EAP user).
+            var device = JsonSerializer.Deserialize(
+                respContent, GRDCredentialJsonContext.Default.VPNDeviceResponse);
+            if (device is null)
+                return errorResponse.SetErrorMessage(
+                    "Device registration response could not be parsed.");
+
+            var cred = GRDCredential.CreateFromDeviceResponse(
+                transportProtocol, device,
+                hostName: hostname, hostnameDisplayValue: hostname,
+                mainCredential: true, validForDays: validForDays);
+            errorResponse.SetData(cred);
         }
         catch (Exception e)
         {
             errorResponse.SetException(e);
         }
-
-        errorResponse.SetData(cred);
 
         return errorResponse;
     }
@@ -313,7 +315,7 @@ public class GRDGateway
         // We retry ONCE (after 350ms) on host-not-found / network-unreachable
         // style failures, and surface anything else immediately.
         HttpResponseMessage response;
-        WireGuardRegistrationResponse? wgResponse;
+        VPNDeviceResponse? wgResponse;
         const int maxAttempts = 2;
         int attempt = 0;
         Exception? lastException = null;
@@ -345,7 +347,7 @@ public class GRDGateway
 
                 var respContent = await response.Content.ReadAsStringAsync();
                 wgResponse = JsonSerializer.Deserialize(
-                    respContent, WireGuardRegistrationResponseJsonContext.Default.WireGuardRegistrationResponse);
+                    respContent, GRDCredentialJsonContext.Default.VPNDeviceResponse);
                 break;
             }
             catch (Exception e) when (IsTransientDnsOrNetworkFailure(e) && attempt < maxAttempts)
@@ -378,27 +380,19 @@ public class GRDGateway
                 "WireGuard registration response missing required fields (server-public-key / mapped-ipv4-address / client-id).");
         }
 
-        var credential = new GRDCredential
-        {
-            TransportProtocol  = GRDTransportProtocol.TransportProtocol.TransportWireGuard,
-            Identifer          = "main",
-            MainCredential     = true,
-            HostName           = hostname,
-            HostnameDisplayValue = hostname,
-            Name               = hostname,
-            ExpirationDate     = DateTime.UtcNow.AddDays(validForDays),
-            ClientId           = wgResponse.ClientId,
-            ApiAuthToken       = wgResponse.ApiAuthToken,
-            DevicePrivateKey   = privateKey.ToBase64(),
-            DevicePublicKey    = publicKey.ToBase64(),
-            ServerPublicKey    = wgResponse.ServerPublicKey,
-            IPv4Address        = wgResponse.MappedIPv4Address,
-            IPv6Address        = wgResponse.MappedIPv6Address,
-            // Per Tech Lead pattern from GRDCredential.InitWithTransportProtocol — populate
-            // UserName/Password so older code paths that key off them don't break.
-            UserName           = wgResponse.ClientId,
-            Password           = "wireguard-creds",
-        };
+        // Carry the host reply verbatim on the credential; the client-side
+        // keypair (private key never leaves this process) is passed in
+        // separately. No UserName/Password stuffing — the WG field set is
+        // disjoint from IKEv2's by construction now.
+        var credential = GRDCredential.CreateFromDeviceResponse(
+            GRDTransportProtocol.TransportProtocol.TransportWireGuard,
+            wgResponse,
+            hostName: hostname,
+            hostnameDisplayValue: hostname,
+            mainCredential: true,
+            validForDays: validForDays,
+            devicePrivateKey: privateKey.ToBase64(),
+            devicePublicKey: publicKey.ToBase64());
 
         errorResponse.SetData(credential);
         Logger.LogInformation(

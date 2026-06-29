@@ -275,6 +275,12 @@ public class VPNTransportIKEV2 : ITransportProvider
 #else
                         Logger.LogInformation( "PollConnectionState: ****************** UNPLANNED DISCONNECT. IGNORING for now...");
 #endif
+                        // The planned-disconnect path removes the DNS-leak filters via
+                        // DisconnectEntryAndRemove; an unplanned drop never did, leaving the
+                        // LUID-scoped DNS permits pinned to a dead tunnel adapter and blocking
+                        // all DNS — the machine then can't resolve anything and every reconnect
+                        // fails "host unknown" until reboot. Reconcile/remove them here.
+                        ConnectionRoutines.RemoveDnsFiltersAfterUnplannedDisconnect();
                     }
 
                     break;

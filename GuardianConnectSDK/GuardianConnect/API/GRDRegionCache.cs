@@ -17,7 +17,7 @@ public class GRDRegionCache
     internal List<string> RegionKeys = new();
     internal Dictionary<string, string> RegionKeysByDisplay = new();
     internal byte[] Sha = Array.Empty<byte>();
-    internal Dictionary<string, List<RegionalHostRecord>> _hostLookup = new();
+    internal Dictionary<string, List<GRDSGWServer>> _hostLookup = new();
     internal List<string> contentstrings = new();
     internal Dictionary<string, GRDRegion> regionLookup = new();
 
@@ -27,7 +27,7 @@ public class GRDRegionCache
     {
         timezonesLookup = new Dictionary<string, List<string>>();
         regionLookup = new Dictionary<string, GRDRegion>();
-        _hostLookup = new Dictionary<string, List<RegionalHostRecord>>();
+        _hostLookup = new Dictionary<string, List<GRDSGWServer>>();
         RegionKeys = new List<string>();
         RegionKeysByDisplay = new Dictionary<string, string>();
     }

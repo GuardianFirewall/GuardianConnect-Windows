@@ -143,7 +143,7 @@ public static class ConnectionRoutines
             szDeviceType = PInvoke.RASDT_Vpn,
             szDeviceName = "WAN Miniport (IKEv2)",
             dwType = PInvoke.RASET_Vpn,
-            dwEncryptionType = PInvoke.ET_Optional,
+            dwEncryptionType = PInvoke.ET_RequireMax,
             dwVpnStrategy = PInvoke.VS_Ikev2Only,
             dwfOptions2 = PInvoke.RASEO2_DontNegotiateMultilink | PInvoke.RASEO2_ReconnectIfDropped |
                           PInvoke.RASEO2_IPv6RemoteDefaultGateway | PInvoke.RASEO2_CacheCredentials,
@@ -193,11 +193,23 @@ public static class ConnectionRoutines
                 null, error);
         }
 
+        // CustomIPSecPolicies = 6 little-endian DWORDs. AES-256-GCM / SHA-384 / ECP-384.
+        //   [0] dwIntegrityMethod         = 3  SHA-384      (IKE/MM integrity)
+        //   [1] dwEncryptionMethod        = 4  AES-256      (IKE/MM cipher)
+        //   [2] dwCipherTransformConstant = 5  AES-256-GCM  (ESP/QM data cipher)
+        //   [3] dwAuthTransformConstant   = 8  AES-256-GCM  (ESP/QM auth)
+        //   [4] dwPfsGroup                = 5  ECP-384      (QM PFS)
+        //   [5] dwDhGroup                 = 5  ECP-384      (IKE/MM key exchange)
+        // IMPORTANT: the CLIENT phonebook encodes GCM-256 as cipher=5 / auth=8 — the OPPOSITE of
+        // the MS-RRASM *server* enum (ROUTER_CUSTOM_IKEv2_POLICY_0 lists GCM-256 cipher=8/auth=5).
+        // Using the server values here produced FWP_E_INVALID_ENUMERATOR (0x8032001D) at RasDial.
+        // This hex is what Set-VpnConnectionIPsecConfiguration (the authoritative client API)
+        // emits for -CipherTransformConstants GCMAES256 -AuthenticationTransformConstants GCMAES256
+        // -EncryptionMethod AES256 -IntegrityCheckMethod SHA384 -DHGroup ECP384 -PfsGroup ECP384.
+        // NOTE: with ET_RequireMax the dial fails (no downgrade) if the gateway can't offer this
+        // suite — verify a successful SA with Get-NetIPsecQuickModeSA.
         entryWasWritten = PInvoke.WritePrivateProfileString(entryName, "CustomIPSecPolicies",
-            "030000000400000002000000050000000200000000000000", phonebookPath);
-        /* given by BC/Brave - the 5 in the middle here could be the ECP384 curve specifier
-                   "030000000400000005000000050000000200000000000000",
-        */
+            "030000000400000005000000080000000500000005000000", phonebookPath);
         if (!entryWasWritten)
         {
             var error = Marshal.GetLastWin32Error();
@@ -269,6 +281,23 @@ public static class ConnectionRoutines
 
         Logger.LogInformation("ConnectEntry: exiting...");
         return new ErrorResponse();
+    }
+
+    /// <summary>
+    /// Tear down DNS-leak filters left installed when the tunnel dropped OUTSIDE the
+    /// planned-disconnect path — e.g. an unplanned RAS drop on network loss (wifi
+    /// deadspot). The filters permit DNS only on the (now-dead) tunnel adapter LUID
+    /// and block everything else, so an orphaned filter set leaves the machine unable
+    /// to resolve ANY hostname — every reconnect's GetServerStatus then fails with
+    /// "host unknown" and the only recovery is a reboot. UpdateFiltersState re-checks
+    /// the connection, sees it DISCONNECTED, and removes the filters. Safe no-op if the
+    /// entry is unknown or no filters are installed.
+    /// </summary>
+    public static void RemoveDnsFiltersAfterUnplannedDisconnect()
+    {
+        Logger.LogInformation(
+            $"RemoveDnsFiltersAfterUnplannedDisconnect: reconciling DNS filters for entry '{ActiveConnectionEntryName}' after unplanned disconnect");
+        VpnDnsFilteringHandler.UpdateFiltersState(ActiveConnectionEntryName);
     }
 
     public static bool DisconnectEntryAndRemove()
