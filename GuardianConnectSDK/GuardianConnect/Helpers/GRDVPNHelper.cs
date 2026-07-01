@@ -285,11 +285,12 @@ public class GRDVPNHelper
         mainCredential.HostnameDisplayValue = server.HostLocation();
 
         // --- PoC (host-IP dial): field test for DNS-filtered networks. ---
-        // Device registration above used the FQDN (server.Hostname) so the HTTPS cert
-        // validates. For BOTH protocols, put the pre-resolved IP where the dial "hostname"
-        // goes (mainCredential.HostName -> the IKEv2 RAS VpnHostName / the WireGuard
-        // endpoint host) so the OS stack never needs DNS to reach the gateway at dial time.
-        // Falls back to the FQDN if resolution fails.
+        // IMPORTANT: HostName MUST stay the FQDN — it feeds the HTTPS calls (GetServerStatus
+        // pre-flight, device registration), whose TLS cert won't validate against an IP
+        // (RemoteCertificateNameMismatch). The IP swap for the actual tunnel DIAL happens at
+        // the VpnHostName assignment in StartIKEv2Connection / StartWireGuardFromStoredCreds
+        // (see ResolveDialHostAsync). Here we only fold the IP into the display value so it
+        // surfaces on the General page. Falls back to FQDN-only display if resolution fails.
         try
         {
             var addrs = await System.Net.Dns.GetHostAddressesAsync(server.Hostname);
@@ -300,8 +301,7 @@ public class GRDVPNHelper
             if (!string.IsNullOrEmpty(ipv4))
             {
                 _logger.LogInformation(
-                    $"PoC host-IP dial ({protocol}): resolved '{server.Hostname}' -> '{ipv4}'; using IP as the dial host.");
-                mainCredential.HostName = ipv4;
+                    $"PoC host-IP dial ({protocol}): resolved '{server.Hostname}' -> '{ipv4}'; IP will be used for the tunnel dial, FQDN kept for HTTPS.");
                 // PoC: surface the IP on the General page by folding it into the display value
                 // (feeds GeneralPageViewModel.HostDisplay and the RAS/WG EntryName).
                 mainCredential.HostnameDisplayValue = $"{server.HostLocation()} [{ipv4}]";
@@ -324,6 +324,33 @@ public class GRDVPNHelper
         _logger.LogInformation(
             $"ConnectVpnWithNewUserCredentialsForProtocol(server): return from ConnectVPNTunnel - IsError == {errorResponse.IsError}");
         return errorResponse;
+    }
+
+    /// <summary>
+    /// PoC (host-IP dial): resolve <paramref name="host"/> (an FQDN) to its first IPv4 for use as
+    /// the tunnel DIAL address. Returns the original host unchanged if it's already an IP, has no
+    /// IPv4, or resolution fails. HostName stays the FQDN elsewhere (HTTPS cert validation); only
+    /// the dial address (IKEv2 VpnHostName / WireGuard Endpoint) uses this.
+    /// </summary>
+    private async Task<string> ResolveDialHostAsync(string host)
+    {
+        if (string.IsNullOrWhiteSpace(host) || System.Net.IPAddress.TryParse(host, out _)) return host;
+        try
+        {
+            var addrs = await System.Net.Dns.GetHostAddressesAsync(host);
+            foreach (var a in addrs)
+                if (a.AddressFamily == System.Net.Sockets.AddressFamily.InterNetwork)
+                {
+                    _logger.LogInformation($"PoC host-IP dial: dialing '{host}' as '{a}'.");
+                    return a.ToString();
+                }
+            _logger.LogWarning($"PoC host-IP dial: no IPv4 for '{host}'; dialing by FQDN.");
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, $"PoC host-IP dial: resolve of '{host}' failed; dialing by FQDN.");
+        }
+        return host;
     }
 
     /// <summary>
@@ -576,11 +603,14 @@ public class GRDVPNHelper
         // host, not part of the device reply.
         mainCredential.EnsureDeviceFromLegacyFields();
         var device = mainCredential.Device!;
+        // PoC (host-IP dial): dial the IKEv2 RAS gateway by resolved IP (FQDN kept on HostName
+        // for the HTTPS pre-flight/registration). Falls back to the FQDN if resolution fails.
+        var ikev2DialHost = await ResolveDialHostAsync(mainCredential.HostName);
         // Make IPC call to GuardianWindowsService to start the connection
         var vpnValues = new VPNCallParameters
         {
             Transport = GRDTransportProtocol.TransportProtocol.TransportIKEv2,
-            VpnHostName = mainCredential.HostName,
+            VpnHostName = ikev2DialHost,
             VpnHostDisplay = mainCredential.HostnameDisplayValue,
             EapuserName = device.EapUsername ?? string.Empty,
             Eappassword = device.EapPassword ?? string.Empty,
@@ -635,7 +665,9 @@ public class GRDVPNHelper
                 .SetErrorMessage("No stored WireGuard credential.");
         }
 
-        var configText = GRDWireGuardConfiguration.WireGuardQuickConfigForCredential(cred);
+        // PoC (host-IP dial): dial the WG endpoint by resolved IP (FQDN kept on HostName for HTTPS).
+        var wgDialHost = await ResolveDialHostAsync(cred.HostName);
+        var configText = GRDWireGuardConfiguration.WireGuardQuickConfigForCredential(cred, endpointHostOverride: wgDialHost);
         if (string.IsNullOrEmpty(configText))
         {
             return errorResponse
@@ -649,7 +681,7 @@ public class GRDVPNHelper
             Transport            = GRDTransportProtocol.TransportProtocol.TransportWireGuard,
             EntryName            = $"Guardian WireGuard - {cred.HostnameDisplayValue}",
             WireGuardConfigText  = configText,
-            VpnHostName          = cred.HostName,
+            VpnHostName          = wgDialHost,
             VpnHostDisplay       = cred.HostnameDisplayValue,
         };
 

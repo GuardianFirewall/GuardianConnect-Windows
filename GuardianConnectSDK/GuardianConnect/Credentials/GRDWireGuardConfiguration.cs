@@ -27,7 +27,8 @@ public static class GRDWireGuardConfiguration
     /// credential is missing required fields (private key, public key,
     /// IPv4 address, server public key, or hostname).
     /// </summary>
-    public static string? WireGuardQuickConfigForCredential(GRDCredential credential, string? dnsServers = null)
+    public static string? WireGuardQuickConfigForCredential(GRDCredential credential, string? dnsServers = null,
+        string? endpointHostOverride = null)
     {
         if (credential.TransportProtocol != GRDTransportProtocol.TransportProtocol.TransportWireGuard)
         {
@@ -69,7 +70,9 @@ public static class GRDWireGuardConfiguration
         sb.AppendLine("[Peer]");
         sb.AppendLine($"PublicKey = {device.ServerPublicKey}");
         sb.AppendLine("AllowedIPs = 0.0.0.0/0, ::/0");
-        sb.AppendLine($"Endpoint = {credential.HostName}:{WireGuardEndpointPort}");
+        // PoC (host-IP dial): dial the endpoint by the resolved IP when supplied, else the FQDN.
+        var endpointHost = string.IsNullOrWhiteSpace(endpointHostOverride) ? credential.HostName : endpointHostOverride;
+        sb.AppendLine($"Endpoint = {endpointHost}:{WireGuardEndpointPort}");
 
         var config = sb.ToString();
         Logger.LogDebug("Formatted WireGuard config:\n{Config}", config);
