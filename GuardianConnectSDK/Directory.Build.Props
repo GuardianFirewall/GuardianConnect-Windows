@@ -14,7 +14,7 @@
         <!-- PoC build (host-IP dial): throwaway prerelease off 1.1.1 GA for the DNS-filtered-network
              field test. Registers the device on the FQDN but dials the gateway by resolved IP for
              BOTH protocols (IKEv2 RAS host + WireGuard endpoint host). -->
-        <VersionSuffix>hostip-poc.1</VersionSuffix>
+        <VersionSuffix>hostip-poc.2</VersionSuffix>
     </PropertyGroup>
 
     <PropertyGroup>

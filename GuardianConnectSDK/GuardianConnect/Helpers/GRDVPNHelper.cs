@@ -302,6 +302,9 @@ public class GRDVPNHelper
                 _logger.LogInformation(
                     $"PoC host-IP dial ({protocol}): resolved '{server.Hostname}' -> '{ipv4}'; using IP as the dial host.");
                 mainCredential.HostName = ipv4;
+                // PoC: surface the IP on the General page by folding it into the display value
+                // (feeds GeneralPageViewModel.HostDisplay and the RAS/WG EntryName).
+                mainCredential.HostnameDisplayValue = $"{server.HostLocation()} [{ipv4}]";
             }
             else
             {
