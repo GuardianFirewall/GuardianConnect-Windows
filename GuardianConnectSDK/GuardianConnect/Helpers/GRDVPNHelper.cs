@@ -283,6 +283,38 @@ public class GRDVPNHelper
         mainCredential.MainCredential = true;
         mainCredential.HostName = server.Hostname;
         mainCredential.HostnameDisplayValue = server.HostLocation();
+
+        // --- PoC (host-IP dial): field test for DNS-filtered networks. ---
+        // Device registration above used the FQDN (server.Hostname) so the HTTPS cert
+        // validates. For BOTH protocols, put the pre-resolved IP where the dial "hostname"
+        // goes (mainCredential.HostName -> the IKEv2 RAS VpnHostName / the WireGuard
+        // endpoint host) so the OS stack never needs DNS to reach the gateway at dial time.
+        // Falls back to the FQDN if resolution fails.
+        try
+        {
+            var addrs = await System.Net.Dns.GetHostAddressesAsync(server.Hostname);
+            string? ipv4 = null;
+            foreach (var a in addrs)
+                if (a.AddressFamily == System.Net.Sockets.AddressFamily.InterNetwork) { ipv4 = a.ToString(); break; }
+
+            if (!string.IsNullOrEmpty(ipv4))
+            {
+                _logger.LogInformation(
+                    $"PoC host-IP dial ({protocol}): resolved '{server.Hostname}' -> '{ipv4}'; using IP as the dial host.");
+                mainCredential.HostName = ipv4;
+            }
+            else
+            {
+                _logger.LogWarning(
+                    $"PoC host-IP dial ({protocol}): no IPv4 for '{server.Hostname}'; keeping FQDN as the dial host.");
+            }
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex,
+                $"PoC host-IP dial ({protocol}): DNS resolve of '{server.Hostname}' failed; keeping FQDN as the dial host.");
+        }
+
         GRDCredentialManager.AddOrUpdateCredential(mainCredential);
 
         errorResponse = await ConnectVPNTunnel();

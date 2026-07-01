@@ -8,16 +8,13 @@
         <Authors>DNSFilter, Inc.</Authors>
         <RepositoryUrl>https://github.com/GuardianFirewall/GuardianConnect-Windows</RepositoryUrl>
 
-        <AssemblyVersion>1.1.1</AssemblyVersion>
-        <FileVersion>1.1.1</FileVersion>
-        <Version>1.1.1</Version>
-        <!-- Prerelease suffix: "beta.N" for non-release NuGet packages; empty = stable release.
-             VERSION POLICY (1.1.0+): bump the PATCH (third) digit for every fix/build. Carries the
-             full consolidation line: WireGuard negotiate-consolidation, IKEv2 EAP-MSCHAPv2 + AES-256-GCM/
-             SHA-384/ECP-384 hardening, GRDSGWServer parity, stale-_activeTransport fix, and the
-             orphaned-DNS-filter (wifi-loss) fix.
-             GA: suffix cleared for the stable 1.1.1 release. -->
-        <VersionSuffix></VersionSuffix>
+        <AssemblyVersion>1.2.0</AssemblyVersion>
+        <FileVersion>1.2.0</FileVersion>
+        <Version>1.2.0</Version>
+        <!-- PoC build (host-IP dial): throwaway prerelease off 1.1.1 GA for the DNS-filtered-network
+             field test. Registers the device on the FQDN but dials the gateway by resolved IP for
+             BOTH protocols (IKEv2 RAS host + WireGuard endpoint host). -->
+        <VersionSuffix>hostip-poc.1</VersionSuffix>
     </PropertyGroup>
 
     <PropertyGroup>
