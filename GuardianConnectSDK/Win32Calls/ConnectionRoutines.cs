@@ -143,7 +143,10 @@ public static class ConnectionRoutines
             szDeviceType = PInvoke.RASDT_Vpn,
             szDeviceName = "WAN Miniport (IKEv2)",
             dwType = PInvoke.RASET_Vpn,
-            dwEncryptionType = PInvoke.ET_RequireMax,
+            // PoC (relaxed suite): backed down from ET_RequireMax to the pre-hardening
+            // ET_Optional so the dial doesn't demand maximum-strength while the gateway
+            // side is being tuned.
+            dwEncryptionType = PInvoke.ET_Optional,
             dwVpnStrategy = PInvoke.VS_Ikev2Only,
             dwfOptions2 = PInvoke.RASEO2_DontNegotiateMultilink | PInvoke.RASEO2_ReconnectIfDropped |
                           PInvoke.RASEO2_IPv6RemoteDefaultGateway | PInvoke.RASEO2_CacheCredentials,
@@ -193,8 +196,8 @@ public static class ConnectionRoutines
                 null, error);
         }
 
-        // CustomIPSecPolicies = 6 little-endian DWORDs. AES-256-GCM / SHA-384 / ECP-384.
-        //   [0] dwIntegrityMethod         = 3  SHA-384      (IKE/MM integrity)
+        // CustomIPSecPolicies = 6 little-endian DWORDs. AES-256-GCM / SHA-256 / ECP-384.
+        //   [0] dwIntegrityMethod         = 2  SHA-256      (IKE/MM integrity) [PoC: was 3 SHA-384]
         //   [1] dwEncryptionMethod        = 4  AES-256      (IKE/MM cipher)
         //   [2] dwCipherTransformConstant = 5  AES-256-GCM  (ESP/QM data cipher)
         //   [3] dwAuthTransformConstant   = 8  AES-256-GCM  (ESP/QM auth)
@@ -205,11 +208,9 @@ public static class ConnectionRoutines
         // Using the server values here produced FWP_E_INVALID_ENUMERATOR (0x8032001D) at RasDial.
         // This hex is what Set-VpnConnectionIPsecConfiguration (the authoritative client API)
         // emits for -CipherTransformConstants GCMAES256 -AuthenticationTransformConstants GCMAES256
-        // -EncryptionMethod AES256 -IntegrityCheckMethod SHA384 -DHGroup ECP384 -PfsGroup ECP384.
-        // NOTE: with ET_RequireMax the dial fails (no downgrade) if the gateway can't offer this
-        // suite — verify a successful SA with Get-NetIPsecQuickModeSA.
+        // -EncryptionMethod AES256 -IntegrityCheckMethod SHA256 -DHGroup ECP384 -PfsGroup ECP384.
         entryWasWritten = PInvoke.WritePrivateProfileString(entryName, "CustomIPSecPolicies",
-            "030000000400000005000000080000000500000005000000", phonebookPath);
+            "020000000400000005000000080000000500000005000000", phonebookPath);
         if (!entryWasWritten)
         {
             var error = Marshal.GetLastWin32Error();

@@ -25,6 +25,31 @@ public class GuardianNPCommandDispatcher : IGuardianNPContract
     private static readonly SemaphoreSlim _transportGate = new(1, 1);
     private static ITransportProvider? _activeTransport;
 
+    // Transition state the service PUBLISHES while a connect/disconnect is in
+    // flight, so status readers see "Connecting"/"Disconnecting" instead of a
+    // stale binary Connected/Disconnected. Deliberately a lock-free volatile
+    // int (0=None, 1=Connecting, 2=Disconnecting) and NOT guarded by
+    // _transportGate: Start/Disconnect hold the gate for the entire dial /
+    // teardown, so a status query that took the gate would block until the
+    // operation finished — exactly when the transition state is interesting.
+    private const int TransitionNone = 0;
+    private const int TransitionConnecting = 1;
+    private const int TransitionDisconnecting = 2;
+    private static volatile int _transitionState = TransitionNone;
+
+    /// <summary>
+    /// Publish a transition (or its end) and wake the client-side state
+    /// listener so the app re-fetches status. Pulse ONLY the client event:
+    /// VPNServiceNotifierHandle's listener is the IKEv2 poller, which would
+    /// misread a mid-transition wake as an unplanned disconnect (see the
+    /// comment in VpnTunnelManager for the WG analog of this rule).
+    /// </summary>
+    private static void PublishTransition(int transition)
+    {
+        _transitionState = transition;
+        NotificationHandler.VPNClientNotifierHandle?.Set();
+    }
+
     private static ILogger Logger
     {
         get
@@ -107,7 +132,19 @@ public class GuardianNPCommandDispatcher : IGuardianNPContract
                 "GuardianNPCommandDispatcher.StartVPNConnection: starting transport {Transport}",
                 transport.ProtocolType);
 
-            var result = await transport.StartVPNTunnelWithOptions(protocolRequest).ConfigureAwait(false);
+            // Publish CONNECTING only around the actual dial (refusal paths above
+            // must not flash a transition). Cleared in the inner finally so a
+            // throwing transport can't leave the service stuck "Connecting".
+            PublishTransition(TransitionConnecting);
+            ErrorResponse result;
+            try
+            {
+                result = await transport.StartVPNTunnelWithOptions(protocolRequest).ConfigureAwait(false);
+            }
+            finally
+            {
+                PublishTransition(TransitionNone);
+            }
             Logger.LogInformation(
                 "GuardianNPCommandDispatcher.StartVPNConnection: transport {Transport} returned IsError={IsError}",
                 transport.ProtocolType, result.IsError);
@@ -138,6 +175,10 @@ public class GuardianNPCommandDispatcher : IGuardianNPContract
                 "GuardianNPCommandDispatcher.DisconnectVPNConnection: stopping active transport (current entry '{Entry}')",
                 ConnectionRoutines.ActiveConnectionEntryName);
 
+            // Publish DISCONNECTING for the duration of the teardown; cleared in
+            // the finally so an exception can't leave the state stuck.
+            PublishTransition(TransitionDisconnecting);
+
             if (_activeTransport is null)
             {
                 // Backward-compat: legacy clients call Disconnect without a prior Start
@@ -154,6 +195,7 @@ public class GuardianNPCommandDispatcher : IGuardianNPContract
         }
         finally
         {
+            PublishTransition(TransitionNone);
             _transportGate.Release();
         }
     }
@@ -216,6 +258,29 @@ public class GuardianNPCommandDispatcher : IGuardianNPContract
 
     public CurrentVPNStatus GetCurrentVpnConnectionStatus()
     {
+        // Transition states first, BEFORE touching _transportGate: Start /
+        // Disconnect hold the gate for the whole operation, so gating this
+        // read would block the status query until the transition is over —
+        // the caller would never actually observe Connecting/Disconnecting.
+        var transition = _transitionState;
+        if (transition != TransitionNone)
+        {
+            var transitionEntry = string.IsNullOrEmpty(ConnectionRoutines.ActiveConnectionEntryName)
+                ? (string.IsNullOrEmpty(NotificationHandler.LastKnownConnectedEntry)
+                    ? "None"
+                    : NotificationHandler.LastKnownConnectedEntry)
+                : ConnectionRoutines.ActiveConnectionEntryName;
+            var transitionStatus = new CurrentVPNStatus(
+                transition == TransitionConnecting
+                    ? ConnectionStateEnum.Connecting
+                    : ConnectionStateEnum.Disconnecting,
+                transitionEntry);
+            Logger.LogInformation(
+                "GuardianNPCommandDispatcher.GetVpnConnectionStatus: transition in flight — {State}, Entry='{Entry}'",
+                transitionStatus.ConnectionState, transitionStatus.EntryName);
+            return transitionStatus;
+        }
+
         var status = new CurrentVPNStatus
         {
             ConnectionState = ConnectionStateEnum.Disconnected,
