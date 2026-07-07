@@ -37,6 +37,19 @@ public class GRDSGWServer
     [JsonPropertyName("smart-routing-enabled")]
     public bool SmartProxyRoutingEnabled { get; set; }
 
+    /// The gateway's public IPv4 address, as published by the host in the
+    /// hostnames-for-region / all-hostnames responses. When present, the IKEv2
+    /// dial uses this instead of the FQDN (the OS then needs no DNS at dial
+    /// time); registration/HTTPS stays on the FQDN for TLS SAN validation.
+    /// Distinct from the WG "mapped-ipv4-address" (the client's tunnel IP).
+    [JsonPropertyName("ipv4-address")]
+    public string Ipv4Address { get; set; } = string.Empty;
+
+    /// The gateway's public IPv6 address. Currently empty on the wire; carried
+    /// for forward-compat alongside <see cref="Ipv4Address"/>.
+    [JsonPropertyName("ipv6-address")]
+    public string Ipv6Address { get; set; } = string.Empty;
+
     /// The region that owns this host. Mirrors iOS GRDSGWServer.region. The
     /// servers/all-hostnames responses nest a "region" object per host, so this
     /// binds directly from JSON (e.g. GetAllHostnamesAsync).

@@ -97,6 +97,18 @@ public class GRDCredential
     public string IPv6Address { get; set; } = string.Empty;
 
     /// <summary>
+    /// The GATEWAY's public IPv4/IPv6 addresses (from GRDSGWServer's
+    /// "ipv4-address"/"ipv6-address" wire fields), captured at credential-creation
+    /// time so a reconnect-from-persisted-credential can still dial by IP. NOT the
+    /// same as IPv4Address/IPv6Address above — those are the WG mapped (client
+    /// tunnel interface) addresses from the device response. When
+    /// ServerIPv4Address is non-empty, the IKEv2 dial targets it instead of
+    /// HostName; HostName remains the FQDN for registration/HTTPS (TLS SAN).
+    /// </summary>
+    public string ServerIPv4Address { get; set; } = string.Empty;
+    public string ServerIPv6Address { get; set; } = string.Empty;
+
+    /// <summary>
     /// The host's <c>POST /api/v1.3/device</c> reply, carried verbatim. This is
     /// the authoritative source for the server-provided fields; the flat fields
     /// above (UserName/Password/ServerPublicKey/IPv4Address/IPv6Address/ClientId/

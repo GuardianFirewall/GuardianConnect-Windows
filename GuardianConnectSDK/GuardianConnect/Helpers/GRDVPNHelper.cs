@@ -283,6 +283,10 @@ public class GRDVPNHelper
         mainCredential.MainCredential = true;
         mainCredential.HostName = server.Hostname;
         mainCredential.HostnameDisplayValue = server.HostLocation();
+        // Server-published gateway IPs (may be empty): the IKEv2 dial prefers
+        // ServerIPv4Address over the FQDN when present.
+        mainCredential.ServerIPv4Address = server.Ipv4Address;
+        mainCredential.ServerIPv6Address = server.Ipv6Address;
         GRDCredentialManager.AddOrUpdateCredential(mainCredential);
 
         errorResponse = await ConnectVPNTunnel();
@@ -481,6 +485,10 @@ public class GRDVPNHelper
         var credentials = (GRDCredential)errorResponse.Data!;
         credentials.HostName = selectedServer.Hostname;
         credentials.HostnameDisplayValue = selectedServer.HostLocation();
+        // Server-published gateway IPs (may be empty): the IKEv2 dial prefers
+        // ServerIPv4Address over the FQDN when present.
+        credentials.ServerIPv4Address = selectedServer.Ipv4Address;
+        credentials.ServerIPv6Address = selectedServer.Ipv6Address;
         return new ErrorResponse().SetData(credentials);
     }
 
@@ -541,11 +549,23 @@ public class GRDVPNHelper
         // host, not part of the device reply.
         mainCredential.EnsureDeviceFromLegacyFields();
         var device = mainCredential.Device!;
+
+        // Dial by the server-published gateway IPv4 when the host supplied one
+        // (hostnames-for-region "ipv4-address"): the OS then needs no DNS at
+        // dial time. Registration/HTTPS stays on the FQDN (TLS SAN validation).
+        // Falls back to the FQDN for hosts that don't publish an IP yet.
+        var dialTarget = string.IsNullOrEmpty(mainCredential.ServerIPv4Address)
+            ? mainCredential.HostName
+            : mainCredential.ServerIPv4Address;
+        if (dialTarget != mainCredential.HostName)
+            _logger.LogInformation(
+                $"StartIKEv2Connection: dialing by server-published IPv4 '{dialTarget}' (FQDN '{mainCredential.HostName}')");
+
         // Make IPC call to GuardianWindowsService to start the connection
         var vpnValues = new VPNCallParameters
         {
             Transport = GRDTransportProtocol.TransportProtocol.TransportIKEv2,
-            VpnHostName = mainCredential.HostName,
+            VpnHostName = dialTarget,
             VpnHostDisplay = mainCredential.HostnameDisplayValue,
             EapuserName = device.EapUsername ?? string.Empty,
             Eappassword = device.EapPassword ?? string.Empty,
