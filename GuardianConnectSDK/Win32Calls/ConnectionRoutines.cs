@@ -274,13 +274,62 @@ public static class ConnectionRoutines
             }
         }
 
-        // Update Filters to shape traffic as needed
+        // RasDial(...,0,null,...) returns once the dial is INITIATED, not when the tunnel is
+        // actually up. WAIT for RASCS_Connected, or capture the real negotiation error (e.g.
+        // 13801 ERROR_IPSEC_IKE_AUTH_FAIL). Previously ConnectEntry returned OK here regardless,
+        // which is why a failed IKE negotiation was reported as a (false) success.
+        var negErr = WaitForConnectedOrError(ActiveConnectionHandle, 45000);
+        if (negErr != 0)
+        {
+            Logger.LogError(
+                $"ConnectEntry: tunnel did not reach Connected; RAS/IKE error {negErr}. Hanging up.");
+            try { PInvoke.RasHangUp(ActiveConnectionHandle); } catch { /* best effort */ }
+            ActiveConnectionHandle = HRASCONN.Null;
+            return new ErrorResponse("Connection failed during negotiation", null, true, null, negErr);
+        }
+
+        // Update Filters to shape traffic as needed (only now that we're actually connected).
         Logger.LogInformation(
             "ConnectEntry: Calling VpnDnsFilteringHandler.UpdateFiltersState to turn on traffic filtering...");
         VpnDnsFilteringHandler.UpdateFiltersState(ActiveConnectionEntryName);
 
         Logger.LogInformation("ConnectEntry: exiting...");
         return new ErrorResponse();
+    }
+
+    /// <summary>
+    /// Poll RasGetConnectStatus until the tunnel reaches RASCS_Connected (returns 0) or reports a
+    /// terminal error/disconnect (returns the RAS/IKE dwError, e.g. 13801 ERROR_IPSEC_IKE_AUTH_FAIL).
+    /// Returns ERROR_TIMEOUT (1460) if it never settles within <paramref name="timeoutMs"/>. This is
+    /// what lets ConnectEntry propagate the REAL negotiation result instead of a premature OK.
+    /// </summary>
+    private static unsafe uint WaitForConnectedOrError(HRASCONN h, int timeoutMs)
+    {
+        var status = new RASCONNSTATUSW { dwSize = (uint)sizeof(RASCONNSTATUSW) };
+        var start = Environment.TickCount64;
+        while (Environment.TickCount64 - start < timeoutMs)
+        {
+            var q = PInvoke.RasGetConnectStatus(h, ref status);
+            if (q != 0)
+            {
+                Logger.LogError($"WaitForConnectedOrError: RasGetConnectStatus query failed with {q}");
+                return q;
+            }
+            if (status.dwError != 0)
+            {
+                Logger.LogError(
+                    $"WaitForConnectedOrError: connection reported error {status.dwError} (state {status.rasconnstate})");
+                return status.dwError;
+            }
+            if (status.rasconnstate == RASCONNSTATE.RASCS_Connected) return 0;
+            if (status.rasconnstate == RASCONNSTATE.RASCS_Disconnected)
+                return status.dwError != 0 ? status.dwError : 1u;
+
+            System.Threading.Thread.Sleep(250);
+        }
+
+        Logger.LogError("WaitForConnectedOrError: timed out waiting for RASCS_Connected");
+        return 1460; // ERROR_TIMEOUT
     }
 
     /// <summary>
