@@ -371,6 +371,15 @@ public class ClientPipeService : BackgroundService
                             var exitResp = cmdDispatcher.ExitConnectingMode();
                             ss.WriteString(JsonSerializer.Serialize(exitResp, ErrorResponseJsonContext.Default.ErrorResponse));
                             break;
+                        case IGuardianNPContract.NPCommands.ApplyUpdate:
+                            // Payload = advertised version string, a hint only.
+                            // The host-registered handler re-derives everything
+                            // else itself; no URL or file path ever crosses this
+                            // pipe (see IGuardianNPContract.ApplyUpdate).
+                            _logger.Log(LogLevel.Information, $"ClientPipeService[{threadId}]: Performing ApplyUpdate (advertised='{cmdPayload}')");
+                            var updateResp = cmdDispatcher.ApplyUpdate(cmdPayload);
+                            ss.WriteString(JsonSerializer.Serialize(updateResp, ErrorResponseJsonContext.Default.ErrorResponse));
+                            break;
                         default:
                             _logger.Log(LogLevel.Information, "WHY ARE WE HERE?");
                             break;

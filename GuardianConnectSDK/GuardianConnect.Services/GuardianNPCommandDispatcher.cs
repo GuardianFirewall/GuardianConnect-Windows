@@ -342,4 +342,50 @@ public class GuardianNPCommandDispatcher : IGuardianNPContract
         svc.ExitConnectingMode();
         return new ErrorResponse();
     }
+
+    /// <summary>
+    /// Update behavior supplied by the HOSTING SERVICE PROCESS at startup
+    /// (e.g. GuardianFirewallService registers this in its Program/MainService
+    /// init). The SDK deliberately implements none of the update mechanics —
+    /// feed location, artifact download, signature verification, and installer
+    /// launch are product-private concerns of the host, and the pipe contract
+    /// carries only an advertised-version HINT (never a URL or file path; see
+    /// IGuardianNPContract.ApplyUpdate for the threat model).
+    ///
+    /// Handler obligations:
+    ///  - Independently verify the advertised version is newer than what is
+    ///    installed (never trust the hint).
+    ///  - Authenticate the downloaded artifact before executing it.
+    ///  - VALIDATE synchronously but perform the long-running work (download /
+    ///    install) on a background task and RETURN PROMPTLY — the installer
+    ///    stops this service, so a handler that blocks until the update
+    ///    completes never gets its response back to the client.
+    /// </summary>
+    public static Func<string, ErrorResponse>? UpdateRequestHandler;
+
+    public ErrorResponse ApplyUpdate(string advertisedVersion)
+    {
+        var handler = UpdateRequestHandler;
+        if (handler is null)
+        {
+            Logger.LogWarning(
+                "GuardianNPCommandDispatcher.ApplyUpdate: no UpdateRequestHandler registered by the hosting service; refusing.");
+            return new ErrorResponse().SetErrorMessage(
+                "Update requests are not supported by this service host.");
+        }
+
+        Logger.LogInformation(
+            "GuardianNPCommandDispatcher.ApplyUpdate: user-approved update requested (advertised '{Version}'); invoking host handler.",
+            advertisedVersion);
+        try
+        {
+            return handler(advertisedVersion ?? string.Empty);
+        }
+        catch (Exception ex)
+        {
+            Logger.LogError(ex, "GuardianNPCommandDispatcher.ApplyUpdate: host handler threw.");
+            return new ErrorResponse().SetException(ex)
+                .SetErrorMessage($"Update handler failed: {ex.Message}");
+        }
+    }
 }

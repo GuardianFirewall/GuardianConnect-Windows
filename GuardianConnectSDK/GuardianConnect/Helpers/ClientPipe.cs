@@ -148,6 +148,17 @@ public static class ClientPipe
         if (!Instance.IsConnected) Instance.ReopenNamedPipe();
         return Instance.ExitConnectingMode();
     }
+
+    /// <summary>
+    /// User approved applying an available product update (advertised version
+    /// is a hint only — see IGuardianNPContract.ApplyUpdate for the contract
+    /// and threat model).
+    /// </summary>
+    public static ErrorResponse ApplyUpdate(string advertisedVersion)
+    {
+        if (!Instance.IsConnected) Instance.ReopenNamedPipe();
+        return Instance.ApplyUpdate(advertisedVersion);
+    }
 }
 
 public class ClientPipeImpl : IGuardianNPContract
@@ -447,9 +458,22 @@ public class ClientPipeImpl : IGuardianNPContract
     public ErrorResponse ExitConnectingMode()  => SendVoidCommand(IGuardianNPContract.NPCommands.ExitConnectingMode);
 
     /// <summary>
-    /// Shared helper for IPC commands that take no payload and return an ErrorResponse.
+    /// User approved applying an available product update. The payload is the
+    /// advertised version string — a HINT only; the service host's registered
+    /// handler independently re-derives, verifies, and authenticates everything
+    /// it executes (no URL or file path crosses the pipe; see
+    /// IGuardianNPContract.ApplyUpdate). Uses the bounded-read path: the handler
+    /// contract is validate-then-background, so a prompt ACK is expected and a
+    /// hung service can't wedge the UI's pipe.
     /// </summary>
-    private ErrorResponse SendVoidCommand(IGuardianNPContract.NPCommands cmd)
+    public ErrorResponse ApplyUpdate(string advertisedVersion) =>
+        SendVoidCommand(IGuardianNPContract.NPCommands.ApplyUpdate, advertisedVersion ?? string.Empty);
+
+    /// <summary>
+    /// Shared helper for IPC commands that return an ErrorResponse, with an
+    /// optional string payload (empty = void command).
+    /// </summary>
+    private ErrorResponse SendVoidCommand(IGuardianNPContract.NPCommands cmd, string payload = "")
     {
         var resp = new ErrorResponse();
         try
@@ -458,7 +482,7 @@ public class ClientPipeImpl : IGuardianNPContract
             _pipeIO.Wait();
             try
             {
-                var cmdString = $"{Hexify(cmd)}.";
+                var cmdString = $"{Hexify(cmd)}.{payload}";
                 ss.WriteString(cmdString);
 
                 // Bounded read. Run the synchronously-blocking response read on a
