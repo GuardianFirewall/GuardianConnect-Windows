@@ -16,7 +16,7 @@
              update-alpha.N = the in-place-update line off 1.1.1 GA: ApplyUpdate pipe command
              (advertised-version hint only; update mechanics are host-registered via
              GuardianNPCommandDispatcher.UpdateRequestHandler — the SDK carries no feed/URL/path). -->
-        <VersionSuffix>update-alpha.1</VersionSuffix>
+        <VersionSuffix>update-beta.1</VersionSuffix>
     </PropertyGroup>
 
     <PropertyGroup>
