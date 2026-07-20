@@ -51,6 +51,12 @@ public static class ErrorResponseExtensions
 
     public static ErrorResponse SetGrdApiError(this ErrorResponse er, GRDAPIError error)
     {
-        return er.SetGrdApiError(error);
+        // (was: `return er.SetGrdApiError(error);` — infinite self-recursion;
+        // latent until the v1.4 error plumbing became the first caller)
+        er.IsError = true;
+        er.GRDApiError = error;
+        if (string.IsNullOrEmpty(er.Message) && !string.IsNullOrEmpty(error.Message))
+            er.Message = string.IsNullOrEmpty(error.Title) ? error.Message : $"{error.Title}: {error.Message}";
+        return er;
     }
 }

@@ -104,6 +104,10 @@ public class GRDGateway
         }
 
         Logger.LogInformation($"GetServerStatus: Making status call to host {vpnHost} ...");
+        // DELIBERATELY still v1.3: server-status is absent from the v1.4 spec
+        // (GRD-1461 gateway-team question #1). The doc warns mixed API
+        // versions are "possible but not guaranteed" — move this to v1.4 (or
+        // get the mix blessed) before the migration ships.
         var reqUri = new Uri($"https://{vpnHost}/api/v1.3/server-status");
         var request = new HttpRequestMessage(HttpMethod.Get, reqUri);
 
@@ -159,11 +163,13 @@ public class GRDGateway
         public string? PublicKey { get; set; }
     }
 
-    // WireGuardRegistrationResponse retired: both protocols' POST /api/v1.3/device
-    // replies now deserialize into the shared VPNDeviceResponse DTO
-    // (GuardianConnect.Credentials), which is carried verbatim on the credential.
+    // WireGuardRegistrationResponse retired: both protocols' registration
+    // replies deserialize into the shared VPNDeviceResponse DTO
+    // (GuardianConnect.Credentials), which is carried verbatim on the
+    // credential. The v1.4 spec states the registration response is unchanged
+    // from previous API versions, so the DTO carries over as-is.
 
-    #region v1.3 APIs
+    #region SGW APIs (v1.4 migration, GRD-1461)
 
     /// Used to register a new device for a given transport protocol
     /// @param transportProtocol Specified what kind of VPN credentials will be returned
@@ -199,7 +205,10 @@ public class GRDGateway
             transportProtocol = GRDTransportProtocol.TransportProtocolStringFor(transportProtocol)
         };
 
-        var reqUri = new Uri($"https://{hostname}/api/v1.3/device");
+        // v1.4 (GRD-1461): registration moved to the renamed
+        // /device-credentials path; request keys and response shape are
+        // unchanged from v1.3.
+        var reqUri = new Uri($"https://{hostname}/api/v1.4/device-credentials");
         var request = new HttpRequestMessage(HttpMethod.Post, reqUri);
         var payLoadString =
             JsonSerializer.Serialize(payload, RegisterDevicePayloadJsonContext.Default.RegisterDevicePayload);
@@ -212,18 +221,18 @@ public class GRDGateway
             errorResponse.SetResponse(response);
             var respContent = await response.Content.ReadAsStringAsync();
 
-            // Surface the server's explanation on a non-2xx (e.g. 400 Bad Request).
-            // Without this the caller only saw the HTTP reason phrase ("Bad Request")
-            // and the response body — which carries the actual reason, e.g.
-            // {"error-message":"Guardian Firewall staff access restricted node"} — was
-            // silently discarded. Mirrors the WireGuard branch's failure logging.
+            // v1.4 standardizes every non-2xx body as
+            // {"error-title","error-message"}, explicitly user-showable.
+            // Parse it so callers get a presentable GRDAPIError instead of a
+            // raw body dump (FromResponseBody degrades gracefully for
+            // anything non-standard, e.g. proxy HTML).
             if (!response.IsSuccessStatusCode)
             {
+                var apiError = GRDAPIError.FromResponseBody(respContent, response.StatusCode);
                 Logger.LogError(
-                    "RegisterDeviceForTransportProtocol: device registration failed {Status}: {Body}",
-                    (int)response.StatusCode, respContent);
-                return errorResponse.SetErrorMessage(
-                    $"Device registration failed ({(int)response.StatusCode}): {respContent}");
+                    "RegisterDeviceForTransportProtocol: device registration failed {Status}: {Title}: {Message}",
+                    (int)response.StatusCode, apiError.Title, apiError.Message);
+                return errorResponse.SetGrdApiError(apiError);
             }
 
             // Same VPNDeviceResponse DTO as the WireGuard branch — for IKEv2 the
@@ -295,13 +304,14 @@ public class GRDGateway
             PublicKey            = publicKey.ToBase64()
         };
 
-        var reqUri = new Uri($"https://{hostname}/api/v1.3/device");
+        // v1.4 (GRD-1461): renamed /device-credentials path; same keys/response.
+        var reqUri = new Uri($"https://{hostname}/api/v1.4/device-credentials");
         var request = new HttpRequestMessage(HttpMethod.Post, reqUri);
         var payloadString = JsonSerializer.Serialize(
             payload, RegisterDevicePayloadJsonContext.Default.RegisterDevicePayload);
         // Don't log the JWT or public key — both are sensitive. Log shape only.
         Logger.LogInformation(
-            "EstablishWireGuardCredential: POST /api/v1.3/device transport=wireguard host={Host}",
+            "EstablishWireGuardCredential: POST /api/v1.4/device-credentials transport=wireguard host={Host}",
             hostname);
         request.Content = new StringContent(payloadString);
 
@@ -337,12 +347,14 @@ public class GRDGateway
 
                 if (!response.IsSuccessStatusCode)
                 {
+                    // v1.4 standardized error body — parse for a
+                    // user-showable title/message (see IKEv2 branch).
                     var body = await response.Content.ReadAsStringAsync();
+                    var apiError = GRDAPIError.FromResponseBody(body, response.StatusCode);
                     Logger.LogError(
-                        "EstablishWireGuardCredential: register failed {Status}: {Body}",
-                        (int)response.StatusCode, body);
-                    return errorResponse.SetErrorMessage(
-                        $"WireGuard registration failed: {(int)response.StatusCode}");
+                        "EstablishWireGuardCredential: register failed {Status}: {Title}: {Message}",
+                        (int)response.StatusCode, apiError.Title, apiError.Message);
+                    return errorResponse.SetGrdApiError(apiError);
                 }
 
                 var respContent = await response.Content.ReadAsStringAsync();
@@ -415,7 +427,11 @@ public class GRDGateway
 
         var payload = new InvalidateCredsPayload { ApiToken = apiToken, SubscriberCredential = subCred };
 
-        var reqUri = new Uri($"https://{hostName}/api/v1.3/device/{clientId}/invalidate-credentials");
+        // v1.4 (GRD-1461): same path shape under the new version. The body
+        // already matches the v1.4 spec exactly (api-auth-token +
+        // subscriber-credential). Best-effort semantics per the spec — the
+        // response body can be dismissed.
+        var reqUri = new Uri($"https://{hostName}/api/v1.4/device/{clientId}/invalidate-credentials");
         var request = new HttpRequestMessage(HttpMethod.Post, reqUri);
         request.Content = new StringContent(JsonSerializer.Serialize(payload,
             InvalidateCredsPayloadJsonContext.Default.InvalidateCredsPayload));
@@ -466,6 +482,11 @@ public class GRDGateway
             var clientId = DeviceIdentifier;
 
             // build request
+            // DELIBERATELY still v1.3: the standalone filters endpoint is
+            // absent from the v1.4 spec — registration now takes
+            // device-filter-config inline, but WE change filters mid-session
+            // from the UI (GRD-1461 gateway-team question #2). Migrate or
+            // redesign once the gateway team answers.
             var reqUri = new Uri($"https://{BaseHostName}/api/v1.3/device/{clientId}/config/filters");
             var request = new HttpRequestMessage(HttpMethod.Post, reqUri);
             request.Content = new StringContent(dfcJson);
@@ -487,5 +508,5 @@ public class GRDGateway
 
     #endregion - Device Filter Configs
 
-    #endregion - v1.3 APIs
+    #endregion - SGW APIs (v1.4 migration, GRD-1461)
 }
