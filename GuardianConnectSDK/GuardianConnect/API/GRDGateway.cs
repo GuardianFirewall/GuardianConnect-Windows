@@ -104,10 +104,10 @@ public class GRDGateway
         }
 
         Logger.LogInformation($"GetServerStatus: Making status call to host {vpnHost} ...");
-        // DELIBERATELY still v1.3: server-status is absent from the v1.4 spec
-        // (GRD-1461 gateway-team question #1). The doc warns mixed API
-        // versions are "possible but not guaranteed" — move this to v1.4 (or
-        // get the mix blessed) before the migration ships.
+        // v1.3 by design, permanently: per the gateway team (GRD-1461,
+        // 2026-07-20) only endpoints dealing with VPN device credentials
+        // moved to v1.4 — server-status is the sanctioned exception and has
+        // no v1.4 form.
         var reqUri = new Uri($"https://{vpnHost}/api/v1.3/server-status");
         var request = new HttpRequestMessage(HttpMethod.Get, reqUri);
 
@@ -413,6 +413,61 @@ public class GRDGateway
         return errorResponse;
     }
 
+    /// <summary>
+    /// v1.4 (GRD-1461): validate a stored VPN credential BEFORE
+    /// re-establishing a tunnel with it. Per the spec: a 200 means the
+    /// credential is usable (body is dismissible); ANY non-200 is a critical
+    /// failure and the credential must never be used again — callers should
+    /// discard it and run a fresh registration. Auth rides the
+    /// grd-api-auth-token HTTP header (the v1.4 convention for GETs; header
+    /// value = the api-auth-token — confirmed by the gateway team, the
+    /// spec's "client-id" value there was a typo).
+    ///
+    /// Not yet wired into the reconnect paths (app start / power resume /
+    /// reconnect-after-update) — that policy work is the follow-on to the
+    /// mechanical migration.
+    /// </summary>
+    public static async Task<ErrorResponse> VerifyCredentialsForClientId(string clientId, string apiToken,
+        string hostName)
+    {
+        var errorResponse = new ErrorResponse();
+        if (string.IsNullOrEmpty(clientId) || string.IsNullOrEmpty(apiToken) || string.IsNullOrEmpty(hostName))
+        {
+            Logger.LogInformation(
+                "VerifyCredentialsForClientId: identifier portions are null or empty; nothing to verify.");
+            return new ErrorResponse("EMPTYPARAMS", null, true);
+        }
+
+        var reqUri = new Uri($"https://{hostName}/api/v1.4/device/{clientId}/verify-credentials");
+        var request = new HttpRequestMessage(HttpMethod.Get, reqUri);
+        request.Headers.Add("grd-api-auth-token", apiToken);
+
+        try
+        {
+            var response = await HttpUtils.Client.SendAsync(request);
+            errorResponse.SetResponse(response);
+            if (!response.IsSuccessStatusCode)
+            {
+                var body = await response.Content.ReadAsStringAsync();
+                var apiError = GRDAPIError.FromResponseBody(body, response.StatusCode);
+                Logger.LogError(
+                    "VerifyCredentialsForClientId: credential INVALID ({Status}): {Title}: {Message} — must not be reused.",
+                    (int)response.StatusCode, apiError.Title, apiError.Message);
+                return errorResponse.SetGrdApiError(apiError);
+            }
+            Logger.LogInformation("VerifyCredentialsForClientId: credential for {ClientId} is valid.", clientId);
+        }
+        catch (Exception e)
+        {
+            // Transport-level failure (offline, DNS) is NOT a verdict on the
+            // credential — surface the exception distinctly so callers don't
+            // discard a good credential over a network blip.
+            errorResponse.SetException(e);
+        }
+
+        return errorResponse;
+    }
+
     public static async Task<ErrorResponse> InvalidateCredentialsForClientId(string clientId, string apiToken,
         string hostName, string subCred)
     {
@@ -482,12 +537,13 @@ public class GRDGateway
             var clientId = DeviceIdentifier;
 
             // build request
-            // DELIBERATELY still v1.3: the standalone filters endpoint is
-            // absent from the v1.4 spec — registration now takes
-            // device-filter-config inline, but WE change filters mid-session
-            // from the UI (GRD-1461 gateway-team question #2). Migrate or
-            // redesign once the gateway team answers.
-            var reqUri = new Uri($"https://{BaseHostName}/api/v1.3/device/{clientId}/config/filters");
+            // v1.4 (GRD-1461): confirmed by the gateway team (2026-07-20) —
+            // all tunnel-modifying data endpoints (filters, multihop,
+            // client-rules) accept mid-session POSTs under v1.4 and take
+            // effect server-side instantly. Token stays in the JSON body per
+            // the convention: GETs use the grd-api-auth-token header, POSTs
+            // carry the token in the body (as this config dict already does).
+            var reqUri = new Uri($"https://{BaseHostName}/api/v1.4/device/{clientId}/config/filters");
             var request = new HttpRequestMessage(HttpMethod.Post, reqUri);
             request.Content = new StringContent(dfcJson);
 
