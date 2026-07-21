@@ -104,6 +104,8 @@ public class GRDGateway
         }
 
         Logger.LogInformation($"GetServerStatus: Making status call to host {vpnHost} ...");
+        // Deliberately v1.3: server-status has no v1.4 form — only the
+        // device-credential endpoints moved to v1.4.
         var reqUri = new Uri($"https://{vpnHost}/api/v1.3/server-status");
         var request = new HttpRequestMessage(HttpMethod.Get, reqUri);
 
@@ -159,11 +161,13 @@ public class GRDGateway
         public string? PublicKey { get; set; }
     }
 
-    // WireGuardRegistrationResponse retired: both protocols' POST /api/v1.3/device
-    // replies now deserialize into the shared VPNDeviceResponse DTO
-    // (GuardianConnect.Credentials), which is carried verbatim on the credential.
+    // WireGuardRegistrationResponse retired: both protocols' registration
+    // replies deserialize into the shared VPNDeviceResponse DTO
+    // (GuardianConnect.Credentials), which is carried verbatim on the
+    // credential. The v1.4 spec states the registration response is unchanged
+    // from previous API versions, so the DTO carries over as-is.
 
-    #region v1.3 APIs
+    #region SGW APIs (v1.4)
 
     /// Used to register a new device for a given transport protocol
     /// @param transportProtocol Specified what kind of VPN credentials will be returned
@@ -199,7 +203,9 @@ public class GRDGateway
             transportProtocol = GRDTransportProtocol.TransportProtocolStringFor(transportProtocol)
         };
 
-        var reqUri = new Uri($"https://{hostname}/api/v1.3/device");
+        // Request keys and response shape are identical to the former
+        // v1.3 /device endpoint.
+        var reqUri = new Uri($"https://{hostname}/api/v1.4/device-credentials");
         var request = new HttpRequestMessage(HttpMethod.Post, reqUri);
         var payLoadString =
             JsonSerializer.Serialize(payload, RegisterDevicePayloadJsonContext.Default.RegisterDevicePayload);
@@ -212,18 +218,18 @@ public class GRDGateway
             errorResponse.SetResponse(response);
             var respContent = await response.Content.ReadAsStringAsync();
 
-            // Surface the server's explanation on a non-2xx (e.g. 400 Bad Request).
-            // Without this the caller only saw the HTTP reason phrase ("Bad Request")
-            // and the response body — which carries the actual reason, e.g.
-            // {"error-message":"Guardian Firewall staff access restricted node"} — was
-            // silently discarded. Mirrors the WireGuard branch's failure logging.
+            // v1.4 standardizes every non-2xx body as
+            // {"error-title","error-message"}, explicitly user-showable.
+            // Parse it so callers get a presentable GRDAPIError instead of a
+            // raw body dump (FromResponseBody degrades gracefully for
+            // anything non-standard, e.g. proxy HTML).
             if (!response.IsSuccessStatusCode)
             {
+                var apiError = GRDAPIError.FromResponseBody(respContent, response.StatusCode);
                 Logger.LogError(
-                    "RegisterDeviceForTransportProtocol: device registration failed {Status}: {Body}",
-                    (int)response.StatusCode, respContent);
-                return errorResponse.SetErrorMessage(
-                    $"Device registration failed ({(int)response.StatusCode}): {respContent}");
+                    "RegisterDeviceForTransportProtocol: device registration failed {Status}: {Title}: {Message}",
+                    (int)response.StatusCode, apiError.Title, apiError.Message);
+                return errorResponse.SetGrdApiError(apiError);
             }
 
             // Same VPNDeviceResponse DTO as the WireGuard branch — for IKEv2 the
@@ -295,13 +301,14 @@ public class GRDGateway
             PublicKey            = publicKey.ToBase64()
         };
 
-        var reqUri = new Uri($"https://{hostname}/api/v1.3/device");
+        // Same keys/response as the former v1.3 /device endpoint.
+        var reqUri = new Uri($"https://{hostname}/api/v1.4/device-credentials");
         var request = new HttpRequestMessage(HttpMethod.Post, reqUri);
         var payloadString = JsonSerializer.Serialize(
             payload, RegisterDevicePayloadJsonContext.Default.RegisterDevicePayload);
         // Don't log the JWT or public key — both are sensitive. Log shape only.
         Logger.LogInformation(
-            "EstablishWireGuardCredential: POST /api/v1.3/device transport=wireguard host={Host}",
+            "EstablishWireGuardCredential: POST /api/v1.4/device-credentials transport=wireguard host={Host}",
             hostname);
         request.Content = new StringContent(payloadString);
 
@@ -337,12 +344,14 @@ public class GRDGateway
 
                 if (!response.IsSuccessStatusCode)
                 {
+                    // v1.4 standardized error body — parse for a
+                    // user-showable title/message (see IKEv2 branch).
                     var body = await response.Content.ReadAsStringAsync();
+                    var apiError = GRDAPIError.FromResponseBody(body, response.StatusCode);
                     Logger.LogError(
-                        "EstablishWireGuardCredential: register failed {Status}: {Body}",
-                        (int)response.StatusCode, body);
-                    return errorResponse.SetErrorMessage(
-                        $"WireGuard registration failed: {(int)response.StatusCode}");
+                        "EstablishWireGuardCredential: register failed {Status}: {Title}: {Message}",
+                        (int)response.StatusCode, apiError.Title, apiError.Message);
+                    return errorResponse.SetGrdApiError(apiError);
                 }
 
                 var respContent = await response.Content.ReadAsStringAsync();
@@ -401,6 +410,55 @@ public class GRDGateway
         return errorResponse;
     }
 
+    /// <summary>
+    /// Validates a stored VPN credential before re-establishing a tunnel
+    /// with it. A 200 means the credential is usable (body is dismissible);
+    /// any non-200 is a critical failure and the credential must never be
+    /// used again — discard it and run a fresh registration. Auth is the
+    /// api-auth-token sent in the grd-api-auth-token HTTP header (the v1.4
+    /// convention for GET requests).
+    /// </summary>
+    public static async Task<ErrorResponse> VerifyCredentialsForClientId(string clientId, string apiToken,
+        string hostName)
+    {
+        var errorResponse = new ErrorResponse();
+        if (string.IsNullOrEmpty(clientId) || string.IsNullOrEmpty(apiToken) || string.IsNullOrEmpty(hostName))
+        {
+            Logger.LogInformation(
+                "VerifyCredentialsForClientId: identifier portions are null or empty; nothing to verify.");
+            return new ErrorResponse("EMPTYPARAMS", null, true);
+        }
+
+        var reqUri = new Uri($"https://{hostName}/api/v1.4/device/{clientId}/verify-credentials");
+        var request = new HttpRequestMessage(HttpMethod.Get, reqUri);
+        request.Headers.Add("grd-api-auth-token", apiToken);
+
+        try
+        {
+            var response = await HttpUtils.Client.SendAsync(request);
+            errorResponse.SetResponse(response);
+            if (!response.IsSuccessStatusCode)
+            {
+                var body = await response.Content.ReadAsStringAsync();
+                var apiError = GRDAPIError.FromResponseBody(body, response.StatusCode);
+                Logger.LogError(
+                    "VerifyCredentialsForClientId: credential INVALID ({Status}): {Title}: {Message} — must not be reused.",
+                    (int)response.StatusCode, apiError.Title, apiError.Message);
+                return errorResponse.SetGrdApiError(apiError);
+            }
+            Logger.LogInformation("VerifyCredentialsForClientId: credential for {ClientId} is valid.", clientId);
+        }
+        catch (Exception e)
+        {
+            // Transport-level failure (offline, DNS) is NOT a verdict on the
+            // credential — surface the exception distinctly so callers don't
+            // discard a good credential over a network blip.
+            errorResponse.SetException(e);
+        }
+
+        return errorResponse;
+    }
+
     public static async Task<ErrorResponse> InvalidateCredentialsForClientId(string clientId, string apiToken,
         string hostName, string subCred)
     {
@@ -415,7 +473,9 @@ public class GRDGateway
 
         var payload = new InvalidateCredsPayload { ApiToken = apiToken, SubscriberCredential = subCred };
 
-        var reqUri = new Uri($"https://{hostName}/api/v1.3/device/{clientId}/invalidate-credentials");
+        // Best-effort per the v1.4 spec — the response body carries nothing
+        // actionable.
+        var reqUri = new Uri($"https://{hostName}/api/v1.4/device/{clientId}/invalidate-credentials");
         var request = new HttpRequestMessage(HttpMethod.Post, reqUri);
         request.Content = new StringContent(JsonSerializer.Serialize(payload,
             InvalidateCredsPayloadJsonContext.Default.InvalidateCredsPayload));
@@ -466,7 +526,11 @@ public class GRDGateway
             var clientId = DeviceIdentifier;
 
             // build request
-            var reqUri = new Uri($"https://{BaseHostName}/api/v1.3/device/{clientId}/config/filters");
+            // Mid-session POSTs are accepted under v1.4 and take effect
+            // server-side immediately. The auth token stays in the JSON body
+            // (v1.4 convention: GETs use the grd-api-auth-token header,
+            // POSTs carry the token in the body).
+            var reqUri = new Uri($"https://{BaseHostName}/api/v1.4/device/{clientId}/config/filters");
             var request = new HttpRequestMessage(HttpMethod.Post, reqUri);
             request.Content = new StringContent(dfcJson);
 
@@ -487,5 +551,5 @@ public class GRDGateway
 
     #endregion - Device Filter Configs
 
-    #endregion - v1.3 APIs
+    #endregion - SGW APIs (v1.4)
 }

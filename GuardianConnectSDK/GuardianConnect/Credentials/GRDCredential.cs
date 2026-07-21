@@ -97,7 +97,7 @@ public class GRDCredential
     public string IPv6Address { get; set; } = string.Empty;
 
     /// <summary>
-    /// The host's <c>POST /api/v1.3/device</c> reply, carried verbatim. This is
+    /// The host's <c>POST /api/v1.4/device-credentials</c> reply, carried verbatim. This is
     /// the authoritative source for the server-provided fields; the flat fields
     /// above (UserName/Password/ServerPublicKey/IPv4Address/IPv6Address/ClientId/
     /// ApiAuthToken) are kept in sync for persistence back-compat and for the

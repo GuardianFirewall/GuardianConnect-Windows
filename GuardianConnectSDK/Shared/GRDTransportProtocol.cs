@@ -76,7 +76,7 @@ public static class GRDTransportProtocol
 
     /// <summary>
     /// Wire-format string used in the <c>transport-protocol</c> JSON field
-    /// for <c>POST /api/v1.3/device</c>. Matches the strings the iOS/macOS
+    /// for <c>POST /api/v1.4/device-credentials</c>. Matches the strings the iOS/macOS
     /// SDK uses (<c>GRDTransportProtocol transportProtocolStringFor</c>):
     /// <c>"ikev2"</c> or <c>"wireguard"</c>. Lowercase by design — distinct
     /// from the registry-format strings (<c>"IKEv2"</c> / <c>"WireGuard"</c>)
