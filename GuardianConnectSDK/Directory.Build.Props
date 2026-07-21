@@ -12,10 +12,7 @@
         <FileVersion>1.2.0</FileVersion>
         <Version>1.2.0</Version>
         <!-- Prerelease suffix: "beta.N" for non-release NuGet packages; empty = stable release.
-             VERSION POLICY (1.1.0+): bump the PATCH (third) digit for every fix/build.
-             1.2.0: SGW API v1.4 migration (GRD-1461) — device-credentials/invalidate/config-filters
-             on v1.4, standardized error bodies, VerifyCredentialsForClientId.
-             GA: suffix cleared for the stable 1.2.0 release. -->
+             VERSION POLICY (1.1.0+): bump the PATCH (third) digit for every fix/build. -->
         <VersionSuffix></VersionSuffix>
     </PropertyGroup>
 

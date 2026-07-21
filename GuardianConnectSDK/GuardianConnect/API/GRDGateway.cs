@@ -104,10 +104,8 @@ public class GRDGateway
         }
 
         Logger.LogInformation($"GetServerStatus: Making status call to host {vpnHost} ...");
-        // v1.3 by design, permanently: per the gateway team (GRD-1461,
-        // 2026-07-20) only endpoints dealing with VPN device credentials
-        // moved to v1.4 — server-status is the sanctioned exception and has
-        // no v1.4 form.
+        // Deliberately v1.3: server-status has no v1.4 form — only the
+        // device-credential endpoints moved to v1.4.
         var reqUri = new Uri($"https://{vpnHost}/api/v1.3/server-status");
         var request = new HttpRequestMessage(HttpMethod.Get, reqUri);
 
@@ -169,7 +167,7 @@ public class GRDGateway
     // credential. The v1.4 spec states the registration response is unchanged
     // from previous API versions, so the DTO carries over as-is.
 
-    #region SGW APIs (v1.4 migration, GRD-1461)
+    #region SGW APIs (v1.4)
 
     /// Used to register a new device for a given transport protocol
     /// @param transportProtocol Specified what kind of VPN credentials will be returned
@@ -205,9 +203,8 @@ public class GRDGateway
             transportProtocol = GRDTransportProtocol.TransportProtocolStringFor(transportProtocol)
         };
 
-        // v1.4 (GRD-1461): registration moved to the renamed
-        // /device-credentials path; request keys and response shape are
-        // unchanged from v1.3.
+        // Request keys and response shape are identical to the former
+        // v1.3 /device endpoint.
         var reqUri = new Uri($"https://{hostname}/api/v1.4/device-credentials");
         var request = new HttpRequestMessage(HttpMethod.Post, reqUri);
         var payLoadString =
@@ -304,7 +301,7 @@ public class GRDGateway
             PublicKey            = publicKey.ToBase64()
         };
 
-        // v1.4 (GRD-1461): renamed /device-credentials path; same keys/response.
+        // Same keys/response as the former v1.3 /device endpoint.
         var reqUri = new Uri($"https://{hostname}/api/v1.4/device-credentials");
         var request = new HttpRequestMessage(HttpMethod.Post, reqUri);
         var payloadString = JsonSerializer.Serialize(
@@ -414,18 +411,12 @@ public class GRDGateway
     }
 
     /// <summary>
-    /// v1.4 (GRD-1461): validate a stored VPN credential BEFORE
-    /// re-establishing a tunnel with it. Per the spec: a 200 means the
-    /// credential is usable (body is dismissible); ANY non-200 is a critical
-    /// failure and the credential must never be used again — callers should
-    /// discard it and run a fresh registration. Auth rides the
-    /// grd-api-auth-token HTTP header (the v1.4 convention for GETs; header
-    /// value = the api-auth-token — confirmed by the gateway team, the
-    /// spec's "client-id" value there was a typo).
-    ///
-    /// Not yet wired into the reconnect paths (app start / power resume /
-    /// reconnect-after-update) — that policy work is the follow-on to the
-    /// mechanical migration.
+    /// Validates a stored VPN credential before re-establishing a tunnel
+    /// with it. A 200 means the credential is usable (body is dismissible);
+    /// any non-200 is a critical failure and the credential must never be
+    /// used again — discard it and run a fresh registration. Auth is the
+    /// api-auth-token sent in the grd-api-auth-token HTTP header (the v1.4
+    /// convention for GET requests).
     /// </summary>
     public static async Task<ErrorResponse> VerifyCredentialsForClientId(string clientId, string apiToken,
         string hostName)
@@ -482,10 +473,8 @@ public class GRDGateway
 
         var payload = new InvalidateCredsPayload { ApiToken = apiToken, SubscriberCredential = subCred };
 
-        // v1.4 (GRD-1461): same path shape under the new version. The body
-        // already matches the v1.4 spec exactly (api-auth-token +
-        // subscriber-credential). Best-effort semantics per the spec — the
-        // response body can be dismissed.
+        // Best-effort per the v1.4 spec — the response body carries nothing
+        // actionable.
         var reqUri = new Uri($"https://{hostName}/api/v1.4/device/{clientId}/invalidate-credentials");
         var request = new HttpRequestMessage(HttpMethod.Post, reqUri);
         request.Content = new StringContent(JsonSerializer.Serialize(payload,
@@ -537,12 +526,10 @@ public class GRDGateway
             var clientId = DeviceIdentifier;
 
             // build request
-            // v1.4 (GRD-1461): confirmed by the gateway team (2026-07-20) —
-            // all tunnel-modifying data endpoints (filters, multihop,
-            // client-rules) accept mid-session POSTs under v1.4 and take
-            // effect server-side instantly. Token stays in the JSON body per
-            // the convention: GETs use the grd-api-auth-token header, POSTs
-            // carry the token in the body (as this config dict already does).
+            // Mid-session POSTs are accepted under v1.4 and take effect
+            // server-side immediately. The auth token stays in the JSON body
+            // (v1.4 convention: GETs use the grd-api-auth-token header,
+            // POSTs carry the token in the body).
             var reqUri = new Uri($"https://{BaseHostName}/api/v1.4/device/{clientId}/config/filters");
             var request = new HttpRequestMessage(HttpMethod.Post, reqUri);
             request.Content = new StringContent(dfcJson);
@@ -564,5 +551,5 @@ public class GRDGateway
 
     #endregion - Device Filter Configs
 
-    #endregion - SGW APIs (v1.4 migration, GRD-1461)
+    #endregion - SGW APIs (v1.4)
 }

@@ -5,11 +5,10 @@ using System.Text.Json.Serialization;
 namespace GuardianConnect.Shared;
 
 /// <summary>
-/// The standardized API error body. As of the v1.4 SGW API this exact shape —
-/// <c>{"error-title", "error-message"}</c> — is returned for EVERY non-200/201
-/// response in both the Connect API and SGW environments, and the doc
-/// explicitly blesses showing title/message to the user ("plain english
-/// explanation of what has gone wrong").
+/// The standardized API error body: <c>{"error-title", "error-message"}</c>.
+/// As of API v1.4 every non-200/201 response in both the Connect API and SGW
+/// environments returns this shape, and title/message are intended to be
+/// shown to the user directly.
 /// </summary>
 public class GRDAPIError
 {
