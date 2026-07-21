@@ -12,12 +12,11 @@
         <FileVersion>1.2.0</FileVersion>
         <Version>1.2.0</Version>
         <!-- Prerelease suffix: "beta.N" for non-release NuGet packages; empty = stable release.
-             VERSION POLICY (1.1.0+): bump the PATCH (third) digit for every fix/build. Carries the
-             full consolidation line: WireGuard negotiate-consolidation, IKEv2 EAP-MSCHAPv2 + AES-256-GCM/
-             SHA-384/ECP-384 hardening, GRDSGWServer parity, stale-_activeTransport fix, and the
-             orphaned-DNS-filter (wifi-loss) fix.
-             GA: suffix cleared for the stable 1.1.1 release. -->
-        <VersionSuffix>apiv14-beta.1</VersionSuffix>
+             VERSION POLICY (1.1.0+): bump the PATCH (third) digit for every fix/build.
+             1.2.0: SGW API v1.4 migration (GRD-1461) — device-credentials/invalidate/config-filters
+             on v1.4, standardized error bodies, VerifyCredentialsForClientId.
+             GA: suffix cleared for the stable 1.2.0 release. -->
+        <VersionSuffix></VersionSuffix>
     </PropertyGroup>
 
     <PropertyGroup>
