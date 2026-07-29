@@ -1,7 +1,7 @@
 ﻿<Project Sdk="Microsoft.NET.Sdk">
 
     <PropertyGroup>
-        <TargetFramework>net9.0-windows</TargetFramework>
+        <TargetFramework>net10.0-windows</TargetFramework>
         <ImplicitUsings>enable</ImplicitUsings>
         <Nullable>enable</Nullable>
         <AllowUnsafeBlocks>true</AllowUnsafeBlocks>
@@ -16,7 +16,7 @@
             <PrivateAssets>all</PrivateAssets>
             <IncludeAssets>runtime; build; native; contentfiles; analyzers; buildtransitive</IncludeAssets>
         </PackageReference>
-        <PackageReference Include="System.Threading.AccessControl" Version="9.0.3"/>
+        <PackageReference Include="System.Threading.AccessControl" Version="10.0.10"/>
     </ItemGroup>
 
     <ItemGroup>

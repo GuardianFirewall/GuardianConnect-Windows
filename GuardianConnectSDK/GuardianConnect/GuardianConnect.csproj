@@ -35,6 +35,6 @@
     <ItemGroup>
         <!-- Microsoft.Extensions.Logging[.Abstractions] come from Directory.Build.Props,
              which injects them into every project. Don't redeclare here (NU1504). -->
-        <PackageReference Include="Microsoft.Win32.SystemEvents" Version="9.0.7" />
+        <PackageReference Include="Microsoft.Win32.SystemEvents" Version="10.0.10" />
     </ItemGroup>
 </Project>
