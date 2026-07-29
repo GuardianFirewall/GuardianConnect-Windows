@@ -13,7 +13,7 @@
         <copyright>Copyright DNSFilter, Inc.</copyright>
         <tags>GuardianConnectSDK Windows</tags>
         <dependencies>
-            <group targetFramework="net9.0">
+            <group targetFramework="net10.0">
                 <!-- Add your dependencies here -->
             </group>
         </dependencies>
@@ -23,30 +23,30 @@
         <file src="..\Guardian.png"/>
 
         <!-- Compile-time ref assemblies (managed IL is identical across platforms; use x64 build) -->
-        <file src="BuildOutput\GuardianConnect\runtimes\win10-x64\lib\net9.0-windows\GuardianConnect.dll" target="lib\net9.0\GuardianConnect.dll"/>
-        <file src="BuildOutput\GuardianConnect\runtimes\win10-x64\lib\net9.0-windows\GuardianConnect.Shared.dll" target="lib\net9.0\GuardianConnect.Shared.dll"/>
-        <file src="BuildOutput\GuardianConnect\runtimes\win10-x64\lib\net9.0-windows\GuardianConnect.Abstractions.dll" target="lib\net9.0\GuardianConnect.Abstractions.dll"/>
-        <file src="BuildOutput\GuardianConnect\runtimes\win10-x64\lib\net9.0-windows\Win32Calls.dll" target="lib\net9.0\Win32Calls.dll"/>
-        <file src="BuildOutput\GuardianConnect\runtimes\win10-x64\lib\net9.0-windows\Win32Calls.WFP.dll" target="lib\net9.0\Win32Calls.WFP.dll"/>
+        <file src="BuildOutput\GuardianConnect\runtimes\win10-x64\lib\net10.0-windows\GuardianConnect.dll" target="lib\net10.0\GuardianConnect.dll"/>
+        <file src="BuildOutput\GuardianConnect\runtimes\win10-x64\lib\net10.0-windows\GuardianConnect.Shared.dll" target="lib\net10.0\GuardianConnect.Shared.dll"/>
+        <file src="BuildOutput\GuardianConnect\runtimes\win10-x64\lib\net10.0-windows\GuardianConnect.Abstractions.dll" target="lib\net10.0\GuardianConnect.Abstractions.dll"/>
+        <file src="BuildOutput\GuardianConnect\runtimes\win10-x64\lib\net10.0-windows\Win32Calls.dll" target="lib\net10.0\Win32Calls.dll"/>
+        <file src="BuildOutput\GuardianConnect\runtimes\win10-x64\lib\net10.0-windows\Win32Calls.WFP.dll" target="lib\net10.0\Win32Calls.WFP.dll"/>
         <!-- Win32Calls.WireGuard is consumed by GuardianConnect.Services, not GuardianConnect,
              so it doesn't appear in GuardianConnect's BuildOutput. Source from its own. -->
-        <file src="BuildOutput\Win32Calls.WireGuard\runtimes\win10-x64\lib\net9.0-windows\Win32Calls.WireGuard.dll" target="lib\net9.0\Win32Calls.WireGuard.dll"/>
+        <file src="BuildOutput\Win32Calls.WireGuard\runtimes\win10-x64\lib\net10.0-windows\Win32Calls.WireGuard.dll" target="lib\net10.0\Win32Calls.WireGuard.dll"/>
 
         <!-- x64 runtime assemblies -->
-        <file src="BuildOutput\GuardianConnect\runtimes\win10-x64\lib\net9.0-windows\GuardianConnect.dll" target="runtimes\win-x64\lib\net9.0\GuardianConnect.dll"/>
-        <file src="BuildOutput\GuardianConnect\runtimes\win10-x64\lib\net9.0-windows\GuardianConnect.Shared.dll" target="runtimes\win-x64\lib\net9.0\GuardianConnect.Shared.dll"/>
-        <file src="BuildOutput\GuardianConnect\runtimes\win10-x64\lib\net9.0-windows\GuardianConnect.Abstractions.dll" target="runtimes\win-x64\lib\net9.0\GuardianConnect.Abstractions.dll"/>
-        <file src="BuildOutput\GuardianConnect\runtimes\win10-x64\lib\net9.0-windows\Win32Calls.dll" target="runtimes\win-x64\lib\net9.0\Win32Calls.dll"/>
-        <file src="BuildOutput\GuardianConnect\runtimes\win10-x64\lib\net9.0-windows\Win32Calls.WFP.dll" target="runtimes\win-x64\lib\net9.0\Win32Calls.WFP.dll"/>
-        <file src="BuildOutput\Win32Calls.WireGuard\runtimes\win10-x64\lib\net9.0-windows\Win32Calls.WireGuard.dll" target="runtimes\win-x64\lib\net9.0\Win32Calls.WireGuard.dll"/>
+        <file src="BuildOutput\GuardianConnect\runtimes\win10-x64\lib\net10.0-windows\GuardianConnect.dll" target="runtimes\win-x64\lib\net10.0\GuardianConnect.dll"/>
+        <file src="BuildOutput\GuardianConnect\runtimes\win10-x64\lib\net10.0-windows\GuardianConnect.Shared.dll" target="runtimes\win-x64\lib\net10.0\GuardianConnect.Shared.dll"/>
+        <file src="BuildOutput\GuardianConnect\runtimes\win10-x64\lib\net10.0-windows\GuardianConnect.Abstractions.dll" target="runtimes\win-x64\lib\net10.0\GuardianConnect.Abstractions.dll"/>
+        <file src="BuildOutput\GuardianConnect\runtimes\win10-x64\lib\net10.0-windows\Win32Calls.dll" target="runtimes\win-x64\lib\net10.0\Win32Calls.dll"/>
+        <file src="BuildOutput\GuardianConnect\runtimes\win10-x64\lib\net10.0-windows\Win32Calls.WFP.dll" target="runtimes\win-x64\lib\net10.0\Win32Calls.WFP.dll"/>
+        <file src="BuildOutput\Win32Calls.WireGuard\runtimes\win10-x64\lib\net10.0-windows\Win32Calls.WireGuard.dll" target="runtimes\win-x64\lib\net10.0\Win32Calls.WireGuard.dll"/>
 
         <!-- ARM64 runtime assemblies -->
-        <file src="BuildOutput\GuardianConnect\runtimes\win10-arm64\lib\net9.0-windows\GuardianConnect.dll" target="runtimes\win-arm64\lib\net9.0\GuardianConnect.dll"/>
-        <file src="BuildOutput\GuardianConnect\runtimes\win10-arm64\lib\net9.0-windows\GuardianConnect.Shared.dll" target="runtimes\win-arm64\lib\net9.0\GuardianConnect.Shared.dll"/>
-        <file src="BuildOutput\GuardianConnect\runtimes\win10-arm64\lib\net9.0-windows\GuardianConnect.Abstractions.dll" target="runtimes\win-arm64\lib\net9.0\GuardianConnect.Abstractions.dll"/>
-        <file src="BuildOutput\GuardianConnect\runtimes\win10-arm64\lib\net9.0-windows\Win32Calls.dll" target="runtimes\win-arm64\lib\net9.0\Win32Calls.dll"/>
-        <file src="BuildOutput\GuardianConnect\runtimes\win10-arm64\lib\net9.0-windows\Win32Calls.WFP.dll" target="runtimes\win-arm64\lib\net9.0\Win32Calls.WFP.dll"/>
-        <file src="BuildOutput\Win32Calls.WireGuard\runtimes\win10-arm64\lib\net9.0-windows\Win32Calls.WireGuard.dll" target="runtimes\win-arm64\lib\net9.0\Win32Calls.WireGuard.dll"/>
+        <file src="BuildOutput\GuardianConnect\runtimes\win10-arm64\lib\net10.0-windows\GuardianConnect.dll" target="runtimes\win-arm64\lib\net10.0\GuardianConnect.dll"/>
+        <file src="BuildOutput\GuardianConnect\runtimes\win10-arm64\lib\net10.0-windows\GuardianConnect.Shared.dll" target="runtimes\win-arm64\lib\net10.0\GuardianConnect.Shared.dll"/>
+        <file src="BuildOutput\GuardianConnect\runtimes\win10-arm64\lib\net10.0-windows\GuardianConnect.Abstractions.dll" target="runtimes\win-arm64\lib\net10.0\GuardianConnect.Abstractions.dll"/>
+        <file src="BuildOutput\GuardianConnect\runtimes\win10-arm64\lib\net10.0-windows\Win32Calls.dll" target="runtimes\win-arm64\lib\net10.0\Win32Calls.dll"/>
+        <file src="BuildOutput\GuardianConnect\runtimes\win10-arm64\lib\net10.0-windows\Win32Calls.WFP.dll" target="runtimes\win-arm64\lib\net10.0\Win32Calls.WFP.dll"/>
+        <file src="BuildOutput\Win32Calls.WireGuard\runtimes\win10-arm64\lib\net10.0-windows\Win32Calls.WireGuard.dll" target="runtimes\win-arm64\lib\net10.0\Win32Calls.WireGuard.dll"/>
 
         <!-- Native WireGuardNT driver wrapper. Loaded by Win32Calls.WireGuard via [LibraryImport].
              Vendored under native/wireguard/win-{arch}/ (see VERSION.txt for source + SHAs). -->
