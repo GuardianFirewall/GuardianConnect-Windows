@@ -16,7 +16,7 @@
             <PrivateAssets>all</PrivateAssets>
             <IncludeAssets>runtime; build; native; contentfiles; analyzers; buildtransitive</IncludeAssets>
         </PackageReference>
-        <PackageReference Include="System.Threading.AccessControl" Version="10.0.10"/>
+<!-- System.Threading.AccessControl is in the net10 shared framework (NU1510); no explicit ref. -->
     </ItemGroup>
 
     <ItemGroup>
