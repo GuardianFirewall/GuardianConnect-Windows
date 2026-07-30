@@ -33,7 +33,7 @@ public static unsafe class WireGuardDnsBlockPermit
     /// <summary>Opaque handle returned by <see cref="Install"/>; pass to <see cref="Uninstall"/>.</summary>
     public sealed class Installation
     {
-        internal HANDLE Engine;
+        internal FWPM_ENGINE_HANDLE Engine;
         internal readonly List<ulong> FilterIds = new();
     }
 
@@ -45,7 +45,7 @@ public static unsafe class WireGuardDnsBlockPermit
     public static Installation? Install(ulong adapterLuid)
     {
         var engine = VpnUtils.OpenWpmSession();
-        if (engine == HANDLE.Null)
+        if (engine == FWPM_ENGINE_HANDLE.Null)
         {
             Log.Error("WireGuardDnsBlockPermit.Install: OpenWpmSession failed.");
             return null;
@@ -92,7 +92,7 @@ public static unsafe class WireGuardDnsBlockPermit
     /// </summary>
     public static void Uninstall(Installation install)
     {
-        if (install.Engine == HANDLE.Null) return;
+        if (install.Engine == FWPM_ENGINE_HANDLE.Null) return;
 
         foreach (var id in install.FilterIds)
         {
@@ -104,7 +104,7 @@ public static unsafe class WireGuardDnsBlockPermit
         install.FilterIds.Clear();
 
         VpnUtils.CloseWpmSession(install.Engine);
-        install.Engine = HANDLE.Null;
+        install.Engine = FWPM_ENGINE_HANDLE.Null;
         Log.Information("WireGuardDnsBlockPermit.Uninstall: complete.");
     }
 
@@ -115,7 +115,7 @@ public static unsafe class WireGuardDnsBlockPermit
         if (id != 0) install.FilterIds.Add(id);
     }
 
-    private static ulong AddBlockDns(HANDLE engine, Guid layerKey, string label)
+    private static ulong AddBlockDns(FWPM_ENGINE_HANDLE engine, Guid layerKey, string label)
     {
         var portVal = new FWP_CONDITION_VALUE0
         {

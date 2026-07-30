@@ -55,19 +55,19 @@ public static unsafe class TunnelDnsPermit
     // failure; check Marshal.GetLastWin32Error or the structured logs.
     // -----------------------------------------------------------------------------
 
-    public static ulong AddPermitDnsUdpV4(HANDLE engine, ulong luid) =>
+    public static ulong AddPermitDnsUdpV4(FWPM_ENGINE_HANDLE engine, ulong luid) =>
         AddFilter(engine, PInvoke.FWPM_LAYER_ALE_AUTH_CONNECT_V4, ProtocolUdp,
                   luid, "PermitDnsUdpOnTunnelV4");
 
-    public static ulong AddPermitDnsTcpV4(HANDLE engine, ulong luid) =>
+    public static ulong AddPermitDnsTcpV4(FWPM_ENGINE_HANDLE engine, ulong luid) =>
         AddFilter(engine, PInvoke.FWPM_LAYER_ALE_AUTH_CONNECT_V4, ProtocolTcp,
                   luid, "PermitDnsTcpOnTunnelV4");
 
-    public static ulong AddPermitDnsUdpV6(HANDLE engine, ulong luid) =>
+    public static ulong AddPermitDnsUdpV6(FWPM_ENGINE_HANDLE engine, ulong luid) =>
         AddFilter(engine, PInvoke.FWPM_LAYER_ALE_AUTH_CONNECT_V6, ProtocolUdp,
                   luid, "PermitDnsUdpOnTunnelV6");
 
-    public static ulong AddPermitDnsTcpV6(HANDLE engine, ulong luid) =>
+    public static ulong AddPermitDnsTcpV6(FWPM_ENGINE_HANDLE engine, ulong luid) =>
         AddFilter(engine, PInvoke.FWPM_LAYER_ALE_AUTH_CONNECT_V6, ProtocolTcp,
                   luid, "PermitDnsTcpOnTunnelV6");
 
@@ -76,7 +76,7 @@ public static unsafe class TunnelDnsPermit
     /// list of filter IDs added. Callers track and pass back to
     /// <see cref="RemoveAll"/> for cleanup on disconnect.
     /// </summary>
-    public static List<ulong> AddAll(HANDLE engine, ulong luid)
+    public static List<ulong> AddAll(FWPM_ENGINE_HANDLE engine, ulong luid)
     {
         var ids = new List<ulong>(4);
         TrackId(ids, AddPermitDnsUdpV4(engine, luid));
@@ -90,7 +90,7 @@ public static unsafe class TunnelDnsPermit
     /// Delete previously-installed permit filters by ID. Continues past
     /// individual failures (logs them); returns false if any deletion failed.
     /// </summary>
-    public static bool RemoveAll(HANDLE engine, IEnumerable<ulong> filterIds)
+    public static bool RemoveAll(FWPM_ENGINE_HANDLE engine, IEnumerable<ulong> filterIds)
     {
         var allOk = true;
         foreach (var id in filterIds)
@@ -113,7 +113,7 @@ public static unsafe class TunnelDnsPermit
         if (id != 0) ids.Add(id);
     }
 
-    private static ulong AddFilter(HANDLE engine, Guid layerKey, byte protocol,
+    private static ulong AddFilter(FWPM_ENGINE_HANDLE engine, Guid layerKey, byte protocol,
                                    ulong luid, string label)
     {
         // FWPM_CONDITION_IP_LOCAL_INTERFACE takes a UINT64 LUID via pointer;

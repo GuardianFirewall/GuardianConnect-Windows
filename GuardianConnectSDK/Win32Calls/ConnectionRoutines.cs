@@ -35,7 +35,7 @@ public static class ConnectionRoutines
 
         // First call to RasEnumConnections to get count of connections and required buffer size
 
-        var retVal = PInvoke.RasEnumConnections(null, ref cb, out cConnections);
+        var retVal = PInvoke.RasEnumConnections(default(Span<RASCONNW>), ref cb, out cConnections);
         //Logger.LogInformation($"GetRasConnections: First call for size returned {retVal}, cb={cb}, # of Connections = {cConnections}");
         var msg =
             $"GetRasConnections: First call for size returned {retVal}, cb={cb}, # of Connections = {cConnections}";
@@ -56,7 +56,7 @@ public static class ConnectionRoutines
         Logger.LogInformation(
             "GetRasConnections: There is an active RAS connection. Preparing to get connection details.");
         //retVal = PInvoke.RasEnumConnections(ref ConnectionsZero, ref cb, out cConnections);
-        retVal = PInvoke.RasEnumConnections(pConnectionsZero, ref cb, out cConnections);
+        retVal = PInvoke.RasEnumConnections(new Span<RASCONNW>(pConnectionsZero, (int)cConnections), ref cb, out cConnections);
         if (retVal != 0)
         {
             Logger.LogError($"GetRasConnections: Call to RasEnumConnections returned NON-SUCCESS value of {retVal}");
@@ -468,7 +468,7 @@ public static class ConnectionRoutines
             uint numberOfEntries = 0;
 
             // First call to get required buffer size and number of entries
-            var ret = PInvoke.RasEnumEntries(null, null, null, ref entriesBufferSize, out numberOfEntries);
+            var ret = PInvoke.RasEnumEntries(default, default, null, &entriesBufferSize, &numberOfEntries);
             if (numberOfEntries == 0)
             {
                 Logger.LogInformation("RemoveAllRasEntries: No RAS entries found in phonebook.");
@@ -487,7 +487,7 @@ public static class ConnectionRoutines
             {
                 for (var i = 0; i < numberOfEntries; i++) pEntries[i].dwSize = (uint)Marshal.SizeOf<RASENTRYNAMEW>();
 
-                ret = PInvoke.RasEnumEntries(null, null, pEntries, ref entriesBufferSize, out numberOfEntries);
+                ret = PInvoke.RasEnumEntries(default, default, pEntries, &entriesBufferSize, &numberOfEntries);
                 if (ret != 0)
                 {
                     Logger.LogError($"RemoveAllRasEntries: RasEnumEntries failed with error {ret}");
