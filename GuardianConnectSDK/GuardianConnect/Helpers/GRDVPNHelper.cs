@@ -398,6 +398,25 @@ public class GRDVPNHelper
         string.Equals(
             RegistrySettings.RetrieveGuardianUserSettings(Common.kGuardianUseFileBasedWireGuardConfig),
             "true", StringComparison.OrdinalIgnoreCase);
+
+    /// <summary>
+    /// True when the user has opted into the Smart Routing Proxy. This is the
+    /// user preference alone; it does not mean SRP applies to the current
+    /// connection. Host capability and region are evaluated in
+    /// GRDWireGuardConfiguration.WireGuardQuickConfigForCredential.
+    /// </summary>
+    public static bool IsSmartRoutingProxyEnabled() =>
+        string.Equals(
+            RegistrySettings.RetrieveGuardianUserSettings(Common.kGRDSmartRountingProxyEnabled),
+            "true", StringComparison.OrdinalIgnoreCase);
+
+    /// <summary>
+    /// Persists the user's Smart Routing Proxy preference to HKCU. Takes effect
+    /// on the next connect, when the WireGuard config is built.
+    /// </summary>
+    public static void SetSmartRoutingProxyEnabled(bool enabled) =>
+        RegistrySettings.UpdateGuardianUserSettings(
+            Common.kGRDSmartRountingProxyEnabled, enabled ? "true" : "false");
     public async Task<ErrorResponse> DisconnectVPNTunnel()
     {
         var errorResponse = new ErrorResponse();
@@ -600,7 +619,16 @@ public class GRDVPNHelper
                 .SetErrorMessage("No stored WireGuard credential.");
         }
 
-        var configText = GRDWireGuardConfiguration.WireGuardQuickConfigForCredential(cred);
+        // Supply the gateway record so the config builder can evaluate Smart
+        // Routing Proxy eligibility. A cache miss yields null, which disables SRP
+        // for this connect rather than failing it.
+        var srpServer = GRDServerManager.FindHostRecord(cred.HostName);
+        if (srpServer is null)
+            _logger.LogWarning(
+                "StartWireGuardFromStoredCreds: no cached gateway record for {Host}; "
+                + "Smart Routing Proxy cannot be evaluated for this connection.", cred.HostName);
+
+        var configText = GRDWireGuardConfiguration.WireGuardQuickConfigForCredential(cred, null, srpServer);
         if (string.IsNullOrEmpty(configText))
         {
             return errorResponse
