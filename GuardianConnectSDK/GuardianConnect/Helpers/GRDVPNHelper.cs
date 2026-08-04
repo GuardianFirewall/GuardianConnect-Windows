@@ -407,7 +407,7 @@ public class GRDVPNHelper
     /// </summary>
     public static bool IsSmartRoutingProxyEnabled() =>
         string.Equals(
-            RegistrySettings.RetrieveGuardianUserSettings(Common.kGRDSmartRountingProxyEnabled),
+            RegistrySettings.RetrieveGuardianUserSettings(Common.kGRDSmartRoutingProxyEnabled),
             "true", StringComparison.OrdinalIgnoreCase);
 
     /// <summary>
@@ -416,7 +416,7 @@ public class GRDVPNHelper
     /// </summary>
     public static void SetSmartRoutingProxyEnabled(bool enabled) =>
         RegistrySettings.UpdateGuardianUserSettings(
-            Common.kGRDSmartRountingProxyEnabled, enabled ? "true" : "false");
+            Common.kGRDSmartRoutingProxyEnabled, enabled ? "true" : "false");
     public async Task<ErrorResponse> DisconnectVPNTunnel()
     {
         var errorResponse = new ErrorResponse();

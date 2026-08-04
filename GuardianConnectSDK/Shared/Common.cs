@@ -83,10 +83,11 @@ public class Common
     /// HKCU user setting. "true" means the user has opted into the Smart Routing
     /// Proxy. The feature only engages on a WireGuard connection to a host that
     /// advertises smart-routing-enabled and sits in the US or the UK.
-    /// The value name misspells "Routing" as "Rounting" to match the key Apple's
-    /// SDK ships; do not correct it without a cross-platform migration.
+    /// Apple's SDK spells this key "kGRDSmartRountingProxyEnabled" (sic). Windows
+    /// uses the correct spelling; the keys are per-platform local storage and are
+    /// never exchanged, so they do not need to match.
     /// </summary>
-    public const string kGRDSmartRountingProxyEnabled = "kGRDSmartRountingProxyEnabled";
+    public const string kGRDSmartRoutingProxyEnabled = "kGRDSmartRoutingProxyEnabled";
 
     public const string kGRDWGDevicePublicKey = "wg-device-public-key";
     public const string kGRDWGDevicePrivateKey = "wg-device-private-key";
