@@ -276,6 +276,47 @@ public class GRDServerManager
         return null;
     }
 
+    /// <summary>
+    /// Resolves a host record for the given hostname, falling back to the
+    /// all-hostnames endpoint when the local cache has no entry.
+    /// <para>
+    /// The cache is only populated as a side effect of host selection
+    /// (SelectGuardianHostWithCompletion → SelectBestHostInRegion →
+    /// GetHostsForRegion), which does not run when a connection dials with
+    /// already-stored credentials. In a freshly started process that path leaves
+    /// the cache empty, so a cache-only lookup returns null for a host we are
+    /// actively connecting to. The remote list carries both smart-routing-enabled
+    /// and the nested region, so one call recovers the full record.
+    /// </para>
+    /// Returns null if the hostname is absent from the remote list too.
+    /// </summary>
+    public static async Task<GRDSGWServer?> FindHostRecordResilient(string hostname)
+    {
+        if (string.IsNullOrWhiteSpace(hostname)) return null;
+
+        var cached = FindHostRecord(hostname);
+        if (cached != null) return cached;
+
+        Logger.LogInformation(
+            "FindHostRecordResilient: {Host} not in the local cache; querying all-hostnames.", hostname);
+        try
+        {
+            var all = await GetAllHostnamesAsync();
+            var match = all.FirstOrDefault(h =>
+                string.Equals(h.Hostname, hostname, StringComparison.OrdinalIgnoreCase));
+            if (match == null)
+                Logger.LogWarning(
+                    "FindHostRecordResilient: {Host} absent from all-hostnames ({Count} records).",
+                    hostname, all.Count);
+            return match;
+        }
+        catch (Exception e)
+        {
+            Logger.LogError(e, "FindHostRecordResilient: all-hostnames lookup for {Host} threw.", hostname);
+            return null;
+        }
+    }
+
     #endregion
 
     #region private methods

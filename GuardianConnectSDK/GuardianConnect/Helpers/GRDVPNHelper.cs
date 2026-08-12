@@ -619,16 +619,24 @@ public class GRDVPNHelper
                 .SetErrorMessage("No stored WireGuard credential.");
         }
 
-        // Supply the gateway record so the config builder can evaluate Smart
-        // Routing Proxy eligibility. A cache miss yields null, which disables SRP
-        // for this connect rather than failing it.
-        var srpServer = GRDServerManager.FindHostRecord(cred.HostName);
-        if (srpServer is null)
-            _logger.LogWarning(
-                "StartWireGuardFromStoredCreds: no cached gateway record for {Host}; "
-                + "Smart Routing Proxy cannot be evaluated for this connection.", cred.HostName);
+        // Smart Routing Proxy takes two independent inputs: the user preference
+        // (read here, passed as dnsSRPMode) and the host's own support flag (read
+        // by the config builder off the gateway record). Only resolve the record
+        // when the preference is on — with SRP off it cannot change the config, so
+        // there is no reason to pay for a possible network lookup.
+        var dnsSRPMode = IsSmartRoutingProxyEnabled();
+        GRDSGWServer? srpServer = null;
+        if (dnsSRPMode)
+        {
+            srpServer = await GRDServerManager.FindHostRecordResilient(cred.HostName);
+            if (srpServer is null)
+                _logger.LogWarning(
+                    "StartWireGuardFromStoredCreds: could not resolve a gateway record for {Host}; "
+                    + "Smart Routing Proxy stays off for this connection.", cred.HostName);
+        }
 
-        var configText = GRDWireGuardConfiguration.WireGuardQuickConfigForCredential(cred, null, srpServer);
+        var configText =
+            GRDWireGuardConfiguration.WireGuardQuickConfigForCredential(cred, null, srpServer, dnsSRPMode);
         if (string.IsNullOrEmpty(configText))
         {
             return errorResponse

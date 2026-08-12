@@ -1,7 +1,6 @@
 using System.Text;
 using GuardianConnect.Abstractions;
 using GuardianConnect.API.Model;
-using GuardianConnect.Helpers;
 using GuardianConnect.Shared;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Logging.Abstractions;
@@ -40,12 +39,17 @@ public static class GRDWireGuardConfiguration
     /// Proxy mode applies.
     /// </param>
     /// <param name="srpServer">
-    /// The gateway record for the host being dialled, supplied so this function
-    /// can decide whether Smart Routing Proxy DNS mode applies. Pass null to
-    /// build a config with SRP unconditionally off.
+    /// The gateway record for the host being dialled. Supplies the host-side half
+    /// of the Smart Routing Proxy decision — whether the server supports SRP at
+    /// all, and which regional resolver to use. Null builds a config with SRP off.
+    /// </param>
+    /// <param name="dnsSRPMode">
+    /// Whether the user has enabled the Smart Routing Proxy preference. This is
+    /// the caller's half of the decision; the host-support half is read from
+    /// <paramref name="srpServer"/>. SRP engages only when both are satisfied.
     /// </param>
     public static string? WireGuardQuickConfigForCredential(GRDCredential credential, string? dnsServers = null,
-        GRDSGWServer? srpServer = null)
+        GRDSGWServer? srpServer = null, bool dnsSRPMode = false)
     {
         if (credential.TransportProtocol != GRDTransportProtocol.TransportProtocol.TransportWireGuard)
         {
@@ -72,7 +76,7 @@ public static class GRDWireGuardConfiguration
 
         // Smart Routing Proxy wins over both the caller-supplied value and the
         // Cloudflare default when it applies.
-        var srpDns = SmartRoutingProxyDnsFor(srpServer);
+        var srpDns = SmartRoutingProxyDnsFor(srpServer, dnsSRPMode);
         var dns = srpDns ?? (string.IsNullOrWhiteSpace(dnsServers) ? DefaultDnsServers : dnsServers!);
 
         // Build the [Interface] address line. Include IPv6 when the server
@@ -99,15 +103,22 @@ public static class GRDWireGuardConfiguration
 
     /// <summary>
     /// Returns the Smart Routing Proxy resolver to use, or null when SRP does not
-    /// apply and normal DNS selection should stand. All three SRP preconditions
-    /// are evaluated here so no caller has to reason about them: the host must
-    /// advertise smart-routing-enabled, the user must have switched the feature
-    /// on, and the host must be in the US or the UK. The WireGuard transport
-    /// requirement is implicit — the caller rejects non-WireGuard credentials
-    /// before reaching this point.
+    /// apply and normal DNS selection should stand. SRP requires two independent
+    /// conditions to hold: the host advertises smart-routing-enabled (server
+    /// support) and <paramref name="dnsSRPMode"/> is set (user preference). The
+    /// host must also be in the US or the UK, since those are the only regions
+    /// with a resolver. The WireGuard transport requirement is implicit — the
+    /// caller rejects non-WireGuard credentials before reaching this point.
+    /// Only DNS inside the WireGuard tunnel is affected; system DNS is untouched.
     /// </summary>
-    private static string? SmartRoutingProxyDnsFor(GRDSGWServer? server)
+    private static string? SmartRoutingProxyDnsFor(GRDSGWServer? server, bool dnsSRPMode)
     {
+        if (!dnsSRPMode)
+        {
+            Logger.LogDebug("SmartRoutingProxyDnsFor: user preference is off.");
+            return null;
+        }
+
         if (server is null) return null;
 
         if (!server.SmartProxyRoutingEnabled)
@@ -115,12 +126,6 @@ public static class GRDWireGuardConfiguration
             Logger.LogDebug(
                 "SmartRoutingProxyDnsFor: host {Host} does not advertise smart-routing-enabled.",
                 server.Hostname);
-            return null;
-        }
-
-        if (!GRDVPNHelper.IsSmartRoutingProxyEnabled())
-        {
-            Logger.LogDebug("SmartRoutingProxyDnsFor: user preference is off.");
             return null;
         }
 
