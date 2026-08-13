@@ -50,6 +50,13 @@ public class Common
     /// Public production Connect API environment
     public const string DefaultConnectAPIHostname = "connect-api.guardianapp.com";
 
+    /// Region precision requested from the v1.3 servers endpoints. The API also
+    /// accepts "country", "city" and "city-by-country"; "default" is the country-
+    /// precision set this client's time-zone-to-region mapping is built on, and
+    /// both the region list and the host list must request the same precision or
+    /// they disagree about what a region is.
+    public const string kRegionPrecisionDefault = "default";
+
     public const string DefaultHousekeepingAPIHostname = "connect-api.guardianapp.com";
     public const string kConnectAPIHostname = "ConnectAPIHostname";
     public const string kHousekeepingAPIHostname = "HousekeepingAPIHostname";

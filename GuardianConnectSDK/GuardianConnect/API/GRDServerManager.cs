@@ -14,11 +14,6 @@ public class GRDServerManager
 
     public GRDVPNHelper.GRDServerFeatureEnvironment FeatureEnv;
 
-    /// Region precision accepted by /api/v1.3/servers/hostnames-for-region.
-    /// Windows maps the device time zone onto the default regions, so the host
-    /// set must be requested at that same precision.
-    private const string kRegionPrecisionDefault = "default";
-
     /// Feature environment and beta preference for the host-list request.
     /// GetHostsForRegion is static while FeatureEnv / BetaCapable are instance
     /// members, so these carry the same values the constructor assigns. Nothing
@@ -550,7 +545,7 @@ public class GRDServerManager
                 Paid = true,
                 FeatureEnvironment = (int)HostRequestFeatureEnvironment,
                 BetaCapable = HostRequestBetaCapable,
-                RegionPrecision = kRegionPrecisionDefault,
+                RegionPrecision = Common.kRegionPrecisionDefault,
             };
 
             Logger.LogInformation("About to do GET for Region Hosts collection retrieval");
