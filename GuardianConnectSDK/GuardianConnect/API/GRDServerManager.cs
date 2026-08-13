@@ -14,6 +14,21 @@ public class GRDServerManager
 
     public GRDVPNHelper.GRDServerFeatureEnvironment FeatureEnv;
 
+    /// Region precision accepted by /api/v1.3/servers/hostnames-for-region.
+    /// Windows maps the device time zone onto the default regions, so the host
+    /// set must be requested at that same precision.
+    private const string kRegionPrecisionDefault = "default";
+
+    /// Feature environment and beta preference for the host-list request.
+    /// GetHostsForRegion is static while FeatureEnv / BetaCapable are instance
+    /// members, so these carry the same values the constructor assigns. Nothing
+    /// overrides those at runtime today; if that changes, thread the instance
+    /// values through instead of widening these.
+    private static readonly GRDVPNHelper.GRDServerFeatureEnvironment HostRequestFeatureEnvironment =
+        GRDVPNHelper.GRDServerFeatureEnvironment.ServerFeatureEnvironmentProduction;
+
+    private const bool HostRequestBetaCapable = false;
+
     public GRDServerManager()
     {
         FeatureEnv = GRDVPNHelper.GRDServerFeatureEnvironment.ServerFeatureEnvironmentProduction;
@@ -521,12 +536,22 @@ public class GRDServerManager
         Logger.LogInformation($"GetHostsForRegion: Calling GetHostsForRegionKey with key = '{regionKey}");
 
         var response = new HttpResponseMessage();
-        var getHostsForRegionUrl = $"https://{Common.DefaultConnectAPIHostname}/api/v1/servers/hostnames-for-region";
+        var getHostsForRegionUrl = $"https://{Common.DefaultConnectAPIHostname}/api/v1.3/servers/hostnames-for-region";
         var uri = new Uri(getHostsForRegionUrl);
         try
         {
-            var rip = new RegionInputParameter();
-            rip.Region = regionRec.RegionName;
+            // v1.3 rather than v1: only v1.3 returns "smart-routing-enabled" and
+            // the nested "region" object per host. On v1 both are absent, so
+            // GRDSGWServer.SmartProxyRoutingEnabled deserialized to the bool
+            // default of false and Smart Routing Proxy could never engage.
+            var rip = new RegionInputParameter
+            {
+                Region = regionRec.RegionName,
+                Paid = true,
+                FeatureEnvironment = (int)HostRequestFeatureEnvironment,
+                BetaCapable = HostRequestBetaCapable,
+                RegionPrecision = kRegionPrecisionDefault,
+            };
 
             Logger.LogInformation("About to do GET for Region Hosts collection retrieval");
             var ripSerialized =
