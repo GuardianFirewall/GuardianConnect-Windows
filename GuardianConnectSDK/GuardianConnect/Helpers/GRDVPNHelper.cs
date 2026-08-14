@@ -358,7 +358,18 @@ public class GRDVPNHelper
         // the ApiHostname static-property indirection while WG didn't
         // pre-flight at all).
         var cred = GRDCredentialManager.GetMainCredentials()!;
-        var statusErr = await GRDGateway.GetServerStatus(cred.HostName, clientCall: true);
+
+        // Stealth Mode: substitute the gateway's published address for its hostname
+        // everywhere the connect touches the network. The pre-flight below is an
+        // HTTPS call and the dial that follows is IKEv2 or WireGuard; on a network
+        // that blocks resolution of guardianapp.com, leaving the hostname on the
+        // pre-flight aborts the connect before either dial is reached. Gateway
+        // certificates carry the address as an iPAddress SAN, so TLS validates
+        // against the address.
+        var stealthDialHost = await StealthDialAddressAsync(cred.HostName);
+        var preflightHost = stealthDialHost ?? cred.HostName;
+
+        var statusErr = await GRDGateway.GetServerStatus(preflightHost, clientCall: true);
         if (statusErr.IsError)
         {
             // When GetServerStatus throws (DNS failure, socket-block from KS,
@@ -379,9 +390,9 @@ public class GRDVPNHelper
         return protocol switch
         {
             GRDTransportProtocol.TransportProtocol.TransportIKEv2 =>
-                await StartIKEv2Connection(),
+                await StartIKEv2Connection(stealthDialHost),
             GRDTransportProtocol.TransportProtocol.TransportWireGuard =>
-                await StartWireGuardFromStoredCreds(),
+                await StartWireGuardFromStoredCreds(stealthDialHost),
             _ => new ErrorResponse()
                 .SetException(new InvalidOperationException(
                     $"Unsupported transport protocol: {protocol}"))
@@ -435,6 +446,41 @@ public class GRDVPNHelper
     public static void SetStealthModeEnabled(bool enabled) =>
         RegistrySettings.UpdateGuardianUserSettings(
             Common.kGRDStealthModeEnabled, enabled ? "true" : "false");
+
+    /// <summary>
+    /// The gateway address to use in place of <paramref name="hostname"/> for this
+    /// connection, or null to keep the hostname. Returns null when Stealth Mode is
+    /// off, when no gateway record can be resolved, or when the record publishes no
+    /// IPv4 address — in every one of those cases the hostname stands, so a missing
+    /// address degrades to today's behavior rather than producing an unreachable
+    /// endpoint.
+    /// </summary>
+    private async Task<string?> StealthDialAddressAsync(string hostname)
+    {
+        if (!IsStealthModeEnabled()) return null;
+
+        var server = await GRDServerManager.FindHostRecordResilient(hostname);
+        if (server is null)
+        {
+            _logger.LogWarning(
+                "StealthDialAddressAsync: Stealth Mode is on but no gateway record resolved for "
+                + "{Host}; connecting by hostname.", hostname);
+            return null;
+        }
+
+        if (string.IsNullOrWhiteSpace(server.IPv4Address))
+        {
+            _logger.LogWarning(
+                "StealthDialAddressAsync: Stealth Mode is on but {Host} publishes no IPv4 address; "
+                + "connecting by hostname.", hostname);
+            return null;
+        }
+
+        _logger.LogInformation(
+            "StealthDialAddressAsync: Stealth Mode on — using {Address} in place of {Host}.",
+            server.IPv4Address, hostname);
+        return server.IPv4Address;
+    }
     public async Task<ErrorResponse> DisconnectVPNTunnel()
     {
         var errorResponse = new ErrorResponse();
@@ -560,7 +606,14 @@ public class GRDVPNHelper
         PreferredRegion = regionNameKey;
     }
 
-    private async Task<ErrorResponse> StartIKEv2Connection()
+    /// <param name="sgwServerAddressOverride">
+    /// When set, dialled as the RAS gateway in place of the credential's hostname.
+    /// Stealth Mode supplies the gateway's published IPv4 address. Windows validates
+    /// the IKE machine certificate against the address it dialled, which the gateway
+    /// certificates now cover with an iPAddress SAN. HostName itself is left alone —
+    /// it still identifies the host for HTTPS and for display.
+    /// </param>
+    private async Task<ErrorResponse> StartIKEv2Connection(string? sgwServerAddressOverride = null)
     {
         var errorResponse = new ErrorResponse();
 
@@ -582,7 +635,9 @@ public class GRDVPNHelper
         var vpnValues = new VPNCallParameters
         {
             Transport = GRDTransportProtocol.TransportProtocol.TransportIKEv2,
-            VpnHostName = mainCredential.HostName,
+            VpnHostName = string.IsNullOrWhiteSpace(sgwServerAddressOverride)
+                ? mainCredential.HostName
+                : sgwServerAddressOverride!,
             VpnHostDisplay = mainCredential.HostnameDisplayValue,
             EapuserName = device.EapUsername ?? string.Empty,
             Eappassword = device.EapPassword ?? string.Empty,
@@ -622,7 +677,11 @@ public class GRDVPNHelper
     /// returns true for WireGuard — i.e., we have a valid cached cred and don't
     /// need to exchange keys.
     /// </summary>
-    private async Task<ErrorResponse> StartWireGuardFromStoredCreds()
+    /// <param name="sgwServerAddressOverride">
+    /// When set, used as the WireGuard Endpoint host in place of the credential's
+    /// hostname. Stealth Mode supplies the gateway's published IPv4 address.
+    /// </param>
+    private async Task<ErrorResponse> StartWireGuardFromStoredCreds(string? sgwServerAddressOverride = null)
     {
         var errorResponse = new ErrorResponse();
         _logger.LogInformation("StartWireGuardFromStoredCreds: entry");
@@ -639,34 +698,20 @@ public class GRDVPNHelper
 
         // Smart Routing Proxy takes two independent inputs: the user preference
         // (read here, passed as dnsSRPMode) and the host's own support flag (read
-        // by the config builder off the gateway record). Stealth Mode needs the
-        // same record for its published IPv4 address. Resolve it once when either
-        // preference is on; with both off it cannot change the config, so there is
-        // no reason to pay for a possible network lookup.
+        // by the config builder off the gateway record). Only resolve the record
+        // when the preference is on — with SRP off it cannot change the config, so
+        // there is no reason to pay for a possible network lookup. The Stealth Mode
+        // address arrives already resolved from ConnectVPNTunnel, which needs it for
+        // the pre-flight as well.
         var dnsSRPMode = IsSmartRoutingProxyEnabled();
-        var stealthMode = IsStealthModeEnabled();
         GRDSGWServer? srpServer = null;
-        if (dnsSRPMode || stealthMode)
+        if (dnsSRPMode)
         {
             srpServer = await GRDServerManager.FindHostRecordResilient(cred.HostName);
             if (srpServer is null)
                 _logger.LogWarning(
                     "StartWireGuardFromStoredCreds: could not resolve a gateway record for {Host}; "
-                    + "Smart Routing Proxy and Stealth Mode stay off for this connection.", cred.HostName);
-        }
-
-        // Stealth Mode only applies when the record actually carries an address.
-        // A host record without one falls back to the hostname rather than
-        // producing an Endpoint line that cannot resolve.
-        string? sgwServerAddressOverride = null;
-        if (stealthMode && srpServer is not null)
-        {
-            if (!string.IsNullOrWhiteSpace(srpServer.IPv4Address))
-                sgwServerAddressOverride = srpServer.IPv4Address;
-            else
-                _logger.LogWarning(
-                    "StartWireGuardFromStoredCreds: Stealth Mode is on but {Host} published no IPv4 "
-                    + "address; dialling by hostname.", cred.HostName);
+                    + "Smart Routing Proxy stays off for this connection.", cred.HostName);
         }
 
         var configText = GRDWireGuardConfiguration.WireGuardQuickConfigForCredential(
