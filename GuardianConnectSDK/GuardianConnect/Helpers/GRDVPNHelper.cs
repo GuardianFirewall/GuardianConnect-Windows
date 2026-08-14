@@ -417,6 +417,24 @@ public class GRDVPNHelper
     public static void SetSmartRoutingProxyEnabled(bool enabled) =>
         RegistrySettings.UpdateGuardianUserSettings(
             Common.kGRDSmartRoutingProxyEnabled, enabled ? "true" : "false");
+
+    /// <summary>
+    /// True when the user has opted into Stealth Mode. This is the user preference
+    /// alone; whether the gateway is actually dialled by address also depends on
+    /// the host record carrying an IPv4 address, which is resolved at connect time.
+    /// </summary>
+    public static bool IsStealthModeEnabled() =>
+        string.Equals(
+            RegistrySettings.RetrieveGuardianUserSettings(Common.kGRDStealthModeEnabled),
+            "true", StringComparison.OrdinalIgnoreCase);
+
+    /// <summary>
+    /// Persists the user's Stealth Mode preference to HKCU. Takes effect on the
+    /// next connect, when the WireGuard config is built.
+    /// </summary>
+    public static void SetStealthModeEnabled(bool enabled) =>
+        RegistrySettings.UpdateGuardianUserSettings(
+            Common.kGRDStealthModeEnabled, enabled ? "true" : "false");
     public async Task<ErrorResponse> DisconnectVPNTunnel()
     {
         var errorResponse = new ErrorResponse();
@@ -621,22 +639,38 @@ public class GRDVPNHelper
 
         // Smart Routing Proxy takes two independent inputs: the user preference
         // (read here, passed as dnsSRPMode) and the host's own support flag (read
-        // by the config builder off the gateway record). Only resolve the record
-        // when the preference is on — with SRP off it cannot change the config, so
-        // there is no reason to pay for a possible network lookup.
+        // by the config builder off the gateway record). Stealth Mode needs the
+        // same record for its published IPv4 address. Resolve it once when either
+        // preference is on; with both off it cannot change the config, so there is
+        // no reason to pay for a possible network lookup.
         var dnsSRPMode = IsSmartRoutingProxyEnabled();
+        var stealthMode = IsStealthModeEnabled();
         GRDSGWServer? srpServer = null;
-        if (dnsSRPMode)
+        if (dnsSRPMode || stealthMode)
         {
             srpServer = await GRDServerManager.FindHostRecordResilient(cred.HostName);
             if (srpServer is null)
                 _logger.LogWarning(
                     "StartWireGuardFromStoredCreds: could not resolve a gateway record for {Host}; "
-                    + "Smart Routing Proxy stays off for this connection.", cred.HostName);
+                    + "Smart Routing Proxy and Stealth Mode stay off for this connection.", cred.HostName);
         }
 
-        var configText =
-            GRDWireGuardConfiguration.WireGuardQuickConfigForCredential(cred, null, srpServer, dnsSRPMode);
+        // Stealth Mode only applies when the record actually carries an address.
+        // A host record without one falls back to the hostname rather than
+        // producing an Endpoint line that cannot resolve.
+        string? sgwServerAddressOverride = null;
+        if (stealthMode && srpServer is not null)
+        {
+            if (!string.IsNullOrWhiteSpace(srpServer.IPv4Address))
+                sgwServerAddressOverride = srpServer.IPv4Address;
+            else
+                _logger.LogWarning(
+                    "StartWireGuardFromStoredCreds: Stealth Mode is on but {Host} published no IPv4 "
+                    + "address; dialling by hostname.", cred.HostName);
+        }
+
+        var configText = GRDWireGuardConfiguration.WireGuardQuickConfigForCredential(
+            cred, null, srpServer, dnsSRPMode, sgwServerAddressOverride);
         if (string.IsNullOrEmpty(configText))
         {
             return errorResponse

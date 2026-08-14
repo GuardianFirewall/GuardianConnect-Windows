@@ -32,6 +32,13 @@ public class GRDSGWServer
 
     [JsonPropertyName("beta-capable")] public bool BetaCapable { get; set; }
 
+    /// The gateway's published IPv4 address. Returned populated by
+    /// /api/v1.3/servers/hostnames-for-region and /api/v1.1/servers/all-hostnames;
+    /// v1 of the per-region endpoint sent an empty string. Stealth Mode dials this
+    /// instead of Hostname so no DNS lookup is required.
+    [JsonPropertyName("ipv4-address")]
+    public string IPv4Address { get; set; } = string.Empty;
+
     /// Whether this server supports smart-proxy routing. Maps to iOS
     /// GRDSGWServer.smartProxyRoutingEnabled (wire key "smart-routing-enabled").
     [JsonPropertyName("smart-routing-enabled")]

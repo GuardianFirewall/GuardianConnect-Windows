@@ -96,6 +96,15 @@ public class Common
     /// </summary>
     public const string kGRDSmartRoutingProxyEnabled = "kGRDSmartRoutingProxyEnabled";
 
+    /// <summary>
+    /// HKCU user setting. "true" means the user has opted into Stealth Mode, which
+    /// dials the gateway by its published IPv4 address instead of its hostname so
+    /// the connection survives a network that blocks DNS resolution for
+    /// guardianapp.com. WireGuard only — it authenticates by public key and needs
+    /// no name to validate against.
+    /// </summary>
+    public const string kGRDStealthModeEnabled = "kGRDStealthModeEnabled";
+
     public const string kGRDWGDevicePublicKey = "wg-device-public-key";
     public const string kGRDWGDevicePrivateKey = "wg-device-private-key";
     public const string kGRDWGServerPublicKey = "server-public-key";

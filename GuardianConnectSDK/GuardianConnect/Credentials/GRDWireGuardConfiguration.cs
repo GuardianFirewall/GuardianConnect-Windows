@@ -48,8 +48,14 @@ public static class GRDWireGuardConfiguration
     /// the caller's half of the decision; the host-support half is read from
     /// <paramref name="srpServer"/>. SRP engages only when both are satisfied.
     /// </param>
+    /// <param name="sgwServerAddressOverride">
+    /// When set, used as the Endpoint host in place of the credential's hostname.
+    /// Stealth Mode passes the gateway's published IPv4 address here so the tunnel
+    /// can be established on a network that blocks DNS resolution for the
+    /// guardianapp.com domain. Null or empty leaves the hostname in place.
+    /// </param>
     public static string? WireGuardQuickConfigForCredential(GRDCredential credential, string? dnsServers = null,
-        GRDSGWServer? srpServer = null, bool dnsSRPMode = false)
+        GRDSGWServer? srpServer = null, bool dnsSRPMode = false, string? sgwServerAddressOverride = null)
     {
         if (credential.TransportProtocol != GRDTransportProtocol.TransportProtocol.TransportWireGuard)
         {
@@ -85,6 +91,19 @@ public static class GRDWireGuardConfiguration
         if (!string.IsNullOrEmpty(device.MappedIPv6Address))
             addresses = $"{device.MappedIPv4Address}, {device.MappedIPv6Address}";
 
+        // Stealth Mode: dial the gateway by address so establishing the tunnel
+        // needs no name resolution. WireGuard authenticates the peer by public
+        // key, so substituting the address costs nothing — unlike IKEv2, which
+        // validates the hostname against the certificate's SAN.
+        var endpointHost = credential.HostName!;
+        if (!string.IsNullOrWhiteSpace(sgwServerAddressOverride))
+        {
+            endpointHost = sgwServerAddressOverride!;
+            Logger.LogInformation(
+                "WireGuardQuickConfigForCredential: dialling {Endpoint} by address for {Host} (Stealth Mode).",
+                endpointHost, credential.HostName);
+        }
+
         var sb = new StringBuilder();
         sb.AppendLine("[Interface]");
         sb.AppendLine($"PrivateKey = {credential.DevicePrivateKey}");
@@ -94,7 +113,7 @@ public static class GRDWireGuardConfiguration
         sb.AppendLine("[Peer]");
         sb.AppendLine($"PublicKey = {device.ServerPublicKey}");
         sb.AppendLine("AllowedIPs = 0.0.0.0/0, ::/0");
-        sb.AppendLine($"Endpoint = {credential.HostName}:{WireGuardEndpointPort}");
+        sb.AppendLine($"Endpoint = {endpointHost}:{WireGuardEndpointPort}");
 
         var config = sb.ToString();
         Logger.LogDebug("Formatted WireGuard config:\n{Config}", config);
