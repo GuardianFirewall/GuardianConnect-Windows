@@ -548,9 +548,9 @@ public class GRDServerManager
                 RegionPrecision = Common.kRegionPrecisionDefault,
             };
 
-            Logger.LogInformation("About to do GET for Region Hosts collection retrieval");
             var ripSerialized =
                 JsonSerializer.Serialize(rip, RegionInputParameterJsonContext.Default.RegionInputParameter);
+            Logger.LogInformation("GetHostsForRegion: POST {Url} {Body}", getHostsForRegionUrl, ripSerialized);
             HttpContent content = new StringContent(ripSerialized);
             content.Headers.Remove("Content-Type");
             content.Headers.Add("Content-Type", "application/json; charset=utf-8");

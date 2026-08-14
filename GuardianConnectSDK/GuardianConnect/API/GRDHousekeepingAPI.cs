@@ -280,7 +280,7 @@ public static class GRDHousekeepingAPI
         var uri = new Uri(GetAllRegionsUrl);
         try
         {
-            Logger.LogInformation("RequestServerRegions: Getting latest Regions collection from backend...");
+            Logger.LogInformation("RequestServerRegions: GET {Url}", GetAllRegionsUrl);
             {
                 var response = HttpUtils.Client.GetAsync(uri).GetAwaiter().GetResult(); // Task short-circuit jump
                 if (response.IsSuccessStatusCode)
