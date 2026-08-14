@@ -81,6 +81,23 @@ public class GRDCredential
     public string HostnameDisplayValue { get; set; } = string.Empty;
     public DateTime ExpirationDate { get; set; }
     public string HostName { get; set; } = string.Empty;
+
+    /// <summary>
+    /// The gateway's published IPv4 address, captured from the GRDSGWServer record
+    /// when this credential was created. Distinct from <see cref="IPv4Address"/>,
+    /// which is this device's address inside the tunnel.
+    /// <para>
+    /// Persisted so Stealth Mode can dial the gateway without a name lookup on a
+    /// later connect. The host record it comes from lives in an in-memory cache
+    /// that is populated only by host selection, which a stored-credential dial
+    /// skips — so in a new process the address is otherwise recoverable only via
+    /// an API call that itself needs DNS, which is what Stealth Mode exists to
+    /// avoid. Empty on credentials created before this field existed, and on any
+    /// host that publishes no address.
+    /// </para>
+    /// </summary>
+    public string SgwIPv4Address { get; set; } = string.Empty;
+
     public string ClientId { get; set; } = string.Empty;
 
     [JsonPropertyName("api-auth-token")] public string ApiAuthToken { get; set; } = string.Empty;

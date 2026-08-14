@@ -283,6 +283,9 @@ public class GRDVPNHelper
         mainCredential.MainCredential = true;
         mainCredential.HostName = server.Hostname;
         mainCredential.HostnameDisplayValue = server.HostLocation();
+        // Captured while the record is in hand: a later stored-credential dial has
+        // no host selection to repopulate the cache it came from.
+        mainCredential.SgwIPv4Address = server.IPv4Address;
         GRDCredentialManager.AddOrUpdateCredential(mainCredential);
 
         errorResponse = await ConnectVPNTunnel();
@@ -456,10 +459,30 @@ public class GRDVPNHelper
     /// IPv4 address — in every one of those cases the hostname stands, so a missing
     /// address degrades to today's behavior rather than producing an unreachable
     /// endpoint.
+    /// <para>
+    /// The address stored on the credential is preferred because reading it needs
+    /// no network at all. The record lookup behind it can fall back to an API call
+    /// that resolves connect-api.guardianapp.com, which is exactly what a network
+    /// hostile to Guardian blocks — so it serves credentials predating the stored
+    /// field, not the case this feature is for.
+    /// </para>
     /// </summary>
     private async Task<string?> StealthDialAddressAsync(string hostname)
     {
         if (!IsStealthModeEnabled()) return null;
+
+        var stored = GRDCredentialManager.GetMainCredentials()?.SgwIPv4Address;
+        if (!string.IsNullOrWhiteSpace(stored))
+        {
+            _logger.LogInformation(
+                "StealthDialAddressAsync: Stealth Mode on — using stored address {Address} for {Host}.",
+                stored, hostname);
+            return stored;
+        }
+
+        _logger.LogInformation(
+            "StealthDialAddressAsync: no address stored on the credential for {Host}; falling back to a "
+            + "host-record lookup, which needs name resolution.", hostname);
 
         var server = await GRDServerManager.FindHostRecordResilient(hostname);
         if (server is null)
@@ -566,6 +589,7 @@ public class GRDVPNHelper
         var credentials = (GRDCredential)errorResponse.Data!;
         credentials.HostName = selectedServer.Hostname;
         credentials.HostnameDisplayValue = selectedServer.HostLocation();
+        credentials.SgwIPv4Address = selectedServer.IPv4Address;
         return new ErrorResponse().SetData(credentials);
     }
 
