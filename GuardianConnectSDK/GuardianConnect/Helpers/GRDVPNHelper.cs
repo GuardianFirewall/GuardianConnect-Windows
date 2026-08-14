@@ -285,7 +285,7 @@ public class GRDVPNHelper
         mainCredential.HostnameDisplayValue = server.HostLocation();
         // Captured while the record is in hand: a later stored-credential dial has
         // no host selection to repopulate the cache it came from.
-        mainCredential.SgwIPv4Address = server.IPv4Address;
+        mainCredential.Server = server;
         GRDCredentialManager.AddOrUpdateCredential(mainCredential);
 
         errorResponse = await ConnectVPNTunnel();
@@ -471,18 +471,18 @@ public class GRDVPNHelper
     {
         if (!IsStealthModeEnabled()) return null;
 
-        var stored = GRDCredentialManager.GetMainCredentials()?.SgwIPv4Address;
+        var stored = GRDCredentialManager.GetMainCredentials()?.Server?.IPv4Address;
         if (!string.IsNullOrWhiteSpace(stored))
         {
             _logger.LogInformation(
-                "StealthDialAddressAsync: Stealth Mode on — using stored address {Address} for {Host}.",
-                stored, hostname);
+                "StealthDialAddressAsync: Stealth Mode on — using the address on the stored gateway "
+                + "record, {Address}, for {Host}.", stored, hostname);
             return stored;
         }
 
         _logger.LogInformation(
-            "StealthDialAddressAsync: no address stored on the credential for {Host}; falling back to a "
-            + "host-record lookup, which needs name resolution.", hostname);
+            "StealthDialAddressAsync: no gateway record with an address stored on the credential for "
+            + "{Host}; falling back to a host-record lookup, which needs name resolution.", hostname);
 
         var server = await GRDServerManager.FindHostRecordResilient(hostname);
         if (server is null)
@@ -589,7 +589,7 @@ public class GRDVPNHelper
         var credentials = (GRDCredential)errorResponse.Data!;
         credentials.HostName = selectedServer.Hostname;
         credentials.HostnameDisplayValue = selectedServer.HostLocation();
-        credentials.SgwIPv4Address = selectedServer.IPv4Address;
+        credentials.Server = selectedServer;
         return new ErrorResponse().SetData(credentials);
     }
 

@@ -39,6 +39,12 @@ public class GRDSGWServer
     [JsonPropertyName("ipv4-address")]
     public string IPv4Address { get; set; } = string.Empty;
 
+    /// The gateway's published IPv6 address. Present in the same responses as
+    /// IPv4Address but empty across every host the backend currently returns, so
+    /// nothing dials by it yet.
+    [JsonPropertyName("ipv6-address")]
+    public string IPv6Address { get; set; } = string.Empty;
+
     /// Whether this server supports smart-proxy routing. Maps to iOS
     /// GRDSGWServer.smartProxyRoutingEnabled (wire key "smart-routing-enabled").
     [JsonPropertyName("smart-routing-enabled")]
