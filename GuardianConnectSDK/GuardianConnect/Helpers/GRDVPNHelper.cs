@@ -359,14 +359,16 @@ public class GRDVPNHelper
         // pre-flight at all).
         var cred = GRDCredentialManager.GetMainCredentials()!;
 
-        // Stealth Mode: substitute the gateway's published address for its hostname
-        // everywhere the connect touches the network. The pre-flight below is an
-        // HTTPS call and the dial that follows is IKEv2 or WireGuard; on a network
-        // that blocks resolution of guardianapp.com, leaving the hostname on the
-        // pre-flight aborts the connect before either dial is reached. Gateway
-        // certificates carry the address as an iPAddress SAN, so TLS validates
-        // against the address.
-        var stealthDialHost = await StealthDialAddressAsync(cred.HostName);
+        // Stealth Mode is WireGuard-only. On a WireGuard connect the gateway's
+        // published address replaces its hostname for both the pre-flight below and
+        // the dial that follows: the pre-flight is an HTTPS call, so leaving the
+        // hostname on it aborts the connect before the dial is reached on a network
+        // that blocks resolution of guardianapp.com. IKEv2 is untouched — it dials
+        // and pre-flights by hostname regardless of the preference.
+        var stealthDialHost =
+            protocol == GRDTransportProtocol.TransportProtocol.TransportWireGuard
+                ? await StealthDialAddressAsync(cred.HostName)
+                : null;
         var preflightHost = stealthDialHost ?? cred.HostName;
 
         var statusErr = await GRDGateway.GetServerStatus(preflightHost, clientCall: true);
@@ -390,7 +392,7 @@ public class GRDVPNHelper
         return protocol switch
         {
             GRDTransportProtocol.TransportProtocol.TransportIKEv2 =>
-                await StartIKEv2Connection(stealthDialHost),
+                await StartIKEv2Connection(),
             GRDTransportProtocol.TransportProtocol.TransportWireGuard =>
                 await StartWireGuardFromStoredCreds(stealthDialHost),
             _ => new ErrorResponse()
@@ -606,14 +608,7 @@ public class GRDVPNHelper
         PreferredRegion = regionNameKey;
     }
 
-    /// <param name="sgwServerAddressOverride">
-    /// When set, dialled as the RAS gateway in place of the credential's hostname.
-    /// Stealth Mode supplies the gateway's published IPv4 address. Windows validates
-    /// the IKE machine certificate against the address it dialled, which the gateway
-    /// certificates now cover with an iPAddress SAN. HostName itself is left alone —
-    /// it still identifies the host for HTTPS and for display.
-    /// </param>
-    private async Task<ErrorResponse> StartIKEv2Connection(string? sgwServerAddressOverride = null)
+    private async Task<ErrorResponse> StartIKEv2Connection()
     {
         var errorResponse = new ErrorResponse();
 
@@ -635,9 +630,7 @@ public class GRDVPNHelper
         var vpnValues = new VPNCallParameters
         {
             Transport = GRDTransportProtocol.TransportProtocol.TransportIKEv2,
-            VpnHostName = string.IsNullOrWhiteSpace(sgwServerAddressOverride)
-                ? mainCredential.HostName
-                : sgwServerAddressOverride!,
+            VpnHostName = mainCredential.HostName,
             VpnHostDisplay = mainCredential.HostnameDisplayValue,
             EapuserName = device.EapUsername ?? string.Empty,
             Eappassword = device.EapPassword ?? string.Empty,
