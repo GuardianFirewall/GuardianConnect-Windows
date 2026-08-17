@@ -1,94 +1,77 @@
-﻿// Other Functions
-WritePrivateProfileString
+// CsWin32 input for Win32Calls. See CSWIN32-REGEN.md.
+//
+// Explicit names only. The module wildcards this list used to carry
+// (Ws2_32.*, Iphlpapi.*, powrprof.*) generated 437 imports, none of which were
+// called: the one power-management API in use, PowerRegisterSuspendResumeNotification,
+// is a hand-written DllImport in Shared/PowerTransitionMonitor.cs, and no Winsock
+// entry point is called at all. Prefix wildcards (IP*, RPC*, FWPM*, RASCN*) were
+// likewise pulling in whole namespaces for a handful of names.
+//
+// Everything below is referenced by hand-written code in this project. CsWin32
+// generates transitive types automatically, so a struct reachable from a method
+// listed here does not need its own entry -- the explicit type entries are the
+// ones used on their own.
 
-// RRAS Functions
-RasValidateEntryName
-RasEnumConnections
-RasEnumEntries
-RasSetEntryProperties
-RasGetCredentials
-RasSetCredentials
+// --- RAS: dial, enumerate, credentials, phonebook -------------------------
+RasConnectionNotification
 RasDeleteEntry
 RasDial
+RasEnumConnections
+RasEnumEntries
 RasGetConnectStatus
-RasGetErrorString
+RasGetCredentials
 RasHangUp
-RasGetConnectStatus
+RasSetCredentials
+RasSetEntryProperties
 
-// RRAS Structures
+// --- RAS types ------------------------------------------------------------
+HRASCONN
+RASCONNSTATE
+RASCONNSTATUSW
+RASCONNW
+RASCREDENTIALSW
+RASDIALPARAMSW
 RASENTRYNAMEW
 RASENTRYW
-RASCREDENTIALSW
-RASCONNSTATUSW
-RASDIALPARAMSW
-RASCONNW
 
-// RRAS Enumerations
-RASCONNSUBSTATE
-RASCONNSTATE
-
+// --- RAS constants --------------------------------------------------------
+ET_RequireMax
+RASCM_Password
+RASCM_UserName
+RASCN_Connection
+RASCN_Disconnection
+RASDT_Vpn
+RASEO2_CacheCredentials
+RASEO2_DontNegotiateMultilink
+RASEO2_IPv6RemoteDefaultGateway
+RASEO2_ReconnectIfDropped
+RASEO_PreviewDomain
 RASEO_RemoteDefaultGateway
 RASEO_RequireEAP
-RASEO_PreviewUserPw
-RASEO_PreviewDomain
 RASEO_ShowDialingProgress
+RASET_Vpn
+RASFP_Ppp
 RASNP_Ip
 RASNP_Ipv6
-RASFP_Ppp
-RASDT_Vpn
-RASET_Vpn
-ET_Optional
-ET_RequireMax
 VS_Ikev2Only
-RASEO2_DontNegotiateMultilink
-RASEO2_ReconnectIfDropped
-RASEO2_IPv6RemoteDefaultGateway
-RASEO2_CacheCredentials
-RASCM_UserName
-RASCM_Password
-IP*
-IP_ADAPTER_INFO
 
-// Global
-WIN32_ERROR
-ERROR_BUFFER_TOO_SMALL
-HRASCONN
-
-INFINITE
-
+// --- Event wait for the RAS connection-notification callback --------------
 CreateEvent
-SetEvent
-ResetEvent
 WaitForSingleObject
-RasConnectionNotification
-InitializeSecurityDescriptor
-
-RASCN*
-RASCONNSTATE
-
-SetSecurityDescriptorDacl
-SetSecurityDescriptorSacl
-SECURITY_DESCRIPTOR
-SECURITY_DESCRIPTOR_REVISION
+INFINITE
+WAIT_EVENT
+HANDLE
 SECURITY_ATTRIBUTES
-ACL
 
-// Libraries
-//rasapi32.*
-Ws2_32.*
-//Fwpuclnt.*
-Iphlpapi.*
-//advapi32.*
-powrprof.*
-//Synchapi.*
+// --- Phonebook writes -----------------------------------------------------
+WritePrivateProfileString
 
-//RAS*
+// --- Held, not called, by VpnDnsFilteringHandler --------------------------
+// The engine handle is stored here and passed to Win32Calls.WFP; this project
+// calls no Fwpm* entry point itself.
+FWPM_ENGINE_HANDLE
 
-//RPC_C_AUTHN_WINNT
-RPC*
-FWPM_SESSION_FLAG_DYNAMIC
-FWPM*
-IP_*
-MAX_ADAPTER_NAME_LENGTH
-MAX_ADAPTER_DESCRIPTION_LENGTH
-MAX_ADAPTER_ADDRESS_LENGTH
+// --- Misc -----------------------------------------------------------------
+ERROR_BUFFER_TOO_SMALL
+LUID
+WIN32_ERROR
