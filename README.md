@@ -12,7 +12,7 @@ The SDK provides all of the abstractions to integrate the ability to establish a
 The benefit of the separation is that the service can maintain a reliable VPN connection. The service is required to be executed with SYSTEM authority for necessary Windows OS operations.
 
 ## Manual Builds
-The SDK is currently based on .NET version 9, though older versions may be compatible as well. If a local build is preferred for the integration it can be achieved by following the information below.
+The SDK targets .NET 10 (`net10.0-windows`) and requires the .NET 10 SDK to build; earlier versions are not compatible. If a local build is preferred for the integration it can be achieved by following the information below.
 
 #### Main SDK
 The GuardianConnect for Windows repo contains six core projects that need to be built for inclusion into your solution.  
