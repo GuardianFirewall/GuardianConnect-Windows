@@ -1,7 +1,7 @@
 # GuardianConnect-Windows
 
 This is a work-in-progress SDK for Windows applications to integrate with the Guardian Connect API and establish VPN connections to the Guardian Firewall infrastructure. All lower level components are exposed but the use of high level APIs in `GRDVPNHelper` are recommended. This framework includes everything to establish an IKEv2 VPN connection leveraging the IKEv2 VPN daemon included in Windows. We officially suppport Windows 10 & 11.
-The SDK is built using native Windows C# technologies and supports .NET AOT ([ahead-of-time](https://learn.microsoft.com/en-us/dotnet/core/deploying/native-aot/?tabs=windows%2Cnet8)) complications.
+The SDK is built using native Windows C# technologies and supports .NET AOT ([ahead-of-time](https://learn.microsoft.com/en-us/dotnet/core/deploying/native-aot/?tabs=windows)) compilations.
 
 For more information and a direct contact please visit https://guardianapp.com/company/partners
 
