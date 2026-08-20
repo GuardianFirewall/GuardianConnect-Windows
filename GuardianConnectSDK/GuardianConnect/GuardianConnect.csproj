@@ -8,9 +8,6 @@
 
         <GeneratePackageOnBuild>False</GeneratePackageOnBuild>
         <PackageIcon>Guardian.png</PackageIcon>
-        <!--
-        <TargetFramework>net9.0-windows10.0.26100.0</TargetFramework>
-        -->
         <Platforms>x64;ARM64</Platforms>
     </PropertyGroup>
 
