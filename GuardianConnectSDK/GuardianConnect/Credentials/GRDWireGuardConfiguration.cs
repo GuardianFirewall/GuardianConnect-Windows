@@ -12,8 +12,6 @@ public static class GRDWireGuardConfiguration
     private const int WireGuardEndpointPort = 51821;
     private const string DefaultDnsServers = "1.1.1.1, 1.0.0.1";
 
-    // Smart Routing Proxy resolvers. One per region; there is no SRP resolver
-    // outside the US and the UK, which is what limits the feature to those hosts.
     private const string SmartRoutingProxyDnsUS = "10.183.10.11";
     private const string SmartRoutingProxyDnsUK = "10.183.10.12";
 
@@ -33,21 +31,6 @@ public static class GRDWireGuardConfiguration
     /// credential is missing required fields (private key, public key,
     /// IPv4 address, server public key, or hostname).
     /// </summary>
-    /// <param name="dnsServers">
-    /// DNS servers for the [Interface] block. Falls back to the Cloudflare
-    /// defaults when null or blank, and is ignored entirely when Smart Routing
-    /// Proxy mode applies.
-    /// </param>
-    /// <param name="srpServer">
-    /// The gateway record for the host being dialled. Supplies the host-side half
-    /// of the Smart Routing Proxy decision — whether the server supports SRP at
-    /// all, and which regional resolver to use. Null builds a config with SRP off.
-    /// </param>
-    /// <param name="dnsSRPMode">
-    /// Whether the user has enabled the Smart Routing Proxy preference. This is
-    /// the caller's half of the decision; the host-support half is read from
-    /// <paramref name="srpServer"/>. SRP engages only when both are satisfied.
-    /// </param>
     public static string? WireGuardQuickConfigForCredential(GRDCredential credential, string? dnsServers = null,
         GRDSGWServer? srpServer = null, bool dnsSRPMode = false)
     {
@@ -74,8 +57,6 @@ public static class GRDWireGuardConfiguration
             return null;
         }
 
-        // Smart Routing Proxy wins over both the caller-supplied value and the
-        // Cloudflare default when it applies.
         var srpDns = SmartRoutingProxyDnsFor(srpServer, dnsSRPMode);
         var dns = srpDns ?? (string.IsNullOrWhiteSpace(dnsServers) ? DefaultDnsServers : dnsServers!);
 
@@ -103,13 +84,7 @@ public static class GRDWireGuardConfiguration
 
     /// <summary>
     /// Returns the Smart Routing Proxy resolver to use, or null when SRP does not
-    /// apply and normal DNS selection should stand. SRP requires two independent
-    /// conditions to hold: the host advertises smart-routing-enabled (server
-    /// support) and <paramref name="dnsSRPMode"/> is set (user preference). The
-    /// host must also be in the US or the UK, since those are the only regions
-    /// with a resolver. The WireGuard transport requirement is implicit — the
-    /// caller rejects non-WireGuard credentials before reaching this point.
-    /// Only DNS inside the WireGuard tunnel is affected; system DNS is untouched.
+    /// apply and normal DNS selection should stand.
     /// </summary>
     private static string? SmartRoutingProxyDnsFor(GRDSGWServer? server, bool dnsSRPMode)
     {
@@ -129,9 +104,6 @@ public static class GRDWireGuardConfiguration
             return null;
         }
 
-        // Region is nullable: the per-region host-list endpoint omits it and
-        // GRDServerManager back-fills it. Without it the country is unknown and
-        // there is no resolver to pick.
         var iso = server.Region?.CountryISOCode;
         if (string.IsNullOrWhiteSpace(iso))
         {
@@ -149,8 +121,6 @@ public static class GRDWireGuardConfiguration
             return SmartRoutingProxyDnsUS;
         }
 
-        // Region data has used both the ISO 3166 code for the United Kingdom and
-        // the colloquial form, so accept either.
         if (string.Equals(iso, "GB", StringComparison.OrdinalIgnoreCase)
             || string.Equals(iso, "UK", StringComparison.OrdinalIgnoreCase))
         {

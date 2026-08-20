@@ -50,11 +50,6 @@ public class Common
     /// Public production Connect API environment
     public const string DefaultConnectAPIHostname = "connect-api.guardianapp.com";
 
-    /// Region precision requested from the v1.3 servers endpoints. The API also
-    /// accepts "country", "city" and "city-by-country"; "default" is the country-
-    /// precision set this client's time-zone-to-region mapping is built on, and
-    /// both the region list and the host list must request the same precision or
-    /// they disagree about what a region is.
     public const string kRegionPrecisionDefault = "default";
 
     public const string DefaultHousekeepingAPIHostname = "connect-api.guardianapp.com";
@@ -86,14 +81,6 @@ public class Common
     /// </summary>
     public const string kGuardianUseFileBasedWireGuardConfig = "kGuardianUseFileBasedWireGuardConfig";
 
-    /// <summary>
-    /// HKCU user setting. "true" means the user has opted into the Smart Routing
-    /// Proxy. The feature only engages on a WireGuard connection to a host that
-    /// advertises smart-routing-enabled and sits in the US or the UK.
-    /// Apple's SDK spells this key "kGRDSmartRountingProxyEnabled" (sic). Windows
-    /// uses the correct spelling; the keys are per-platform local storage and are
-    /// never exchanged, so they do not need to match.
-    /// </summary>
     public const string kGRDSmartRoutingProxyEnabled = "kGRDSmartRoutingProxyEnabled";
 
     public const string kGRDWGDevicePublicKey = "wg-device-public-key";

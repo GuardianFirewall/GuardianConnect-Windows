@@ -270,10 +270,6 @@ public static class GRDHousekeepingAPI
 
     internal static async Task<ErrorResponse> RequestServerRegions()
     {
-        // v1.3 requires the precision as a path segment. At "default" it returns
-        // the same region set as v1 with identical name, name-pretty, continent
-        // and country-iso-code values, plus the capability and coordinate fields
-        // v1 never carried.
         var GetAllRegionsUrl =
             $"https://{Common.DefaultConnectAPIHostname}/api/v1.3/servers/all-server-regions/{Common.kRegionPrecisionDefault}";
         var errorResponse = new ErrorResponse();

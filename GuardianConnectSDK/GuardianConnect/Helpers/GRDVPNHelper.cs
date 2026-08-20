@@ -400,10 +400,7 @@ public class GRDVPNHelper
             "true", StringComparison.OrdinalIgnoreCase);
 
     /// <summary>
-    /// True when the user has opted into the Smart Routing Proxy. This is the
-    /// user preference alone; it does not mean SRP applies to the current
-    /// connection. Host capability and region are evaluated in
-    /// GRDWireGuardConfiguration.WireGuardQuickConfigForCredential.
+    /// True when the user has opted into the Smart Routing Proxy preference.
     /// </summary>
     public static bool IsSmartRoutingProxyEnabled() =>
         string.Equals(
@@ -411,8 +408,7 @@ public class GRDVPNHelper
             "true", StringComparison.OrdinalIgnoreCase);
 
     /// <summary>
-    /// Persists the user's Smart Routing Proxy preference to HKCU. Takes effect
-    /// on the next connect, when the WireGuard config is built.
+    /// Persists the user's Smart Routing Proxy preference to HKCU.
     /// </summary>
     public static void SetSmartRoutingProxyEnabled(bool enabled) =>
         RegistrySettings.UpdateGuardianUserSettings(
@@ -619,11 +615,6 @@ public class GRDVPNHelper
                 .SetErrorMessage("No stored WireGuard credential.");
         }
 
-        // Smart Routing Proxy takes two independent inputs: the user preference
-        // (read here, passed as dnsSRPMode) and the host's own support flag (read
-        // by the config builder off the gateway record). Only resolve the record
-        // when the preference is on — with SRP off it cannot change the config, so
-        // there is no reason to pay for a possible network lookup.
         var dnsSRPMode = IsSmartRoutingProxyEnabled();
         GRDSGWServer? srpServer = null;
         if (dnsSRPMode)

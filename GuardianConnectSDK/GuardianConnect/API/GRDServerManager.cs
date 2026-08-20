@@ -14,11 +14,6 @@ public class GRDServerManager
 
     public GRDVPNHelper.GRDServerFeatureEnvironment FeatureEnv;
 
-    /// Feature environment and beta preference for the host-list request.
-    /// GetHostsForRegion is static while FeatureEnv / BetaCapable are instance
-    /// members, so these carry the same values the constructor assigns. Nothing
-    /// overrides those at runtime today; if that changes, thread the instance
-    /// values through instead of widening these.
     private static readonly GRDVPNHelper.GRDServerFeatureEnvironment HostRequestFeatureEnvironment =
         GRDVPNHelper.GRDServerFeatureEnvironment.ServerFeatureEnvironmentProduction;
 
@@ -288,17 +283,8 @@ public class GRDServerManager
 
     /// <summary>
     /// Resolves a host record for the given hostname, falling back to the
-    /// all-hostnames endpoint when the local cache has no entry.
-    /// <para>
-    /// The cache is only populated as a side effect of host selection
-    /// (SelectGuardianHostWithCompletion → SelectBestHostInRegion →
-    /// GetHostsForRegion), which does not run when a connection dials with
-    /// already-stored credentials. In a freshly started process that path leaves
-    /// the cache empty, so a cache-only lookup returns null for a host we are
-    /// actively connecting to. The remote list carries both smart-routing-enabled
-    /// and the nested region, so one call recovers the full record.
-    /// </para>
-    /// Returns null if the hostname is absent from the remote list too.
+    /// all-hostnames endpoint when the local cache has no entry. Returns null
+    /// if the hostname is absent from both.
     /// </summary>
     public static async Task<GRDSGWServer?> FindHostRecordResilient(string hostname)
     {
@@ -535,10 +521,6 @@ public class GRDServerManager
         var uri = new Uri(getHostsForRegionUrl);
         try
         {
-            // v1.3 rather than v1: only v1.3 returns "smart-routing-enabled" and
-            // the nested "region" object per host. On v1 both are absent, so
-            // GRDSGWServer.SmartProxyRoutingEnabled deserialized to the bool
-            // default of false and Smart Routing Proxy could never engage.
             var rip = new RegionInputParameter
             {
                 Region = regionRec.RegionName,

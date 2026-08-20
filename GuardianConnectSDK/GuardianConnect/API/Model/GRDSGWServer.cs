@@ -32,14 +32,9 @@ public class GRDSGWServer
 
     [JsonPropertyName("beta-capable")] public bool BetaCapable { get; set; }
 
-    /// The gateway's published IPv4 address. Returned populated by
-    /// /api/v1.3/servers/hostnames-for-region and /api/v1.1/servers/all-hostnames;
-    /// v1 of the per-region endpoint sent an empty string.
     [JsonPropertyName("ipv4-address")]
     public string IPv4Address { get; set; } = string.Empty;
 
-    /// The gateway's published IPv6 address. Present in the same responses as
-    /// IPv4Address but empty on every host the backend currently returns.
     [JsonPropertyName("ipv6-address")]
     public string IPv6Address { get; set; } = string.Empty;
 
