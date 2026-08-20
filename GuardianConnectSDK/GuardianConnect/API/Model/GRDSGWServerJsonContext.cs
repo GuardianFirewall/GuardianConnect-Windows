@@ -10,6 +10,7 @@ namespace GuardianConnect.API.Model;
 [JsonSerializable(typeof(GRDSGWServer))]
 [JsonSerializable(typeof(List<GRDSGWServer>))]
 [JsonSerializable(typeof(GRDRegion))]
+[JsonSerializable(typeof(List<string>))]
 public partial class GRDSGWServerJsonContext : JsonSerializerContext
 {
 }

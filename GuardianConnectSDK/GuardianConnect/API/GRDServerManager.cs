@@ -14,6 +14,11 @@ public class GRDServerManager
 
     public GRDVPNHelper.GRDServerFeatureEnvironment FeatureEnv;
 
+    private static readonly GRDVPNHelper.GRDServerFeatureEnvironment HostRequestFeatureEnvironment =
+        GRDVPNHelper.GRDServerFeatureEnvironment.ServerFeatureEnvironmentProduction;
+
+    private const bool HostRequestBetaCapable = false;
+
     public GRDServerManager()
     {
         FeatureEnv = GRDVPNHelper.GRDServerFeatureEnvironment.ServerFeatureEnvironmentProduction;
@@ -276,6 +281,38 @@ public class GRDServerManager
         return null;
     }
 
+    /// <summary>
+    /// Resolves a host record for the given hostname, falling back to the
+    /// all-hostnames endpoint when the local cache has no entry. Returns null
+    /// if the hostname is absent from both.
+    /// </summary>
+    public static async Task<GRDSGWServer?> FindHostRecordResilient(string hostname)
+    {
+        if (string.IsNullOrWhiteSpace(hostname)) return null;
+
+        var cached = FindHostRecord(hostname);
+        if (cached != null) return cached;
+
+        Logger.LogInformation(
+            "FindHostRecordResilient: {Host} not in the local cache; querying all-hostnames.", hostname);
+        try
+        {
+            var all = await GetAllHostnamesAsync();
+            var match = all.FirstOrDefault(h =>
+                string.Equals(h.Hostname, hostname, StringComparison.OrdinalIgnoreCase));
+            if (match == null)
+                Logger.LogWarning(
+                    "FindHostRecordResilient: {Host} absent from all-hostnames ({Count} records).",
+                    hostname, all.Count);
+            return match;
+        }
+        catch (Exception e)
+        {
+            Logger.LogError(e, "FindHostRecordResilient: all-hostnames lookup for {Host} threw.", hostname);
+            return null;
+        }
+    }
+
     #endregion
 
     #region private methods
@@ -480,16 +517,22 @@ public class GRDServerManager
         Logger.LogInformation($"GetHostsForRegion: Calling GetHostsForRegionKey with key = '{regionKey}");
 
         var response = new HttpResponseMessage();
-        var getHostsForRegionUrl = $"https://{Common.DefaultConnectAPIHostname}/api/v1/servers/hostnames-for-region";
+        var getHostsForRegionUrl = $"https://{Common.DefaultConnectAPIHostname}/api/v1.3/servers/hostnames-for-region";
         var uri = new Uri(getHostsForRegionUrl);
         try
         {
-            var rip = new RegionInputParameter();
-            rip.Region = regionRec.RegionName;
+            var rip = new RegionInputParameter
+            {
+                Region = regionRec.RegionName,
+                Paid = true,
+                FeatureEnvironment = (int)HostRequestFeatureEnvironment,
+                BetaCapable = HostRequestBetaCapable,
+                RegionPrecision = Common.kRegionPrecisionDefault,
+            };
 
-            Logger.LogInformation("About to do GET for Region Hosts collection retrieval");
             var ripSerialized =
                 JsonSerializer.Serialize(rip, RegionInputParameterJsonContext.Default.RegionInputParameter);
+            Logger.LogInformation("GetHostsForRegion: POST {Url} {Body}", getHostsForRegionUrl, ripSerialized);
             HttpContent content = new StringContent(ripSerialized);
             content.Headers.Remove("Content-Type");
             content.Headers.Add("Content-Type", "application/json; charset=utf-8");

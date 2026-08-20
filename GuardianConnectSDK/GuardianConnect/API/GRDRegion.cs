@@ -18,6 +18,35 @@ public class GRDRegion
 
     [JsonPropertyName("name")] public string RegionName = string.Empty; //name
 
+    [JsonPropertyName("country")] public string Country = string.Empty; //country
+
+    [JsonPropertyName("region-precision")]
+    public string RegionPrecision = string.Empty; //region-precision
+
+    [JsonPropertyName("latitude")] public double Latitude; //latitude
+
+    [JsonPropertyName("longitude")] public double Longitude; //longitude
+
+    [JsonPropertyName("server-count")] public int ServerCount; //server-count
+
+    [JsonPropertyName("smart-routing-proxy-servers")]
+    public int SmartRoutingProxyServers; //smart-routing-proxy-servers
+
+    [JsonPropertyName("smart-routing-proxy-state")]
+    public string SmartRoutingProxyState = string.Empty; //smart-routing-proxy-state
+
+    [JsonPropertyName("multihop-entry-enabled-servers")]
+    public int MultihopEntryEnabledServers; //multihop-entry-enabled-servers
+
+    [JsonPropertyName("multihop-entry-enabled-state")]
+    public string MultihopEntryEnabledState = string.Empty; //multihop-entry-enabled-state
+
+    [JsonPropertyName("multihop-exit-names")]
+    public List<string> MultihopExitNames = new(); //multihop-exit-names
+
+    [JsonIgnore]
+    public bool SupportsSmartRoutingProxy => SmartRoutingProxyServers > 0;
+
     [JsonConstructor]
     public GRDRegion()
     {

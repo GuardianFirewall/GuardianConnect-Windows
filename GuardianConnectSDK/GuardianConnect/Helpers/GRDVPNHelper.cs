@@ -398,6 +398,21 @@ public class GRDVPNHelper
         string.Equals(
             RegistrySettings.RetrieveGuardianUserSettings(Common.kGuardianUseFileBasedWireGuardConfig),
             "true", StringComparison.OrdinalIgnoreCase);
+
+    /// <summary>
+    /// True when the user has opted into the Smart Routing Proxy preference.
+    /// </summary>
+    public static bool IsSmartRoutingProxyEnabled() =>
+        string.Equals(
+            RegistrySettings.RetrieveGuardianUserSettings(Common.kGRDSmartRoutingProxyEnabled),
+            "true", StringComparison.OrdinalIgnoreCase);
+
+    /// <summary>
+    /// Persists the user's Smart Routing Proxy preference to HKCU.
+    /// </summary>
+    public static void SetSmartRoutingProxyEnabled(bool enabled) =>
+        RegistrySettings.UpdateGuardianUserSettings(
+            Common.kGRDSmartRoutingProxyEnabled, enabled ? "true" : "false");
     public async Task<ErrorResponse> DisconnectVPNTunnel()
     {
         var errorResponse = new ErrorResponse();
@@ -600,7 +615,19 @@ public class GRDVPNHelper
                 .SetErrorMessage("No stored WireGuard credential.");
         }
 
-        var configText = GRDWireGuardConfiguration.WireGuardQuickConfigForCredential(cred);
+        var dnsSRPMode = IsSmartRoutingProxyEnabled();
+        GRDSGWServer? srpServer = null;
+        if (dnsSRPMode)
+        {
+            srpServer = await GRDServerManager.FindHostRecordResilient(cred.HostName);
+            if (srpServer is null)
+                _logger.LogWarning(
+                    "StartWireGuardFromStoredCreds: could not resolve a gateway record for {Host}; "
+                    + "Smart Routing Proxy stays off for this connection.", cred.HostName);
+        }
+
+        var configText =
+            GRDWireGuardConfiguration.WireGuardQuickConfigForCredential(cred, null, srpServer, dnsSRPMode);
         if (string.IsNullOrEmpty(configText))
         {
             return errorResponse

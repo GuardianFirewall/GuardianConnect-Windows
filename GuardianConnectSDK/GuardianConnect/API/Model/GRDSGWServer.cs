@@ -32,6 +32,12 @@ public class GRDSGWServer
 
     [JsonPropertyName("beta-capable")] public bool BetaCapable { get; set; }
 
+    [JsonPropertyName("ipv4-address")]
+    public string IPv4Address { get; set; } = string.Empty;
+
+    [JsonPropertyName("ipv6-address")]
+    public string IPv6Address { get; set; } = string.Empty;
+
     /// Whether this server supports smart-proxy routing. Maps to iOS
     /// GRDSGWServer.smartProxyRoutingEnabled (wire key "smart-routing-enabled").
     [JsonPropertyName("smart-routing-enabled")]

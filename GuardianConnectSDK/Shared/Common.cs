@@ -50,6 +50,8 @@ public class Common
     /// Public production Connect API environment
     public const string DefaultConnectAPIHostname = "connect-api.guardianapp.com";
 
+    public const string kRegionPrecisionDefault = "default";
+
     public const string DefaultHousekeepingAPIHostname = "connect-api.guardianapp.com";
     public const string kConnectAPIHostname = "ConnectAPIHostname";
     public const string kHousekeepingAPIHostname = "HousekeepingAPIHostname";
@@ -78,6 +80,8 @@ public class Common
     /// backend on every connect, matching the iOS/macOS SDK pattern.
     /// </summary>
     public const string kGuardianUseFileBasedWireGuardConfig = "kGuardianUseFileBasedWireGuardConfig";
+
+    public const string kGRDSmartRoutingProxyEnabled = "kGRDSmartRoutingProxyEnabled";
 
     public const string kGRDWGDevicePublicKey = "wg-device-public-key";
     public const string kGRDWGDevicePrivateKey = "wg-device-private-key";

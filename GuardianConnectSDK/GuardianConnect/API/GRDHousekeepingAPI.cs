@@ -270,12 +270,13 @@ public static class GRDHousekeepingAPI
 
     internal static async Task<ErrorResponse> RequestServerRegions()
     {
-        var GetAllRegionsUrl = $"https://{Common.DefaultConnectAPIHostname}/api/v1/servers/all-server-regions";
+        var GetAllRegionsUrl =
+            $"https://{Common.DefaultConnectAPIHostname}/api/v1.3/servers/all-server-regions/{Common.kRegionPrecisionDefault}";
         var errorResponse = new ErrorResponse();
         var uri = new Uri(GetAllRegionsUrl);
         try
         {
-            Logger.LogInformation("RequestServerRegions: Getting latest Regions collection from backend...");
+            Logger.LogInformation("RequestServerRegions: GET {Url}", GetAllRegionsUrl);
             {
                 var response = HttpUtils.Client.GetAsync(uri).GetAwaiter().GetResult(); // Task short-circuit jump
                 if (response.IsSuccessStatusCode)
