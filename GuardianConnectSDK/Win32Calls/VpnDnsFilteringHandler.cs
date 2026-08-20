@@ -1,4 +1,5 @@
 ﻿using Windows.Win32.Foundation;
+using Windows.Win32.NetworkManagement.WindowsFilteringPlatform;
 using GuardianConnect.Shared;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Logging.Abstractions;
@@ -10,7 +11,7 @@ internal class VpnDnsFilteringHandler
 {
     private static ILogger _logger = NullLogger.Instance;
 
-    internal static HANDLE engine_ = HANDLE.Null;
+    internal static FWPM_ENGINE_HANDLE engine_ = FWPM_ENGINE_HANDLE.Null;
 
     public static ILogger Logger
     {
@@ -36,7 +37,7 @@ internal class VpnDnsFilteringHandler
 
         Logger.LogInformation($"SetFilters: Setting DNS filters for '{EntryName}'...");
         engine_ = VpnUtils.OpenWpmSession();
-        if (engine_ == HANDLE.Null)
+        if (engine_ == FWPM_ENGINE_HANDLE.Null)
         {
             Logger.LogInformation("SetFilters: Failed to create engine.");
             return false;
@@ -82,7 +83,7 @@ internal class VpnDnsFilteringHandler
             return false;
         }
 
-        engine_ = HANDLE.Null;
+        engine_ = FWPM_ENGINE_HANDLE.Null;
         Logger.LogInformation("RemoveFilters: DNS Filtering removed successfully.");
 
 #if NEEDED
@@ -98,7 +99,7 @@ internal class VpnDnsFilteringHandler
                 Logger.LogInformation("RemoveFilters: Failed to close engine.");
                 return false;
             }
-            engine_ = HANDLE.Null;
+            engine_ = FWPM_ENGINE_HANDLE.Null;
             Logger.LogInformation("RemoveFilters: DNS Filtering removed successfully.");
 #endif
         return success;

@@ -1,7 +1,7 @@
 ﻿<Project Sdk="Microsoft.NET.Sdk">
 
     <PropertyGroup>
-        <TargetFramework>net9.0-windows</TargetFramework>
+        <TargetFramework>net10.0-windows</TargetFramework>
         <ImplicitUsings>enable</ImplicitUsings>
         <Nullable>enable</Nullable>
         <AllowUnsafeBlocks>true</AllowUnsafeBlocks>
@@ -11,13 +11,21 @@
         <NoWarn>$(NoWarn);CS0436</NoWarn>
     </PropertyGroup>
 
+    <!-- System.Threading.AccessControl is in the net10 shared framework (NU1510); no explicit ref. -->
+
+    <!-- CsWin32 generation is FROZEN: the P/Invoke surface is checked in under
+         Generated/ and compiled as static source; the source generator is not
+         run at build time. To regenerate (e.g. to add a Win32 API): temporarily
+         restore the Microsoft.Windows.CsWin32 PackageReference below, edit
+         NativeMethods.txt, build with -p:EmitCompilerGeneratedFiles=true, copy
+         the emitted *.g.cs from obj into Generated/, then remove the package.
     <ItemGroup>
-        <PackageReference Include="Microsoft.Windows.CsWin32" Version="0.3.213">
+        <PackageReference Include="Microsoft.Windows.CsWin32" Version="0.3.298">
             <PrivateAssets>all</PrivateAssets>
             <IncludeAssets>runtime; build; native; contentfiles; analyzers; buildtransitive</IncludeAssets>
         </PackageReference>
-        <PackageReference Include="System.Threading.AccessControl" Version="9.0.3"/>
     </ItemGroup>
+    -->
 
     <ItemGroup>
         <ProjectReference Include="..\Win32Calls.WFP\Win32Calls.WFP.csproj"/>

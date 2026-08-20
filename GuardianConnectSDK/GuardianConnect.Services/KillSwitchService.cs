@@ -10,6 +10,7 @@ using Microsoft.Extensions.Logging.Abstractions;
 using Win32Calls;
 using Win32Calls.WFP;
 using Windows.Win32.Foundation;
+using Windows.Win32.NetworkManagement.WindowsFilteringPlatform;
 
 namespace GuardianConnect.Services;
 
@@ -41,7 +42,7 @@ public sealed class KillSwitchService : BackgroundService
     private bool _allowLan;
 
     // WFP state (only valid while _isActive)
-    private HANDLE _engine = HANDLE.Null;
+    private FWPM_ENGINE_HANDLE _engine = FWPM_ENGINE_HANDLE.Null;
     private readonly List<ulong> _installedFilterIds = new();
     private bool _isActive;
 
@@ -429,7 +430,7 @@ public sealed class KillSwitchService : BackgroundService
         _logger.LogInformation("KillSwitchService.InstallFiltersUnsafe: opening engine and installing kill-switch filter set.");
 
         _engine = KillSwitchFilters.OpenDynamicEngine();
-        if (_engine == HANDLE.Null)
+        if (_engine == FWPM_ENGINE_HANDLE.Null)
         {
             _logger.LogError("KillSwitchService.InstallFiltersUnsafe: OpenDynamicEngine returned Null. Aborting install.");
             return;
@@ -439,7 +440,7 @@ public sealed class KillSwitchService : BackgroundService
         {
             _logger.LogError("KillSwitchService.InstallFiltersUnsafe: EnsureDynamicSublayerRegistered failed. Aborting install.");
             KillSwitchFilters.CloseEngine(_engine);
-            _engine = HANDLE.Null;
+            _engine = FWPM_ENGINE_HANDLE.Null;
             return;
         }
 
@@ -476,7 +477,7 @@ public sealed class KillSwitchService : BackgroundService
         {
             _logger.LogError("KillSwitchService.InstallFiltersUnsafe: BeginTransaction failed. Aborting install.");
             KillSwitchFilters.CloseEngine(_engine);
-            _engine = HANDLE.Null;
+            _engine = FWPM_ENGINE_HANDLE.Null;
             return;
         }
 
@@ -555,7 +556,7 @@ public sealed class KillSwitchService : BackgroundService
             {
                 _logger.LogError("KillSwitchService.InstallFiltersUnsafe: CommitTransaction failed. Engine closing without active state.");
                 KillSwitchFilters.CloseEngine(_engine);
-                _engine = HANDLE.Null;
+                _engine = FWPM_ENGINE_HANDLE.Null;
                 _installedFilterIds.Clear();
                 return;
             }
@@ -565,7 +566,7 @@ public sealed class KillSwitchService : BackgroundService
             _logger.LogError(ex, "KillSwitchService.InstallFiltersUnsafe: exception during filter set install. Aborting transaction.");
             KillSwitchFilters.AbortTransaction(_engine);
             KillSwitchFilters.CloseEngine(_engine);
-            _engine = HANDLE.Null;
+            _engine = FWPM_ENGINE_HANDLE.Null;
             _installedFilterIds.Clear();
             return;
         }
@@ -623,7 +624,7 @@ public sealed class KillSwitchService : BackgroundService
 
     private void RemoveFiltersUnsafe()
     {
-        if (!_isActive && _installedFilterIds.Count == 0 && _engine == HANDLE.Null) return;
+        if (!_isActive && _installedFilterIds.Count == 0 && _engine == FWPM_ENGINE_HANDLE.Null) return;
 
         _logger.LogInformation("KillSwitchService.RemoveFiltersUnsafe: tearing down kill switch.");
 
@@ -636,7 +637,7 @@ public sealed class KillSwitchService : BackgroundService
             ExitConnectingModeUnsafe();
         }
 
-        if (_engine != HANDLE.Null)
+        if (_engine != FWPM_ENGINE_HANDLE.Null)
         {
             // Closing the dynamic engine is enough — all filters tear down with the session.
             // We still call DeleteFiltersById first for clean per-filter removal in the common
@@ -653,7 +654,7 @@ public sealed class KillSwitchService : BackgroundService
             }
 
             KillSwitchFilters.CloseEngine(_engine);
-            _engine = HANDLE.Null;
+            _engine = FWPM_ENGINE_HANDLE.Null;
         }
 
         _installedFilterIds.Clear();
@@ -733,7 +734,7 @@ public sealed class KillSwitchService : BackgroundService
             return;
         }
 
-        if (_engine == HANDLE.Null)
+        if (_engine == FWPM_ENGINE_HANDLE.Null)
         {
             _logger.LogWarning("KillSwitchService.EnterConnectingMode: _isActive but engine handle is null. Skipping overlay install.");
             return;
@@ -791,7 +792,7 @@ public sealed class KillSwitchService : BackgroundService
 
         _logger.LogInformation("KillSwitchService.ExitConnectingMode: removing overlay permits ({Count} filters).", _connectingOverlayFilterIds.Count);
 
-        if (_engine != HANDLE.Null && _connectingOverlayFilterIds.Count > 0)
+        if (_engine != FWPM_ENGINE_HANDLE.Null && _connectingOverlayFilterIds.Count > 0)
         {
             try
             {

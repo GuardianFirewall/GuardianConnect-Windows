@@ -65,9 +65,9 @@ public class VpnUtils
         }
     }
 
-    public static unsafe HANDLE OpenWpmSession()
+    public static unsafe FWPM_ENGINE_HANDLE OpenWpmSession()
     {
-        var engine = HANDLE.Null;
+        var engine = FWPM_ENGINE_HANDLE.Null;
         var session = new FWPM_SESSION0();
         session.flags = PInvoke.FWPM_SESSION_FLAG_DYNAMIC;
         session.displayData = new FWPM_DISPLAY_DATA0();
@@ -93,16 +93,16 @@ public class VpnUtils
         if (result != 0)
         {
             Log.Error($"OpenWpmSession: Failed to open filter engine. Error: {result}");
-            return HANDLE.Null;
+            return FWPM_ENGINE_HANDLE.Null;
         }
 
         Log.Debug("OpenWpmSession: success");
         return engine;
     }
 
-    public static bool CloseWpmSession(HANDLE engine)
+    public static bool CloseWpmSession(FWPM_ENGINE_HANDLE engine)
     {
-        if (engine == HANDLE.Null) return true;
+        if (engine == FWPM_ENGINE_HANDLE.Null) return true;
         var result = PInvoke.FwpmEngineClose0(engine);
         if (result != 0)
         {
@@ -113,7 +113,7 @@ public class VpnUtils
         return true;
     }
 
-    internal static unsafe uint AddSublayer(HANDLE engineHandle, Guid uuid)
+    internal static unsafe uint AddSublayer(FWPM_ENGINE_HANDLE engineHandle, Guid uuid)
     {
         uint result = 0;
 
@@ -151,7 +151,7 @@ public class VpnUtils
         return result;
     }
 
-    internal static unsafe uint RemoveSublayer(HANDLE engineHandle, Guid uuid)
+    internal static unsafe uint RemoveSublayer(FWPM_ENGINE_HANDLE engineHandle, Guid uuid)
     {
         uint result = 0;
         result = PInvoke.FwpmSubLayerDeleteByKey0(engineHandle, &uuid);
@@ -164,7 +164,7 @@ public class VpnUtils
         return result;
     }
 
-    internal static unsafe uint RegisterSublayer(HANDLE engineHandle, Guid uuid)
+    internal static unsafe uint RegisterSublayer(FWPM_ENGINE_HANDLE engineHandle, Guid uuid)
     {
         FWPM_SUBLAYER0* sublayerPtr = null;
         Log.Debug("RegisterSublayer: checking if sublayer already exists...");
@@ -232,7 +232,7 @@ public class VpnUtils
         return -1;
     }
 
-    internal static unsafe uint BlockIPv4Queries(HANDLE engineHandle)
+    internal static unsafe uint BlockIPv4Queries(FWPM_ENGINE_HANDLE engineHandle)
     {
         var cv = new FWP_CONDITION_VALUE0();
         cv.type = FWP_DATA_TYPE.FWP_UINT16;
@@ -276,7 +276,7 @@ public class VpnUtils
     }
 
 
-    internal static unsafe uint BlockIPv6Queries(HANDLE engineHandle)
+    internal static unsafe uint BlockIPv6Queries(FWPM_ENGINE_HANDLE engineHandle)
     {
         // Mirror BlockIPv4Queries: scope to port 53 explicitly. Previously,
         // this filter had numFilterConditions = 0, which would mean "block
@@ -342,7 +342,7 @@ public class VpnUtils
     // LUID> + IP_REMOTE_PORT = 53 + IP_PROTOCOL = UDP|TCP. WFP arbitration
     // prefers the more-specific (3 conditions) permit over the
     // less-specific (1 condition: port-53) block at equal weight.
-    internal static uint PermitQueriesFromTAP(HANDLE engineHandle, string connectionName)
+    internal static uint PermitQueriesFromTAP(FWPM_ENGINE_HANDLE engineHandle, string connectionName)
     {
         // Resolve the IKEv2 tunnel adapter LUID by name first, then fall
         // back to the same description / IF_TYPE_PPP strategies
@@ -389,9 +389,9 @@ public class VpnUtils
         return 0;
     }
 
-    public static bool AddWpmFilters(HANDLE engine_handle, string name)
+    public static bool AddWpmFilters(FWPM_ENGINE_HANDLE engine_handle, string name)
     {
-        if (engine_handle == HANDLE.Null)
+        if (engine_handle == FWPM_ENGINE_HANDLE.Null)
         {
             Log.Error("AddWpmFilters: Invalid engine handle.");
             return false;
@@ -437,13 +437,13 @@ public class VpnUtils
         return true;
     }
 
-    public static bool RemoveWpmFilters(HANDLE engine_handle, string name)
+    public static bool RemoveWpmFilters(FWPM_ENGINE_HANDLE engine_handle, string name)
     {
         // We need to fall through and try to remove all filters even if one fails.
         var whetherSuccessful = true;
         try
         {
-            if (engine_handle == HANDLE.Null)
+            if (engine_handle == FWPM_ENGINE_HANDLE.Null)
             {
                 Log.Error("RemoveWpmFilters: Invalid engine handle.");
                 whetherSuccessful = false;

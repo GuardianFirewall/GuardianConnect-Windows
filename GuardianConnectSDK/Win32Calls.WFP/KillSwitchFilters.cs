@@ -63,9 +63,9 @@ public static unsafe class KillSwitchFilters
     /// Open a WFP engine handle in dynamic-session mode. All filters added through this
     /// handle disappear when the handle closes (or the process exits).
     /// </summary>
-    public static HANDLE OpenDynamicEngine()
+    public static FWPM_ENGINE_HANDLE OpenDynamicEngine()
     {
-        var engine = HANDLE.Null;
+        var engine = FWPM_ENGINE_HANDLE.Null;
         var session = new FWPM_SESSION0
         {
             flags = PInvoke.FWPM_SESSION_FLAG_DYNAMIC,
@@ -88,7 +88,7 @@ public static unsafe class KillSwitchFilters
             if (result != 0)
             {
                 Log.Error($"KillSwitchFilters.OpenDynamicEngine: FwpmEngineOpen0 failed. Error: 0x{result:X8}");
-                return HANDLE.Null;
+                return FWPM_ENGINE_HANDLE.Null;
             }
         }
 
@@ -96,10 +96,10 @@ public static unsafe class KillSwitchFilters
         return engine;
     }
 
-    /// <summary>Close a WFP engine handle. Idempotent for HANDLE.Null.</summary>
-    public static bool CloseEngine(HANDLE engine)
+    /// <summary>Close a WFP engine handle. Idempotent for FWPM_ENGINE_HANDLE.Null.</summary>
+    public static bool CloseEngine(FWPM_ENGINE_HANDLE engine)
     {
-        if (engine == HANDLE.Null) return true;
+        if (engine == FWPM_ENGINE_HANDLE.Null) return true;
         var result = PInvoke.FwpmEngineClose0(engine);
         if (result != 0)
         {
@@ -113,13 +113,13 @@ public static unsafe class KillSwitchFilters
     /// Register the kill-switch dynamic sublayer if not already present. Idempotent —
     /// if the sublayer already exists for this session, returns success.
     /// </summary>
-    public static uint EnsureDynamicSublayerRegistered(HANDLE engine)
+    public static uint EnsureDynamicSublayerRegistered(FWPM_ENGINE_HANDLE engine)
     {
-        if (engine == HANDLE.Null) return uint.MaxValue;
+        if (engine == FWPM_ENGINE_HANDLE.Null) return uint.MaxValue;
 
         FWPM_SUBLAYER0* existing = null;
         var sublayerKey = SublayerDynamicGuid;
-        if (PInvoke.FwpmSubLayerGetByKey0(engine, &sublayerKey, &existing) == 0)
+        if (PInvoke.FwpmSubLayerGetByKey0(engine, sublayerKey, out existing) == 0)
         {
             PInvoke.FwpmFreeMemory0((void**)&existing);
             Log.Debug("KillSwitchFilters.EnsureDynamicSublayerRegistered: sublayer already present.");
@@ -139,7 +139,7 @@ public static unsafe class KillSwitchFilters
             sublayer.displayData.name = new PWSTR(pName);
             sublayer.displayData.description = new PWSTR(pDesc);
 
-            var result = PInvoke.FwpmSubLayerAdd0(engine, &sublayer, PSECURITY_DESCRIPTOR.Null);
+            var result = PInvoke.FwpmSubLayerAdd0(engine, sublayer, PSECURITY_DESCRIPTOR.Null);
             if (result != 0 && result != 0x000004B7) // ERROR_ALREADY_EXISTS
             {
                 Log.Error($"KillSwitchFilters.EnsureDynamicSublayerRegistered: FwpmSubLayerAdd0 failed. Error: 0x{result:X8}");
@@ -156,7 +156,7 @@ public static unsafe class KillSwitchFilters
     // installed kill-switch state.
     // -----------------------------------------------------------------------------------
 
-    public static uint BeginTransaction(HANDLE engine)
+    public static uint BeginTransaction(FWPM_ENGINE_HANDLE engine)
     {
         var result = PInvoke.FwpmTransactionBegin0(engine, 0);
         if (result != 0)
@@ -164,7 +164,7 @@ public static unsafe class KillSwitchFilters
         return result;
     }
 
-    public static uint CommitTransaction(HANDLE engine)
+    public static uint CommitTransaction(FWPM_ENGINE_HANDLE engine)
     {
         var result = PInvoke.FwpmTransactionCommit0(engine);
         if (result != 0)
@@ -172,7 +172,7 @@ public static unsafe class KillSwitchFilters
         return result;
     }
 
-    public static uint AbortTransaction(HANDLE engine)
+    public static uint AbortTransaction(FWPM_ENGINE_HANDLE engine)
     {
         var result = PInvoke.FwpmTransactionAbort0(engine);
         if (result != 0)
@@ -187,19 +187,19 @@ public static unsafe class KillSwitchFilters
     // stack hosts leak around the tunnel by default.
     // -----------------------------------------------------------------------------------
 
-    public static ulong AddBlockAllOutboundV4(HANDLE engine) =>
+    public static ulong AddBlockAllOutboundV4(FWPM_ENGINE_HANDLE engine) =>
         AddSimpleFilter(engine, PInvoke.FWPM_LAYER_ALE_AUTH_CONNECT_V4,
                         FWP_ACTION_TYPE.FWP_ACTION_BLOCK, WeightBlockAll, "BlockAllOutboundV4");
 
-    public static ulong AddBlockAllInboundV4(HANDLE engine) =>
+    public static ulong AddBlockAllInboundV4(FWPM_ENGINE_HANDLE engine) =>
         AddSimpleFilter(engine, PInvoke.FWPM_LAYER_ALE_AUTH_RECV_ACCEPT_V4,
                         FWP_ACTION_TYPE.FWP_ACTION_BLOCK, WeightBlockAll, "BlockAllInboundV4");
 
-    public static ulong AddBlockAllOutboundV6(HANDLE engine) =>
+    public static ulong AddBlockAllOutboundV6(FWPM_ENGINE_HANDLE engine) =>
         AddSimpleFilter(engine, PInvoke.FWPM_LAYER_ALE_AUTH_CONNECT_V6,
                         FWP_ACTION_TYPE.FWP_ACTION_BLOCK, WeightBlockAll, "BlockAllOutboundV6");
 
-    public static ulong AddBlockAllInboundV6(HANDLE engine) =>
+    public static ulong AddBlockAllInboundV6(FWPM_ENGINE_HANDLE engine) =>
         AddSimpleFilter(engine, PInvoke.FWPM_LAYER_ALE_AUTH_RECV_ACCEPT_V6,
                         FWP_ACTION_TYPE.FWP_ACTION_BLOCK, WeightBlockAll, "BlockAllInboundV6");
 
@@ -207,16 +207,16 @@ public static unsafe class KillSwitchFilters
     // Loopback permits (weight 4) — per-layer permit gated on the loopback flag.
     // -----------------------------------------------------------------------------------
 
-    public static ulong AddPermitLoopbackOutboundV4(HANDLE engine) =>
+    public static ulong AddPermitLoopbackOutboundV4(FWPM_ENGINE_HANDLE engine) =>
         AddLoopbackFilter(engine, PInvoke.FWPM_LAYER_ALE_AUTH_CONNECT_V4, "PermitLoopbackOutboundV4");
 
-    public static ulong AddPermitLoopbackInboundV4(HANDLE engine) =>
+    public static ulong AddPermitLoopbackInboundV4(FWPM_ENGINE_HANDLE engine) =>
         AddLoopbackFilter(engine, PInvoke.FWPM_LAYER_ALE_AUTH_RECV_ACCEPT_V4, "PermitLoopbackInboundV4");
 
-    public static ulong AddPermitLoopbackOutboundV6(HANDLE engine) =>
+    public static ulong AddPermitLoopbackOutboundV6(FWPM_ENGINE_HANDLE engine) =>
         AddLoopbackFilter(engine, PInvoke.FWPM_LAYER_ALE_AUTH_CONNECT_V6, "PermitLoopbackOutboundV6");
 
-    public static ulong AddPermitLoopbackInboundV6(HANDLE engine) =>
+    public static ulong AddPermitLoopbackInboundV6(FWPM_ENGINE_HANDLE engine) =>
         AddLoopbackFilter(engine, PInvoke.FWPM_LAYER_ALE_AUTH_RECV_ACCEPT_V6, "PermitLoopbackInboundV6");
 
     // -----------------------------------------------------------------------------------
@@ -224,7 +224,7 @@ public static unsafe class KillSwitchFilters
     // replies UDP/67 -> client UDP/68.
     // -----------------------------------------------------------------------------------
 
-    public static ulong AddPermitDhcpOutboundV4(HANDLE engine)
+    public static ulong AddPermitDhcpOutboundV4(FWPM_ENGINE_HANDLE engine)
     {
         // Outbound UDP to remote port 67 (DHCP server)
         var protoVal = new FWP_CONDITION_VALUE0
@@ -256,7 +256,7 @@ public static unsafe class KillSwitchFilters
                                        conditions, 2, "PermitDhcpOutboundV4");
     }
 
-    public static ulong AddPermitDhcpInboundV4(HANDLE engine)
+    public static ulong AddPermitDhcpInboundV4(FWPM_ENGINE_HANDLE engine)
     {
         // Inbound UDP to local port 68 (DHCP client receiving server reply)
         var protoVal = new FWP_CONDITION_VALUE0
@@ -294,19 +294,19 @@ public static unsafe class KillSwitchFilters
     // post-connect.
     // -----------------------------------------------------------------------------------
 
-    public static ulong AddPermitTunnelLuidOutboundV4(HANDLE engine, ulong luid) =>
+    public static ulong AddPermitTunnelLuidOutboundV4(FWPM_ENGINE_HANDLE engine, ulong luid) =>
         AddTunnelLuidFilter(engine, PInvoke.FWPM_LAYER_ALE_AUTH_CONNECT_V4, luid,
                             "PermitTunnelLuidOutboundV4");
 
-    public static ulong AddPermitTunnelLuidInboundV4(HANDLE engine, ulong luid) =>
+    public static ulong AddPermitTunnelLuidInboundV4(FWPM_ENGINE_HANDLE engine, ulong luid) =>
         AddTunnelLuidFilter(engine, PInvoke.FWPM_LAYER_ALE_AUTH_RECV_ACCEPT_V4, luid,
                             "PermitTunnelLuidInboundV4");
 
-    public static ulong AddPermitTunnelLuidOutboundV6(HANDLE engine, ulong luid) =>
+    public static ulong AddPermitTunnelLuidOutboundV6(FWPM_ENGINE_HANDLE engine, ulong luid) =>
         AddTunnelLuidFilter(engine, PInvoke.FWPM_LAYER_ALE_AUTH_CONNECT_V6, luid,
                             "PermitTunnelLuidOutboundV6");
 
-    public static ulong AddPermitTunnelLuidInboundV6(HANDLE engine, ulong luid) =>
+    public static ulong AddPermitTunnelLuidInboundV6(FWPM_ENGINE_HANDLE engine, ulong luid) =>
         AddTunnelLuidFilter(engine, PInvoke.FWPM_LAYER_ALE_AUTH_RECV_ACCEPT_V6, luid,
                             "PermitTunnelLuidInboundV6");
 
@@ -324,7 +324,7 @@ public static unsafe class KillSwitchFilters
     // are not normally used by anything else.
     // -----------------------------------------------------------------------------------
 
-    public static ulong AddPermitIkeOutboundV4(HANDLE engine) =>
+    public static ulong AddPermitIkeOutboundV4(FWPM_ENGINE_HANDLE engine) =>
         AddIkePortFilter(engine, PInvoke.FWPM_LAYER_ALE_AUTH_CONNECT_V4, IkePort,
                          "PermitIkeOutboundV4 (UDP/500)");
 
@@ -337,11 +337,11 @@ public static unsafe class KillSwitchFilters
     // dropped on its way out the physical NIC — the tunnel transport dies and nothing
     // flows. Confirmed via WFP capture (filter 72517 = block-all drops on proto 4
     // egressing to the VPN gateway IP).
-    public static ulong AddPermitIpInIpOutboundV4(HANDLE engine) =>
+    public static ulong AddPermitIpInIpOutboundV4(FWPM_ENGINE_HANDLE engine) =>
         AddProtocolPermitFilter(engine, PInvoke.FWPM_LAYER_ALE_AUTH_CONNECT_V4, ProtocolIpInIp,
                                 "PermitIpInIpOutboundV4 (proto 4 — IKEv2 tunnel transport)");
 
-    public static ulong AddPermitEspOutboundV4(HANDLE engine) =>
+    public static ulong AddPermitEspOutboundV4(FWPM_ENGINE_HANDLE engine) =>
         AddProtocolPermitFilter(engine, PInvoke.FWPM_LAYER_ALE_AUTH_CONNECT_V4, ProtocolEsp,
                                 "PermitEspOutboundV4 (proto 50 — IPSec ESP)");
 
@@ -365,13 +365,13 @@ public static unsafe class KillSwitchFilters
     // -----------------------------------------------------------------------------------
 
     /// <param name="serverAddrHostOrder">Server IPv4 address in host byte order (e.g. 0x0A000001 == 10.0.0.1).</param>
-    public static ulong AddPermitWireGuardCarrierOutboundV4(HANDLE engine, uint serverAddrHostOrder, ushort serverPort) =>
+    public static ulong AddPermitWireGuardCarrierOutboundV4(FWPM_ENGINE_HANDLE engine, uint serverAddrHostOrder, ushort serverPort) =>
         AddRemoteUdpHostPermitV4(engine, PInvoke.FWPM_LAYER_ALE_AUTH_CONNECT_V4,
                                  serverAddrHostOrder, serverPort,
                                  $"PermitWireGuardCarrierOutboundV4 (UDP -> server :{serverPort})");
 
     /// <param name="serverAddr16">Server IPv6 address, 16 bytes in network order (IPAddress.GetAddressBytes()).</param>
-    public static ulong AddPermitWireGuardCarrierOutboundV6(HANDLE engine, byte[] serverAddr16, ushort serverPort) =>
+    public static ulong AddPermitWireGuardCarrierOutboundV6(FWPM_ENGINE_HANDLE engine, byte[] serverAddr16, ushort serverPort) =>
         AddRemoteUdpHostPermitV6(engine, PInvoke.FWPM_LAYER_ALE_AUTH_CONNECT_V6,
                                  serverAddr16, serverPort,
                                  $"PermitWireGuardCarrierOutboundV6 (UDP -> server :{serverPort})");
@@ -390,17 +390,17 @@ public static unsafe class KillSwitchFilters
     // via the ALE-layer LAN permits. v1 trade-off.
     // -----------------------------------------------------------------------------------
 
-    public static ulong AddBlockNonTunnelIcmpOutboundV4(HANDLE engine, ulong tunnelLuid) =>
+    public static ulong AddBlockNonTunnelIcmpOutboundV4(FWPM_ENGINE_HANDLE engine, ulong tunnelLuid) =>
         AddBlockProtocolNonTunnelFilter(engine, PInvoke.FWPM_LAYER_OUTBOUND_IPPACKET_V4,
                                         ProtocolIcmpV4, tunnelLuid,
                                         "BlockNonTunnelIcmpOutboundV4");
 
-    public static ulong AddBlockNonTunnelIcmpOutboundV6(HANDLE engine, ulong tunnelLuid) =>
+    public static ulong AddBlockNonTunnelIcmpOutboundV6(FWPM_ENGINE_HANDLE engine, ulong tunnelLuid) =>
         AddBlockProtocolNonTunnelFilter(engine, PInvoke.FWPM_LAYER_OUTBOUND_IPPACKET_V6,
                                         ProtocolIcmpV6, tunnelLuid,
                                         "BlockNonTunnelIcmpOutboundV6");
 
-    public static ulong AddPermitIkeNatTOutboundV4(HANDLE engine) =>
+    public static ulong AddPermitIkeNatTOutboundV4(FWPM_ENGINE_HANDLE engine) =>
         AddIkePortFilter(engine, PInvoke.FWPM_LAYER_ALE_AUTH_CONNECT_V4, IkeNatTPort,
                          "PermitIkeNatTOutboundV4 (UDP/4500)");
 
@@ -411,19 +411,19 @@ public static unsafe class KillSwitchFilters
     // that's added later (Phase 4) doesn't accidentally allow DNS off-tunnel.
     // -----------------------------------------------------------------------------------
 
-    public static ulong AddBlockDnsUdpOutboundV4(HANDLE engine) =>
+    public static ulong AddBlockDnsUdpOutboundV4(FWPM_ENGINE_HANDLE engine) =>
         AddDnsBlockFilter(engine, PInvoke.FWPM_LAYER_ALE_AUTH_CONNECT_V4, ProtocolUdp,
                           "BlockDnsUdpOutboundV4");
 
-    public static ulong AddBlockDnsTcpOutboundV4(HANDLE engine) =>
+    public static ulong AddBlockDnsTcpOutboundV4(FWPM_ENGINE_HANDLE engine) =>
         AddDnsBlockFilter(engine, PInvoke.FWPM_LAYER_ALE_AUTH_CONNECT_V4, ProtocolTcp,
                           "BlockDnsTcpOutboundV4");
 
-    public static ulong AddBlockDnsUdpOutboundV6(HANDLE engine) =>
+    public static ulong AddBlockDnsUdpOutboundV6(FWPM_ENGINE_HANDLE engine) =>
         AddDnsBlockFilter(engine, PInvoke.FWPM_LAYER_ALE_AUTH_CONNECT_V6, ProtocolUdp,
                           "BlockDnsUdpOutboundV6");
 
-    public static ulong AddBlockDnsTcpOutboundV6(HANDLE engine) =>
+    public static ulong AddBlockDnsTcpOutboundV6(FWPM_ENGINE_HANDLE engine) =>
         AddDnsBlockFilter(engine, PInvoke.FWPM_LAYER_ALE_AUTH_CONNECT_V6, ProtocolTcp,
                           "BlockDnsTcpOutboundV6");
 
@@ -432,19 +432,19 @@ public static unsafe class KillSwitchFilters
     // adapter only. Combines protocol + remote-port + local-interface conditions.
     // -----------------------------------------------------------------------------------
 
-    public static ulong AddPermitDnsUdpOnTunnelV4(HANDLE engine, ulong luid) =>
+    public static ulong AddPermitDnsUdpOnTunnelV4(FWPM_ENGINE_HANDLE engine, ulong luid) =>
         AddDnsTunnelPermitFilter(engine, PInvoke.FWPM_LAYER_ALE_AUTH_CONNECT_V4, ProtocolUdp,
                                  luid, "PermitDnsUdpOnTunnelV4");
 
-    public static ulong AddPermitDnsTcpOnTunnelV4(HANDLE engine, ulong luid) =>
+    public static ulong AddPermitDnsTcpOnTunnelV4(FWPM_ENGINE_HANDLE engine, ulong luid) =>
         AddDnsTunnelPermitFilter(engine, PInvoke.FWPM_LAYER_ALE_AUTH_CONNECT_V4, ProtocolTcp,
                                  luid, "PermitDnsTcpOnTunnelV4");
 
-    public static ulong AddPermitDnsUdpOnTunnelV6(HANDLE engine, ulong luid) =>
+    public static ulong AddPermitDnsUdpOnTunnelV6(FWPM_ENGINE_HANDLE engine, ulong luid) =>
         AddDnsTunnelPermitFilter(engine, PInvoke.FWPM_LAYER_ALE_AUTH_CONNECT_V6, ProtocolUdp,
                                  luid, "PermitDnsUdpOnTunnelV6");
 
-    public static ulong AddPermitDnsTcpOnTunnelV6(HANDLE engine, ulong luid) =>
+    public static ulong AddPermitDnsTcpOnTunnelV6(FWPM_ENGINE_HANDLE engine, ulong luid) =>
         AddDnsTunnelPermitFilter(engine, PInvoke.FWPM_LAYER_ALE_AUTH_CONNECT_V6, ProtocolTcp,
                                  luid, "PermitDnsTcpOnTunnelV6");
 
@@ -465,27 +465,27 @@ public static unsafe class KillSwitchFilters
     // Added in recent commits to fix the KS-on rock-and-hard-place after tunnel drop.
     // -----------------------------------------------------------------------------------
 
-    public static ulong AddPermitDnsUdpAnyOutboundV4(HANDLE engine) =>
+    public static ulong AddPermitDnsUdpAnyOutboundV4(FWPM_ENGINE_HANDLE engine) =>
         AddPortPermitFilter(engine, PInvoke.FWPM_LAYER_ALE_AUTH_CONNECT_V4, ProtocolUdp,
                             DnsPort, "PermitDnsUdpAnyOutboundV4 (connecting overlay)");
 
-    public static ulong AddPermitDnsTcpAnyOutboundV4(HANDLE engine) =>
+    public static ulong AddPermitDnsTcpAnyOutboundV4(FWPM_ENGINE_HANDLE engine) =>
         AddPortPermitFilter(engine, PInvoke.FWPM_LAYER_ALE_AUTH_CONNECT_V4, ProtocolTcp,
                             DnsPort, "PermitDnsTcpAnyOutboundV4 (connecting overlay)");
 
-    public static ulong AddPermitDnsUdpAnyOutboundV6(HANDLE engine) =>
+    public static ulong AddPermitDnsUdpAnyOutboundV6(FWPM_ENGINE_HANDLE engine) =>
         AddPortPermitFilter(engine, PInvoke.FWPM_LAYER_ALE_AUTH_CONNECT_V6, ProtocolUdp,
                             DnsPort, "PermitDnsUdpAnyOutboundV6 (connecting overlay)");
 
-    public static ulong AddPermitDnsTcpAnyOutboundV6(HANDLE engine) =>
+    public static ulong AddPermitDnsTcpAnyOutboundV6(FWPM_ENGINE_HANDLE engine) =>
         AddPortPermitFilter(engine, PInvoke.FWPM_LAYER_ALE_AUTH_CONNECT_V6, ProtocolTcp,
                             DnsPort, "PermitDnsTcpAnyOutboundV6 (connecting overlay)");
 
-    public static ulong AddPermitHttpsAnyOutboundV4(HANDLE engine) =>
+    public static ulong AddPermitHttpsAnyOutboundV4(FWPM_ENGINE_HANDLE engine) =>
         AddPortPermitFilter(engine, PInvoke.FWPM_LAYER_ALE_AUTH_CONNECT_V4, ProtocolTcp,
                             HttpsPort, "PermitHttpsAnyOutboundV4 (connecting overlay)");
 
-    public static ulong AddPermitHttpsAnyOutboundV6(HANDLE engine) =>
+    public static ulong AddPermitHttpsAnyOutboundV6(FWPM_ENGINE_HANDLE engine) =>
         AddPortPermitFilter(engine, PInvoke.FWPM_LAYER_ALE_AUTH_CONNECT_V6, ProtocolTcp,
                             HttpsPort, "PermitHttpsAnyOutboundV6 (connecting overlay)");
 
@@ -495,7 +495,7 @@ public static unsafe class KillSwitchFilters
     /// WeightSpecificPermit so the permit beats the DNS-block (weight 3) and
     /// block-all (weight 1).
     /// </summary>
-    private static ulong AddPortPermitFilter(HANDLE engine, Guid layerKey, byte protocol,
+    private static ulong AddPortPermitFilter(FWPM_ENGINE_HANDLE engine, Guid layerKey, byte protocol,
                                               ushort remotePort, string label)
     {
         var protoVal = new FWP_CONDITION_VALUE0
@@ -538,7 +538,7 @@ public static unsafe class KillSwitchFilters
     // Returns the filter IDs added (caller tracks them for later DeleteFiltersById).
     // -----------------------------------------------------------------------------------
 
-    public static List<ulong> AddPermitLanAll(HANDLE engine)
+    public static List<ulong> AddPermitLanAll(FWPM_ENGINE_HANDLE engine)
     {
         var ids = new List<ulong>();
         var v4Outbound = PInvoke.FWPM_LAYER_ALE_AUTH_CONNECT_V4;
@@ -590,9 +590,9 @@ public static unsafe class KillSwitchFilters
     /// Delete a batch of previously-installed filters by ID. Returns true if all deletions
     /// succeeded; logs and continues past individual failures so the rest get cleaned up.
     /// </summary>
-    public static bool DeleteFiltersById(HANDLE engine, IEnumerable<ulong> filterIds)
+    public static bool DeleteFiltersById(FWPM_ENGINE_HANDLE engine, IEnumerable<ulong> filterIds)
     {
-        if (engine == HANDLE.Null) return false;
+        if (engine == FWPM_ENGINE_HANDLE.Null) return false;
         var allSucceeded = true;
         foreach (var id in filterIds)
         {
@@ -611,13 +611,13 @@ public static unsafe class KillSwitchFilters
     // Internal helpers
     // -----------------------------------------------------------------------------------
 
-    private static ulong AddSimpleFilter(HANDLE engine, Guid layerKey, FWP_ACTION_TYPE action,
+    private static ulong AddSimpleFilter(FWPM_ENGINE_HANDLE engine, Guid layerKey, FWP_ACTION_TYPE action,
                                          byte weight, string label)
     {
         return AddFilterWithConditions(engine, layerKey, action, weight, null, 0, label);
     }
 
-    private static ulong AddLoopbackFilter(HANDLE engine, Guid layerKey, string label)
+    private static ulong AddLoopbackFilter(FWPM_ENGINE_HANDLE engine, Guid layerKey, string label)
     {
         // Condition on the FWPM_CONDITION_FLAGS field; permit when IS_LOOPBACK is set.
         var flagsVal = new FWP_CONDITION_VALUE0
@@ -636,7 +636,7 @@ public static unsafe class KillSwitchFilters
                                        WeightSpecificPermit, &condition, 1, label);
     }
 
-    private static ulong AddBlockProtocolNonTunnelFilter(HANDLE engine, Guid layerKey,
+    private static ulong AddBlockProtocolNonTunnelFilter(FWPM_ENGINE_HANDLE engine, Guid layerKey,
                                                          byte protocol, ulong tunnelLuid,
                                                          string label)
     {
@@ -669,7 +669,7 @@ public static unsafe class KillSwitchFilters
                                        WeightSpecificPermit, conditions, 2, label);
     }
 
-    private static ulong AddProtocolPermitFilter(HANDLE engine, Guid layerKey, byte protocol, string label)
+    private static ulong AddProtocolPermitFilter(FWPM_ENGINE_HANDLE engine, Guid layerKey, byte protocol, string label)
     {
         var protoVal = new FWP_CONDITION_VALUE0
         {
@@ -687,7 +687,7 @@ public static unsafe class KillSwitchFilters
                                        WeightSpecificPermit, &condition, 1, label);
     }
 
-    private static ulong AddIkePortFilter(HANDLE engine, Guid layerKey, ushort remotePort, string label)
+    private static ulong AddIkePortFilter(FWPM_ENGINE_HANDLE engine, Guid layerKey, ushort remotePort, string label)
     {
         var protoVal = new FWP_CONDITION_VALUE0
         {
@@ -720,7 +720,7 @@ public static unsafe class KillSwitchFilters
     // Permit UDP to a single remote IPv4 host (/32) on a specific remote port — the
     // WireGuard encrypted carrier to the server endpoint. Three conditions: protocol +
     // remote address (host /32) + remote port.
-    private static ulong AddRemoteUdpHostPermitV4(HANDLE engine, Guid layerKey,
+    private static ulong AddRemoteUdpHostPermitV4(FWPM_ENGINE_HANDLE engine, Guid layerKey,
                                                   uint addrHostOrder, ushort remotePort, string label)
     {
         FWP_V4_ADDR_AND_MASK addrMask;
@@ -767,7 +767,7 @@ public static unsafe class KillSwitchFilters
     }
 
     // IPv6 counterpart of AddRemoteUdpHostPermitV4 (/128 host scope).
-    private static ulong AddRemoteUdpHostPermitV6(HANDLE engine, Guid layerKey,
+    private static ulong AddRemoteUdpHostPermitV6(FWPM_ENGINE_HANDLE engine, Guid layerKey,
                                                   byte[] addr16, ushort remotePort, string label)
     {
         if (addr16 is null || addr16.Length != 16)
@@ -819,7 +819,7 @@ public static unsafe class KillSwitchFilters
                                        WeightSpecificPermit, conditions, 3, label);
     }
 
-    private static ulong AddDnsBlockFilter(HANDLE engine, Guid layerKey, byte protocol, string label)
+    private static ulong AddDnsBlockFilter(FWPM_ENGINE_HANDLE engine, Guid layerKey, byte protocol, string label)
     {
         var protoVal = new FWP_CONDITION_VALUE0
         {
@@ -849,7 +849,7 @@ public static unsafe class KillSwitchFilters
                                        WeightDnsBlock, conditions, 2, label);
     }
 
-    private static ulong AddDnsTunnelPermitFilter(HANDLE engine, Guid layerKey, byte protocol,
+    private static ulong AddDnsTunnelPermitFilter(FWPM_ENGINE_HANDLE engine, Guid layerKey, byte protocol,
                                                   ulong luid, string label)
     {
         ulong luidStorage = luid;
@@ -892,7 +892,7 @@ public static unsafe class KillSwitchFilters
                                        WeightSpecificPermit, conditions, 3, label);
     }
 
-    private static ulong AddPermitV4Subnet(HANDLE engine, Guid layerKey, uint addr, uint mask, string label)
+    private static ulong AddPermitV4Subnet(FWPM_ENGINE_HANDLE engine, Guid layerKey, uint addr, uint mask, string label)
     {
         FWP_V4_ADDR_AND_MASK addrMask;
         addrMask.addr = addr;
@@ -914,7 +914,7 @@ public static unsafe class KillSwitchFilters
                                        WeightLanPermit, &condition, 1, label);
     }
 
-    private static ulong AddPermitV6Subnet(HANDLE engine, Guid layerKey, byte[] addr16, byte prefixLength, string label)
+    private static ulong AddPermitV6Subnet(FWPM_ENGINE_HANDLE engine, Guid layerKey, byte[] addr16, byte prefixLength, string label)
     {
         if (addr16.Length != 16) throw new ArgumentException("V6 address must be 16 bytes", nameof(addr16));
 
@@ -938,7 +938,7 @@ public static unsafe class KillSwitchFilters
                                        WeightLanPermit, &condition, 1, label);
     }
 
-    private static ulong AddTunnelLuidFilter(HANDLE engine, Guid layerKey, ulong luid, string label)
+    private static ulong AddTunnelLuidFilter(FWPM_ENGINE_HANDLE engine, Guid layerKey, ulong luid, string label)
     {
         // FWPM_CONDITION_IP_LOCAL_INTERFACE expects a UINT64 holding the IF_LUID. The
         // condition value's union member uint64 is a pointer, so we pin a stack ulong.
@@ -959,12 +959,12 @@ public static unsafe class KillSwitchFilters
                                        WeightSpecificPermit, &condition, 1, label);
     }
 
-    private static ulong AddFilterWithConditions(HANDLE engine, Guid layerKey,
+    private static ulong AddFilterWithConditions(FWPM_ENGINE_HANDLE engine, Guid layerKey,
                                                  FWP_ACTION_TYPE action, byte weight,
                                                  FWPM_FILTER_CONDITION0* conditions,
                                                  uint conditionCount, string label)
     {
-        if (engine == HANDLE.Null)
+        if (engine == FWPM_ENGINE_HANDLE.Null)
         {
             Log.Error($"KillSwitchFilters.{label}: invalid engine handle.");
             return 0;
@@ -988,7 +988,7 @@ public static unsafe class KillSwitchFilters
             filter.displayData.name = new PWSTR(pName);
             filter.displayData.description = new PWSTR(pDesc);
 
-            var result = PInvoke.FwpmFilterAdd0(engine, &filter, PSECURITY_DESCRIPTOR.Null, &filterId);
+            var result = PInvoke.FwpmFilterAdd0(engine, filter, PSECURITY_DESCRIPTOR.Null, out filterId);
             if (result != 0)
             {
                 Log.Error($"KillSwitchFilters.{label}: FwpmFilterAdd0 failed. Error: 0x{result:X8}");

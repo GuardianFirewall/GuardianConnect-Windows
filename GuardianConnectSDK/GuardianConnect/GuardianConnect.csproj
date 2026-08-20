@@ -8,9 +8,6 @@
 
         <GeneratePackageOnBuild>False</GeneratePackageOnBuild>
         <PackageIcon>Guardian.png</PackageIcon>
-        <!--
-        <TargetFramework>net9.0-windows10.0.26100.0</TargetFramework>
-        -->
         <Platforms>x64;ARM64</Platforms>
     </PropertyGroup>
 
@@ -35,6 +32,6 @@
     <ItemGroup>
         <!-- Microsoft.Extensions.Logging[.Abstractions] come from Directory.Build.Props,
              which injects them into every project. Don't redeclare here (NU1504). -->
-        <PackageReference Include="Microsoft.Win32.SystemEvents" Version="9.0.7" />
+        <PackageReference Include="Microsoft.Win32.SystemEvents" Version="10.0.10" />
     </ItemGroup>
 </Project>
