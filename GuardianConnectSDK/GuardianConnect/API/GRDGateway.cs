@@ -551,5 +551,94 @@ public class GRDGateway
 
     #endregion - Device Filter Configs
 
+    #region Alerts
+
+    /// <summary>
+    /// Request body for the device alerts endpoint. The device is identified by
+    /// its client id in the URL; this token authorizes the fetch. The gateway
+    /// rejects a POST with no body, so this is sent even though the same token
+    /// would be accepted in a header.
+    /// </summary>
+    public class AlertsRequestPayload
+    {
+        [JsonPropertyName("api-auth-token")]
+        public string ApiAuthToken { get; set; } = string.Empty;
+    }
+
+    /// <summary>
+    /// Fetch this device's privacy alerts — the trackers and page hijackers the
+    /// node blocked or observed. The Windows analog of the Apple SDK's
+    /// <c>getEventsForClientId:apiAuthToken:hostname:</c>.
+    /// </summary>
+    /// <remarks>
+    /// POST with the token in the JSON body, matching this SDK's v1.4 convention
+    /// for POSTs. Verified against a live gateway: the endpoint advertises
+    /// <c>allow: OPTIONS, POST</c> and rejects GET with 405. A body must be
+    /// present — a POST with no body fails JSON decoding server-side. The
+    /// gateway also accepts the token in a <c>grd-api-auth-token</c> header, but
+    /// the body form is used here for consistency with the rest of our POSTs.
+    ///
+    /// Only the API version changed from the v1.2 form of this call; the method
+    /// and the auth shape are unchanged.
+    ///
+    /// The host is the gateway the device is registered to, so this returns an
+    /// error when no credential is held rather than reaching a well-known host.
+    /// Alerts are a property of the node that observed the traffic.
+    /// </remarks>
+    /// <returns>
+    /// On success, <see cref="ErrorResponse.Data"/> holds a
+    /// <c>List&lt;GRDAlert&gt;</c> — empty when the node has nothing to report,
+    /// which is not an error.
+    /// </returns>
+    public static async Task<ErrorResponse> GetAlerts()
+    {
+        var errorResponse = new ErrorResponse();
+
+        if (!CanMakeApiRequests)
+            return errorResponse.SetErrorMessage("GetAlerts: no API hostname; not registered to a gateway.");
+
+        var clientId = DeviceIdentifier;
+        var apiToken = ApiAuthToken;
+        if (string.IsNullOrEmpty(clientId) || string.IsNullOrEmpty(apiToken))
+            return errorResponse.SetErrorMessage("GetAlerts: missing client id or api-auth-token.");
+
+        var payload = new AlertsRequestPayload { ApiAuthToken = apiToken };
+        var payloadString = JsonSerializer.Serialize(
+            payload, GRDAlertJsonContext.Default.AlertsRequestPayload);
+
+        var reqUri = new Uri($"https://{BaseHostName}/api/v1.4/device/{clientId}/alerts");
+        Logger.LogInformation("GetAlerts: POST {Url}", reqUri);
+
+        var request = new HttpRequestMessage(HttpMethod.Post, reqUri)
+        {
+            Content = new StringContent(payloadString),
+        };
+
+        try
+        {
+            var response = await HttpUtils.Client.SendAsync(request);
+            errorResponse.SetResponse(response);
+
+            if (!response.IsSuccessStatusCode)
+            {
+                Logger.LogError("GetAlerts: failed {Status}", (int)response.StatusCode);
+                return errorResponse.SetErrorMessage($"GetAlerts: fetch failed: {(int)response.StatusCode}");
+            }
+
+            var body = await response.Content.ReadAsStringAsync();
+            var alerts = JsonSerializer.Deserialize(body, GRDAlertJsonContext.Default.ListGRDAlert)
+                         ?? new List<GRDAlert>();
+            Logger.LogInformation("GetAlerts: fetched {Count} alert(s).", alerts.Count);
+            return errorResponse.SetData(alerts);
+        }
+        catch (Exception e)
+        {
+            Logger.LogError(e, "GetAlerts: exception during fetch");
+            return errorResponse.SetErrorMessage($"GetAlerts: {e.GetType().Name}: {e.Message}");
+        }
+    }
+
+    #endregion - Alerts
+
     #endregion - SGW APIs (v1.4)
 }
