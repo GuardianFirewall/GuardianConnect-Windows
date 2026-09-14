@@ -162,6 +162,12 @@ public class Common
     public const string kGRDServicePipeName = "GuardianFirewallService";
     public const string kPreferredRegion = "preferred_region";
 
+    /// Region precision the preferred region was chosen at — one of
+    /// kRegionPrecisionDefault / kRegionPrecisionCountry / kRegionPrecisionCity.
+    /// Absent or empty means default, which is what every pre-existing
+    /// installation stores.
+    public const string kPreferredRegionPrecision = "preferred_region_precision";
+
     // Used to hard to code IAP receipts and create Subscriber Credentials
     public const string kGuardianEncodedAppStoreReceipt = "kGuardianEncodedAppStoreReceipt";
 

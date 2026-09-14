@@ -74,6 +74,11 @@ public class GRDVPNHelper
     /// don't set this value manually, it is set upon the region selection code working successfully
     public static string? PreferredRegion { get; set; }
 
+    /// Precision <see cref="PreferredRegion"/> was chosen at. Empty means the
+    /// historical default precision, so installations that predate the
+    /// country/city selector keep working unchanged.
+    public static string PreferredRegionPrecision { get; set; } = Common.kRegionPrecisionDefault;
+
     protected internal void SetForPrivate(bool preferBetaCapableServers,
         GRDServerFeatureEnvironment featureEnvironment)
     {
@@ -93,6 +98,10 @@ public class GRDVPNHelper
 
         GRDServerManager.InitialGeoInformationLoadComplete.Wait(1 * 1000);
         PreferredRegion = Preferences.Get(Common.kPreferredRegion, null!);
+        var storedPrecision = Preferences.Get(Common.kPreferredRegionPrecision, null!);
+        PreferredRegionPrecision = string.IsNullOrWhiteSpace(storedPrecision)
+            ? Common.kRegionPrecisionDefault
+            : storedPrecision;
     }
 
     /// Helper function to quickly determine if a VPN tunnel of any kind
@@ -478,7 +487,8 @@ public class GRDVPNHelper
 
         GRDSGWServer selectedServer;
 
-        var (server, hostErr) = GRDServerManager.SelectGuardianHostWithCompletion(PreferredRegion);
+        var (server, hostErr) =
+            GRDServerManager.SelectGuardianHostWithCompletion(PreferredRegion, PreferredRegionPrecision);
         if (hostErr.IsError)
         {
             _logger.LogError(
@@ -536,6 +546,19 @@ public class GRDVPNHelper
     public void SetPreferredRegion(string? regionNameKey)
     {
         PreferredRegion = regionNameKey;
+        PreferredRegionPrecision = Common.kRegionPrecisionDefault;
+    }
+
+    /// Assign a preferred region chosen at a specific precision. A city key must
+    /// be paired with kRegionPrecisionCity and a country key with
+    /// kRegionPrecisionCountry, because the same name can exist at more than one
+    /// precision. Pass null to reset to Automatic region selection mode.
+    public void SetPreferredRegion(string? regionNameKey, string regionPrecision)
+    {
+        PreferredRegion = regionNameKey;
+        PreferredRegionPrecision = string.IsNullOrWhiteSpace(regionPrecision)
+            ? Common.kRegionPrecisionDefault
+            : regionPrecision;
     }
 
     private async Task<ErrorResponse> StartIKEv2Connection()

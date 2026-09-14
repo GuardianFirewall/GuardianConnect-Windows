@@ -46,13 +46,48 @@ public class GRDServerManager
     /// selected server as one object rather than re-flattening to loose
     /// hostname/display strings. Callers read <c>.Hostname</c> / <c>.HostLocation()</c>
     /// at the point of use.
-    public static (GRDSGWServer, ErrorResponse) SelectGuardianHostWithCompletion(string? selectedRegionKey)
+    /// <param name="regionPrecision">
+    /// Precision <paramref name="selectedRegionKey"/> was chosen at. Automatic
+    /// selection always resolves through the default precision, because the
+    /// timezone map is keyed on default-precision names.
+    /// </param>
+    public static (GRDSGWServer, ErrorResponse) SelectGuardianHostWithCompletion(
+        string? selectedRegionKey, string regionPrecision = Common.kRegionPrecisionDefault)
     {
-        SelectedRegion = GetGRDRegionByKey(selectedRegionKey ?? GetRegionForOurTimeZone());
+        // No explicit selection: fall back to the timezone pick, which is
+        // default-precision by definition.
+        if (string.IsNullOrEmpty(selectedRegionKey))
+        {
+            selectedRegionKey = GetRegionForOurTimeZone();
+            regionPrecision = Common.kRegionPrecisionDefault;
+        }
+
+        if (regionPrecision == Common.kRegionPrecisionDefault)
+        {
+            SelectedRegion = GetGRDRegionByKey(selectedRegionKey);
+        }
+        else
+        {
+            // A stored selection whose region has since disappeared from the
+            // list must not strand the connect flow — drop back to the timezone
+            // pick rather than throwing.
+            var resolved = GetGRDRegionByKey(selectedRegionKey, regionPrecision);
+            if (resolved == null)
+            {
+                Logger.LogWarning(
+                    $"SelectGuardianHostWithCompletion: region '{selectedRegionKey}' not found at precision "
+                    + $"'{regionPrecision}'; falling back to the timezone region.");
+                regionPrecision = Common.kRegionPrecisionDefault;
+                resolved = GetGRDRegionByKey(GetRegionForOurTimeZone());
+            }
+
+            SelectedRegion = resolved;
+        }
 
         Logger.LogInformation(
-            $"GRDServerManager.SelectGuardianHostWithCompletion: Calling SelectBestHostInRegion for region '{SelectedRegion.RegionName}'");
-        var regionHostRecord = SelectBestHostInRegion(SelectedRegion.RegionName);
+            $"GRDServerManager.SelectGuardianHostWithCompletion: Calling SelectBestHostInRegion for region "
+            + $"'{SelectedRegion.RegionName}' (precision '{regionPrecision}')");
+        var regionHostRecord = SelectBestHostInRegion(SelectedRegion.RegionName, regionPrecision);
 
         return (regionHostRecord, new ErrorResponse());
     }
