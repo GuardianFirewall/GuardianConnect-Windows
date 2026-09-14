@@ -13,7 +13,7 @@
         <Version>1.4.0</Version>
         <!-- Prerelease suffix: "beta.N" for non-release NuGet packages; empty = stable release.
              VERSION POLICY (1.1.0+): bump the PATCH (third) digit for every fix/build. -->
-        <VersionSuffix>alerts.1</VersionSuffix>
+        <VersionSuffix>cityprecision.1</VersionSuffix>
     </PropertyGroup>
 
     <PropertyGroup>

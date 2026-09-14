@@ -52,6 +52,18 @@ public class Common
 
     public const string kRegionPrecisionDefault = "default";
 
+    /// One entry per country (41 at time of writing). "USA" collapses the five
+    /// default-precision US regions into a single na-usa entry, and a
+    /// hostnames-for-region call at this precision returns hosts across every
+    /// city in that country.
+    public const string kRegionPrecisionCountry = "country";
+
+    /// One entry per city (57 at time of writing). Note the timezone map
+    /// (timezones-for-regions) is keyed on default-precision names and none of
+    /// them exist at this precision, so timezone-based auto-selection must keep
+    /// using kRegionPrecisionDefault.
+    public const string kRegionPrecisionCity = "city";
+
     public const string DefaultHousekeepingAPIHostname = "connect-api.guardianapp.com";
     public const string kConnectAPIHostname = "ConnectAPIHostname";
     public const string kHousekeepingAPIHostname = "HousekeepingAPIHostname";
