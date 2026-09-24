@@ -52,6 +52,18 @@ public class Common
 
     public const string kRegionPrecisionDefault = "default";
 
+    /// One entry per country (41 at time of writing). "USA" collapses the five
+    /// default-precision US regions into a single na-usa entry, and a
+    /// hostnames-for-region call at this precision returns hosts across every
+    /// city in that country.
+    public const string kRegionPrecisionCountry = "country";
+
+    /// One entry per city (57 at time of writing). Note the timezone map
+    /// (timezones-for-regions) is keyed on default-precision names and none of
+    /// them exist at this precision, so timezone-based auto-selection must keep
+    /// using kRegionPrecisionDefault.
+    public const string kRegionPrecisionCity = "city";
+
     public const string DefaultHousekeepingAPIHostname = "connect-api.guardianapp.com";
     public const string kConnectAPIHostname = "ConnectAPIHostname";
     public const string kHousekeepingAPIHostname = "HousekeepingAPIHostname";
@@ -149,6 +161,17 @@ public class Common
 
     public const string kGRDServicePipeName = "GuardianFirewallService";
     public const string kPreferredRegion = "preferred_region";
+
+    /// Region precision the preferred region was chosen at — one of
+    /// kRegionPrecisionDefault / kRegionPrecisionCountry / kRegionPrecisionCity.
+    /// Absent or empty means default.
+    ///
+    /// The stored name carries a grd_ prefix so keys this SDK owns stay
+    /// distinguishable from any an integrating application writes alongside
+    /// them. There is no read of the unprefixed name: an installation holding
+    /// the older key resolves at default precision, so a saved city would
+    /// connect elsewhere, and testers move across by uninstalling first.
+    public const string kPreferredRegionPrecision = "grd_preferred_region_precision";
 
     // Used to hard to code IAP receipts and create Subscriber Credentials
     public const string kGuardianEncodedAppStoreReceipt = "kGuardianEncodedAppStoreReceipt";

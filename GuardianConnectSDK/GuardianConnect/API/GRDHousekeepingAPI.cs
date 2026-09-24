@@ -268,10 +268,17 @@ public static class GRDHousekeepingAPI
         return errorResponse;
     }
 
-    internal static async Task<ErrorResponse> RequestServerRegions()
+    /// <param name="regionPrecision">
+    /// One of <see cref="Common.kRegionPrecisionDefault"/>,
+    /// <see cref="Common.kRegionPrecisionCountry"/> or
+    /// <see cref="Common.kRegionPrecisionCity"/>. Defaults to the historical
+    /// behaviour so existing callers are unchanged.
+    /// </param>
+    internal static async Task<ErrorResponse> RequestServerRegions(
+        string regionPrecision = Common.kRegionPrecisionDefault)
     {
         var GetAllRegionsUrl =
-            $"https://{Common.DefaultConnectAPIHostname}/api/v1.3/servers/all-server-regions/{Common.kRegionPrecisionDefault}";
+            $"https://{Common.DefaultConnectAPIHostname}/api/v1.3/servers/all-server-regions/{regionPrecision}";
         var errorResponse = new ErrorResponse();
         var uri = new Uri(GetAllRegionsUrl);
         try

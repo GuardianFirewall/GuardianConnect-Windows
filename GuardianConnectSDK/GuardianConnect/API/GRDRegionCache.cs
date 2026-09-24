@@ -21,12 +21,24 @@ public class GRDRegionCache
     internal List<string> contentstrings = new();
     internal Dictionary<string, GRDRegion> regionLookup = new();
 
+    /// Country-precision regions, keyed by region name. Held separately from
+    /// <see cref="regionLookup"/> because the two precisions share names — 26 of
+    /// the 43 default-precision names also exist at country precision (eu-de,
+    /// eu-fr, …) — so a single name-keyed dictionary would have them overwrite
+    /// each other.
+    internal Dictionary<string, GRDRegion> countryLookup = new();
+
+    /// City-precision regions, keyed by region name.
+    internal Dictionary<string, GRDRegion> cityLookup = new();
+
     internal Dictionary<string, List<string>> timezonesLookup = new();
 
     internal GRDRegionCache()
     {
         timezonesLookup = new Dictionary<string, List<string>>();
         regionLookup = new Dictionary<string, GRDRegion>();
+        countryLookup = new Dictionary<string, GRDRegion>();
+        cityLookup = new Dictionary<string, GRDRegion>();
         _hostLookup = new Dictionary<string, List<GRDSGWServer>>();
         RegionKeys = new List<string>();
         RegionKeysByDisplay = new Dictionary<string, string>();

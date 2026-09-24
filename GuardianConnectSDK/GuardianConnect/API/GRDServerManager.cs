@@ -46,13 +46,48 @@ public class GRDServerManager
     /// selected server as one object rather than re-flattening to loose
     /// hostname/display strings. Callers read <c>.Hostname</c> / <c>.HostLocation()</c>
     /// at the point of use.
-    public static (GRDSGWServer, ErrorResponse) SelectGuardianHostWithCompletion(string? selectedRegionKey)
+    /// <param name="regionPrecision">
+    /// Precision <paramref name="selectedRegionKey"/> was chosen at. Automatic
+    /// selection always resolves through the default precision, because the
+    /// timezone map is keyed on default-precision names.
+    /// </param>
+    public static (GRDSGWServer, ErrorResponse) SelectGuardianHostWithCompletion(
+        string? selectedRegionKey, string regionPrecision = Common.kRegionPrecisionDefault)
     {
-        SelectedRegion = GetGRDRegionByKey(selectedRegionKey ?? GetRegionForOurTimeZone());
+        // No explicit selection: fall back to the timezone pick, which is
+        // default-precision by definition.
+        if (string.IsNullOrEmpty(selectedRegionKey))
+        {
+            selectedRegionKey = GetRegionForOurTimeZone();
+            regionPrecision = Common.kRegionPrecisionDefault;
+        }
+
+        if (regionPrecision == Common.kRegionPrecisionDefault)
+        {
+            SelectedRegion = GetGRDRegionByKey(selectedRegionKey);
+        }
+        else
+        {
+            // A stored selection whose region has since disappeared from the
+            // list must not strand the connect flow — drop back to the timezone
+            // pick rather than throwing.
+            var resolved = GetGRDRegionByKey(selectedRegionKey, regionPrecision);
+            if (resolved == null)
+            {
+                Logger.LogWarning(
+                    $"SelectGuardianHostWithCompletion: region '{selectedRegionKey}' not found at precision "
+                    + $"'{regionPrecision}'; falling back to the timezone region.");
+                regionPrecision = Common.kRegionPrecisionDefault;
+                resolved = GetGRDRegionByKey(GetRegionForOurTimeZone());
+            }
+
+            SelectedRegion = resolved;
+        }
 
         Logger.LogInformation(
-            $"GRDServerManager.SelectGuardianHostWithCompletion: Calling SelectBestHostInRegion for region '{SelectedRegion.RegionName}'");
-        var regionHostRecord = SelectBestHostInRegion(SelectedRegion.RegionName);
+            $"GRDServerManager.SelectGuardianHostWithCompletion: Calling SelectBestHostInRegion for region "
+            + $"'{SelectedRegion.RegionName}' (precision '{regionPrecision}')");
+        var regionHostRecord = SelectBestHostInRegion(SelectedRegion.RegionName, regionPrecision);
 
         return (regionHostRecord, new ErrorResponse());
     }
@@ -258,7 +293,12 @@ public class GRDServerManager
         foreach (var kvp in Live._hostLookup)
         {
             if (kvp.Value.Any(h => string.Equals(h.Hostname, hostname, StringComparison.OrdinalIgnoreCase)))
-                return kvp.Key;
+            {
+                // Non-default precisions are cached under a "precision:name" key;
+                // callers expect a bare region name.
+                var sep = kvp.Key.IndexOf(':');
+                return sep >= 0 ? kvp.Key[(sep + 1)..] : kvp.Key;
+            }
         }
         return null;
     }
@@ -454,8 +494,113 @@ public class GRDServerManager
             Alternate.RegionKeysByDisplay.TryAdd(regionRec.DisplayName, regionRec.RegionName);
         }
 
+        // Country- and city-precision lists back the region selector's
+        // country -> city menu. They go into their own dictionaries because the
+        // names overlap with the default-precision list. Failure here is
+        // non-fatal: the default-precision list above is what the connect flow
+        // and the timezone auto-pick depend on.
+        await RefreshStandbyRegionsForPrecision(Common.kRegionPrecisionCountry, Alternate.countryLookup);
+        await RefreshStandbyRegionsForPrecision(Common.kRegionPrecisionCity, Alternate.cityLookup);
+
         return regionsList ?? GRDRegion.StaticRegions;
     }
+
+    /// <summary>
+    /// Fetches one additional region-precision list into <paramref name="target"/>.
+    /// Carries forward the corresponding Live dictionary when the fetch fails or
+    /// comes back empty, so a transient error never empties the selector.
+    /// </summary>
+    private static async Task RefreshStandbyRegionsForPrecision(
+        string regionPrecision, Dictionary<string, GRDRegion> target)
+    {
+        List<GRDRegion>? list = null;
+        try
+        {
+            var resp = await GRDHousekeepingAPI.RequestServerRegions(regionPrecision);
+            if (!resp.IsError && resp.ThrownException == null)
+            {
+                var content = resp.Data?.ToString() ?? string.Empty;
+                if (!string.IsNullOrEmpty(content))
+                {
+                    // Included in the checksum so a change to either list still
+                    // promotes the standby cache.
+                    Alternate.contentstrings.Add(content);
+                    list = JsonSerializer.Deserialize<List<GRDRegion>>(content,
+                        GRDRegionJsonContext.Default.ListGRDRegion);
+                }
+            }
+        }
+        catch (Exception ex)
+        {
+            Logger.LogError(ex, $"RefreshStandbyRegionsForPrecision('{regionPrecision}'): {ex.Message}");
+        }
+
+        if (list == null || list.Count == 0)
+        {
+            var carried = regionPrecision == Common.kRegionPrecisionCountry
+                ? Live.countryLookup
+                : Live.cityLookup;
+            Logger.LogWarning(
+                $"RefreshStandbyRegionsForPrecision('{regionPrecision}'): nothing fetched; carrying forward {carried.Count} last-good entr(ies).");
+            foreach (var kvp in carried) target.TryAdd(kvp.Key, kvp.Value);
+            return;
+        }
+
+        foreach (var r in list) target.TryAdd(r.RegionName, r);
+        Logger.LogInformation(
+            $"RefreshStandbyRegionsForPrecision('{regionPrecision}'): loaded {target.Count} region(s).");
+    }
+
+    /// <summary>
+    /// Country-precision regions, ordered for display. One entry per country;
+    /// countries with several cities are expanded via
+    /// <see cref="GetCitiesForCountry"/>.
+    /// </summary>
+    public static List<GRDRegion> GetCountryRegions()
+    {
+        return Live.countryLookup.Values
+            .OrderBy(r => r.DisplayName, StringComparer.CurrentCultureIgnoreCase)
+            .ToList();
+    }
+
+    /// <summary>
+    /// City-precision regions belonging to the given ISO country code, ordered
+    /// for display. Empty when the country has no city-precision entries.
+    /// </summary>
+    public static List<GRDRegion> GetCitiesForCountry(string countryIsoCode)
+    {
+        if (string.IsNullOrWhiteSpace(countryIsoCode)) return new List<GRDRegion>();
+        return Live.cityLookup.Values
+            .Where(r => string.Equals(r.CountryISOCode, countryIsoCode, StringComparison.OrdinalIgnoreCase))
+            .OrderBy(r => r.DisplayName, StringComparer.CurrentCultureIgnoreCase)
+            .ToList();
+    }
+
+    /// <summary>
+    /// Region lookup for a specific precision. Falls back to the standby cache,
+    /// then returns null — callers decide what a miss means.
+    /// </summary>
+    public static GRDRegion? GetGRDRegionByKey(string regionKey, string regionPrecision)
+    {
+        if (string.IsNullOrEmpty(regionKey)) return null;
+        if (regionPrecision == Common.kRegionPrecisionDefault) return GetGRDRegionByKey(regionKey);
+
+        var live = regionPrecision == Common.kRegionPrecisionCountry ? Live.countryLookup : Live.cityLookup;
+        if (live.TryGetValue(regionKey, out var hit)) return hit;
+
+        var standby = regionPrecision == Common.kRegionPrecisionCountry
+            ? Alternate.countryLookup
+            : Alternate.cityLookup;
+        return standby.TryGetValue(regionKey, out var alt) ? alt : null;
+    }
+
+    /// <summary>
+    /// Host-cache key. Default precision keeps the bare region name so existing
+    /// cache entries and callers are unaffected; the other precisions are
+    /// prefixed because their region names overlap with the default list.
+    /// </summary>
+    private static string HostCacheKey(string regionKey, string regionPrecision)
+        => regionPrecision == Common.kRegionPrecisionDefault ? regionKey : $"{regionPrecision}:{regionKey}";
 
     private static async Task GetLatestTimeZonesForRegions()
     {
@@ -509,11 +654,18 @@ public class GRDServerManager
 
     // Get hosts for a region - NOTE: THIS ACTS ON LIVE DATASET - as we don't need to preload hosts until needed
     // ALSO: We DON'T add this to HASH calculation as hosts are an AT-MOMENT-OF-USE data set
-    internal static async Task GetHostsForRegion(string regionKey)
+    internal static async Task GetHostsForRegion(
+        string regionKey, string regionPrecision = Common.kRegionPrecisionDefault)
     {
         var message = "";
-        Logger.LogInformation($"GetHostsForRegion: Retrieving hosts for region {regionKey}.");
-        var regionRec = Live.regionLookup[regionKey];
+        var cacheKey = HostCacheKey(regionKey, regionPrecision);
+        Logger.LogInformation(
+            $"GetHostsForRegion: Retrieving hosts for region {regionKey} (precision '{regionPrecision}').");
+        var regionRec = regionPrecision == Common.kRegionPrecisionDefault
+            ? Live.regionLookup[regionKey]
+            : GetGRDRegionByKey(regionKey, regionPrecision)
+              ?? throw new KeyNotFoundException(
+                  $"GetHostsForRegion: region '{regionKey}' not found at precision '{regionPrecision}'.");
         Logger.LogInformation($"GetHostsForRegion: Calling GetHostsForRegionKey with key = '{regionKey}");
 
         var response = new HttpResponseMessage();
@@ -527,7 +679,7 @@ public class GRDServerManager
                 Paid = true,
                 FeatureEnvironment = (int)HostRequestFeatureEnvironment,
                 BetaCapable = HostRequestBetaCapable,
-                RegionPrecision = Common.kRegionPrecisionDefault,
+                RegionPrecision = regionPrecision,
             };
 
             var ripSerialized =
@@ -565,11 +717,16 @@ public class GRDServerManager
                 // host-list endpoint omits the nested "region" object (region is the
                 // query context), so stamp it from the known region key. Use ??= so we
                 // never clobber a region the JSON did provide (servers/all-hostnames).
-                var region = GetGRDRegionByKey(regionKey);
+                // A country-precision response DOES carry the nested city region per
+                // host, which is how the caller learns which city a country-wide pick
+                // landed in — ??= preserves it.
+                var region = regionPrecision == Common.kRegionPrecisionDefault
+                    ? GetGRDRegionByKey(regionKey)
+                    : GetGRDRegionByKey(regionKey, regionPrecision) ?? regionRec;
                 foreach (var h in regionHosts) h.Region ??= region;
 
-                if (!Live._hostLookup.ContainsKey(regionKey)) Live._hostLookup.Add(regionKey, null!);
-                Live._hostLookup[regionKey] = regionHosts;
+                if (!Live._hostLookup.ContainsKey(cacheKey)) Live._hostLookup.Add(cacheKey, null!);
+                Live._hostLookup[cacheKey] = regionHosts;
                 message =
                     $"GRDServerManager.GetHostForRegion: Added {regionHosts?.Count} hosts for region '{regionKey}'";
                 Logger.LogInformation(message);
@@ -581,7 +738,7 @@ public class GRDServerManager
                 Logger.LogInformation(message);
             }
 
-            var hostCount = Live._hostLookup[regionRec.RegionName].Count;
+            var hostCount = Live._hostLookup[cacheKey].Count;
             message =
                 $"GetHostsForRegion(): Getting latest collection of hosts for Region {regionRec.RegionName} - {regionRec.DisplayName}. Number of hosts = {hostCount}";
             Logger.LogInformation(message);
@@ -657,14 +814,16 @@ public class GRDServerManager
         }
     }
 
-    internal static GRDSGWServer SelectBestHostInRegion(string regionKey)
+    internal static GRDSGWServer SelectBestHostInRegion(
+        string regionKey, string regionPrecision = Common.kRegionPrecisionDefault)
     {
+        var cacheKey = HostCacheKey(regionKey, regionPrecision);
         RegionHostsRetrievalWaiter.Reset();
-        if (!Live._hostLookup.ContainsKey(regionKey) || Live._hostLookup[regionKey].Count == 0)
+        if (!Live._hostLookup.ContainsKey(cacheKey) || Live._hostLookup[cacheKey].Count == 0)
         {
             Logger.LogInformation(
                 $"GRDServerManager.SelectBestHostInRegion: Region '{regionKey}' needs host list refresh... calling GetHostsForRegion to update now");
-            _ = Task.Factory.StartNew(async () => { await GetHostsForRegion(regionKey); });
+            _ = Task.Factory.StartNew(async () => { await GetHostsForRegion(regionKey, regionPrecision); });
             Logger.LogInformation(
                 "RegionUtil.SelectBestHostInRegion: Waiting for GetHostsForRegion to return results...");
             RegionHostsRetrievalWaiter.Wait(5 * 1000);
@@ -673,11 +832,11 @@ public class GRDServerManager
                 $"GRDServerManager.SelectBestHostInRegion: Return from GetHostsForRegion - region '{regionKey}' host list refresh complete.");
         }
 
-        if (!Live._hostLookup.TryGetValue(regionKey, out var myRegionRecord))
+        if (!Live._hostLookup.TryGetValue(cacheKey, out var myRegionRecord))
             throw new Exception($"Hosts Lookup collection does NOT contain record for region {regionKey}");
 
         // Do random thing
-        var regionHosts = Live._hostLookup[regionKey];
+        var regionHosts = Live._hostLookup[cacheKey];
         var lightest = regionHosts.Where(h => h.CapacityScore == 0);
         var lighter = regionHosts.Where(h => h.CapacityScore == 1);
 
