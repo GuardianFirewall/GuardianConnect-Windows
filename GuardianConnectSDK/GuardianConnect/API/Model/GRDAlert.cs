@@ -10,8 +10,8 @@ namespace GuardianConnect.API.Model;
 /// persisted device-locally on the client.
 ///
 /// Wire-format note: the server sends the unique id under the JSON key
-/// <c>uuid</c> and the time as a Unix timestamp (seconds). The category keys
-/// match the other platforms exactly (see <see cref="GRDAlertCategory"/>).
+/// <c>uuid</c> and the time as a Unix timestamp in whole seconds. The category
+/// keys match the other platforms exactly (see <see cref="GRDAlertCategory"/>).
 /// </summary>
 public class GRDAlert
 {
@@ -19,10 +19,10 @@ public class GRDAlert
     [JsonPropertyName("uuid")]
     public string Identifier { get; set; } = string.Empty;
 
-    /// Event time as a Unix timestamp in seconds (may be fractional). Use
+    /// Event time as a Unix timestamp in whole seconds. Use
     /// <see cref="TimestampUtc"/> for the resolved instant.
     [JsonPropertyName("timestamp")]
-    public double Timestamp { get; set; }
+    public long Timestamp { get; set; }
 
     /// "drop" => the connection was BLOCKED; anything else => DETECTED.
     [JsonPropertyName("action")]
@@ -44,10 +44,9 @@ public class GRDAlert
     [JsonPropertyName("message")]
     public string Message { get; set; } = string.Empty;
 
-    /// Resolved event instant (UTC). Tolerates fractional seconds.
+    /// Resolved event instant (UTC).
     [JsonIgnore]
-    public DateTimeOffset TimestampUtc =>
-        DateTimeOffset.FromUnixTimeMilliseconds((long)(Timestamp * 1000.0));
+    public DateTimeOffset TimestampUtc => DateTimeOffset.FromUnixTimeSeconds(Timestamp);
 
     /// True when the node dropped the connection (vs merely detecting it).
     [JsonIgnore]
