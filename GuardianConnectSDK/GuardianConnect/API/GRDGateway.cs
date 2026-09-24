@@ -570,7 +570,7 @@ public class GRDGateway
     /// </summary>
     /// <remarks>
     /// POST with the token in the JSON body, matching this SDK's v1.4 convention
-    /// for POSTs. the endpoint advertises <c>allow: OPTIONS, POST</c> and rejects GET with 405.
+    /// for POSTs. The endpoint advertises <c>allow: OPTIONS, POST</c> and rejects GET with 405.
     /// A body must be present — a POST with no body fails JSON decoding server-side. The
     /// gateway also accepts the token in a <c>grd-api-auth-token</c> header, but
     /// the body form is used here for consistency with the rest of our POSTs.
