@@ -164,9 +164,14 @@ public class Common
 
     /// Region precision the preferred region was chosen at — one of
     /// kRegionPrecisionDefault / kRegionPrecisionCountry / kRegionPrecisionCity.
-    /// Absent or empty means default, which is what every pre-existing
-    /// installation stores.
-    public const string kPreferredRegionPrecision = "preferred_region_precision";
+    /// Absent or empty means default.
+    ///
+    /// The stored name carries a grd_ prefix so keys this SDK owns stay
+    /// distinguishable from any an integrating application writes alongside
+    /// them. There is no read of the unprefixed name: an installation holding
+    /// the older key resolves at default precision, so a saved city would
+    /// connect elsewhere, and testers move across by uninstalling first.
+    public const string kPreferredRegionPrecision = "grd_preferred_region_precision";
 
     // Used to hard to code IAP receipts and create Subscriber Credentials
     public const string kGuardianEncodedAppStoreReceipt = "kGuardianEncodedAppStoreReceipt";

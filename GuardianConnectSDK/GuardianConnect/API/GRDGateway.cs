@@ -566,20 +566,14 @@ public class GRDGateway
     }
 
     /// <summary>
-    /// Fetch this device's privacy alerts — the trackers and page hijackers the
-    /// node blocked or observed. The Windows analog of the Apple SDK's
-    /// <c>getEventsForClientId:apiAuthToken:hostname:</c>.
+    /// Fetch this device's privacy alerts
     /// </summary>
     /// <remarks>
     /// POST with the token in the JSON body, matching this SDK's v1.4 convention
-    /// for POSTs. Verified against a live gateway: the endpoint advertises
-    /// <c>allow: OPTIONS, POST</c> and rejects GET with 405. A body must be
-    /// present — a POST with no body fails JSON decoding server-side. The
+    /// for POSTs. the endpoint advertises <c>allow: OPTIONS, POST</c> and rejects GET with 405.
+    /// A body must be present — a POST with no body fails JSON decoding server-side. The
     /// gateway also accepts the token in a <c>grd-api-auth-token</c> header, but
     /// the body form is used here for consistency with the rest of our POSTs.
-    ///
-    /// Only the API version changed from the v1.2 form of this call; the method
-    /// and the auth shape are unchanged.
     ///
     /// The host is the gateway the device is registered to, so this returns an
     /// error when no credential is held rather than reaching a well-known host.
@@ -621,8 +615,12 @@ public class GRDGateway
 
             if (!response.IsSuccessStatusCode)
             {
-                Logger.LogError("GetAlerts: failed {Status}", (int)response.StatusCode);
-                return errorResponse.SetErrorMessage($"GetAlerts: fetch failed: {(int)response.StatusCode}");
+                var errorBody = await response.Content.ReadAsStringAsync();
+                var apiError = GRDAPIError.FromResponseBody(errorBody, response.StatusCode);
+                Logger.LogError(
+                    "GetAlerts: fetch failed ({Status}): {Title}: {Message}",
+                    (int)response.StatusCode, apiError.Title, apiError.Message);
+                return errorResponse.SetGrdApiError(apiError);
             }
 
             var body = await response.Content.ReadAsStringAsync();
