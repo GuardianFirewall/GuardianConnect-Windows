@@ -1,5 +1,6 @@
 ﻿using System.Text.Json.Serialization;
 using GuardianConnect.Abstractions;
+using GuardianConnect.API.Model;
 using GuardianConnect.Shared;
 
 namespace GuardianConnect.Credentials;
@@ -81,6 +82,23 @@ public class GRDCredential
     public string HostnameDisplayValue { get; set; } = string.Empty;
     public DateTime ExpirationDate { get; set; }
     public string HostName { get; set; } = string.Empty;
+
+    /// <summary>
+    /// The gateway record this credential was created against, carried verbatim —
+    /// the same pattern as <see cref="Device"/>, which carries the device reply.
+    /// Supplies the published IPv4 address (<c>Server.IPv4Address</c>, distinct from
+    /// <see cref="IPv4Address"/>, which is this device's address inside the tunnel),
+    /// the smart-routing capability flag and the owning region.
+    /// <para>
+    /// Persisted because the live copy lives in an in-memory host cache that only
+    /// host selection populates, and a stored-credential dial skips host selection.
+    /// In a new process the record is otherwise recoverable only through an API call
+    /// that itself needs DNS — which is exactly what Stealth Mode exists to avoid.
+    /// Null on credentials created before this property existed.
+    /// </para>
+    /// </summary>
+    public GRDSGWServer? Server { get; set; }
+
     public string ClientId { get; set; } = string.Empty;
 
     [JsonPropertyName("api-auth-token")] public string ApiAuthToken { get; set; } = string.Empty;

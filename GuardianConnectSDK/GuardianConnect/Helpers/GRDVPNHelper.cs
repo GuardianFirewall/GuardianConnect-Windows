@@ -292,6 +292,9 @@ public class GRDVPNHelper
         mainCredential.MainCredential = true;
         mainCredential.HostName = server.Hostname;
         mainCredential.HostnameDisplayValue = server.HostLocation();
+        // Captured while the record is in hand: a later stored-credential dial has
+        // no host selection to repopulate the cache it came from.
+        mainCredential.Server = server;
         GRDCredentialManager.AddOrUpdateCredential(mainCredential);
 
         errorResponse = await ConnectVPNTunnel();
@@ -367,7 +370,20 @@ public class GRDVPNHelper
         // the ApiHostname static-property indirection while WG didn't
         // pre-flight at all).
         var cred = GRDCredentialManager.GetMainCredentials()!;
-        var statusErr = await GRDGateway.GetServerStatus(cred.HostName, clientCall: true);
+
+        // Stealth Mode is WireGuard-only. On a WireGuard connect the gateway's
+        // published address replaces its hostname for both the pre-flight below and
+        // the dial that follows: the pre-flight is an HTTPS call, so leaving the
+        // hostname on it aborts the connect before the dial is reached on a network
+        // that blocks resolution of guardianapp.com. IKEv2 is untouched — it dials
+        // and pre-flights by hostname regardless of the preference.
+        var stealthDialHost =
+            protocol == GRDTransportProtocol.TransportProtocol.TransportWireGuard
+                ? await StealthDialAddressAsync(cred.HostName)
+                : null;
+        var preflightHost = stealthDialHost ?? cred.HostName;
+
+        var statusErr = await GRDGateway.GetServerStatus(preflightHost, clientCall: true);
         if (statusErr.IsError)
         {
             // When GetServerStatus throws (DNS failure, socket-block from KS,
@@ -390,7 +406,7 @@ public class GRDVPNHelper
             GRDTransportProtocol.TransportProtocol.TransportIKEv2 =>
                 await StartIKEv2Connection(),
             GRDTransportProtocol.TransportProtocol.TransportWireGuard =>
-                await StartWireGuardFromStoredCreds(),
+                await StartWireGuardFromStoredCreds(stealthDialHost),
             _ => new ErrorResponse()
                 .SetException(new InvalidOperationException(
                     $"Unsupported transport protocol: {protocol}"))
@@ -422,6 +438,79 @@ public class GRDVPNHelper
     public static void SetSmartRoutingProxyEnabled(bool enabled) =>
         RegistrySettings.UpdateGuardianUserSettings(
             Common.kGRDSmartRoutingProxyEnabled, enabled ? "true" : "false");
+
+    /// <summary>
+    /// True when the user has opted into Stealth Mode. This is the user preference
+    /// alone; whether the gateway is actually dialed by address also depends on
+    /// the host record carrying an IPv4 address, which is resolved at connect time.
+    /// </summary>
+    public static bool IsStealthModeEnabled() =>
+        string.Equals(
+            RegistrySettings.RetrieveGuardianUserSettings(Common.kGRDStealthModeEnabled),
+            "true", StringComparison.OrdinalIgnoreCase);
+
+    /// <summary>
+    /// Persists the user's Stealth Mode preference to HKCU. Takes effect on the
+    /// next connect, when the WireGuard config is built.
+    /// </summary>
+    public static void SetStealthModeEnabled(bool enabled) =>
+        RegistrySettings.UpdateGuardianUserSettings(
+            Common.kGRDStealthModeEnabled, enabled ? "true" : "false");
+
+    /// <summary>
+    /// The gateway address to use in place of <paramref name="hostname"/> for this
+    /// connection, or null to keep the hostname. Returns null when Stealth Mode is
+    /// off, when no gateway record can be resolved, or when the record publishes no
+    /// IPv4 address — in every one of those cases the hostname stands, so a missing
+    /// address degrades to today's behavior rather than producing an unreachable
+    /// endpoint.
+    /// <para>
+    /// The address stored on the credential is preferred because reading it needs
+    /// no network at all. The record lookup behind it can fall back to an API call
+    /// that resolves connect-api.guardianapp.com, which is exactly what a network
+    /// hostile to Guardian blocks — so it serves credentials predating the stored
+    /// field, not the case this feature is for.
+    /// </para>
+    /// </summary>
+    private async Task<string?> StealthDialAddressAsync(string hostname)
+    {
+        if (!IsStealthModeEnabled()) return null;
+
+        var stored = GRDCredentialManager.GetMainCredentials()?.Server?.IPv4Address;
+        if (!string.IsNullOrWhiteSpace(stored))
+        {
+            _logger.LogInformation(
+                "StealthDialAddressAsync: Stealth Mode on — using the address on the stored gateway "
+                + "record, {Address}, for {Host}.", stored, hostname);
+            return stored;
+        }
+
+        _logger.LogInformation(
+            "StealthDialAddressAsync: no gateway record with an address stored on the credential for "
+            + "{Host}; falling back to a host-record lookup, which needs name resolution.", hostname);
+
+        var server = await GRDServerManager.FindHostRecordResilient(hostname);
+        if (server is null)
+        {
+            _logger.LogWarning(
+                "StealthDialAddressAsync: Stealth Mode is on but no gateway record resolved for "
+                + "{Host}; connecting by hostname.", hostname);
+            return null;
+        }
+
+        if (string.IsNullOrWhiteSpace(server.IPv4Address))
+        {
+            _logger.LogWarning(
+                "StealthDialAddressAsync: Stealth Mode is on but {Host} publishes no IPv4 address; "
+                + "connecting by hostname.", hostname);
+            return null;
+        }
+
+        _logger.LogInformation(
+            "StealthDialAddressAsync: Stealth Mode on — using {Address} in place of {Host}.",
+            server.IPv4Address, hostname);
+        return server.IPv4Address;
+    }
     public async Task<ErrorResponse> DisconnectVPNTunnel()
     {
         var errorResponse = new ErrorResponse();
@@ -506,6 +595,7 @@ public class GRDVPNHelper
         var credentials = (GRDCredential)errorResponse.Data!;
         credentials.HostName = selectedServer.Hostname;
         credentials.HostnameDisplayValue = selectedServer.HostLocation();
+        credentials.Server = selectedServer;
         return new ErrorResponse().SetData(credentials);
     }
 
@@ -623,7 +713,11 @@ public class GRDVPNHelper
     /// returns true for WireGuard — i.e., we have a valid cached cred and don't
     /// need to exchange keys.
     /// </summary>
-    private async Task<ErrorResponse> StartWireGuardFromStoredCreds()
+    /// <param name="sgwServerAddressOverride">
+    /// When set, used as the WireGuard Endpoint host in place of the credential's
+    /// hostname. Stealth Mode supplies the gateway's published IPv4 address.
+    /// </param>
+    private async Task<ErrorResponse> StartWireGuardFromStoredCreds(string? sgwServerAddressOverride = null)
     {
         var errorResponse = new ErrorResponse();
         _logger.LogInformation("StartWireGuardFromStoredCreds: entry");
@@ -649,8 +743,8 @@ public class GRDVPNHelper
                     + "Smart Routing Proxy stays off for this connection.", cred.HostName);
         }
 
-        var configText =
-            GRDWireGuardConfiguration.WireGuardQuickConfigForCredential(cred, null, srpServer, dnsSRPMode);
+        var configText = GRDWireGuardConfiguration.WireGuardQuickConfigForCredential(
+            cred, null, srpServer, dnsSRPMode, sgwServerAddressOverride);
         if (string.IsNullOrEmpty(configText))
         {
             return errorResponse
