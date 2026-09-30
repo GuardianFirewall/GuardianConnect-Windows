@@ -99,8 +99,9 @@ public class Common
     /// HKCU user setting. "true" means the user has opted into Stealth Mode, which
     /// dials the gateway by its published IPv4 address instead of its hostname so
     /// the connection survives a network that blocks DNS resolution for
-    /// guardianapp.com. WireGuard only — it authenticates by public key and needs
-    /// no name to validate against.
+    /// guardianapp.com. Applies to both WireGuard and IKEv2; IKEv2 and the HTTPS
+    /// pre-flight validate the address against the gateway certificate's
+    /// iPAddress SAN.
     /// </summary>
     public const string kGRDStealthModeEnabled = "kGRDStealthModeEnabled";
 

@@ -22,7 +22,8 @@ public class GRDGateway
     /// network connectivity hiccup of the kind that resolves on its own
     /// within a few hundred ms — typically post-WG-teardown when the
     /// Windows resolver hasn't yet failed over from the (now-gone) WG
-    /// adapter's DNS to the physical NIC's. Matches HostNotFound /
+    /// adapter's DNS to the physical NIC's, or a WireGuard tunnel reported up
+    /// before it carries traffic. Matches HostNotFound / NoData /
     /// TryAgain socket errors and broad HttpRequestException with a
     /// SocketException inner cause.
     /// </summary>
@@ -34,6 +35,7 @@ public class GRDGateway
         {
             return sockEx.SocketErrorCode is
                 SocketError.HostNotFound or
+                SocketError.NoData or
                 SocketError.TryAgain or
                 SocketError.NetworkUnreachable or
                 SocketError.HostUnreachable;
@@ -73,7 +75,12 @@ public class GRDGateway
         }
     }
 
-    public static string BaseHostName => ApiHostname;
+    /// <summary>
+    /// Host for gateway API requests made while connected. Stealth Mode substitutes
+    /// the stored published IPv4 address, which the gateway certificate covers with
+    /// an iPAddress SAN; otherwise the credential's hostname.
+    /// </summary>
+    public static string BaseHostName => GRDVPNHelper.StoredStealthAddress() ?? ApiHostname;
 
     public static bool CanMakeApiRequests => !string.IsNullOrEmpty(BaseHostName);
 
@@ -505,7 +512,9 @@ public class GRDGateway
     // crashed the app when BaseHostName failed DNS during region churn.
     public static async Task SetDeviceFilterConfigsForDeviceId()
     {
-        if (!GRDVPNHelper.Singleton.IsConnected(out _)) return;
+        // GetCurrentVPNState asks the service, which tracks both transports;
+        // IsConnected walks only the RAS table and so never sees a WireGuard tunnel.
+        if (!GRDVPNHelper.Singleton.GetCurrentVPNState(out _)) return;
         if (string.IsNullOrEmpty(BaseHostName))
         {
             Logger.LogError("Cannot set DeviceFilterConfig since BaseHostName is not set!");
@@ -531,17 +540,37 @@ public class GRDGateway
             // (v1.4 convention: GETs use the grd-api-auth-token header,
             // POSTs carry the token in the body).
             var reqUri = new Uri($"https://{BaseHostName}/api/v1.4/device/{clientId}/config/filters");
-            var request = new HttpRequestMessage(HttpMethod.Post, reqUri);
-            request.Content = new StringContent(dfcJson);
 
-            var response = await HttpUtils.Client.SendAsync(request);
+            // This runs straight after the connect returns. A WireGuard tunnel is
+            // reported up before it carries traffic, so the first attempts can fail
+            // with an unreachable host or an unresolvable name; retry those.
+            const int maxAttempts = 10;
+            for (var attempt = 1; ; attempt++)
+            {
+                try
+                {
+                    var request = new HttpRequestMessage(HttpMethod.Post, reqUri)
+                    {
+                        Content = new StringContent(dfcJson),
+                    };
+                    var response = await HttpUtils.Client.SendAsync(request);
 
-            if (!response.IsSuccessStatusCode)
-                Logger.LogError(
-                    $"SetDeviceFilterConfigsForDeviceId: Error returned when syncing with host: {response.StatusCode}");
-            else
-                Logger.LogInformation(
-                    $"SetDeviceFilterConfigsForDeviceId: Syncing with host successful: {response.StatusCode}");
+                    if (!response.IsSuccessStatusCode)
+                        Logger.LogError(
+                            $"SetDeviceFilterConfigsForDeviceId: Error returned when syncing with host: {response.StatusCode}");
+                    else
+                        Logger.LogInformation(
+                            $"SetDeviceFilterConfigsForDeviceId: Syncing with host successful: {response.StatusCode} (attempt {attempt})");
+                    break;
+                }
+                catch (Exception e) when (IsTransientDnsOrNetworkFailure(e) && attempt < maxAttempts)
+                {
+                    Logger.LogWarning(
+                        "SetDeviceFilterConfigsForDeviceId: transient DNS/network failure on attempt {Attempt}/{Max} for '{Host}'; retrying after 1s. {Msg}",
+                        attempt, maxAttempts, reqUri.Host, e.Message);
+                    await Task.Delay(1000);
+                }
+            }
         }
         catch (Exception ex)
         {
