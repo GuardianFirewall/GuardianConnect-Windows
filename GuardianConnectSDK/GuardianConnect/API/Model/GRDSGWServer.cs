@@ -43,6 +43,18 @@ public class GRDSGWServer
     [JsonPropertyName("smart-routing-enabled")]
     public bool SmartProxyRoutingEnabled { get; set; }
 
+    /// Whether this host accepts a multi-hop registration. Each city has exactly
+    /// one such host, which also serves as that city's exit; registering with a
+    /// multihop-exit-region on any other host returns HTTP 400.
+    [JsonPropertyName("multihop-entry-enabled")]
+    public bool MultihopEntryEnabled { get; set; }
+
+    /// The multi-hop exit slug for this host's own city (e.g. "miami"). The
+    /// gateway refuses an exit equal to the entry host's own city. Populated by
+    /// v1.3 hostnames-for-region; absent from v1.1 all-hostnames.
+    [JsonPropertyName("region-multihop-exit-name")]
+    public string RegionMultihopExitName { get; set; } = string.Empty;
+
     /// The region that owns this host. Mirrors iOS GRDSGWServer.region. The
     /// servers/all-hostnames responses nest a "region" object per host, so this
     /// binds directly from JSON (e.g. GetAllHostnamesAsync).

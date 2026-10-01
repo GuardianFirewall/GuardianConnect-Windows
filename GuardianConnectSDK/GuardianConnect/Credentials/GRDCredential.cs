@@ -99,6 +99,14 @@ public class GRDCredential
     /// </summary>
     public GRDSGWServer? Server { get; set; }
 
+    /// <summary>
+    /// The multi-hop exit slug the gateway has for this device, set at registration
+    /// and updated by a successful <c>config/multihop</c> call. Empty means
+    /// single-hop.
+    /// </summary>
+    [JsonPropertyName("multihop-exit-region")]
+    public string MultihopExitRegion { get; set; } = string.Empty;
+
     public string ClientId { get; set; } = string.Empty;
 
     [JsonPropertyName("api-auth-token")] public string ApiAuthToken { get; set; } = string.Empty;

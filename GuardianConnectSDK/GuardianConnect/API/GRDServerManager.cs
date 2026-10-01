@@ -3,6 +3,7 @@ using System.Text.Json.Serialization;
 using GuardianConnect.API.Model;
 using GuardianConnect.Helpers;
 using GuardianConnect.Shared;
+using GuardianConnect.Shared.Extensions;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Logging.Abstractions;
 
@@ -51,8 +52,15 @@ public class GRDServerManager
     /// selection always resolves through the default precision, because the
     /// timezone map is keyed on default-precision names.
     /// </param>
+    /// <param name="multihopExitRegion">
+    /// When set, only multihop-entry-enabled hosts outside the exit's own city are
+    /// candidates, since the gateway refuses any other combination. For an Automatic
+    /// entry in a region with several multi-hop cities this is what moves the entry
+    /// off the exit city.
+    /// </param>
     public static (GRDSGWServer, ErrorResponse) SelectGuardianHostWithCompletion(
-        string? selectedRegionKey, string regionPrecision = Common.kRegionPrecisionDefault)
+        string? selectedRegionKey, string regionPrecision = Common.kRegionPrecisionDefault,
+        string? multihopExitRegion = null)
     {
         // No explicit selection: fall back to the timezone pick, which is
         // default-precision by definition.
@@ -87,10 +95,66 @@ public class GRDServerManager
         Logger.LogInformation(
             $"GRDServerManager.SelectGuardianHostWithCompletion: Calling SelectBestHostInRegion for region "
             + $"'{SelectedRegion.RegionName}' (precision '{regionPrecision}')");
-        var regionHostRecord = SelectBestHostInRegion(SelectedRegion.RegionName, regionPrecision);
+        if (string.IsNullOrWhiteSpace(multihopExitRegion))
+        {
+            var regionHostRecord = SelectBestHostInRegion(SelectedRegion.RegionName, regionPrecision);
+            return regionHostRecord is null
+                ? (null!, new ErrorResponse().SetErrorMessage(
+                    $"No gateway is available in '{SelectedRegion.DisplayName}'."))
+                : (regionHostRecord, new ErrorResponse());
+        }
 
-        return (regionHostRecord, new ErrorResponse());
+        var exit = multihopExitRegion;
+        var entry = SelectBestHostInRegion(SelectedRegion.RegionName, regionPrecision,
+            h => h.MultihopEntryEnabled
+                 && !string.Equals(h.RegionMultihopExitName, exit, StringComparison.OrdinalIgnoreCase));
+        if (entry is null)
+        {
+            var message =
+                $"No multi-hop entry gateway in '{SelectedRegion.DisplayName}' can exit through '{exit}'.";
+            Logger.LogError("SelectGuardianHostWithCompletion: {Message}", message);
+            return (null!, new ErrorResponse().SetErrorMessage(message));
+        }
+
+        Logger.LogInformation(
+            "SelectGuardianHostWithCompletion: multi-hop entry {Host} ({EntryCity}) for exit {Exit}",
+            entry.Hostname, entry.RegionMultihopExitName, exit);
+        return (entry, new ErrorResponse());
     }
+
+    /// <summary>
+    /// Multi-hop exit choices for an entry: every city-precision region with a
+    /// multi-hop host, minus the one city the gateway would refuse. An entry region
+    /// with a single multi-hop city (an explicit city, or an Automatic region such as
+    /// eu-en) forces the entry into that city, so it cannot also be the exit. An
+    /// Automatic region with several (us-east) excludes nothing, because the entry
+    /// moves to another of its cities at connect time.
+    /// </summary>
+    /// <param name="entryRegionKey">The entry region, or null/empty for Automatic.</param>
+    /// <param name="entryRegionPrecision">Precision <paramref name="entryRegionKey"/> was chosen at.</param>
+    public static List<GRDRegion> GetMultihopExitRegions(
+        string? entryRegionKey, string entryRegionPrecision = Common.kRegionPrecisionDefault)
+    {
+        var entryRegion = string.IsNullOrEmpty(entryRegionKey)
+            ? GetGRDRegionByKey(GetRegionForOurTimeZone())
+            : GetGRDRegionByKey(entryRegionKey, entryRegionPrecision);
+        var forced = entryRegion is { MultihopExitNames.Count: 1 } ? entryRegion.MultihopExitNames[0] : null;
+
+        return Live.cityLookup.Values
+            .Where(city => city.SupportsMultihopEntry)
+            .Where(city => forced is null
+                           || !string.Equals(MultihopExitSlug(city), forced, StringComparison.OrdinalIgnoreCase))
+            .OrderBy(city => city.DisplayName, StringComparer.CurrentCultureIgnoreCase)
+            .ToList();
+    }
+
+    /// <summary>
+    /// The exit slug to send for a city-precision region (e.g. "mcallen" for us-mfe).
+    /// Region keys never match exit slugs, so the slug always comes from
+    /// <see cref="GRDRegion.MultihopExitNames"/>.
+    /// </summary>
+    public static string? MultihopExitSlug(GRDRegion cityRegion) =>
+        cityRegion.MultihopExitNames.Count > 0 ? cityRegion.MultihopExitNames[0] : null;
 
     #region GRDServerManager private stuff
 
@@ -814,8 +878,13 @@ public class GRDServerManager
         }
     }
 
-    internal static GRDSGWServer SelectBestHostInRegion(
-        string regionKey, string regionPrecision = Common.kRegionPrecisionDefault)
+    /// <param name="filter">
+    /// Optional candidate filter. With a filter the result is null when no host
+    /// passes it; without one the region's full host list is used as before.
+    /// </param>
+    internal static GRDSGWServer? SelectBestHostInRegion(
+        string regionKey, string regionPrecision = Common.kRegionPrecisionDefault,
+        Func<GRDSGWServer, bool>? filter = null)
     {
         var cacheKey = HostCacheKey(regionKey, regionPrecision);
         RegionHostsRetrievalWaiter.Reset();
@@ -836,20 +905,30 @@ public class GRDServerManager
             throw new Exception($"Hosts Lookup collection does NOT contain record for region {regionKey}");
 
         // Do random thing
-        var regionHosts = Live._hostLookup[cacheKey];
-        var lightest = regionHosts.Where(h => h.CapacityScore == 0);
-        var lighter = regionHosts.Where(h => h.CapacityScore == 1);
+        var regionHosts = filter is null
+            ? Live._hostLookup[cacheKey]
+            : Live._hostLookup[cacheKey].Where(filter).ToList();
+        if (regionHosts.Count == 0)
+        {
+            Logger.LogWarning(
+                $"SelectBestHostInRegion: no host in region '{regionKey}' passes the candidate filter");
+            return null;
+        }
+
+        var lightest = regionHosts.Where(h => h.CapacityScore == 0).ToList();
+        var lighter = regionHosts.Where(h => h.CapacityScore == 1).ToList();
 
         Logger.LogInformation(
-            $"SelectBestHostInRegion: For region '{regionKey}' we have {lightest.Count()} lightest hosts, {lighter.Count()} midrange hosts out of {regionHosts.Count()} total hosts");
+            $"SelectBestHostInRegion: For region '{regionKey}' we have {lightest.Count} lightest hosts, {lighter.Count} midrange hosts out of {regionHosts.Count} candidate hosts");
 
-        if (lightest != null && lightest.Count() > 0)
-            return lightest.ElementAt(Random.Shared.Next(lightest.Count() - 1));
+        // Random.Next's upper bound is exclusive, so pass the count itself.
+        if (lightest.Count > 0)
+            return lightest[Random.Shared.Next(lightest.Count)];
 
-        if (lighter != null && lighter.Count() > 0)
-            return lighter.ElementAt(Random.Shared.Next(lighter.Count() - 1));
+        if (lighter.Count > 0)
+            return lighter[Random.Shared.Next(lighter.Count)];
 
-        return regionHosts.ElementAt(Random.Shared.Next(regionHosts.Count - 1));
+        return regionHosts[Random.Shared.Next(regionHosts.Count)];
     }
 
     private static string GetLocalTimeZone()

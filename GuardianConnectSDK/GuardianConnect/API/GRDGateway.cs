@@ -166,6 +166,15 @@ public class GRDGateway
         [JsonPropertyName("public-key")]
         [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingDefault)]
         public string? PublicKey { get; set; }
+
+        /// <summary>
+        /// Multi-hop exit slug, sent for both protocols. Absent means single-hop.
+        /// The host must be multihop-entry-enabled and the exit must not be the
+        /// host's own city, or the host returns HTTP 400.
+        /// </summary>
+        [JsonPropertyName("multihop-exit-region")]
+        [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingDefault)]
+        public string? MultihopExitRegion { get; set; }
     }
 
     // WireGuardRegistrationResponse retired: both protocols' registration
@@ -185,8 +194,9 @@ public class GRDGateway
     /// @param completion The completion handler called once the task is compeleted
     public static async Task<ErrorResponse> RegisterDeviceForTransportProtocol(
         GRDTransportProtocol.TransportProtocol transportProtocol, string hostname, string subscriberCredentialJWT,
-        int validForDays)
+        int validForDays, string? multihopExitRegion = null)
     {
+        if (string.IsNullOrWhiteSpace(multihopExitRegion)) multihopExitRegion = null;
         // WireGuard requires a curve25519 public-key in the request and parses
         // a different response shape (server-public-key, mapped-ipv4, etc.).
         // Dispatch to the WG-specific implementation; otherwise fall through
@@ -199,7 +209,7 @@ public class GRDGateway
         // symmetrically for both protocols.
         if (transportProtocol == GRDTransportProtocol.TransportProtocol.TransportWireGuard)
         {
-            return await EstablishWireGuardCredential(hostname, subscriberCredentialJWT, validForDays);
+            return await EstablishWireGuardCredential(hostname, subscriberCredentialJWT, validForDays, multihopExitRegion);
         }
 
         var errorResponse = new ErrorResponse();
@@ -207,7 +217,8 @@ public class GRDGateway
         var payload = new RegisterDevicePayload
         {
             subscriberCredential = subscriberCredentialJWT,
-            transportProtocol = GRDTransportProtocol.TransportProtocolStringFor(transportProtocol)
+            transportProtocol = GRDTransportProtocol.TransportProtocolStringFor(transportProtocol),
+            MultihopExitRegion = multihopExitRegion,
         };
 
         // Request keys and response shape are identical to the former
@@ -252,6 +263,7 @@ public class GRDGateway
                 transportProtocol, device,
                 hostName: hostname, hostnameDisplayValue: hostname,
                 mainCredential: true, validForDays: validForDays);
+            cred.MultihopExitRegion = multihopExitRegion ?? string.Empty;
             errorResponse.SetData(cred);
         }
         catch (Exception e)
@@ -279,8 +291,9 @@ public class GRDGateway
     /// credential or a saved alternate.
     /// </summary>
     public static async Task<ErrorResponse> EstablishWireGuardCredential(
-        string hostname, string subscriberCredentialJWT, int validForDays)
+        string hostname, string subscriberCredentialJWT, int validForDays, string? multihopExitRegion = null)
     {
+        if (string.IsNullOrWhiteSpace(multihopExitRegion)) multihopExitRegion = null;
         var errorResponse = new ErrorResponse();
 
         if (string.IsNullOrWhiteSpace(hostname) || string.IsNullOrWhiteSpace(subscriberCredentialJWT))
@@ -305,7 +318,8 @@ public class GRDGateway
         {
             subscriberCredential = subscriberCredentialJWT,
             transportProtocol    = GRDTransportProtocol.TransportProtocolStringFor(GRDTransportProtocol.TransportProtocol.TransportWireGuard),
-            PublicKey            = publicKey.ToBase64()
+            PublicKey            = publicKey.ToBase64(),
+            MultihopExitRegion   = multihopExitRegion,
         };
 
         // Same keys/response as the former v1.3 /device endpoint.
@@ -409,6 +423,7 @@ public class GRDGateway
             validForDays: validForDays,
             devicePrivateKey: privateKey.ToBase64(),
             devicePublicKey: publicKey.ToBase64());
+        credential.MultihopExitRegion = multihopExitRegion ?? string.Empty;
 
         errorResponse.SetData(credential);
         Logger.LogInformation(
@@ -579,6 +594,66 @@ public class GRDGateway
     }
 
     #endregion - Device Filter Configs
+
+    #region Multi-hop
+
+    public class MultihopConfigPayload
+    {
+        [JsonPropertyName("multihop-exit-region")]
+        public string MultihopExitRegion { get; set; } = string.Empty;
+
+        [JsonPropertyName("api-auth-token")]
+        public string ApiAuthToken { get; set; } = string.Empty;
+    }
+
+    /// <summary>
+    /// Changes the multi-hop exit of the main credential's existing registration:
+    /// <c>POST /api/v1.4/device/{client-id}/config/multihop</c>. Pass an exit slug,
+    /// or <see cref="Common.kGRDMultihopDisabled"/> to return to single-hop. The
+    /// gateway re-routes a live tunnel within a few seconds, so no reconnect is
+    /// needed. It returns HTTP 400 when the exit is the entry host's own city or the
+    /// host is not multihop-entry-enabled; the previous exit then stays in effect.
+    /// </summary>
+    public static async Task<ErrorResponse> SetMultihopExitRegion(string exitRegionOrDisabled)
+    {
+        var errorResponse = new ErrorResponse();
+        var clientId = DeviceIdentifier;
+        if (string.IsNullOrEmpty(BaseHostName) || string.IsNullOrEmpty(clientId) || string.IsNullOrEmpty(ApiAuthToken))
+            return errorResponse.SetErrorMessage("SetMultihopExitRegion: no registered gateway credential.");
+
+        var payloadString = JsonSerializer.Serialize(
+            new MultihopConfigPayload { MultihopExitRegion = exitRegionOrDisabled, ApiAuthToken = ApiAuthToken },
+            RegisterDevicePayloadJsonContext.Default.MultihopConfigPayload);
+        var reqUri = new Uri($"https://{BaseHostName}/api/v1.4/device/{clientId}/config/multihop");
+        Logger.LogInformation("SetMultihopExitRegion: POST {Url} exit={Exit}", reqUri, exitRegionOrDisabled);
+
+        try
+        {
+            var response = await HttpUtils.Client.SendAsync(
+                new HttpRequestMessage(HttpMethod.Post, reqUri) { Content = new StringContent(payloadString) });
+            errorResponse.SetResponse(response);
+            if (!response.IsSuccessStatusCode)
+            {
+                var body = await response.Content.ReadAsStringAsync();
+                var apiError = GRDAPIError.FromResponseBody(body, response.StatusCode);
+                Logger.LogError(
+                    "SetMultihopExitRegion: refused ({Status}): {Title}: {Message}",
+                    (int)response.StatusCode, apiError.Title, apiError.Message);
+                return errorResponse.SetGrdApiError(apiError);
+            }
+
+            Logger.LogInformation("SetMultihopExitRegion: exit is now {Exit}", exitRegionOrDisabled);
+        }
+        catch (Exception e)
+        {
+            Logger.LogError(e, "SetMultihopExitRegion: request failed");
+            errorResponse.SetException(e).SetErrorMessage(e.Message);
+        }
+
+        return errorResponse;
+    }
+
+    #endregion - Multi-hop
 
     #region Alerts
 

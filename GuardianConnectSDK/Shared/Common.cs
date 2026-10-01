@@ -105,6 +105,24 @@ public class Common
     /// </summary>
     public const string kGRDStealthModeEnabled = "kGRDStealthModeEnabled";
 
+    /// <summary>
+    /// HKCU user setting. "true" means the user has turned Multi-hop on. Multi-hop
+    /// is in effect only when an exit is also set (<see cref="kGRDMultihopExitRegion"/>).
+    /// </summary>
+    public const string kGRDMultihopEnabled = "kGRDMultihopEnabled";
+
+    /// <summary>
+    /// HKCU user setting: the multi-hop exit slug (a city's
+    /// <c>multihop-exit-names</c> entry, e.g. "newyork"). Empty means no exit chosen.
+    /// </summary>
+    public const string kGRDMultihopExitRegion = "kGRDMultihopExitRegion";
+
+    /// <summary>
+    /// Value sent as <c>multihop-exit-region</c> to turn multi-hop off on an
+    /// existing registration.
+    /// </summary>
+    public const string kGRDMultihopDisabled = "disabled";
+
     public const string kGRDWGDevicePublicKey = "wg-device-public-key";
     public const string kGRDWGDevicePrivateKey = "wg-device-private-key";
     public const string kGRDWGServerPublicKey = "server-public-key";

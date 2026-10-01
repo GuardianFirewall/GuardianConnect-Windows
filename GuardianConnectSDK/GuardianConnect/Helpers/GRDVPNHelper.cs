@@ -191,10 +191,27 @@ public class GRDVPNHelper
             _ => false,
         };
 
+        // A credential that cannot carry the requested multi-hop exit is not reusable:
+        // config/multihop is refused on a host that is not multihop-entry-enabled and
+        // for an exit in the entry host's own city. Returning false routes the
+        // connect through a fresh registration on a suitable entry host.
+        var exit = ActiveMultihopExit();
+        if (valid && exit is not null && !CanCarryMultihopExit(mainCreds, exit))
+        {
+            _logger.LogInformation(
+                "ActiveConnectionPossible({Protocol}): stored host {Host} cannot carry multi-hop exit {Exit}; "
+                + "a new registration is needed", p, mainCreds.HostName, exit);
+            valid = false;
+        }
+
         _logger.LogInformation(
             "ActiveConnectionPossible({Protocol}): result={Valid}", p, valid);
         return valid;
     }
+
+    private static bool CanCarryMultihopExit(GRDCredential cred, string exit) =>
+        cred.Server is { MultihopEntryEnabled: true } server
+        && !string.Equals(server.RegionMultihopExitName, exit, StringComparison.OrdinalIgnoreCase);
 
     /// Used to clear all of our current VPN configuration details from user defaults and the keychain.
     /// Returns a Task (was async void) so consumers can await the server-side
@@ -397,6 +414,12 @@ public class GRDVPNHelper
                 $"ConnectVPNTunnel: GetServerStatus failed: {detail}");
         }
 
+        // The stored registration may carry a different exit than the preference
+        // (changed while disconnected). ActiveConnectionPossible already guaranteed
+        // the host can carry the wanted exit, so this is a config/multihop call.
+        var exitErr = await ReconcileMultihopExitAsync(cred);
+        if (exitErr.IsError) return exitErr;
+
         // Dial using stored creds.
         return protocol switch
         {
@@ -453,6 +476,101 @@ public class GRDVPNHelper
     public static void SetStealthModeEnabled(bool enabled) =>
         RegistrySettings.UpdateGuardianUserSettings(
             Common.kGRDStealthModeEnabled, enabled ? "true" : "false");
+
+    /// <summary>True when the user has turned Multi-hop on.</summary>
+    public static bool IsMultihopEnabled() =>
+        string.Equals(
+            RegistrySettings.RetrieveGuardianUserSettings(Common.kGRDMultihopEnabled),
+            "true", StringComparison.OrdinalIgnoreCase);
+
+    /// <summary>Persists the Multi-hop on/off preference to HKCU.</summary>
+    public static void SetMultihopEnabled(bool enabled) =>
+        RegistrySettings.UpdateGuardianUserSettings(
+            Common.kGRDMultihopEnabled, enabled ? "true" : "false");
+
+    /// <summary>The saved multi-hop exit slug, or null when none is chosen.</summary>
+    public static string? GetMultihopExitRegion()
+    {
+        var exit = RegistrySettings.RetrieveGuardianUserSettings(Common.kGRDMultihopExitRegion);
+        return string.IsNullOrWhiteSpace(exit) ? null : exit;
+    }
+
+    /// <summary>
+    /// Persists the multi-hop exit slug (from <see cref="GRDServerManager.MultihopExitSlug"/>),
+    /// or clears it with null.
+    /// </summary>
+    public static void SetMultihopExitRegion(string? exitSlug) =>
+        RegistrySettings.UpdateGuardianUserSettings(Common.kGRDMultihopExitRegion, exitSlug ?? string.Empty);
+
+    /// <summary>
+    /// The exit to register or switch to: the saved slug when Multi-hop is on and an
+    /// exit is chosen, otherwise null (single-hop).
+    /// </summary>
+    public static string? ActiveMultihopExit() => IsMultihopEnabled() ? GetMultihopExitRegion() : null;
+
+    public enum MultihopChangeOutcome
+    {
+        /// Not connected; the preference is saved and applies on the next connect.
+        Saved,
+        /// The live connection now uses the new exit (or is back to single-hop).
+        Applied,
+        /// The current entry host cannot carry the new exit. The caller disconnects,
+        /// clears the main credential and reconnects, which registers on a suitable host.
+        ReconnectRequired,
+        /// The gateway refused the change; the preference is restored to the exit
+        /// still in effect.
+        Failed,
+    }
+
+    /// <summary>
+    /// Applies the saved Multi-hop preference to a live connection after the user
+    /// changes it. An exit change, or turning Multi-hop off, is a config/multihop
+    /// call that re-routes the existing tunnel. A new registration is needed only
+    /// when the entry host cannot carry the exit: it is not multihop-entry-enabled,
+    /// or the exit is its own city.
+    /// </summary>
+    public async Task<(MultihopChangeOutcome, ErrorResponse)> ApplyMultihopPreferenceAsync()
+    {
+        var cred = GRDCredentialManager.GetMainCredentials();
+        if (cred is null || !GetCurrentVPNState(out _))
+            return (MultihopChangeOutcome.Saved, new ErrorResponse());
+
+        var exit = ActiveMultihopExit();
+        if (exit is not null && !CanCarryMultihopExit(cred, exit))
+        {
+            _logger.LogInformation(
+                "ApplyMultihopPreferenceAsync: {Host} cannot carry exit {Exit}; reconnect required",
+                cred.HostName, exit);
+            return (MultihopChangeOutcome.ReconnectRequired, new ErrorResponse());
+        }
+
+        var err = await ReconcileMultihopExitAsync(cred);
+        if (!err.IsError) return (MultihopChangeOutcome.Applied, err);
+
+        SetMultihopEnabled(!string.IsNullOrEmpty(cred.MultihopExitRegion));
+        SetMultihopExitRegion(string.IsNullOrEmpty(cred.MultihopExitRegion) ? null : cred.MultihopExitRegion);
+        return (MultihopChangeOutcome.Failed, err);
+    }
+
+    /// <summary>
+    /// Brings the stored registration's exit in line with the preference with a
+    /// config/multihop call, and records the result on the credential. No call is
+    /// made when they already match.
+    /// </summary>
+    private async Task<ErrorResponse> ReconcileMultihopExitAsync(GRDCredential cred)
+    {
+        var wanted = ActiveMultihopExit() ?? string.Empty;
+        if (string.Equals(wanted, cred.MultihopExitRegion, StringComparison.OrdinalIgnoreCase))
+            return new ErrorResponse();
+
+        var err = await GRDGateway.SetMultihopExitRegion(
+            wanted.Length == 0 ? Common.kGRDMultihopDisabled : wanted);
+        if (err.IsError) return err;
+
+        cred.MultihopExitRegion = wanted;
+        GRDCredentialManager.AddOrUpdateCredential(cred);
+        return new ErrorResponse();
+    }
 
     /// <summary>
     /// The published IPv4 address on the main credential's stored gateway record
@@ -585,8 +703,9 @@ public class GRDVPNHelper
 
         GRDSGWServer selectedServer;
 
+        var multihopExit = ActiveMultihopExit();
         var (server, hostErr) =
-            GRDServerManager.SelectGuardianHostWithCompletion(PreferredRegion, PreferredRegionPrecision);
+            GRDServerManager.SelectGuardianHostWithCompletion(PreferredRegion, PreferredRegionPrecision, multihopExit);
         if (hostErr.IsError)
         {
             _logger.LogError(
@@ -597,7 +716,8 @@ public class GRDVPNHelper
         selectedServer = server;
 
         // PROTOPICK
-        errorResponse = await CreateStandaloneCredentialsForTransportProtocol(protocol, validForDays, selectedServer);
+        errorResponse = await CreateStandaloneCredentialsForTransportProtocol(
+            protocol, validForDays, selectedServer, multihopExit);
         if (errorResponse.IsError) return errorResponse;
 
         // adding in host info here instead of above in caller
@@ -615,8 +735,10 @@ public class GRDVPNHelper
     /// @param days number of days these credentials will be valid for
     /// @param server the GRDSGWServer (GRDSGWServer) to create credentials for
     /// @param completion block Completion block that will contain an NSDictionary of credentials upon success
+    /// @param multihopExitRegion exit slug to register with, or null for single-hop
     public async Task<ErrorResponse> CreateStandaloneCredentialsForTransportProtocol(
-        GRDTransportProtocol.TransportProtocol protocol, int days, GRDSGWServer server)
+        GRDTransportProtocol.TransportProtocol protocol, int days, GRDSGWServer server,
+        string? multihopExitRegion = null)
     {
         ErrorResponse errorResponse;
         (var subCreds, errorResponse) = await GetValidSubscriberCredentialWithCompletion();
@@ -626,7 +748,8 @@ public class GRDVPNHelper
             errorResponse = new ErrorResponse("SubscriberCredentials is null!", null, true);
             return errorResponse;
         }
-        errorResponse = await GRDGateway.RegisterDeviceForTransportProtocol(protocol, server.Hostname, subCreds.Jwt, days);
+        errorResponse = await GRDGateway.RegisterDeviceForTransportProtocol(
+            protocol, server.Hostname, subCreds.Jwt, days, multihopExitRegion);
 
         return errorResponse;
     }

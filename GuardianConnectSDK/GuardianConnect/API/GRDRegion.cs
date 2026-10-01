@@ -47,6 +47,10 @@ public class GRDRegion
     [JsonIgnore]
     public bool SupportsSmartRoutingProxy => SmartRoutingProxyServers > 0;
 
+    /// True when the region has at least one multihop-entry-enabled host, so it
+    /// can serve as a multi-hop entry and, at city precision, as an exit.
+    public bool SupportsMultihopEntry => MultihopEntryEnabledServers > 0 && MultihopExitNames.Count > 0;
+
     [JsonConstructor]
     public GRDRegion()
     {
