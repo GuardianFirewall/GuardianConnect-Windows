@@ -4,23 +4,37 @@ using GuardianConnect.Shared.Extensions;
 namespace GuardianConnect.Shared;
 
 public record ErrorResponse(
-    string MessageArg = "",
-    Exception? ThrownExceptionArg = null,
-    bool IsErrorArg = false,
-    object? ResponseArg = null,
-    object? DataArg = null,
+    [property: JsonIgnore] string MessageArg = "",
+    [property: JsonIgnore] Exception? ThrownExceptionArg = null,
+    [property: JsonIgnore] bool IsErrorArg = false,
+    [property: JsonIgnore] object? ResponseArg = null,
+    [property: JsonIgnore] object? DataArg = null,
     HttpResponseMessage? HttpResponse = null,
-    GRDAPIError? GrdapiErrorArg = null)
+    [property: JsonIgnore] GRDAPIError? GrdapiErrorArg = null)
 {
+    // Deserialization entry point, so the source generator does not emit
+    // metadata for the primary constructor's Exception parameter.
+    [JsonConstructor]
+    public ErrorResponse() : this("")
+    {
+    }
+
     public bool IsError { get; set; } = IsErrorArg;
 
     public string Message { get; set; } = MessageArg;
 
-    // Typed as Exception (not object) so the JsonConverter is picked up by
-    // System.Text.Json static-type dispatch — without that, STJ walks the
-    // runtime Exception and chokes on `TargetSite` (a MethodBase).
-    [JsonConverter(typeof(ExceptionJsonConverter))]
+    // Serialized through ThrownExceptionWire. Source-generated metadata for
+    // Exception reads `TargetSite`, which is trim-unsafe and not serializable.
+    [JsonIgnore]
     public Exception? ThrownException { get; set; } = ThrownExceptionArg;
+
+    [JsonInclude]
+    [JsonPropertyName("ThrownException")]
+    internal WireException? ThrownExceptionWire
+    {
+        get => WireException.From(ThrownException);
+        set => ThrownException = value?.ToException();
+    }
     public object? Response { get; set; } = ResponseArg;
     public object? GRDApiError { get; set; } = GrdapiErrorArg;
     public object? Data { get; set; } = DataArg;

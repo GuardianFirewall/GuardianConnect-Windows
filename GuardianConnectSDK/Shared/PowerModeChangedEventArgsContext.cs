@@ -7,7 +7,6 @@ namespace GuardianConnect.Shared;
     PropertyNameCaseInsensitive = true, IncludeFields = true)]
 [JsonSerializable(typeof(PowerModeChangedEventArgs))]
 [JsonSerializable(typeof(string))]
-[JsonSerializable(typeof(Exception))]
 public partial class PowerModeChangedEventArgsContext : JsonSerializerContext
 {
     
