@@ -4,7 +4,6 @@ using System.Text;
 using System.Text.Json;
 using System.Text.Json.Serialization;
 using Serilog;
-using Serilog.Enrichers.WithCaller;
 using Serilog.Events;
 
 namespace GuardianConnect.Shared;
@@ -412,7 +411,7 @@ public class Common
                 .Enrich.WithProcessId()
                 .Enrich.WithThreadId()
                 .Enrich.WithThreadName()
-                .Enrich.WithCaller(false, 0)
+                .Enrich.With(new CallerEnricher())
                 .WriteTo.Conditional(evt => !LogFilterOn, wt => wt.File(LogFilePath, shared: true,
                     outputTemplate:
                     "{Timestamp:yyyy-MM-dd HH:mm:ss:ffffff-K} {ProcessId}.{ThreadId}[{ThreadName}]):{Caller} [{Level:u3}] {Message}{NewLine}{Exception}"));

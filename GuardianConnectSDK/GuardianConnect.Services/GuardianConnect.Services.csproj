@@ -11,7 +11,6 @@
         <PackageReference Remove="Serilog.Enrichers.Environment"/>
         <PackageReference Remove="Serilog.Enrichers.Process"/>
         <PackageReference Remove="Serilog.Enrichers.Thread"/>
-        <PackageReference Remove="Serilog.Enrichers.WithCaller"/>
         <PackageReference Remove="Serilog.Extensions.Logging"/>
         <PackageReference Remove="Serilog.Settings.AppSettings"/>
         <PackageReference Remove="Serilog.Settings.Configuration"/>
