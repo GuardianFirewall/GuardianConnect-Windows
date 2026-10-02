@@ -10,10 +10,10 @@
 
         <AssemblyVersion>1.3.1</AssemblyVersion>
         <FileVersion>1.3.1</FileVersion>
-        <Version>1.4.1</Version>
+        <Version>1.4.2</Version>
         <!-- Prerelease suffix: "beta.N" for non-release NuGet packages; empty = stable release.
              VERSION POLICY (1.1.0+): bump the PATCH (third) digit for every fix/build. -->
-        <VersionSuffix>stealth.2</VersionSuffix>
+        <VersionSuffix>multihop.1</VersionSuffix>
     </PropertyGroup>
 
     <PropertyGroup>
