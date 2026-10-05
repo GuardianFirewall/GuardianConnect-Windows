@@ -5,6 +5,12 @@ on:
   workflow_dispatch:
     branches: [ "*" ]
 
+  # workflow_dispatch only works once this file is on the default branch;
+  # until then a push that edits this file runs it.
+  push:
+    branches-ignore: [ "main" ]
+    paths: [ ".github/workflows/DualPlatformBuildAndPackage2026.yml" ]
+
 defaults:
   run:
     working-directory: .\GuardianConnectSDK
