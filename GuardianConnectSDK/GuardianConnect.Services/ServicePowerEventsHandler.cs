@@ -517,11 +517,21 @@ public static class ServicePowerEventsHandler
                 break;
             case IGuardianNPContract.SystemEventType.NetworkChangeOnNetworkAvailabilityChanged:
                 var networkAvailabilityEventArg = JsonSerializer.Deserialize(serializedClientEventParameters, NetworkAvailabilityEventArgsContext.Default.NetworkAvailabilityEventArgs);
-                Logger.LogInformation($"Network availability changed: {networkAvailabilityEventArg?.IsAvailable}");
+                if (networkAvailabilityEventArg is null)
+                {
+                    Logger.LogWarning("Network availability changed: client sent no event data; ignoring");
+                    break;
+                }
+                Logger.LogInformation($"Network availability changed: {networkAvailabilityEventArg.IsAvailable}");
                 NetworkChangeOnNetworkAvailabilityChanged("ClientSentEvent", networkAvailabilityEventArg);
                 break;
             case IGuardianNPContract.SystemEventType.PowerModeChangeEvent:
                 var powerModeChangeEventArg = JsonSerializer.Deserialize<PowerModeChangedEventArgs>(serializedClientEventParameters, PowerModeChangedEventArgsContext.Default.PowerModeChangedEventArgs);
+                if (powerModeChangeEventArg is null)
+                {
+                    Logger.LogWarning("Client PowerModeChangedEvent: client sent no event data; ignoring");
+                    break;
+                }
                 Logger.LogInformation($"Client PowerModeChangedEvent: {powerModeChangeEventArg.Mode}");
                 SystemEventsOnPowerModeChanged("Client_PowerModeChangeEvent", powerModeChangeEventArg);
                 break;

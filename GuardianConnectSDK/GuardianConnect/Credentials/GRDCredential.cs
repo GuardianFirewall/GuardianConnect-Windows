@@ -68,8 +68,6 @@ public class GRDCredential
         self.TransportProtocol = GRDTransportProtocol.TransportProtocol.TransportIKEv2;
         HostName = hostname;
         ExpirationDate = expirationDate;
-        _checkedExpiration = false;
-        _expired = false;
     }
 
     public DateTime LastUpdated { get; set; }
@@ -204,7 +202,6 @@ public class GRDCredential
                 break;
         }
 
-        self.CheckExpiration();
         return self;
     }
 
@@ -245,21 +242,8 @@ public class GRDCredential
 
     private static string? NullIfEmpty(string? s) => string.IsNullOrEmpty(s) ? null : s;
 
-    private void CheckExpiration()
-    {
-        if (ExpirationDate < DateTime.Now)
-        {
-            _checkedExpiration = true;
-            _expired = true;
-        }
-    }
-
     private int DaysLeft()
     {
         return (ExpirationDate - DateTime.Now).Days;
     }
-#pragma warning disable CS0414
-    [JsonIgnore] private bool _checkedExpiration;
-    [JsonIgnore] private bool _expired;
-#pragma warning restore CS0414
 }

@@ -18,7 +18,7 @@ public class GRDAPIError
         Message = "";
     }
 
-    public GRDAPIError(Dictionary<string, object>? dict, HttpStatusCode statusCode)
+    public GRDAPIError(Dictionary<string, object?>? dict, HttpStatusCode statusCode)
     {
         Title = "";
         Message = "";
@@ -29,8 +29,9 @@ public class GRDAPIError
         }
         else
         {
-            Title = (dict.ContainsKey("error-title") ? dict["error-title"].ToString() : "") ?? "";
-            Message = (dict.ContainsKey("error-message") ? dict["error-message"].ToString() : "") ?? "";
+            // A key present with a JSON null value yields "" rather than throwing.
+            Title = dict.TryGetValue("error-title", out var title) ? title?.ToString() ?? "" : "";
+            Message = dict.TryGetValue("error-message", out var message) ? message?.ToString() ?? "" : "";
             StatusCode = (int)statusCode;
         }
     }

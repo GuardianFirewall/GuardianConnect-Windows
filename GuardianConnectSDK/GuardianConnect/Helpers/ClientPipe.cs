@@ -619,7 +619,7 @@ public class ClientPipeImpl : IGuardianNPContract
         return serviceLogLines;
     }
 
-    public async Task<ErrorResponse> SendPowerAndNetworkChangeEvents( Dictionary<string, object> systemEventsDict)
+    public ErrorResponse SendPowerAndNetworkChangeEvents(Dictionary<string, object> systemEventsDict)
     {
         if (systemEventsDict == null)
         {
@@ -667,7 +667,14 @@ public class ClientPipeImpl : IGuardianNPContract
                 break;
             case "Client_NetworkAvailabilityChange":
                 senderEventType = (int)IGuardianNPContract.SystemEventType.NetworkChangeOnNetworkAvailabilityChanged;
-                cmdPayload = JsonSerializer.Serialize((NetworkAvailabilityEventArgs)o, NetworkAvailabilityEventArgsContext.Default.NetworkAvailabilityEventArgs);
+                try
+                {
+                    cmdPayload = JsonSerializer.Serialize((NetworkAvailabilityEventArgs)o, NetworkAvailabilityEventArgsContext.Default.NetworkAvailabilityEventArgs);
+                }
+                catch (Exception e)
+                {
+                    ClientPipe.Logger.LogError($"Error serializing NetworkAvailabilityChange event: {e.Message}");
+                }
                 break;
         }
         var cmdString = $"{Hexify(IGuardianNPContract.NPCommands.SendPowerAndNetworkEvents)}{senderEventType}.{cmdPayload}";
@@ -681,8 +688,16 @@ public class ClientPipeImpl : IGuardianNPContract
         // interleaves its length-prefixed bytes with whichever thread holds the
         // semaphore, throwing the framing off and stranding the next reader on
         // a response that will never arrive.
+        // Callers run on system-event threads and do not inspect the result, so
+        // a failed write (e.g. the service restarting) is logged and returned
+        // rather than thrown.
         _pipeIO.Wait();
         try { ss.WriteString(cmdString); }
+        catch (Exception e)
+        {
+            ClientPipe.Logger.LogError($"SendPowerAndNetworkChangeEvents: pipe write failed: {e.Message}");
+            return ErrorResponse.FromException(e);
+        }
         finally { _pipeIO.Release(); }
 
         return new ErrorResponse();
