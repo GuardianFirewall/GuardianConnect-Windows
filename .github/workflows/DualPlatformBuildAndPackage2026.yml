@@ -6,10 +6,10 @@ on:
     branches: [ "*" ]
 
   # workflow_dispatch only works once this file is on the default branch;
-  # until then a push that edits this file runs it.
+  # until then a push that edits this file or the main workflow runs it.
   push:
     branches-ignore: [ "main" ]
-    paths: [ ".github/workflows/DualPlatformBuildAndPackage2026.yml" ]
+    paths: [ ".github/workflows/DualPlatformBuildAndPackage2026.yml", ".github/workflows/DualPlatformBuildAndPackage.yml" ]
 
 defaults:
   run:
