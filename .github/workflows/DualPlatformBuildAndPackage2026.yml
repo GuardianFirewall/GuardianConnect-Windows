@@ -175,9 +175,13 @@ jobs:
         name: UnsignedGuardianBinaries.zip
         path: D:\a\GuardianConnect-Windows\GuardianConnect-Windows\GuardianConnectSDK\${{env.unsignedzipfile}}
 
+    # Installed once; each signing step below imports it.
+    - name: Install SignPath PowerShell module
+      run: Install-Module -Name SignPath -Force
+
       # Sign Guardian binaries only  with certificate
     - name: Sign Guardian Binaries with certificate
-      run: Install-Module -Name SignPath -Force
+      run: Import-Module SignPath
         
         Submit-SigningRequest `
         -OrganizationId "5c1e4170-8bf7-48b1-8542-78374ccc3471" `
@@ -227,7 +231,7 @@ jobs:
     # will fail; the unsigned nupkgs uploaded above are the inputs to use when creating the
     # new SignPath templates. Update the slug names here once templates are configured.
     - name: Sign GuardianConnectSDK package with certificate
-      run: Install-Module -Name SignPath -Force
+      run: Import-Module SignPath
 
         Submit-SigningRequest `
         -OrganizationId "5c1e4170-8bf7-48b1-8542-78374ccc3471" `
@@ -240,7 +244,7 @@ jobs:
         -WaitForCompletion
 
     - name: Sign GuardianConnect.Services.SDK package with certificate
-      run: Install-Module -Name SignPath -Force
+      run: Import-Module SignPath
 
         Submit-SigningRequest `
         -OrganizationId "5c1e4170-8bf7-48b1-8542-78374ccc3471" `
