@@ -1,0 +1,17 @@
+name: Runner access test (w11-x64-medium)
+
+on:
+  workflow_dispatch:
+  push:
+    branches: [ "test-w11-runner" ]
+    paths: [ ".github/workflows/RunnerAccessTest.yml" ]
+
+jobs:
+  probe:
+    runs-on: w11-x64-medium
+    steps:
+    - name: Report the runner
+      shell: pwsh
+      run: |
+        "Runner: $env:RUNNER_NAME"
+        "Processor count: $([Environment]::ProcessorCount)"
