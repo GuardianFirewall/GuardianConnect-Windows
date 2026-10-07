@@ -10,6 +10,7 @@ on:
   pull_request:
     branches: [ "main" ]
 
+
 defaults:
   run:
     working-directory: .\GuardianConnectSDK
@@ -22,7 +23,7 @@ jobs:
       matrix:
         configuration: [Release]
           
-    runs-on: windows-2022
+    runs-on: windows-2025-vs2026
 
     env:
       Solution_Name: GuardianConnectSDK.sln
@@ -90,19 +91,19 @@ jobs:
       uses: microsoft/setup-msbuild@v2
 
     - name: Build GuardianConnect for x64 CPU
-      run: msbuild /t:restore /t:Build /p:Platform=x64 /p:Configuration=Release /p:RuntimeIdentifier=win-x64 GuardianConnect\GuardianConnect.csproj
+      run: msbuild -m /t:restore /t:Build /p:Platform=x64 /p:Configuration=Release /p:RuntimeIdentifier=win-x64 GuardianConnect\GuardianConnect.csproj
 
     - name: Build GuardianConnect for ARM64 CPU
-      run: msbuild /t:restore /t:Build /p:Platform=arm64 /p:Configuration=Release /p:RuntimeIdentifier=win-arm64 GuardianConnect\GuardianConnect.csproj
+      run: msbuild -m /t:restore /t:Build /p:Platform=arm64 /p:Configuration=Release /p:RuntimeIdentifier=win-arm64 GuardianConnect\GuardianConnect.csproj
     
     - name: Build GuardianConnect.Services for x64 CPU
-      run: msbuild /t:restore /t:Build /p:Platform=x64 /p:Configuration=Release /p:RuntimeIdentifier=win-x64 GuardianConnect.Services\GuardianConnect.Services.csproj
+      run: msbuild -m /t:restore /t:Build /p:Platform=x64 /p:Configuration=Release /p:RuntimeIdentifier=win-x64 GuardianConnect.Services\GuardianConnect.Services.csproj
       
     - name: Build GuardianConnect.Services for ARM64 CPU
-      run: msbuild /t:restore /t:Build /p:Platform=arm64 /p:Configuration=Release /p:RuntimeIdentifier=win-arm64 GuardianConnect.Services\GuardianConnect.Services.csproj
+      run: msbuild -m /t:restore /t:Build /p:Platform=arm64 /p:Configuration=Release /p:RuntimeIdentifier=win-arm64 GuardianConnect.Services\GuardianConnect.Services.csproj
       
     - name: Build GuardianConnectSDK.Services.Abstractions for any CPU
-      run: msbuild /t:restore /t:Build /p:Configuration=Release GuardianConnect.Abstractions\GuardianConnect.Abstractions.csproj
+      run: msbuild -m /t:restore /t:Build /p:Configuration=Release GuardianConnect.Abstractions\GuardianConnect.Abstractions.csproj
 
     ##############################################################################
     # curve25519.dll — built from Go source on every SDK CI run for proper
@@ -117,12 +118,29 @@ jobs:
     # GO_EXE and LLVM_MINGW_BIN env vars.
     ##############################################################################
 
+    # The built DLLs are cached under a key of their Go source, build script and
+    # toolchain versions; any change to those rebuilds them. On a hit the Go and
+    # llvm-mingw steps below are skipped.
+    - name: Cache curve25519.dll
+      id: cache-curve25519
+      uses: actions/cache@v6
+      with:
+        path: |
+          GuardianConnectSDK/native/curve25519/win-x64/curve25519.dll
+          GuardianConnectSDK/native/curve25519/win-arm64/curve25519.dll
+        key: curve25519-${{ hashFiles('GuardianConnectSDK/native/curve25519/src/**', 'GuardianConnectSDK/native/curve25519/build.cmd') }}-go1.26.4-llvm-mingw-20250709
+
     - name: Set up Go (for curve25519.dll build)
+      if: steps.cache-curve25519.outputs.cache-hit != 'true'
       uses: actions/setup-go@v5
       with:
         go-version: '1.26.4'
+        # No go.sum (the module has no dependencies), so the module cache
+        # would never hit.
+        cache: false
 
     - name: Cache llvm-mingw cross-toolchain
+      if: steps.cache-curve25519.outputs.cache-hit != 'true'
       id: cache-llvm-mingw
       uses: actions/cache@v4
       with:
@@ -130,7 +148,7 @@ jobs:
         key: llvm-mingw-20250709-ucrt-x86_64
 
     - name: Download llvm-mingw (only if cache miss)
-      if: steps.cache-llvm-mingw.outputs.cache-hit != 'true'
+      if: steps.cache-curve25519.outputs.cache-hit != 'true' && steps.cache-llvm-mingw.outputs.cache-hit != 'true'
       shell: pwsh
       run: |
         $url = 'https://github.com/mstorsjo/llvm-mingw/releases/download/20250709/llvm-mingw-20250709-ucrt-x86_64.zip'
@@ -143,6 +161,7 @@ jobs:
         Expand-Archive -Path $dl -DestinationPath C:\llvm-mingw -Force
 
     - name: Build curve25519.dll (x64 + arm64) from Go source
+      if: steps.cache-curve25519.outputs.cache-hit != 'true'
       shell: cmd
       run: |
         for /d %%D in (C:\llvm-mingw\llvm-mingw-*) do set "LLVM_MINGW_BIN=%%D\bin"
@@ -174,9 +193,22 @@ jobs:
         name: UnsignedGuardianBinaries.zip
         path: D:\a\GuardianConnect-Windows\GuardianConnect-Windows\GuardianConnectSDK\${{env.unsignedzipfile}}
 
-    # Installed once; each signing step below imports it.
-    - name: Install SignPath PowerShell module
-      run: Install-Module -Name SignPath -Force
+    # The SignPath module is cached (pinned version) instead of installed from
+    # the PowerShell Gallery on every run; each signing step imports it.
+    - name: Cache SignPath PowerShell module
+      id: cache-signpath
+      uses: actions/cache@v6
+      with:
+        path: C:\psmodules
+        key: signpath-psmodule-4.4.6
+
+    - name: Prepare SignPath PowerShell module
+      shell: pwsh
+      run: |
+        if ('${{ steps.cache-signpath.outputs.cache-hit }}' -ne 'true') {
+          Save-Module -Name SignPath -RequiredVersion 4.4.6 -Path C:\psmodules -Force
+        }
+        "PSModulePath=C:\psmodules;$env:PSModulePath" | Out-File -FilePath $env:GITHUB_ENV -Encoding utf8 -Append
 
       # Sign Guardian binaries only  with certificate
     - name: Sign Guardian Binaries with certificate
@@ -229,31 +261,26 @@ jobs:
     # setup. Until templates exist on SignPath for these consolidated packages, these steps
     # will fail; the unsigned nupkgs uploaded above are the inputs to use when creating the
     # new SignPath templates. Update the slug names here once templates are configured.
-    - name: Sign GuardianConnectSDK package with certificate
-      run: Import-Module SignPath
+    # Both requests are submitted before either is awaited, so SignPath signs
+    # the two packages concurrently.
+    - name: Sign GuardianConnectSDK and GuardianConnect.Services.SDK packages with certificate
+      shell: pwsh
+      run: |
+        Import-Module SignPath
+        $auth = @{ OrganizationId = "5c1e4170-8bf7-48b1-8542-78374ccc3471"; ApiToken = "${{ secrets.CI_SIGNPATH_USER_TOKEN }}" }
+        $policy = @{ ProjectSlug = "Guardian"; SigningPolicySlug = "Guardian_DNSF_Branded" }
 
-        Submit-SigningRequest `
-        -OrganizationId "5c1e4170-8bf7-48b1-8542-78374ccc3471" `
-        -ApiToken "${{ secrets.CI_SIGNPATH_USER_TOKEN }}" `
-        -ProjectSlug "Guardian" `
-        -SigningPolicySlug "Guardian_DNSF_Branded" `
-        -ArtifactConfigurationSlug GuardianConnectSDK_Nuget_Package `
-        -InputArtifactPath "GuardianConnectSDK.${{env.PKGVERSION}}.nupkg" `
-        -OutputArtifactPath "SIGNED_GuardianConnectSDK.${{env.PKGVERSION}}.nupkg" `
-        -WaitForCompletion
+        $sdkRequest = Submit-SigningRequest @auth @policy `
+          -ArtifactConfigurationSlug GuardianConnectSDK_Nuget_Package `
+          -InputArtifactPath "GuardianConnectSDK.$env:PKGVERSION.nupkg"
+        $servicesRequest = Submit-SigningRequest @auth @policy `
+          -ArtifactConfigurationSlug GuardianConnect_Services_SDK_Nuget_Package `
+          -InputArtifactPath "GuardianConnect.Services.SDK.$env:PKGVERSION.nupkg"
 
-    - name: Sign GuardianConnect.Services.SDK package with certificate
-      run: Import-Module SignPath
-
-        Submit-SigningRequest `
-        -OrganizationId "5c1e4170-8bf7-48b1-8542-78374ccc3471" `
-        -ApiToken "${{ secrets.CI_SIGNPATH_USER_TOKEN }}" `
-        -ProjectSlug "Guardian" `
-        -SigningPolicySlug "Guardian_DNSF_Branded" `
-        -ArtifactConfigurationSlug GuardianConnect_Services_SDK_Nuget_Package `
-        -InputArtifactPath "GuardianConnect.Services.SDK.${{env.PKGVERSION}}.nupkg" `
-        -OutputArtifactPath "SIGNED_GuardianConnect.Services.SDK.${{env.PKGVERSION}}.nupkg" `
-        -WaitForCompletion
+        Get-SignedArtifact @auth -SigningRequestId $sdkRequest `
+          -OutputArtifactPath "SIGNED_GuardianConnectSDK.$env:PKGVERSION.nupkg"
+        Get-SignedArtifact @auth -SigningRequestId $servicesRequest `
+          -OutputArtifactPath "SIGNED_GuardianConnect.Services.SDK.$env:PKGVERSION.nupkg"
     
       # Sign GuardianFirewallService package with certificate
     # Name GuardianFirewallService Windows Nuget Package
