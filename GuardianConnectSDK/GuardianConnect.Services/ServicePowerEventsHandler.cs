@@ -27,7 +27,68 @@ public static class ServicePowerEventsHandler
     private static Common.PowerTransitionStates CurrentPowerTransitionState
     {
         get => (Common.PowerTransitionStates)Volatile.Read(ref _powerTransitionState);
-        set => Volatile.Write(ref _powerTransitionState, (int)value);
+        set
+        {
+            Volatile.Write(ref _powerTransitionState, (int)value);
+            if (value == Common.PowerTransitionStates.Suspend) PersistSessionFlag(kSuspendedFlag, true);
+            else if (value == Common.PowerTransitionStates.Resume) PersistSessionFlag(kSuspendedFlag, false);
+        }
+    }
+
+    // The suspend state lives in memory, and the service process can be ended and
+    // restarted while the machine sleeps (for example under Modern Standby), which
+    // would lose it: the new process would neither treat the wake as a resume nor
+    // reconnect. Both flags are mirrored to a volatile HKLM key, which survives a
+    // service restart but is discarded at reboot, so a stale flag cannot reconnect
+    // after a later boot.
+    private const string SessionStateKeyPath = @"Software\GuardianFirewall\PowerSessionState";
+    private const string kSuspendedFlag = "Suspended";
+    private const string kConnectedAtSuspendFlag = "ConnectedAtSuspend";
+
+    private static void PersistSessionFlag(string name, bool set)
+    {
+        try
+        {
+            using var key = Registry.LocalMachine.CreateSubKey(SessionStateKeyPath,
+                RegistryKeyPermissionCheck.ReadWriteSubTree, RegistryOptions.Volatile);
+            if (set) key.SetValue(name, "1");
+            else key.DeleteValue(name, throwOnMissingValue: false);
+        }
+        catch (Exception e)
+        {
+            Logger.LogWarning($"PersistSessionFlag: could not {(set ? "set" : "clear")} '{name}': {e.Message}");
+        }
+    }
+
+    private static bool PersistedSessionFlag(string name)
+    {
+        try
+        {
+            using var key = Registry.LocalMachine.OpenSubKey(SessionStateKeyPath);
+            return key?.GetValue(name) is string;
+        }
+        catch (Exception e)
+        {
+            Logger.LogWarning($"PersistedSessionFlag: could not read '{name}': {e.Message}");
+            return false;
+        }
+    }
+
+    /// <summary>
+    /// Restores the suspend state a previous service process persisted in this
+    /// boot session, so a wake after a restart is still handled as a resume.
+    /// </summary>
+    private static void RestoreSessionStateAfterRestart()
+    {
+        var connected = PersistedSessionFlag(kConnectedAtSuspendFlag);
+        var suspended = PersistedSessionFlag(kSuspendedFlag);
+        if (connected)
+            VPNStatusAtSuspendTime = ITransportProvider.VPNProviderStatus.VPNStatusConnected;
+        if (suspended)
+            Volatile.Write(ref _powerTransitionState, (int)Common.PowerTransitionStates.Suspend);
+        if (connected || suspended)
+            Logger.LogInformation(
+                $"RestoreSessionStateAfterRestart: restored from the previous service process: connected at suspend={connected}, suspended={suspended}");
     }
 
     /// <summary>
@@ -72,6 +133,7 @@ public static class ServicePowerEventsHandler
     internal static void SetConnectedAtSuspendTime()
     {
         VPNStatusAtSuspendTime = ITransportProvider.VPNProviderStatus.VPNStatusConnected;
+        PersistSessionFlag(kConnectedAtSuspendFlag, true);
         Logger.LogInformation(
             $"SetVPNStateAtSuspendTime() called from Poller... VPNStatusAtSuspendTime now set to {VPNStatusAtSuspendTime}");
     }
@@ -79,6 +141,7 @@ public static class ServicePowerEventsHandler
     internal static void ResetVpnStatusAtSuspendTime()
     {
         VPNStatusAtSuspendTime = ITransportProvider.VPNProviderStatus.VPNStatusInvalid;
+        PersistSessionFlag(kConnectedAtSuspendFlag, false);
     }
 
     public static void SetupServicePowerEventsHandler()
@@ -92,6 +155,7 @@ public static class ServicePowerEventsHandler
         VPNTransportIKEV2.PowerResumeActions = PerformResumeActions;
         VPNTransportIKEV2.SetVPNStateAtSuspend = SetConnectedAtSuspendTime;
         VPNTransportIKEV2.ResetVPNStateAtSuspend = ResetVpnStatusAtSuspendTime;
+        RestoreSessionStateAfterRestart();
     }
 
     public static void NetworkChangeOnNetworkAddressChanged(object? sender, EventArgs e)
