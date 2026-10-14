@@ -13,6 +13,12 @@ internal class VpnDnsFilteringHandler
 
     internal static FWPM_ENGINE_HANDLE engine_ = FWPM_ENGINE_HANDLE.Null;
 
+    // Serializes the IsActive() check with the open/close of engine_. Without it, two
+    // threads removing filters at once (suspend hang-up and the unplanned-disconnect
+    // poller) both pass IsActive() and both call FwpmEngineClose0 on the same handle,
+    // a double free that ends the process with STATUS_HEAP_CORRUPTION.
+    private static readonly System.Threading.Lock FiltersLock = new();
+
     public static ILogger Logger
     {
         get
@@ -28,6 +34,14 @@ internal class VpnDnsFilteringHandler
     }
 
     internal static bool SetFilters(string EntryName)
+    {
+        lock (FiltersLock)
+        {
+            return SetFiltersLocked(EntryName);
+        }
+    }
+
+    private static bool SetFiltersLocked(string EntryName)
     {
         if (IsActive())
         {
@@ -68,6 +82,14 @@ internal class VpnDnsFilteringHandler
     }
 
     internal static bool RemoveFilters(string EntryName)
+    {
+        lock (FiltersLock)
+        {
+            return RemoveFiltersLocked(EntryName);
+        }
+    }
+
+    private static bool RemoveFiltersLocked(string EntryName)
     {
         var success = true;
         if (!IsActive())

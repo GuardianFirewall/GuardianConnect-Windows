@@ -366,6 +366,15 @@ public static class ServicePowerEventsHandler
                 return;
             }
 
+            // A service restarted during sleep starts with empty in-memory parameters;
+            // PowerResumeVPNConnection dials from them, so take the saved copy instead.
+            if (string.IsNullOrEmpty(VPNTransportIKEV2.VpnResumeParameters.EntryName))
+            {
+                Logger.LogInformation(
+                    "************** PerformResumeActions: no in-memory connection parameters; using the saved parameters for the resume dial.");
+                VPNTransportIKEV2.VpnResumeParameters = vpnResumeParameters!;
+            }
+
             Logger.LogInformation(
                 $"************** Check network stack readiness by attempting a status check of the vpn host '{host}'");
             var countValue = RegistrySettings.RetrieveGuardianUserSettings(Common.kServicePowerResumeReconnectAttempts);
