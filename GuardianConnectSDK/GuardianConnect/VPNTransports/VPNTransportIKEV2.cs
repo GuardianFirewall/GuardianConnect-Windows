@@ -72,7 +72,6 @@ public class VPNTransportIKEV2 : ITransportProvider
 
         Logger.LogInformation("StartVPNTunnelWithOptions: Evaluating vpn connection parameters...");
         Logger.LogInformation($"EapuserName: {options.EapuserName}");
-        Logger.LogInformation($"Eappassword: {options.Eappassword}");
         Logger.LogInformation($"EntryNam: {options.EntryName}");
         Logger.LogInformation($"VpnHostName: {options.VpnHostName}");
         Logger.LogInformation($"VpnHostDisplay: {options.VpnHostDisplay}");

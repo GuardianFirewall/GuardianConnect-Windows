@@ -252,7 +252,10 @@ public class GRDGateway
         var request = new HttpRequestMessage(HttpMethod.Post, reqUri);
         var payLoadString =
             JsonSerializer.Serialize(payload, RegisterDevicePayloadJsonContext.Default.RegisterDevicePayload);
-        Logger.LogInformation($"RegisterDeviceForTransportProtocol: payload for call is '{payLoadString}");
+        // Don't log the payload: it carries the subscriber credential JWT.
+        Logger.LogInformation(
+            "RegisterDeviceForTransportProtocol: POST /api/v1.4/device-credentials transport={Transport} host={Host}",
+            payload.transportProtocol, hostname);
         request.Content = new StringContent(payLoadString);
 
         try

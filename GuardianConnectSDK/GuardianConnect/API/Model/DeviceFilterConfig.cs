@@ -86,11 +86,23 @@ public class DeviceFilterConfig
         DeviceFilterConfigBlockList = 0;
     }
 
+    /// <summary>
+    /// A config holding the flags saved by <see cref="SyncBlocklist"/>, or no flags
+    /// when none are saved.
+    /// </summary>
+    public static DeviceFilterConfig LoadSaved()
+    {
+        var config = new DeviceFilterConfig();
+        var saved = Preferences.Get(Common.kGRDDeviceFilterConfigBlocklist, string.Empty);
+        if (int.TryParse(saved, out var flags))
+            config.DeviceFilterConfigBlockList =
+                (DeviceFilterConfigFlags)flags & (DeviceFilterConfigFlags.BlocklistMax - 1);
+        return config;
+    }
+
     public void SyncBlocklist()
     {
-        if (GRDVPNHelper.Singleton.CurrentDeviceBlocklistConfig != null)
-            Preferences.Set(Common.kGRDDeviceFilterConfigBlocklist,
-                GRDVPNHelper.Singleton.CurrentDeviceBlocklistConfig.ToString());
+        Preferences.Set(Common.kGRDDeviceFilterConfigBlocklist, (int)DeviceFilterConfigBlockList);
         // Call GRDGateway setter. Fire-and-forget by design: the UI doesn't
         // wait for the remote sync; the discard makes the unawaited Task explicit.
         _ = GRDGateway.SetDeviceFilterConfigsForDeviceId();
