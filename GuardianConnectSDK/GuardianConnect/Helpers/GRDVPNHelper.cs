@@ -205,6 +205,19 @@ public class GRDVPNHelper
             valid = false;
         }
 
+        // Stealth Mode and Smart Routing Proxy read the gateway record saved on the
+        // credential. A credential saved without one is not reusable while either is
+        // on; a fresh registration saves the record.
+        if (valid && mainCreds.Server is null
+            && (IsStealthModeEnabled()
+                || (IsSmartRoutingProxyEnabled() && p == GRDTransportProtocol.TransportProtocol.TransportWireGuard)))
+        {
+            _logger.LogInformation(
+                "ActiveConnectionPossible({Protocol}): stored credential for {Host} has no gateway record; "
+                + "a new registration is needed", p, mainCreds.HostName);
+            valid = false;
+        }
+
         _logger.LogInformation(
             "ActiveConnectionPossible({Protocol}): result={Valid}", p, valid);
         return valid;
@@ -212,7 +225,7 @@ public class GRDVPNHelper
 
     /// True when the credential's gateway accepts multi-hop and <paramref name="exit"/>
     /// is not that gateway's own city.
-    private static bool CanCarryMultihopExit(GRDCredential cred, string exit) =>
+    public static bool CanCarryMultihopExit(GRDCredential cred, string exit) =>
         cred.Server is { MultihopEntryEnabled: true } server
         && !string.Equals(server.RegionMultihopExitName, exit, StringComparison.OrdinalIgnoreCase);
 
@@ -397,7 +410,14 @@ public class GRDVPNHelper
         // The pre-flight is an HTTPS call, so leaving the hostname on it aborts the
         // connect before the dial is reached on a network that blocks resolution of
         // guardianapp.com.
-        var stealthDialHost = await StealthDialAddressAsync(cred.HostName);
+        var stealthDialHost = StoredStealthAddress();
+        if (stealthDialHost is not null)
+            _logger.LogInformation(
+                "Stealth Mode on: using {Address} in place of {Host}.", stealthDialHost, cred.HostName);
+        else if (IsStealthModeEnabled())
+            _logger.LogWarning(
+                "Stealth Mode is on but the gateway record for {Host} has no IPv4 address; connecting by hostname.",
+                cred.HostName);
         var preflightHost = stealthDialHost ?? cred.HostName;
 
         var statusErr = await GRDGateway.GetServerStatus(preflightHost, clientCall: true);
@@ -495,15 +515,12 @@ public class GRDVPNHelper
         new(new JsonSerializerOptions { IncludeFields = true, PropertyNameCaseInsensitive = true });
 
     /// <summary>
-    /// The saved multi-hop exit city, or null when none is chosen. A value that is
-    /// a bare exit slug rather than an encoded region is resolved against the
-    /// loaded region data.
+    /// The saved multi-hop exit city, or null when none is chosen.
     /// </summary>
     public static GRDRegion? GetMultihopExitRegion()
     {
         var stored = RegistrySettings.RetrieveGuardianUserSettings(Common.kGRDMultihopExitRegion);
         if (string.IsNullOrWhiteSpace(stored)) return null;
-        if (!stored.TrimStart().StartsWith('{')) return GRDServerManager.FindMultihopExitRegion(stored.Trim());
 
         try
         {
@@ -616,60 +633,6 @@ public class GRDVPNHelper
         return string.IsNullOrWhiteSpace(stored) ? null : stored;
     }
 
-    /// <summary>
-    /// The gateway address to use in place of <paramref name="hostname"/> for this
-    /// connection, or null to keep the hostname. Returns null when Stealth Mode is
-    /// off, when no gateway record can be resolved, or when the record publishes no
-    /// IPv4 address — in every one of those cases the hostname stands, so a missing
-    /// address degrades to today's behavior rather than producing an unreachable
-    /// endpoint.
-    /// <para>
-    /// The address stored on the credential is preferred because reading it needs
-    /// no network at all. The record lookup behind it can fall back to an API call
-    /// that resolves connect-api.guardianapp.com, which is exactly what a network
-    /// hostile to Guardian blocks — so it serves credentials predating the stored
-    /// field, not the case this feature is for.
-    /// </para>
-    /// </summary>
-    private async Task<string?> StealthDialAddressAsync(string hostname)
-    {
-        if (!IsStealthModeEnabled()) return null;
-
-        var stored = StoredStealthAddress();
-        if (stored is not null)
-        {
-            _logger.LogInformation(
-                "StealthDialAddressAsync: Stealth Mode on — using the address on the stored gateway "
-                + "record, {Address}, for {Host}.", stored, hostname);
-            return stored;
-        }
-
-        _logger.LogInformation(
-            "StealthDialAddressAsync: no gateway record with an address stored on the credential for "
-            + "{Host}; falling back to a host-record lookup, which needs name resolution.", hostname);
-
-        var server = await GRDServerManager.FindHostRecordResilient(hostname);
-        if (server is null)
-        {
-            _logger.LogWarning(
-                "StealthDialAddressAsync: Stealth Mode is on but no gateway record resolved for "
-                + "{Host}; connecting by hostname.", hostname);
-            return null;
-        }
-
-        if (string.IsNullOrWhiteSpace(server.IPv4Address))
-        {
-            _logger.LogWarning(
-                "StealthDialAddressAsync: Stealth Mode is on but {Host} publishes no IPv4 address; "
-                + "connecting by hostname.", hostname);
-            return null;
-        }
-
-        _logger.LogInformation(
-            "StealthDialAddressAsync: Stealth Mode on — using {Address} in place of {Host}.",
-            server.IPv4Address, hostname);
-        return server.IPv4Address;
-    }
     public async Task<ErrorResponse> DisconnectVPNTunnel()
     {
         var errorResponse = new ErrorResponse();
@@ -905,15 +868,11 @@ public class GRDVPNHelper
         }
 
         var dnsSRPMode = IsSmartRoutingProxyEnabled();
-        GRDSGWServer? srpServer = null;
-        if (dnsSRPMode)
-        {
-            srpServer = await GRDServerManager.FindHostRecordResilient(cred.HostName);
-            if (srpServer is null)
-                _logger.LogWarning(
-                    "StartWireGuardFromStoredCreds: could not resolve a gateway record for {Host}; "
-                    + "Smart Routing Proxy stays off for this connection.", cred.HostName);
-        }
+        var srpServer = dnsSRPMode ? cred.Server : null;
+        if (dnsSRPMode && srpServer is null)
+            _logger.LogWarning(
+                "StartWireGuardFromStoredCreds: no gateway record on the credential for {Host}; "
+                + "Smart Routing Proxy stays off for this connection.", cred.HostName);
 
         var configText = GRDWireGuardConfiguration.WireGuardQuickConfigForCredential(
             cred, null, srpServer, dnsSRPMode, sgwServerAddressOverride);
