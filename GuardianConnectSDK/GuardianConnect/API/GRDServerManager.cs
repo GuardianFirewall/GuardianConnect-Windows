@@ -153,8 +153,16 @@ public class GRDServerManager
     /// Region keys never match exit slugs, so the slug always comes from
     /// <see cref="GRDRegion.MultihopExitNames"/>.
     /// </summary>
-    public static string? MultihopExitSlug(GRDRegion cityRegion) =>
-        cityRegion.MultihopExitNames.Count > 0 ? cityRegion.MultihopExitNames[0] : null;
+    public static string? MultihopExitSlug(GRDRegion? cityRegion) =>
+        cityRegion is { MultihopExitNames.Count: > 0 } ? cityRegion.MultihopExitNames[0] : null;
+
+    /// <summary>
+    /// The city-precision region whose exit slug is <paramref name="exitSlug"/>, or
+    /// null when region data is not loaded or no city has that slug.
+    /// </summary>
+    public static GRDRegion? FindMultihopExitRegion(string exitSlug) =>
+        Live.cityLookup.Values.FirstOrDefault(city =>
+            string.Equals(MultihopExitSlug(city), exitSlug, StringComparison.OrdinalIgnoreCase));
 
     #region GRDServerManager private stuff
 
@@ -387,7 +395,7 @@ public class GRDServerManager
 
     /// <summary>
     /// Resolves a host record for the given hostname, falling back to the
-    /// all-hostnames endpoint when the local cache has no entry. Returns null
+    /// full host list when the local cache has no entry. Returns null
     /// if the hostname is absent from both.
     /// </summary>
     public static async Task<GRDSGWServer?> FindHostRecordResilient(string hostname)
@@ -780,7 +788,7 @@ public class GRDServerManager
                 // Populate the GRDSGWServer-style region back-ref. The per-region
                 // host-list endpoint omits the nested "region" object (region is the
                 // query context), so stamp it from the known region key. Use ??= so we
-                // never clobber a region the JSON did provide (servers/all-hostnames).
+                // never clobber a region the JSON did provide.
                 // A country-precision response DOES carry the nested city region per
                 // host, which is how the caller learns which city a country-wide pick
                 // landed in — ??= preserves it.

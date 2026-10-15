@@ -83,7 +83,8 @@ public class GRDCredential
 
     /// <summary>
     /// The gateway record this credential was created against, carried verbatim —
-    /// the same pattern as <see cref="Device"/>, which carries the device reply.
+    /// the same pattern as <see cref="Device"/>, which carries the gateway's response
+    /// to the device registration.
     /// Supplies the published IPv4 address (<c>Server.IPv4Address</c>, distinct from
     /// <see cref="IPv4Address"/>, which is this device's address inside the tunnel),
     /// the smart-routing capability flag and the owning region.
@@ -117,11 +118,17 @@ public class GRDCredential
     public string DevicePublicKey { get; set; } = string.Empty;
     public string DevicePrivateKey { get; set; } = string.Empty;
     public string ServerPublicKey { get; set; } = string.Empty;
+
+    /// <summary>
+    /// This device's address inside the tunnel. Set for WireGuard only: the gateway
+    /// assigns it statically per WireGuard public key from the tunnel subnet. Empty
+    /// for IKEv2.
+    /// </summary>
     public string IPv4Address { get; set; } = string.Empty;
     public string IPv6Address { get; set; } = string.Empty;
 
     /// <summary>
-    /// The host's <c>POST /api/v1.4/device-credentials</c> reply, carried verbatim. This is
+    /// The host's response to the device registration, carried verbatim. This is
     /// the authoritative source for the server-provided fields; the flat fields
     /// above (UserName/Password/ServerPublicKey/IPv4Address/IPv6Address/ClientId/
     /// ApiAuthToken) are kept in sync for persistence back-compat and for the

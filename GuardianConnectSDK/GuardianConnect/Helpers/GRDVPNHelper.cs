@@ -1,5 +1,6 @@
 ﻿using System.Diagnostics;
 using System.Runtime.CompilerServices;
+using System.Text.Json;
 using GuardianConnect.Abstractions;
 using GuardianConnect.API;
 using GuardianConnect.API.Model;
@@ -209,6 +210,8 @@ public class GRDVPNHelper
         return valid;
     }
 
+    /// True when the credential's gateway accepts multi-hop and <paramref name="exit"/>
+    /// is not that gateway's own city.
     private static bool CanCarryMultihopExit(GRDCredential cred, string exit) =>
         cred.Server is { MultihopEntryEnabled: true } server
         && !string.Equals(server.RegionMultihopExitName, exit, StringComparison.OrdinalIgnoreCase);
@@ -488,25 +491,50 @@ public class GRDVPNHelper
         RegistrySettings.UpdateGuardianUserSettings(
             Common.kGRDMultihopEnabled, enabled ? "true" : "false");
 
-    /// <summary>The saved multi-hop exit slug, or null when none is chosen.</summary>
-    public static string? GetMultihopExitRegion()
+    private static readonly GRDRegionJsonContext MultihopExitRegionJson =
+        new(new JsonSerializerOptions { IncludeFields = true, PropertyNameCaseInsensitive = true });
+
+    /// <summary>
+    /// The saved multi-hop exit city, or null when none is chosen. A value that is
+    /// a bare exit slug rather than an encoded region is resolved against the
+    /// loaded region data.
+    /// </summary>
+    public static GRDRegion? GetMultihopExitRegion()
     {
-        var exit = RegistrySettings.RetrieveGuardianUserSettings(Common.kGRDMultihopExitRegion);
-        return string.IsNullOrWhiteSpace(exit) ? null : exit;
+        var stored = RegistrySettings.RetrieveGuardianUserSettings(Common.kGRDMultihopExitRegion);
+        if (string.IsNullOrWhiteSpace(stored)) return null;
+        if (!stored.TrimStart().StartsWith('{')) return GRDServerManager.FindMultihopExitRegion(stored.Trim());
+
+        try
+        {
+            var region = JsonSerializer.Deserialize(stored, MultihopExitRegionJson.GRDRegion);
+            return GRDServerManager.MultihopExitSlug(region) is null ? null : region;
+        }
+        catch (JsonException e)
+        {
+            _logger.LogWarning("GetMultihopExitRegion: the saved exit could not be decoded: {Message}", e.Message);
+            return null;
+        }
     }
 
-    /// <summary>
-    /// Persists the multi-hop exit slug (from <see cref="GRDServerManager.MultihopExitSlug"/>),
-    /// or clears it with null.
-    /// </summary>
-    public static void SetMultihopExitRegion(string? exitSlug) =>
-        RegistrySettings.UpdateGuardianUserSettings(Common.kGRDMultihopExitRegion, exitSlug ?? string.Empty);
+    /// <summary>The exit slug of the saved multi-hop exit city, or null when none is chosen.</summary>
+    public static string? GetMultihopExitSlug() => GRDServerManager.MultihopExitSlug(GetMultihopExitRegion());
 
     /// <summary>
-    /// The exit to register or switch to: the saved slug when Multi-hop is on and an
-    /// exit is chosen, otherwise null (single-hop).
+    /// Persists the multi-hop exit city (a city-precision region from
+    /// <see cref="GRDServerManager.GetMultihopExitRegions"/>), or clears it with null.
     /// </summary>
-    public static string? ActiveMultihopExit() => IsMultihopEnabled() ? GetMultihopExitRegion() : null;
+    public static void SetMultihopExitRegion(GRDRegion? exitRegion) =>
+        RegistrySettings.UpdateGuardianUserSettings(Common.kGRDMultihopExitRegion,
+            exitRegion is null
+                ? string.Empty
+                : JsonSerializer.Serialize(exitRegion, MultihopExitRegionJson.GRDRegion));
+
+    /// <summary>
+    /// The exit slug to register or switch to: the saved exit's slug when Multi-hop
+    /// is on and an exit is chosen, otherwise null (single-hop).
+    /// </summary>
+    public static string? ActiveMultihopExit() => IsMultihopEnabled() ? GetMultihopExitSlug() : null;
 
     public enum MultihopChangeOutcome
     {
@@ -547,8 +575,11 @@ public class GRDVPNHelper
         var err = await ReconcileMultihopExitAsync(cred);
         if (!err.IsError) return (MultihopChangeOutcome.Applied, err);
 
-        SetMultihopEnabled(!string.IsNullOrEmpty(cred.MultihopExitRegion));
-        SetMultihopExitRegion(string.IsNullOrEmpty(cred.MultihopExitRegion) ? null : cred.MultihopExitRegion);
+        var inEffect = string.IsNullOrEmpty(cred.MultihopExitRegion)
+            ? null
+            : GRDServerManager.FindMultihopExitRegion(cred.MultihopExitRegion);
+        SetMultihopEnabled(inEffect is not null);
+        SetMultihopExitRegion(inEffect);
         return (MultihopChangeOutcome.Failed, err);
     }
 
@@ -573,9 +604,10 @@ public class GRDVPNHelper
     }
 
     /// <summary>
-    /// The published IPv4 address on the main credential's stored gateway record
-    /// when Stealth Mode is on, or null when Stealth Mode is off or no address is
-    /// stored. Reads local state only, so it needs no network.
+    /// <c>Server.IPv4Address</c> of the main credential (the <see cref="GRDSGWServer"/>
+    /// it was registered against) when Stealth Mode is on, or null when Stealth Mode
+    /// is off or the record has no address. Reads the saved credential only, so it
+    /// needs no network.
     /// </summary>
     public static string? StoredStealthAddress()
     {
@@ -804,7 +836,7 @@ public class GRDVPNHelper
 
         // Pluck EAP creds from the device-response DTO (EnsureDevice backfills
         // it for legacy creds). Host stays on the flat field — it's the chosen
-        // host, not part of the device reply.
+        // host, not part of the registration response.
         mainCredential.EnsureDeviceFromLegacyFields();
         var device = mainCredential.Device!;
         // Make IPC call to GuardianWindowsService to start the connection

@@ -51,13 +51,13 @@ public class GRDSGWServer
 
     /// The multi-hop exit slug for this host's own city (e.g. "miami"). The
     /// gateway refuses an exit equal to the entry host's own city. Populated by
-    /// v1.3 hostnames-for-region; absent from v1.1 all-hostnames.
+    /// the per-region host list.
     [JsonPropertyName("region-multihop-exit-name")]
     public string RegionMultihopExitName { get; set; } = string.Empty;
 
     /// The region that owns this host. Mirrors iOS GRDSGWServer.region. The
-    /// servers/all-hostnames responses nest a "region" object per host, so this
-    /// binds directly from JSON (e.g. GetAllHostnamesAsync).
+    /// full host list nests a "region" object per host, so this binds directly
+    /// from JSON (e.g. GetAllHostnamesAsync).
     /// The per-region host-list endpoint omits it (region is the query context),
     /// so GRDServerManager.GetHostsForRegion stamps it as a fallback.
     [JsonPropertyName("region")]
