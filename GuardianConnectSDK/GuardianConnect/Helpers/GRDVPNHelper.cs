@@ -296,7 +296,7 @@ public class GRDVPNHelper
         GRDCredentialManager.AddOrUpdateCredential(mainCredential);
 
         // Do connection call here
-        errorResponse = await ConnectVPNTunnel();
+        errorResponse = await ConnectVPNTunnel(newRegistration: true);
         _logger.LogInformation(
             $"ConnectVpnWithNewUserCredentialsForProtocol: return from ConnectVPNTunnel - errorResponse.IsError == {errorResponse.IsError}");
 
@@ -331,7 +331,7 @@ public class GRDVPNHelper
         mainCredential.Server = server;
         GRDCredentialManager.AddOrUpdateCredential(mainCredential);
 
-        errorResponse = await ConnectVPNTunnel();
+        errorResponse = await ConnectVPNTunnel(newRegistration: true);
         _logger.LogInformation(
             $"ConnectVpnWithNewUserCredentialsForProtocol(server): return from ConnectVPNTunnel - IsError == {errorResponse.IsError}");
         return errorResponse;
@@ -357,7 +357,14 @@ public class GRDVPNHelper
     /// The credentials check (<see cref="ActiveConnectionPossible(GRDTransportProtocol.TransportProtocol?)"/>)
     /// is now protocol-aware and applied symmetrically.
     /// </summary>
-    public async Task<ErrorResponse> ConnectVPNTunnel()
+    public Task<ErrorResponse> ConnectVPNTunnel() => ConnectVPNTunnel(newRegistration: false);
+
+    /// <param name="newRegistration">
+    /// True when the main credential was registered for this connect. The
+    /// registration already carried the device filter config, so the config/filters
+    /// sync after the dial is skipped.
+    /// </param>
+    private async Task<ErrorResponse> ConnectVPNTunnel(bool newRegistration)
     {
         var protocol = GRDTransportProtocol.GetPreferred();
 
@@ -444,7 +451,7 @@ public class GRDVPNHelper
         if (exitErr.IsError) return exitErr;
 
         // Dial using stored creds.
-        return protocol switch
+        var dialResult = protocol switch
         {
             GRDTransportProtocol.TransportProtocol.TransportIKEv2 =>
                 await StartIKEv2Connection(stealthDialHost),
@@ -455,6 +462,13 @@ public class GRDVPNHelper
                     $"Unsupported transport protocol: {protocol}"))
                 .SetErrorMessage("Unsupported transport protocol."),
         };
+
+        // A reused registration may hold filter settings changed since it was made;
+        // a new one received them in the registration request.
+        if (!dialResult.IsError && !newRegistration)
+            _ = GRDGateway.SetDeviceFilterConfigsForDeviceId();
+
+        return dialResult;
     }
 
     /// <summary>

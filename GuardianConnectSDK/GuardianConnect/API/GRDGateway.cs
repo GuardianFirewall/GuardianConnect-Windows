@@ -171,6 +171,37 @@ public class GRDGateway
         [JsonPropertyName("multihop-exit-region")]
         [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingDefault)]
         public string? MultihopExitRegion { get; set; }
+
+        /// <summary>
+        /// The device's filter settings, applied by the host with the new
+        /// registration. Sent for both protocols.
+        /// </summary>
+        [JsonPropertyName("device-filter-config")]
+        [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingDefault)]
+        public RegistrationFilterConfig? DeviceFilterConfig { get; set; }
+    }
+
+    /// <summary>
+    /// The <c>device-filter-config</c> object of a registration request: the same
+    /// keys as the config/filters body, without the api-auth-token, which does not
+    /// exist until the registration returns.
+    /// </summary>
+    public class RegistrationFilterConfig
+    {
+        [JsonPropertyName("block-phishing")] public bool BlockPhishing { get; set; }
+        [JsonPropertyName("block-ads")] public bool BlockAds { get; set; }
+        [JsonPropertyName("block-none")] public bool BlockNone { get; set; }
+
+        /// <summary>The current filter settings, or null when none are loaded.</summary>
+        public static RegistrationFilterConfig? Current() =>
+            GRDVPNHelper.Singleton.CurrentDeviceBlocklistConfig is { } config
+                ? new RegistrationFilterConfig
+                {
+                    BlockPhishing = config.Block_Phishing,
+                    BlockAds = config.Block_Ads,
+                    BlockNone = config.Disable_Firewall,
+                }
+                : null;
     }
 
     // WireGuardRegistrationResponse retired: both protocols' registration
@@ -214,6 +245,7 @@ public class GRDGateway
             subscriberCredential = subscriberCredentialJWT,
             transportProtocol = GRDTransportProtocol.TransportProtocolStringFor(transportProtocol),
             MultihopExitRegion = multihopExitRegion,
+            DeviceFilterConfig = RegistrationFilterConfig.Current(),
         };
 
         var reqUri = new Uri($"https://{hostname}/api/v1.4/device-credentials");
@@ -313,6 +345,7 @@ public class GRDGateway
             transportProtocol    = GRDTransportProtocol.TransportProtocolStringFor(GRDTransportProtocol.TransportProtocol.TransportWireGuard),
             PublicKey            = publicKey.ToBase64(),
             MultihopExitRegion   = multihopExitRegion,
+            DeviceFilterConfig   = RegistrationFilterConfig.Current(),
         };
 
         var reqUri = new Uri($"https://{hostname}/api/v1.4/device-credentials");
