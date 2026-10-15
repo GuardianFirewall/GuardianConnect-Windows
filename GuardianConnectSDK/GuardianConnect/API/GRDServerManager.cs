@@ -393,38 +393,6 @@ public class GRDServerManager
         return null;
     }
 
-    /// <summary>
-    /// Resolves a host record for the given hostname, falling back to the
-    /// full host list when the local cache has no entry. Returns null
-    /// if the hostname is absent from both.
-    /// </summary>
-    public static async Task<GRDSGWServer?> FindHostRecordResilient(string hostname)
-    {
-        if (string.IsNullOrWhiteSpace(hostname)) return null;
-
-        var cached = FindHostRecord(hostname);
-        if (cached != null) return cached;
-
-        Logger.LogInformation(
-            "FindHostRecordResilient: {Host} not in the local cache; querying all-hostnames.", hostname);
-        try
-        {
-            var all = await GetAllHostnamesAsync();
-            var match = all.FirstOrDefault(h =>
-                string.Equals(h.Hostname, hostname, StringComparison.OrdinalIgnoreCase));
-            if (match == null)
-                Logger.LogWarning(
-                    "FindHostRecordResilient: {Host} absent from all-hostnames ({Count} records).",
-                    hostname, all.Count);
-            return match;
-        }
-        catch (Exception e)
-        {
-            Logger.LogError(e, "FindHostRecordResilient: all-hostnames lookup for {Host} threw.", hostname);
-            return null;
-        }
-    }
-
     #endregion
 
     #region private methods
@@ -821,69 +789,6 @@ public class GRDServerManager
         }
 
         RegionHostsRetrievalWaiter.Set();
-    }
-
-    public static async Task<List<GRDSGWServer>> GetAllHostnamesAsync()
-    {
-        var url = $"https://{Common.DefaultConnectAPIHostname}/api/v1.1/servers/all-hostnames";
-        var uri = new Uri(url);
-
-        try
-        {
-            Logger.LogInformation("GetAllHostnamesAsync: GET {Url}", url);
-            var response = await (HttpUtils.Client?.GetAsync(uri)
-                                  ?? throw new InvalidOperationException("HttpUtils.Client is null"));
-
-            var body = await response.Content.ReadAsStringAsync();
-            // Log status + body-length so the caller can tell hung-call (no log)
-            // from empty-list (logs 200 + small body) from wrong-path (logs 404)
-            // from wrong-shape (logs 200 + body that fails to parse below).
-            Logger.LogInformation(
-                "GetAllHostnamesAsync: response status={Status}, body length={Len}",
-                (int)response.StatusCode, body?.Length ?? 0);
-
-            if (!response.IsSuccessStatusCode)
-            {
-                // Log first 500 chars of body so error responses (HTML page,
-                // JSON error envelope, etc.) are visible.
-                var snippet = body is null ? "(null)"
-                            : body.Length > 500 ? body[..500] + "…(truncated)"
-                            : body;
-                Logger.LogError(
-                    "GetAllHostnamesAsync: non-success status {Status}. Body: {Body}",
-                    response.StatusCode, snippet);
-                return new List<GRDSGWServer>();
-            }
-
-            List<GRDSGWServer>? list;
-            try
-            {
-                list = JsonSerializer.Deserialize<List<GRDSGWServer>>(
-                    body ?? string.Empty, GRDSGWServerJsonContext.Default.ListGRDSGWServer);
-            }
-            catch (Exception parseEx)
-            {
-                // Shape mismatch — log the body's first chunk so the caller can
-                // see whether it's a wrapper object like {"hosts":[...]} vs a
-                // bare array. Surface as failure (empty list).
-                var snippet = body is null ? "(null)"
-                            : body.Length > 500 ? body[..500] + "…(truncated)"
-                            : body;
-                Logger.LogError(parseEx,
-                    "GetAllHostnamesAsync: response parsed as List<GRDSGWServer> failed. Body: {Body}",
-                    snippet);
-                return new List<GRDSGWServer>();
-            }
-
-            var count = list?.Count ?? 0;
-            Logger.LogInformation("GetAllHostnamesAsync: parsed {Count} hosts", count);
-            return list ?? new List<GRDSGWServer>();
-        }
-        catch (Exception ex)
-        {
-            Logger.LogError(ex, "GetAllHostnamesAsync: failed");
-            return new List<GRDSGWServer>();
-        }
     }
 
     /// <param name="filter">

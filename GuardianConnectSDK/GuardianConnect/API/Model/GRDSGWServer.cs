@@ -55,9 +55,8 @@ public class GRDSGWServer
     [JsonPropertyName("region-multihop-exit-name")]
     public string RegionMultihopExitName { get; set; } = string.Empty;
 
-    /// The region that owns this host. Mirrors iOS GRDSGWServer.region. The
-    /// full host list nests a "region" object per host, so this binds directly
-    /// from JSON (e.g. GetAllHostnamesAsync).
+    /// The region that owns this host. Mirrors iOS GRDSGWServer.region. Binds
+    /// directly from JSON when a host list nests a "region" object per host.
     /// The per-region host-list endpoint omits it (region is the query context),
     /// so GRDServerManager.GetHostsForRegion stamps it as a fallback.
     [JsonPropertyName("region")]
