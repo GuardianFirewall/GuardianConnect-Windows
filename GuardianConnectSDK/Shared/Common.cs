@@ -111,8 +111,9 @@ public class Common
     public const string kGRDMultihopEnabled = "kGRDMultihopEnabled";
 
     /// <summary>
-    /// HKCU user setting: the multi-hop exit slug (a city's
-    /// <c>multihop-exit-names</c> entry, e.g. "newyork"). Empty means no exit chosen.
+    /// HKCU user setting: the multi-hop exit city, a JSON-encoded city-precision
+    /// <c>GRDRegion</c>. Its <c>multihop-exit-names</c> entry (e.g. "newyork") is the
+    /// exit slug sent to the gateway. Empty means no exit chosen.
     /// </summary>
     public const string kGRDMultihopExitRegion = "kGRDMultihopExitRegion";
 
