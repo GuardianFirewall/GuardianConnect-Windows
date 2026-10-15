@@ -30,47 +30,63 @@ public static class ServicePowerEventsHandler
         set
         {
             Volatile.Write(ref _powerTransitionState, (int)value);
-            if (value == Common.PowerTransitionStates.Suspend) PersistSessionFlag(kSuspendedFlag, true);
-            else if (value == Common.PowerTransitionStates.Resume) PersistSessionFlag(kSuspendedFlag, false);
+            if (value == Common.PowerTransitionStates.Suspend) PersistSessionFlag(PowerSessionFlags.Suspended, true);
+            else if (value == Common.PowerTransitionStates.Resume) PersistSessionFlag(PowerSessionFlags.Suspended, false);
         }
     }
 
     // The suspend state lives in memory, and the service process can be ended and
     // restarted while the machine sleeps (for example under Modern Standby), which
     // would lose it: the new process would neither treat the wake as a resume nor
-    // reconnect. Both flags are mirrored to a volatile HKLM key, which survives a
-    // service restart but is discarded at reboot, so a stale flag cannot reconnect
-    // after a later boot.
-    private const string SessionStateKeyPath = @"Software\GuardianFirewall\PowerSessionState";
-    private const string kSuspendedFlag = "Suspended";
-    private const string kConnectedAtSuspendFlag = "ConnectedAtSuspend";
+    // reconnect. The state is mirrored to a DWORD in a volatile HKLM key, which
+    // survives a service restart but is discarded at reboot, so a stale flag cannot
+    // reconnect after a later boot.
+    private const string kGRDPowerSessionStateKeyPath = @"Software\GuardianFirewall\kGRDPowerSessionState";
+    private const string kGRDPowerSessionFlags = "kGRDPowerSessionFlags";
 
-    private static void PersistSessionFlag(string name, bool set)
+    [Flags]
+    private enum PowerSessionFlags
     {
-        try
+        None = 0,
+        Suspended = 1 << 0,
+        ConnectedAtSuspend = 1 << 1,
+    }
+
+    private static readonly Lock SessionFlagsLock = new();
+
+    private static void PersistSessionFlag(PowerSessionFlags flag, bool set)
+    {
+        lock (SessionFlagsLock)
         {
-            using var key = Registry.LocalMachine.CreateSubKey(SessionStateKeyPath,
-                RegistryKeyPermissionCheck.ReadWriteSubTree, RegistryOptions.Volatile);
-            if (set) key.SetValue(name, "1");
-            else key.DeleteValue(name, throwOnMissingValue: false);
-        }
-        catch (Exception e)
-        {
-            Logger.LogWarning($"PersistSessionFlag: could not {(set ? "set" : "clear")} '{name}': {e.Message}");
+            try
+            {
+                using var key = Registry.LocalMachine.CreateSubKey(kGRDPowerSessionStateKeyPath,
+                    RegistryKeyPermissionCheck.ReadWriteSubTree, RegistryOptions.Volatile);
+                var flags = ReadSessionFlags(key);
+                flags = set ? flags | flag : flags & ~flag;
+                key.SetValue(kGRDPowerSessionFlags, (int)flags, RegistryValueKind.DWord);
+            }
+            catch (Exception e)
+            {
+                Logger.LogWarning($"PersistSessionFlag: could not {(set ? "set" : "clear")} {flag}: {e.Message}");
+            }
         }
     }
 
-    private static bool PersistedSessionFlag(string name)
+    private static PowerSessionFlags ReadSessionFlags(RegistryKey? key) =>
+        key?.GetValue(kGRDPowerSessionFlags) is int value ? (PowerSessionFlags)value : PowerSessionFlags.None;
+
+    private static PowerSessionFlags PersistedSessionFlags()
     {
         try
         {
-            using var key = Registry.LocalMachine.OpenSubKey(SessionStateKeyPath);
-            return key?.GetValue(name) is string;
+            using var key = Registry.LocalMachine.OpenSubKey(kGRDPowerSessionStateKeyPath);
+            return ReadSessionFlags(key);
         }
         catch (Exception e)
         {
-            Logger.LogWarning($"PersistedSessionFlag: could not read '{name}': {e.Message}");
-            return false;
+            Logger.LogWarning($"PersistedSessionFlags: could not read: {e.Message}");
+            return PowerSessionFlags.None;
         }
     }
 
@@ -80,8 +96,9 @@ public static class ServicePowerEventsHandler
     /// </summary>
     private static void RestoreSessionStateAfterRestart()
     {
-        var connected = PersistedSessionFlag(kConnectedAtSuspendFlag);
-        var suspended = PersistedSessionFlag(kSuspendedFlag);
+        var flags = PersistedSessionFlags();
+        var connected = flags.HasFlag(PowerSessionFlags.ConnectedAtSuspend);
+        var suspended = flags.HasFlag(PowerSessionFlags.Suspended);
         if (connected)
             VPNStatusAtSuspendTime = ITransportProvider.VPNProviderStatus.VPNStatusConnected;
         if (suspended)
@@ -133,7 +150,7 @@ public static class ServicePowerEventsHandler
     internal static void SetConnectedAtSuspendTime()
     {
         VPNStatusAtSuspendTime = ITransportProvider.VPNProviderStatus.VPNStatusConnected;
-        PersistSessionFlag(kConnectedAtSuspendFlag, true);
+        PersistSessionFlag(PowerSessionFlags.ConnectedAtSuspend, true);
         Logger.LogInformation(
             $"SetVPNStateAtSuspendTime() called from Poller... VPNStatusAtSuspendTime now set to {VPNStatusAtSuspendTime}");
     }
@@ -141,7 +158,7 @@ public static class ServicePowerEventsHandler
     internal static void ResetVpnStatusAtSuspendTime()
     {
         VPNStatusAtSuspendTime = ITransportProvider.VPNProviderStatus.VPNStatusInvalid;
-        PersistSessionFlag(kConnectedAtSuspendFlag, false);
+        PersistSessionFlag(PowerSessionFlags.ConnectedAtSuspend, false);
     }
 
     public static void SetupServicePowerEventsHandler()
