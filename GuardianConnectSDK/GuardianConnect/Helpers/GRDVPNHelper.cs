@@ -95,7 +95,7 @@ public class GRDVPNHelper
         _singleton._grdServerManager = new GRDServerManager();
         _singleton.PeToken = GRDPEToken.GetCurrentPEToken();
 
-        _singleton.CurrentDeviceBlocklistConfig = new DeviceFilterConfig();
+        _singleton.CurrentDeviceBlocklistConfig = DeviceFilterConfig.LoadSaved();
 
         GRDServerManager.InitialGeoInformationLoadComplete.Wait(1 * 1000);
         PreferredRegion = Preferences.Get(Common.kPreferredRegion, null!);

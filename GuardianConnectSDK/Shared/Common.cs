@@ -215,6 +215,7 @@ public class Common
     public const string kGRDTrialExpirationInterval = "GRDTrialExpirationInterval";
     public const string kGRDFreeTrialExpired = "GRDFreeTrialExpired";
 
+    /// <summary>The device filter flags (<c>DeviceFilterConfigFlags</c>) as an integer.</summary>
     public const string kGRDDeviceFilterConfigBlocklist = "GRDDeviceFilterConfigBlocklist";
 
     // Note from Tech Lead 2023-03-23
