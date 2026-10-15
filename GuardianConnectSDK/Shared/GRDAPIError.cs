@@ -6,7 +6,7 @@ namespace GuardianConnect.Shared;
 
 /// <summary>
 /// The standardized API error body: <c>{"error-title", "error-message"}</c>.
-/// As of API v1.4 every non-200/201 response in both the Connect API and SGW
+/// Every non-200/201 response in both the Connect API and SGW
 /// environments returns this shape, and title/message are intended to be
 /// shown to the user directly.
 /// </summary>

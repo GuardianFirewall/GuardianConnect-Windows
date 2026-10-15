@@ -119,7 +119,6 @@ public static class GRDHousekeepingAPI
         return errorResponse;
     }
 
-    /// endpoint: /api/v1.2/subscriber-credential/create
     /// Used to obtain a signed JWT from housekeeping for later authentication with zoe-agent
     /// @param validationMethod set to determine how to authenticate with housekeeping
     /// @param dict NSDictionary only used when the 'validationMethod' is set to 'ValidationMethodCustom'

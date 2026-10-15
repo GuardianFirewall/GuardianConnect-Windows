@@ -94,7 +94,6 @@ public class GRDGateway
         return request;
     }
 
-    /// endpoint: /api/v1.3/server-status
     /// hits the endpoint for the current VPN host to check if a VPN connection can be established
     public static async Task<ErrorResponse> GetServerStatus(string hostOverride, bool clientCall = false)
     {
@@ -111,8 +110,6 @@ public class GRDGateway
         }
 
         Logger.LogInformation($"GetServerStatus: Making status call to host {vpnHost} ...");
-        // Deliberately v1.3: server-status has no v1.4 form — only the
-        // device-credential endpoints moved to v1.4.
         var reqUri = new Uri($"https://{vpnHost}/api/v1.3/server-status");
         var request = new HttpRequestMessage(HttpMethod.Get, reqUri);
 
@@ -137,7 +134,6 @@ public class GRDGateway
         return errorResponse;
     }
 
-    /// endpoint: /api/v1.3/server-status
     /// hits the endpoint for the current VPN host to check if a VPN connection can be established
     /// This signature of method uses host from main credentials in GRDVPNHelper
     /// and calls dual-use (service/client) version that takes host parameter
@@ -180,10 +176,9 @@ public class GRDGateway
     // WireGuardRegistrationResponse retired: both protocols' registration
     // replies deserialize into the shared VPNDeviceResponse DTO
     // (GuardianConnect.Credentials), which is carried verbatim on the
-    // credential. The v1.4 spec states the registration response is unchanged
-    // from previous API versions, so the DTO carries over as-is.
+    // credential.
 
-    #region SGW APIs (v1.4)
+    #region SGW APIs
 
     /// Used to register a new device for a given transport protocol
     /// @param transportProtocol Specified what kind of VPN credentials will be returned
@@ -221,8 +216,6 @@ public class GRDGateway
             MultihopExitRegion = multihopExitRegion,
         };
 
-        // Request keys and response shape are identical to the former
-        // v1.3 /device endpoint.
         var reqUri = new Uri($"https://{hostname}/api/v1.4/device-credentials");
         var request = new HttpRequestMessage(HttpMethod.Post, reqUri);
         var payLoadString =
@@ -236,7 +229,7 @@ public class GRDGateway
             errorResponse.SetResponse(response);
             var respContent = await response.Content.ReadAsStringAsync();
 
-            // v1.4 standardizes every non-2xx body as
+            // Every non-2xx body is
             // {"error-title","error-message"}, explicitly user-showable.
             // Parse it so callers get a presentable GRDAPIError instead of a
             // raw body dump (FromResponseBody degrades gracefully for
@@ -322,7 +315,6 @@ public class GRDGateway
             MultihopExitRegion   = multihopExitRegion,
         };
 
-        // Same keys/response as the former v1.3 /device endpoint.
         var reqUri = new Uri($"https://{hostname}/api/v1.4/device-credentials");
         var request = new HttpRequestMessage(HttpMethod.Post, reqUri);
         var payloadString = JsonSerializer.Serialize(
@@ -365,7 +357,7 @@ public class GRDGateway
 
                 if (!response.IsSuccessStatusCode)
                 {
-                    // v1.4 standardized error body — parse for a
+                    // Standard error body — parse for a
                     // user-showable title/message (see IKEv2 branch).
                     var body = await response.Content.ReadAsStringAsync();
                     var apiError = GRDAPIError.FromResponseBody(body, response.StatusCode);
@@ -437,7 +429,7 @@ public class GRDGateway
     /// with it. A 200 means the credential is usable (body is dismissible);
     /// any non-200 is a critical failure and the credential must never be
     /// used again — discard it and run a fresh registration. Auth is the
-    /// api-auth-token sent in the grd-api-auth-token HTTP header (the v1.4
+    /// api-auth-token sent in the grd-api-auth-token HTTP header (the
     /// convention for GET requests).
     /// </summary>
     public static async Task<ErrorResponse> VerifyCredentialsForClientId(string clientId, string apiToken,
@@ -495,7 +487,7 @@ public class GRDGateway
 
         var payload = new InvalidateCredsPayload { ApiToken = apiToken, SubscriberCredential = subCred };
 
-        // Best-effort per the v1.4 spec — the response body carries nothing
+        // Best-effort — the response body carries nothing
         // actionable.
         var reqUri = new Uri($"https://{hostName}/api/v1.4/device/{clientId}/invalidate-credentials");
         var request = new HttpRequestMessage(HttpMethod.Post, reqUri);
@@ -550,9 +542,8 @@ public class GRDGateway
             var clientId = DeviceIdentifier;
 
             // build request
-            // Mid-session POSTs are accepted under v1.4 and take effect
-            // server-side immediately. The auth token stays in the JSON body
-            // (v1.4 convention: GETs use the grd-api-auth-token header,
+            // Mid-session POSTs take effect server-side immediately. The auth
+            // token stays in the JSON body (GETs use the grd-api-auth-token header,
             // POSTs carry the token in the body).
             var reqUri = new Uri($"https://{BaseHostName}/api/v1.4/device/{clientId}/config/filters");
 
@@ -608,7 +599,7 @@ public class GRDGateway
 
     /// <summary>
     /// Changes the multi-hop exit of the main credential's existing registration:
-    /// <c>POST /api/v1.4/device/{client-id}/config/multihop</c>. Pass an exit slug,
+    /// <c>POST device/{client-id}/config/multihop</c>. Pass an exit slug,
     /// or <see cref="Common.kGRDMultihopDisabled"/> to return to single-hop. The
     /// gateway re-routes a live tunnel within a few seconds, so no reconnect is
     /// needed. It returns HTTP 400 when the exit is the entry host's own city or the
@@ -673,7 +664,7 @@ public class GRDGateway
     /// Fetch this device's privacy alerts
     /// </summary>
     /// <remarks>
-    /// POST with the token in the JSON body, matching this SDK's v1.4 convention
+    /// POST with the token in the JSON body, matching this SDK's convention
     /// for POSTs. The endpoint advertises <c>allow: OPTIONS, POST</c> and rejects GET with 405.
     /// A body must be present — a POST with no body fails JSON decoding server-side. The
     /// gateway also accepts the token in a <c>grd-api-auth-token</c> header, but
