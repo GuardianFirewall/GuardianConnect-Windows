@@ -13,10 +13,6 @@ namespace GuardianConnect.API;
 
 public class GRDConnectSubscriber
 {
-#pragma warning disable CS0169
-    private static Dictionary<string, object>? _deviceDict;
-#pragma warning restore CS0169
-
     public string Identifier { get; set; } = string.Empty;
     
     public string Secret { get; set; } = string.Empty;

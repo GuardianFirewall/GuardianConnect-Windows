@@ -48,29 +48,24 @@ public static class ConnectionRoutines
             return Array.Empty<RASCONNW>();
         }
 
+        // Enumerate straight into an array sized for the reported count. RAS reads the
+        // structure version from dwSize of the first element, which must be the size
+        // of one RASCONNW, and the buffer size covers the whole array.
         var connections = new RASCONNW[cConnections];
-        var ConnectionsZero = connections[0];
-        var pConnectionsZero = &ConnectionsZero;
-        pConnectionsZero->dwSize = cb;
+        connections[0].dwSize = (uint)sizeof(RASCONNW);
+        cb = (uint)(sizeof(RASCONNW) * connections.Length);
 
         Logger.LogInformation(
             "GetRasConnections: There is an active RAS connection. Preparing to get connection details.");
-        //retVal = PInvoke.RasEnumConnections(ref ConnectionsZero, ref cb, out cConnections);
-        retVal = PInvoke.RasEnumConnections(new Span<RASCONNW>(pConnectionsZero, (int)cConnections), ref cb, out cConnections);
+        retVal = PInvoke.RasEnumConnections(connections, ref cb, out cConnections);
         if (retVal != 0)
         {
             Logger.LogError($"GetRasConnections: Call to RasEnumConnections returned NON-SUCCESS value of {retVal}");
-            return new RASCONNW[0];
+            cConnections = 0;
+            return Array.Empty<RASCONNW>();
         }
 
-        var arrayPtr = new IntPtr(pConnectionsZero);
-
-        for (var i = 0; i < cConnections; i++)
-        {
-            connections[i] = (RASCONNW)Marshal.PtrToStructure(arrayPtr, typeof(RASCONNW))!;
-            arrayPtr = new IntPtr(arrayPtr.ToInt64() + cb);
-        }
-
+        if (cConnections < connections.Length) Array.Resize(ref connections, (int)cConnections);
         return connections;
     }
 
@@ -319,6 +314,7 @@ public static class ConnectionRoutines
             }
             else
             {
+                WaitForHangUpToComplete(ActiveConnectionHandle);
                 Logger.LogInformation(
                     "DisconnectEntryAndRemove: Successful return from call to RasHangup. Calling UpdateFiltersState to remove all traffic filters...");
 
@@ -342,6 +338,37 @@ public static class ConnectionRoutines
         RemoveAllRasEntries();
 
         return disconnectResult;
+    }
+
+    private const uint ERROR_INVALID_HANDLE = 6;
+    private const int HangUpWaitTimeoutMs = 3000;
+    private const int HangUpPollIntervalMs = 50;
+
+    /// <summary>
+    /// RasHangUp returns before RAS has finished tearing the connection down.
+    /// Microsoft's guidance is to poll RasGetConnectStatus until it reports
+    /// ERROR_INVALID_HANDLE before making further RAS calls for the connection;
+    /// deleting its phonebook entry while the hang-up is still in progress
+    /// leaves RAS's in-process state inconsistent.
+    /// </summary>
+    private static unsafe void WaitForHangUpToComplete(HRASCONN handle)
+    {
+        var status = new RASCONNSTATUSW { dwSize = (uint)sizeof(RASCONNSTATUSW) };
+        var elapsed = System.Diagnostics.Stopwatch.StartNew();
+        while (elapsed.ElapsedMilliseconds < HangUpWaitTimeoutMs)
+        {
+            if (PInvoke.RasGetConnectStatus(handle, ref status) == ERROR_INVALID_HANDLE)
+            {
+                Logger.LogInformation(
+                    $"WaitForHangUpToComplete: connection torn down after {elapsed.ElapsedMilliseconds} ms");
+                return;
+            }
+
+            Thread.Sleep(HangUpPollIntervalMs);
+        }
+
+        Logger.LogWarning(
+            $"WaitForHangUpToComplete: connection still present after {HangUpWaitTimeoutMs} ms; continuing");
     }
 
     public static Utility.CheckConnectionResult CheckConnection(string entry_name)

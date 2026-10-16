@@ -1,5 +1,6 @@
 ﻿using System.Text.Json.Serialization;
 using GuardianConnect.Abstractions;
+using GuardianConnect.API.Model;
 using GuardianConnect.Shared;
 
 namespace GuardianConnect.Credentials;
@@ -67,8 +68,6 @@ public class GRDCredential
         self.TransportProtocol = GRDTransportProtocol.TransportProtocol.TransportIKEv2;
         HostName = hostname;
         ExpirationDate = expirationDate;
-        _checkedExpiration = false;
-        _expired = false;
     }
 
     public DateTime LastUpdated { get; set; }
@@ -81,6 +80,31 @@ public class GRDCredential
     public string HostnameDisplayValue { get; set; } = string.Empty;
     public DateTime ExpirationDate { get; set; }
     public string HostName { get; set; } = string.Empty;
+
+    /// <summary>
+    /// The gateway record this credential was created against, carried verbatim —
+    /// the same pattern as <see cref="Device"/>, which carries the gateway's response
+    /// to the device registration.
+    /// Supplies the published IPv4 address (<c>Server.IPv4Address</c>, distinct from
+    /// <see cref="IPv4Address"/>, which is this device's address inside the tunnel),
+    /// the smart-routing capability flag and the owning region.
+    /// <para>
+    /// Persisted because the live copy lives in an in-memory host cache that only
+    /// host selection populates, and a stored-credential dial skips host selection.
+    /// Null on credentials created before this property existed;
+    /// <c>GRDVPNHelper.ActiveConnectionPossible</c> treats those as not reusable.
+    /// </para>
+    /// </summary>
+    public GRDSGWServer? Server { get; set; }
+
+    /// <summary>
+    /// The multi-hop exit slug the gateway has for this device, set at registration
+    /// and updated by a successful <c>config/multihop</c> call. Empty means
+    /// single-hop.
+    /// </summary>
+    [JsonPropertyName("multihop-exit-region")]
+    public string MultihopExitRegion { get; set; } = string.Empty;
+
     public string ClientId { get; set; } = string.Empty;
 
     [JsonPropertyName("api-auth-token")] public string ApiAuthToken { get; set; } = string.Empty;
@@ -93,11 +117,17 @@ public class GRDCredential
     public string DevicePublicKey { get; set; } = string.Empty;
     public string DevicePrivateKey { get; set; } = string.Empty;
     public string ServerPublicKey { get; set; } = string.Empty;
+
+    /// <summary>
+    /// This device's address inside the tunnel. Set for WireGuard only: the gateway
+    /// assigns it statically per WireGuard public key from the tunnel subnet. Empty
+    /// for IKEv2.
+    /// </summary>
     public string IPv4Address { get; set; } = string.Empty;
     public string IPv6Address { get; set; } = string.Empty;
 
     /// <summary>
-    /// The host's <c>POST /api/v1.4/device-credentials</c> reply, carried verbatim. This is
+    /// The host's response to the device registration, carried verbatim. This is
     /// the authoritative source for the server-provided fields; the flat fields
     /// above (UserName/Password/ServerPublicKey/IPv4Address/IPv6Address/ClientId/
     /// ApiAuthToken) are kept in sync for persistence back-compat and for the
@@ -178,7 +208,6 @@ public class GRDCredential
                 break;
         }
 
-        self.CheckExpiration();
         return self;
     }
 
@@ -219,21 +248,8 @@ public class GRDCredential
 
     private static string? NullIfEmpty(string? s) => string.IsNullOrEmpty(s) ? null : s;
 
-    private void CheckExpiration()
-    {
-        if (ExpirationDate < DateTime.Now)
-        {
-            _checkedExpiration = true;
-            _expired = true;
-        }
-    }
-
     private int DaysLeft()
     {
         return (ExpirationDate - DateTime.Now).Days;
     }
-#pragma warning disable CS0414
-    [JsonIgnore] private bool _checkedExpiration;
-    [JsonIgnore] private bool _expired;
-#pragma warning restore CS0414
 }

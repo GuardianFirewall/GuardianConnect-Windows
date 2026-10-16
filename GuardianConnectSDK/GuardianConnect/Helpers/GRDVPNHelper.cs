@@ -1,5 +1,6 @@
 ﻿using System.Diagnostics;
 using System.Runtime.CompilerServices;
+using System.Text.Json;
 using GuardianConnect.Abstractions;
 using GuardianConnect.API;
 using GuardianConnect.API.Model;
@@ -94,7 +95,7 @@ public class GRDVPNHelper
         _singleton._grdServerManager = new GRDServerManager();
         _singleton.PeToken = GRDPEToken.GetCurrentPEToken();
 
-        _singleton.CurrentDeviceBlocklistConfig = new DeviceFilterConfig();
+        _singleton.CurrentDeviceBlocklistConfig = DeviceFilterConfig.LoadSaved();
 
         GRDServerManager.InitialGeoInformationLoadComplete.Wait(1 * 1000);
         PreferredRegion = Preferences.Get(Common.kPreferredRegion, null!);
@@ -104,8 +105,9 @@ public class GRDVPNHelper
             : storedPrecision;
     }
 
-    /// Helper function to quickly determine if a VPN tunnel of any kind
-    /// with any transport protocol is established
+    /// Whether a RAS (IKEv2) connection is established, from the local RAS
+    /// connection table. WireGuard tunnels are not RAS connections and are not
+    /// seen here; <see cref="GetCurrentVPNState"/> covers both transports.
     public bool IsConnected(out string activeConnectionName)
     {
         activeConnectionName = string.Empty;
@@ -190,10 +192,40 @@ public class GRDVPNHelper
             _ => false,
         };
 
+        // A credential that cannot carry the requested multi-hop exit is not reusable:
+        // config/multihop is refused on a host that is not multihop-entry-enabled and
+        // for an exit in the entry host's own city. Returning false routes the
+        // connect through a fresh registration on a suitable entry host.
+        var exit = ActiveMultihopExit();
+        if (valid && exit is not null && !CanCarryMultihopExit(mainCreds, exit))
+        {
+            _logger.LogInformation(
+                "ActiveConnectionPossible({Protocol}): stored host {Host} cannot carry multi-hop exit {Exit}; "
+                + "a new registration is needed", p, mainCreds.HostName, exit);
+            valid = false;
+        }
+
+        // Every credential carries the gateway record it was registered against
+        // (Stealth Mode, Smart Routing Proxy and multi-hop read it). A credential
+        // saved without one is not reusable; a fresh registration saves the record.
+        if (valid && mainCreds.Server is null)
+        {
+            _logger.LogInformation(
+                "ActiveConnectionPossible({Protocol}): stored credential for {Host} has no gateway record; "
+                + "a new registration is needed", p, mainCreds.HostName);
+            valid = false;
+        }
+
         _logger.LogInformation(
             "ActiveConnectionPossible({Protocol}): result={Valid}", p, valid);
         return valid;
     }
+
+    /// True when the credential's gateway accepts multi-hop and <paramref name="exit"/>
+    /// is not that gateway's own city.
+    public static bool CanCarryMultihopExit(GRDCredential cred, string exit) =>
+        cred.Server is { MultihopEntryEnabled: true } server
+        && !string.Equals(server.RegionMultihopExitName, exit, StringComparison.OrdinalIgnoreCase);
 
     /// Used to clear all of our current VPN configuration details from user defaults and the keychain.
     /// Returns a Task (was async void) so consumers can await the server-side
@@ -262,7 +294,7 @@ public class GRDVPNHelper
         GRDCredentialManager.AddOrUpdateCredential(mainCredential);
 
         // Do connection call here
-        errorResponse = await ConnectVPNTunnel();
+        errorResponse = await ConnectVPNTunnel(newRegistration: true);
         _logger.LogInformation(
             $"ConnectVpnWithNewUserCredentialsForProtocol: return from ConnectVPNTunnel - errorResponse.IsError == {errorResponse.IsError}");
 
@@ -292,9 +324,12 @@ public class GRDVPNHelper
         mainCredential.MainCredential = true;
         mainCredential.HostName = server.Hostname;
         mainCredential.HostnameDisplayValue = server.HostLocation();
+        // Captured while the record is in hand: a later stored-credential dial has
+        // no host selection to repopulate the cache it came from.
+        mainCredential.Server = server;
         GRDCredentialManager.AddOrUpdateCredential(mainCredential);
 
-        errorResponse = await ConnectVPNTunnel();
+        errorResponse = await ConnectVPNTunnel(newRegistration: true);
         _logger.LogInformation(
             $"ConnectVpnWithNewUserCredentialsForProtocol(server): return from ConnectVPNTunnel - IsError == {errorResponse.IsError}");
         return errorResponse;
@@ -320,7 +355,14 @@ public class GRDVPNHelper
     /// The credentials check (<see cref="ActiveConnectionPossible(GRDTransportProtocol.TransportProtocol?)"/>)
     /// is now protocol-aware and applied symmetrically.
     /// </summary>
-    public async Task<ErrorResponse> ConnectVPNTunnel()
+    public Task<ErrorResponse> ConnectVPNTunnel() => ConnectVPNTunnel(newRegistration: false);
+
+    /// <param name="newRegistration">
+    /// True when the main credential was registered for this connect. The
+    /// registration already carried the device filter config, so the config/filters
+    /// sync after the dial is skipped.
+    /// </param>
+    private async Task<ErrorResponse> ConnectVPNTunnel(bool newRegistration)
     {
         var protocol = GRDTransportProtocol.GetPreferred();
 
@@ -367,7 +409,23 @@ public class GRDVPNHelper
         // the ApiHostname static-property indirection while WG didn't
         // pre-flight at all).
         var cred = GRDCredentialManager.GetMainCredentials()!;
-        var statusErr = await GRDGateway.GetServerStatus(cred.HostName, clientCall: true);
+
+        // Stealth Mode: the gateway's published address replaces its hostname for
+        // both the pre-flight below and the dial that follows, on either protocol.
+        // The pre-flight is an HTTPS call, so leaving the hostname on it aborts the
+        // connect before the dial is reached on a network that blocks resolution of
+        // guardianapp.com.
+        var stealthDialHost = StoredStealthAddress();
+        if (stealthDialHost is not null)
+            _logger.LogInformation(
+                "Stealth Mode on: using {Address} in place of {Host}.", stealthDialHost, cred.HostName);
+        else if (IsStealthModeEnabled())
+            _logger.LogWarning(
+                "Stealth Mode is on but the gateway record for {Host} has no IPv4 address; connecting by hostname.",
+                cred.HostName);
+        var preflightHost = stealthDialHost ?? cred.HostName;
+
+        var statusErr = await GRDGateway.GetServerStatus(preflightHost, clientCall: true);
         if (statusErr.IsError)
         {
             // When GetServerStatus throws (DNS failure, socket-block from KS,
@@ -384,18 +442,31 @@ public class GRDVPNHelper
                 $"ConnectVPNTunnel: GetServerStatus failed: {detail}");
         }
 
+        // The stored registration may carry a different exit than the preference
+        // (changed while disconnected). ActiveConnectionPossible already guaranteed
+        // the host can carry the wanted exit, so this is a config/multihop call.
+        var exitErr = await ReconcileMultihopExitAsync(cred);
+        if (exitErr.IsError) return exitErr;
+
         // Dial using stored creds.
-        return protocol switch
+        var dialResult = protocol switch
         {
             GRDTransportProtocol.TransportProtocol.TransportIKEv2 =>
-                await StartIKEv2Connection(),
+                await StartIKEv2Connection(stealthDialHost),
             GRDTransportProtocol.TransportProtocol.TransportWireGuard =>
-                await StartWireGuardFromStoredCreds(),
+                await StartWireGuardFromStoredCreds(stealthDialHost),
             _ => new ErrorResponse()
                 .SetException(new InvalidOperationException(
                     $"Unsupported transport protocol: {protocol}"))
                 .SetErrorMessage("Unsupported transport protocol."),
         };
+
+        // A reused registration may hold filter settings changed since it was made;
+        // a new one received them in the registration request.
+        if (!dialResult.IsError && !newRegistration)
+            _ = GRDGateway.SetDeviceFilterConfigsForDeviceId();
+
+        return dialResult;
     }
 
     /// <summary>
@@ -422,6 +493,158 @@ public class GRDVPNHelper
     public static void SetSmartRoutingProxyEnabled(bool enabled) =>
         RegistrySettings.UpdateGuardianUserSettings(
             Common.kGRDSmartRoutingProxyEnabled, enabled ? "true" : "false");
+
+    /// <summary>
+    /// True when the user has opted into Stealth Mode. This is the user preference
+    /// alone; whether the gateway is actually dialed by address also depends on
+    /// the host record carrying an IPv4 address, which is resolved at connect time.
+    /// </summary>
+    public static bool IsStealthModeEnabled() =>
+        string.Equals(
+            RegistrySettings.RetrieveGuardianUserSettings(Common.kGRDStealthModeEnabled),
+            "true", StringComparison.OrdinalIgnoreCase);
+
+    /// <summary>
+    /// Persists the user's Stealth Mode preference to HKCU. Takes effect on the
+    /// next connect, when the WireGuard config is built.
+    /// </summary>
+    public static void SetStealthModeEnabled(bool enabled) =>
+        RegistrySettings.UpdateGuardianUserSettings(
+            Common.kGRDStealthModeEnabled, enabled ? "true" : "false");
+
+    /// <summary>True when the user has turned Multi-hop on.</summary>
+    public static bool IsMultihopEnabled() =>
+        string.Equals(
+            RegistrySettings.RetrieveGuardianUserSettings(Common.kGRDMultihopEnabled),
+            "true", StringComparison.OrdinalIgnoreCase);
+
+    /// <summary>Persists the Multi-hop on/off preference to HKCU.</summary>
+    public static void SetMultihopEnabled(bool enabled) =>
+        RegistrySettings.UpdateGuardianUserSettings(
+            Common.kGRDMultihopEnabled, enabled ? "true" : "false");
+
+    private static readonly GRDRegionJsonContext MultihopExitRegionJson =
+        new(new JsonSerializerOptions { IncludeFields = true, PropertyNameCaseInsensitive = true });
+
+    /// <summary>
+    /// The saved multi-hop exit city, or null when none is chosen.
+    /// </summary>
+    public static GRDRegion? GetMultihopExitRegion()
+    {
+        var stored = RegistrySettings.RetrieveGuardianUserSettings(Common.kGRDMultihopExitRegion);
+        if (string.IsNullOrWhiteSpace(stored)) return null;
+
+        try
+        {
+            var region = JsonSerializer.Deserialize(stored, MultihopExitRegionJson.GRDRegion);
+            return GRDServerManager.MultihopExitSlug(region) is null ? null : region;
+        }
+        catch (JsonException e)
+        {
+            _logger.LogWarning("GetMultihopExitRegion: the saved exit could not be decoded: {Message}", e.Message);
+            return null;
+        }
+    }
+
+    /// <summary>The exit slug of the saved multi-hop exit city, or null when none is chosen.</summary>
+    public static string? GetMultihopExitSlug() => GRDServerManager.MultihopExitSlug(GetMultihopExitRegion());
+
+    /// <summary>
+    /// Persists the multi-hop exit city (a city-precision region from
+    /// <see cref="GRDServerManager.GetMultihopExitRegions"/>), or clears it with null.
+    /// </summary>
+    public static void SetMultihopExitRegion(GRDRegion? exitRegion) =>
+        RegistrySettings.UpdateGuardianUserSettings(Common.kGRDMultihopExitRegion,
+            exitRegion is null
+                ? string.Empty
+                : JsonSerializer.Serialize(exitRegion, MultihopExitRegionJson.GRDRegion));
+
+    /// <summary>
+    /// The exit slug to register or switch to: the saved exit's slug when Multi-hop
+    /// is on and an exit is chosen, otherwise null (single-hop).
+    /// </summary>
+    public static string? ActiveMultihopExit() => IsMultihopEnabled() ? GetMultihopExitSlug() : null;
+
+    public enum MultihopChangeOutcome
+    {
+        /// Not connected; the preference is saved and applies on the next connect.
+        Saved,
+        /// The live connection now uses the new exit (or is back to single-hop).
+        Applied,
+        /// The current entry host cannot carry the new exit. The caller disconnects,
+        /// clears the main credential and reconnects, which registers on a suitable host.
+        ReconnectRequired,
+        /// The gateway refused the change; the preference is restored to the exit
+        /// still in effect.
+        Failed,
+    }
+
+    /// <summary>
+    /// Applies the saved Multi-hop preference to a live connection after the user
+    /// changes it. An exit change, or turning Multi-hop off, is a config/multihop
+    /// call that re-routes the existing tunnel. A new registration is needed only
+    /// when the entry host cannot carry the exit: it is not multihop-entry-enabled,
+    /// or the exit is its own city.
+    /// </summary>
+    public async Task<(MultihopChangeOutcome, ErrorResponse)> ApplyMultihopPreferenceAsync()
+    {
+        var cred = GRDCredentialManager.GetMainCredentials();
+        if (cred is null || !GetCurrentVPNState(out _))
+            return (MultihopChangeOutcome.Saved, new ErrorResponse());
+
+        var exit = ActiveMultihopExit();
+        if (exit is not null && !CanCarryMultihopExit(cred, exit))
+        {
+            _logger.LogInformation(
+                "ApplyMultihopPreferenceAsync: {Host} cannot carry exit {Exit}; reconnect required",
+                cred.HostName, exit);
+            return (MultihopChangeOutcome.ReconnectRequired, new ErrorResponse());
+        }
+
+        var err = await ReconcileMultihopExitAsync(cred);
+        if (!err.IsError) return (MultihopChangeOutcome.Applied, err);
+
+        var inEffect = string.IsNullOrEmpty(cred.MultihopExitRegion)
+            ? null
+            : GRDServerManager.FindMultihopExitRegion(cred.MultihopExitRegion);
+        SetMultihopEnabled(inEffect is not null);
+        SetMultihopExitRegion(inEffect);
+        return (MultihopChangeOutcome.Failed, err);
+    }
+
+    /// <summary>
+    /// Brings the stored registration's exit in line with the preference with a
+    /// config/multihop call, and records the result on the credential. No call is
+    /// made when they already match.
+    /// </summary>
+    private async Task<ErrorResponse> ReconcileMultihopExitAsync(GRDCredential cred)
+    {
+        var wanted = ActiveMultihopExit() ?? string.Empty;
+        if (string.Equals(wanted, cred.MultihopExitRegion, StringComparison.OrdinalIgnoreCase))
+            return new ErrorResponse();
+
+        var err = await GRDGateway.SetMultihopExitRegion(
+            wanted.Length == 0 ? Common.kGRDMultihopDisabled : wanted);
+        if (err.IsError) return err;
+
+        cred.MultihopExitRegion = wanted;
+        GRDCredentialManager.AddOrUpdateCredential(cred);
+        return new ErrorResponse();
+    }
+
+    /// <summary>
+    /// <c>Server.IPv4Address</c> of the main credential (the <see cref="GRDSGWServer"/>
+    /// it was registered against) when Stealth Mode is on, or null when Stealth Mode
+    /// is off or the record has no address. Reads the saved credential only, so it
+    /// needs no network.
+    /// </summary>
+    public static string? StoredStealthAddress()
+    {
+        if (!IsStealthModeEnabled()) return null;
+        var stored = GRDCredentialManager.GetMainCredentials()?.Server?.IPv4Address;
+        return string.IsNullOrWhiteSpace(stored) ? null : stored;
+    }
+
     public async Task<ErrorResponse> DisconnectVPNTunnel()
     {
         var errorResponse = new ErrorResponse();
@@ -487,8 +710,9 @@ public class GRDVPNHelper
 
         GRDSGWServer selectedServer;
 
+        var multihopExit = ActiveMultihopExit();
         var (server, hostErr) =
-            GRDServerManager.SelectGuardianHostWithCompletion(PreferredRegion, PreferredRegionPrecision);
+            GRDServerManager.SelectGuardianHostWithCompletion(PreferredRegion, PreferredRegionPrecision, multihopExit);
         if (hostErr.IsError)
         {
             _logger.LogError(
@@ -499,13 +723,15 @@ public class GRDVPNHelper
         selectedServer = server;
 
         // PROTOPICK
-        errorResponse = await CreateStandaloneCredentialsForTransportProtocol(protocol, validForDays, selectedServer);
+        errorResponse = await CreateStandaloneCredentialsForTransportProtocol(
+            protocol, validForDays, selectedServer, multihopExit);
         if (errorResponse.IsError) return errorResponse;
 
         // adding in host info here instead of above in caller
         var credentials = (GRDCredential)errorResponse.Data!;
         credentials.HostName = selectedServer.Hostname;
         credentials.HostnameDisplayValue = selectedServer.HostLocation();
+        credentials.Server = selectedServer;
         return new ErrorResponse().SetData(credentials);
     }
 
@@ -516,8 +742,10 @@ public class GRDVPNHelper
     /// @param days number of days these credentials will be valid for
     /// @param server the GRDSGWServer (GRDSGWServer) to create credentials for
     /// @param completion block Completion block that will contain an NSDictionary of credentials upon success
+    /// @param multihopExitRegion exit slug to register with, or null for single-hop
     public async Task<ErrorResponse> CreateStandaloneCredentialsForTransportProtocol(
-        GRDTransportProtocol.TransportProtocol protocol, int days, GRDSGWServer server)
+        GRDTransportProtocol.TransportProtocol protocol, int days, GRDSGWServer server,
+        string? multihopExitRegion = null)
     {
         ErrorResponse errorResponse;
         (var subCreds, errorResponse) = await GetValidSubscriberCredentialWithCompletion();
@@ -527,7 +755,8 @@ public class GRDVPNHelper
             errorResponse = new ErrorResponse("SubscriberCredentials is null!", null, true);
             return errorResponse;
         }
-        errorResponse = await GRDGateway.RegisterDeviceForTransportProtocol(protocol, server.Hostname, subCreds.Jwt, days);
+        errorResponse = await GRDGateway.RegisterDeviceForTransportProtocol(
+            protocol, server.Hostname, subCreds.Jwt, days, multihopExitRegion);
 
         return errorResponse;
     }
@@ -561,7 +790,13 @@ public class GRDVPNHelper
             : regionPrecision;
     }
 
-    private async Task<ErrorResponse> StartIKEv2Connection()
+    /// <param name="sgwServerAddressOverride">
+    /// When set, dialed as the RAS gateway in place of the credential's hostname.
+    /// Stealth Mode supplies the gateway's published IPv4 address. Windows validates
+    /// the IKE certificate against the address it dialed, which the gateway
+    /// certificate covers with an iPAddress SAN.
+    /// </param>
+    private async Task<ErrorResponse> StartIKEv2Connection(string? sgwServerAddressOverride = null)
     {
         var errorResponse = new ErrorResponse();
 
@@ -576,14 +811,16 @@ public class GRDVPNHelper
 
         // Pluck EAP creds from the device-response DTO (EnsureDevice backfills
         // it for legacy creds). Host stays on the flat field — it's the chosen
-        // host, not part of the device reply.
+        // host, not part of the registration response.
         mainCredential.EnsureDeviceFromLegacyFields();
         var device = mainCredential.Device!;
         // Make IPC call to GuardianWindowsService to start the connection
         var vpnValues = new VPNCallParameters
         {
             Transport = GRDTransportProtocol.TransportProtocol.TransportIKEv2,
-            VpnHostName = mainCredential.HostName,
+            VpnHostName = string.IsNullOrWhiteSpace(sgwServerAddressOverride)
+                ? mainCredential.HostName
+                : sgwServerAddressOverride!,
             VpnHostDisplay = mainCredential.HostnameDisplayValue,
             EapuserName = device.EapUsername ?? string.Empty,
             Eappassword = device.EapPassword ?? string.Empty,
@@ -623,7 +860,11 @@ public class GRDVPNHelper
     /// returns true for WireGuard — i.e., we have a valid cached cred and don't
     /// need to exchange keys.
     /// </summary>
-    private async Task<ErrorResponse> StartWireGuardFromStoredCreds()
+    /// <param name="sgwServerAddressOverride">
+    /// When set, used as the WireGuard Endpoint host in place of the credential's
+    /// hostname. Stealth Mode supplies the gateway's published IPv4 address.
+    /// </param>
+    private async Task<ErrorResponse> StartWireGuardFromStoredCreds(string? sgwServerAddressOverride = null)
     {
         var errorResponse = new ErrorResponse();
         _logger.LogInformation("StartWireGuardFromStoredCreds: entry");
@@ -639,18 +880,14 @@ public class GRDVPNHelper
         }
 
         var dnsSRPMode = IsSmartRoutingProxyEnabled();
-        GRDSGWServer? srpServer = null;
-        if (dnsSRPMode)
-        {
-            srpServer = await GRDServerManager.FindHostRecordResilient(cred.HostName);
-            if (srpServer is null)
-                _logger.LogWarning(
-                    "StartWireGuardFromStoredCreds: could not resolve a gateway record for {Host}; "
-                    + "Smart Routing Proxy stays off for this connection.", cred.HostName);
-        }
+        var srpServer = dnsSRPMode ? cred.Server : null;
+        if (dnsSRPMode && srpServer is null)
+            _logger.LogWarning(
+                "StartWireGuardFromStoredCreds: no gateway record on the credential for {Host}; "
+                + "Smart Routing Proxy stays off for this connection.", cred.HostName);
 
-        var configText =
-            GRDWireGuardConfiguration.WireGuardQuickConfigForCredential(cred, null, srpServer, dnsSRPMode);
+        var configText = GRDWireGuardConfiguration.WireGuardQuickConfigForCredential(
+            cred, null, srpServer, dnsSRPMode, sgwServerAddressOverride);
         if (string.IsNullOrEmpty(configText))
         {
             return errorResponse
@@ -664,7 +901,9 @@ public class GRDVPNHelper
             Transport            = GRDTransportProtocol.TransportProtocol.TransportWireGuard,
             EntryName            = $"Guardian WireGuard - {cred.HostnameDisplayValue}",
             WireGuardConfigText  = configText,
-            VpnHostName          = cred.HostName,
+            VpnHostName          = string.IsNullOrWhiteSpace(sgwServerAddressOverride)
+                ? cred.HostName
+                : sgwServerAddressOverride!,
             VpnHostDisplay       = cred.HostnameDisplayValue,
         };
 

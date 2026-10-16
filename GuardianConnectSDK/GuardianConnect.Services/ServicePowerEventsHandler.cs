@@ -27,7 +27,85 @@ public static class ServicePowerEventsHandler
     private static Common.PowerTransitionStates CurrentPowerTransitionState
     {
         get => (Common.PowerTransitionStates)Volatile.Read(ref _powerTransitionState);
-        set => Volatile.Write(ref _powerTransitionState, (int)value);
+        set
+        {
+            Volatile.Write(ref _powerTransitionState, (int)value);
+            if (value == Common.PowerTransitionStates.Suspend) PersistSessionFlag(PowerSessionFlags.Suspended, true);
+            else if (value == Common.PowerTransitionStates.Resume) PersistSessionFlag(PowerSessionFlags.Suspended, false);
+        }
+    }
+
+    // The suspend state lives in memory, and the service process can be ended and
+    // restarted while the machine sleeps (for example under Modern Standby), which
+    // would lose it: the new process would neither treat the wake as a resume nor
+    // reconnect. The state is mirrored to a DWORD in a volatile HKLM key, which
+    // survives a service restart but is discarded at reboot, so a stale flag cannot
+    // reconnect after a later boot.
+    private const string kGRDPowerSessionStateKeyPath = @"Software\GuardianFirewall\kGRDPowerSessionState";
+    private const string kGRDPowerSessionFlags = "kGRDPowerSessionFlags";
+
+    [Flags]
+    private enum PowerSessionFlags
+    {
+        None = 0,
+        Suspended = 1 << 0,
+        ConnectedAtSuspend = 1 << 1,
+    }
+
+    private static readonly Lock SessionFlagsLock = new();
+
+    private static void PersistSessionFlag(PowerSessionFlags flag, bool set)
+    {
+        lock (SessionFlagsLock)
+        {
+            try
+            {
+                using var key = Registry.LocalMachine.CreateSubKey(kGRDPowerSessionStateKeyPath,
+                    RegistryKeyPermissionCheck.ReadWriteSubTree, RegistryOptions.Volatile);
+                var flags = ReadSessionFlags(key);
+                flags = set ? flags | flag : flags & ~flag;
+                key.SetValue(kGRDPowerSessionFlags, (int)flags, RegistryValueKind.DWord);
+            }
+            catch (Exception e)
+            {
+                Logger.LogWarning($"PersistSessionFlag: could not {(set ? "set" : "clear")} {flag}: {e.Message}");
+            }
+        }
+    }
+
+    private static PowerSessionFlags ReadSessionFlags(RegistryKey? key) =>
+        key?.GetValue(kGRDPowerSessionFlags) is int value ? (PowerSessionFlags)value : PowerSessionFlags.None;
+
+    private static PowerSessionFlags PersistedSessionFlags()
+    {
+        try
+        {
+            using var key = Registry.LocalMachine.OpenSubKey(kGRDPowerSessionStateKeyPath);
+            return ReadSessionFlags(key);
+        }
+        catch (Exception e)
+        {
+            Logger.LogWarning($"PersistedSessionFlags: could not read: {e.Message}");
+            return PowerSessionFlags.None;
+        }
+    }
+
+    /// <summary>
+    /// Restores the suspend state a previous service process persisted in this
+    /// boot session, so a wake after a restart is still handled as a resume.
+    /// </summary>
+    private static void RestoreSessionStateAfterRestart()
+    {
+        var flags = PersistedSessionFlags();
+        var connected = flags.HasFlag(PowerSessionFlags.ConnectedAtSuspend);
+        var suspended = flags.HasFlag(PowerSessionFlags.Suspended);
+        if (connected)
+            VPNStatusAtSuspendTime = ITransportProvider.VPNProviderStatus.VPNStatusConnected;
+        if (suspended)
+            Volatile.Write(ref _powerTransitionState, (int)Common.PowerTransitionStates.Suspend);
+        if (connected || suspended)
+            Logger.LogInformation(
+                $"RestoreSessionStateAfterRestart: restored from the previous service process: connected at suspend={connected}, suspended={suspended}");
     }
 
     /// <summary>
@@ -72,6 +150,7 @@ public static class ServicePowerEventsHandler
     internal static void SetConnectedAtSuspendTime()
     {
         VPNStatusAtSuspendTime = ITransportProvider.VPNProviderStatus.VPNStatusConnected;
+        PersistSessionFlag(PowerSessionFlags.ConnectedAtSuspend, true);
         Logger.LogInformation(
             $"SetVPNStateAtSuspendTime() called from Poller... VPNStatusAtSuspendTime now set to {VPNStatusAtSuspendTime}");
     }
@@ -79,6 +158,7 @@ public static class ServicePowerEventsHandler
     internal static void ResetVpnStatusAtSuspendTime()
     {
         VPNStatusAtSuspendTime = ITransportProvider.VPNProviderStatus.VPNStatusInvalid;
+        PersistSessionFlag(PowerSessionFlags.ConnectedAtSuspend, false);
     }
 
     public static void SetupServicePowerEventsHandler()
@@ -92,6 +172,7 @@ public static class ServicePowerEventsHandler
         VPNTransportIKEV2.PowerResumeActions = PerformResumeActions;
         VPNTransportIKEV2.SetVPNStateAtSuspend = SetConnectedAtSuspendTime;
         VPNTransportIKEV2.ResetVPNStateAtSuspend = ResetVpnStatusAtSuspendTime;
+        RestoreSessionStateAfterRestart();
     }
 
     public static void NetworkChangeOnNetworkAddressChanged(object? sender, EventArgs e)
@@ -300,6 +381,15 @@ public static class ServicePowerEventsHandler
                 Logger.LogInformation("************** PerformResumeActions: VPN host is empty -- cannot resume. Aborting.");
                 ResetStateIfStillResuming();
                 return;
+            }
+
+            // A service restarted during sleep starts with empty in-memory parameters;
+            // PowerResumeVPNConnection dials from them, so take the saved copy instead.
+            if (string.IsNullOrEmpty(VPNTransportIKEV2.VpnResumeParameters.EntryName))
+            {
+                Logger.LogInformation(
+                    "************** PerformResumeActions: no in-memory connection parameters; using the saved parameters for the resume dial.");
+                VPNTransportIKEV2.VpnResumeParameters = vpnResumeParameters!;
             }
 
             Logger.LogInformation(
@@ -517,11 +607,21 @@ public static class ServicePowerEventsHandler
                 break;
             case IGuardianNPContract.SystemEventType.NetworkChangeOnNetworkAvailabilityChanged:
                 var networkAvailabilityEventArg = JsonSerializer.Deserialize(serializedClientEventParameters, NetworkAvailabilityEventArgsContext.Default.NetworkAvailabilityEventArgs);
-                Logger.LogInformation($"Network availability changed: {networkAvailabilityEventArg?.IsAvailable}");
+                if (networkAvailabilityEventArg is null)
+                {
+                    Logger.LogWarning("Network availability changed: client sent no event data; ignoring");
+                    break;
+                }
+                Logger.LogInformation($"Network availability changed: {networkAvailabilityEventArg.IsAvailable}");
                 NetworkChangeOnNetworkAvailabilityChanged("ClientSentEvent", networkAvailabilityEventArg);
                 break;
             case IGuardianNPContract.SystemEventType.PowerModeChangeEvent:
                 var powerModeChangeEventArg = JsonSerializer.Deserialize<PowerModeChangedEventArgs>(serializedClientEventParameters, PowerModeChangedEventArgsContext.Default.PowerModeChangedEventArgs);
+                if (powerModeChangeEventArg is null)
+                {
+                    Logger.LogWarning("Client PowerModeChangedEvent: client sent no event data; ignoring");
+                    break;
+                }
                 Logger.LogInformation($"Client PowerModeChangedEvent: {powerModeChangeEventArg.Mode}");
                 SystemEventsOnPowerModeChanged("Client_PowerModeChangeEvent", powerModeChangeEventArg);
                 break;

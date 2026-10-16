@@ -6,7 +6,6 @@ namespace GuardianConnect.Shared;
     PropertyNameCaseInsensitive = true, IncludeFields = true)]
 [JsonSerializable(typeof(ErrorResponse))]
 [JsonSerializable(typeof(string))]
-[JsonSerializable(typeof(Exception))]
 public partial class ErrorResponseJsonContext : JsonSerializerContext
 {
 }

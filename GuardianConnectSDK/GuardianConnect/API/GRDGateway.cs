@@ -22,7 +22,8 @@ public class GRDGateway
     /// network connectivity hiccup of the kind that resolves on its own
     /// within a few hundred ms — typically post-WG-teardown when the
     /// Windows resolver hasn't yet failed over from the (now-gone) WG
-    /// adapter's DNS to the physical NIC's. Matches HostNotFound /
+    /// adapter's DNS to the physical NIC's, or a WireGuard tunnel reported up
+    /// before it carries traffic. Matches HostNotFound / NoData /
     /// TryAgain socket errors and broad HttpRequestException with a
     /// SocketException inner cause.
     /// </summary>
@@ -34,6 +35,7 @@ public class GRDGateway
         {
             return sockEx.SocketErrorCode is
                 SocketError.HostNotFound or
+                SocketError.NoData or
                 SocketError.TryAgain or
                 SocketError.NetworkUnreachable or
                 SocketError.HostUnreachable;
@@ -73,7 +75,12 @@ public class GRDGateway
         }
     }
 
-    public static string BaseHostName => ApiHostname;
+    /// <summary>
+    /// Host for gateway API requests made while connected. Stealth Mode substitutes
+    /// the stored published IPv4 address, which the gateway certificate covers with
+    /// an iPAddress SAN; otherwise the credential's hostname.
+    /// </summary>
+    public static string BaseHostName => GRDVPNHelper.StoredStealthAddress() ?? ApiHostname;
 
     public static bool CanMakeApiRequests => !string.IsNullOrEmpty(BaseHostName);
 
@@ -87,7 +94,6 @@ public class GRDGateway
         return request;
     }
 
-    /// endpoint: /api/v1.3/server-status
     /// hits the endpoint for the current VPN host to check if a VPN connection can be established
     public static async Task<ErrorResponse> GetServerStatus(string hostOverride, bool clientCall = false)
     {
@@ -104,8 +110,6 @@ public class GRDGateway
         }
 
         Logger.LogInformation($"GetServerStatus: Making status call to host {vpnHost} ...");
-        // Deliberately v1.3: server-status has no v1.4 form — only the
-        // device-credential endpoints moved to v1.4.
         var reqUri = new Uri($"https://{vpnHost}/api/v1.3/server-status");
         var request = new HttpRequestMessage(HttpMethod.Get, reqUri);
 
@@ -130,7 +134,6 @@ public class GRDGateway
         return errorResponse;
     }
 
-    /// endpoint: /api/v1.3/server-status
     /// hits the endpoint for the current VPN host to check if a VPN connection can be established
     /// This signature of method uses host from main credentials in GRDVPNHelper
     /// and calls dual-use (service/client) version that takes host parameter
@@ -159,15 +162,54 @@ public class GRDGateway
         [JsonPropertyName("public-key")]
         [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingDefault)]
         public string? PublicKey { get; set; }
+
+        /// <summary>
+        /// Multi-hop exit slug, sent for both protocols. Absent means single-hop.
+        /// The host must be multihop-entry-enabled and the exit must not be the
+        /// host's own city, or the host returns HTTP 400.
+        /// </summary>
+        [JsonPropertyName("multihop-exit-region")]
+        [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingDefault)]
+        public string? MultihopExitRegion { get; set; }
+
+        /// <summary>
+        /// The device's filter settings, applied by the host with the new
+        /// registration. Sent for both protocols.
+        /// </summary>
+        [JsonPropertyName("device-filter-config")]
+        [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingDefault)]
+        public RegistrationFilterConfig? DeviceFilterConfig { get; set; }
+    }
+
+    /// <summary>
+    /// The <c>device-filter-config</c> object of a registration request: the same
+    /// keys as the config/filters body, without the api-auth-token, which does not
+    /// exist until the registration returns.
+    /// </summary>
+    public class RegistrationFilterConfig
+    {
+        [JsonPropertyName("block-phishing")] public bool BlockPhishing { get; set; }
+        [JsonPropertyName("block-ads")] public bool BlockAds { get; set; }
+        [JsonPropertyName("block-none")] public bool BlockNone { get; set; }
+
+        /// <summary>The current filter settings, or null when none are loaded.</summary>
+        public static RegistrationFilterConfig? Current() =>
+            GRDVPNHelper.Singleton.CurrentDeviceBlocklistConfig is { } config
+                ? new RegistrationFilterConfig
+                {
+                    BlockPhishing = config.Block_Phishing,
+                    BlockAds = config.Block_Ads,
+                    BlockNone = config.Disable_Firewall,
+                }
+                : null;
     }
 
     // WireGuardRegistrationResponse retired: both protocols' registration
     // replies deserialize into the shared VPNDeviceResponse DTO
     // (GuardianConnect.Credentials), which is carried verbatim on the
-    // credential. The v1.4 spec states the registration response is unchanged
-    // from previous API versions, so the DTO carries over as-is.
+    // credential.
 
-    #region SGW APIs (v1.4)
+    #region SGW APIs
 
     /// Used to register a new device for a given transport protocol
     /// @param transportProtocol Specified what kind of VPN credentials will be returned
@@ -178,8 +220,9 @@ public class GRDGateway
     /// @param completion The completion handler called once the task is compeleted
     public static async Task<ErrorResponse> RegisterDeviceForTransportProtocol(
         GRDTransportProtocol.TransportProtocol transportProtocol, string hostname, string subscriberCredentialJWT,
-        int validForDays)
+        int validForDays, string? multihopExitRegion = null)
     {
+        if (string.IsNullOrWhiteSpace(multihopExitRegion)) multihopExitRegion = null;
         // WireGuard requires a curve25519 public-key in the request and parses
         // a different response shape (server-public-key, mapped-ipv4, etc.).
         // Dispatch to the WG-specific implementation; otherwise fall through
@@ -192,7 +235,7 @@ public class GRDGateway
         // symmetrically for both protocols.
         if (transportProtocol == GRDTransportProtocol.TransportProtocol.TransportWireGuard)
         {
-            return await EstablishWireGuardCredential(hostname, subscriberCredentialJWT, validForDays);
+            return await EstablishWireGuardCredential(hostname, subscriberCredentialJWT, validForDays, multihopExitRegion);
         }
 
         var errorResponse = new ErrorResponse();
@@ -200,16 +243,19 @@ public class GRDGateway
         var payload = new RegisterDevicePayload
         {
             subscriberCredential = subscriberCredentialJWT,
-            transportProtocol = GRDTransportProtocol.TransportProtocolStringFor(transportProtocol)
+            transportProtocol = GRDTransportProtocol.TransportProtocolStringFor(transportProtocol),
+            MultihopExitRegion = multihopExitRegion,
+            DeviceFilterConfig = RegistrationFilterConfig.Current(),
         };
 
-        // Request keys and response shape are identical to the former
-        // v1.3 /device endpoint.
         var reqUri = new Uri($"https://{hostname}/api/v1.4/device-credentials");
         var request = new HttpRequestMessage(HttpMethod.Post, reqUri);
         var payLoadString =
             JsonSerializer.Serialize(payload, RegisterDevicePayloadJsonContext.Default.RegisterDevicePayload);
-        Logger.LogInformation($"RegisterDeviceForTransportProtocol: payload for call is '{payLoadString}");
+        // Don't log the payload: it carries the subscriber credential JWT.
+        Logger.LogInformation(
+            "RegisterDeviceForTransportProtocol: POST /api/v1.4/device-credentials transport={Transport} host={Host}",
+            payload.transportProtocol, hostname);
         request.Content = new StringContent(payLoadString);
 
         try
@@ -218,7 +264,7 @@ public class GRDGateway
             errorResponse.SetResponse(response);
             var respContent = await response.Content.ReadAsStringAsync();
 
-            // v1.4 standardizes every non-2xx body as
+            // Every non-2xx body is
             // {"error-title","error-message"}, explicitly user-showable.
             // Parse it so callers get a presentable GRDAPIError instead of a
             // raw body dump (FromResponseBody degrades gracefully for
@@ -245,6 +291,7 @@ public class GRDGateway
                 transportProtocol, device,
                 hostName: hostname, hostnameDisplayValue: hostname,
                 mainCredential: true, validForDays: validForDays);
+            cred.MultihopExitRegion = multihopExitRegion ?? string.Empty;
             errorResponse.SetData(cred);
         }
         catch (Exception e)
@@ -272,8 +319,9 @@ public class GRDGateway
     /// credential or a saved alternate.
     /// </summary>
     public static async Task<ErrorResponse> EstablishWireGuardCredential(
-        string hostname, string subscriberCredentialJWT, int validForDays)
+        string hostname, string subscriberCredentialJWT, int validForDays, string? multihopExitRegion = null)
     {
+        if (string.IsNullOrWhiteSpace(multihopExitRegion)) multihopExitRegion = null;
         var errorResponse = new ErrorResponse();
 
         if (string.IsNullOrWhiteSpace(hostname) || string.IsNullOrWhiteSpace(subscriberCredentialJWT))
@@ -298,10 +346,11 @@ public class GRDGateway
         {
             subscriberCredential = subscriberCredentialJWT,
             transportProtocol    = GRDTransportProtocol.TransportProtocolStringFor(GRDTransportProtocol.TransportProtocol.TransportWireGuard),
-            PublicKey            = publicKey.ToBase64()
+            PublicKey            = publicKey.ToBase64(),
+            MultihopExitRegion   = multihopExitRegion,
+            DeviceFilterConfig   = RegistrationFilterConfig.Current(),
         };
 
-        // Same keys/response as the former v1.3 /device endpoint.
         var reqUri = new Uri($"https://{hostname}/api/v1.4/device-credentials");
         var request = new HttpRequestMessage(HttpMethod.Post, reqUri);
         var payloadString = JsonSerializer.Serialize(
@@ -344,7 +393,7 @@ public class GRDGateway
 
                 if (!response.IsSuccessStatusCode)
                 {
-                    // v1.4 standardized error body — parse for a
+                    // Standard error body — parse for a
                     // user-showable title/message (see IKEv2 branch).
                     var body = await response.Content.ReadAsStringAsync();
                     var apiError = GRDAPIError.FromResponseBody(body, response.StatusCode);
@@ -402,6 +451,7 @@ public class GRDGateway
             validForDays: validForDays,
             devicePrivateKey: privateKey.ToBase64(),
             devicePublicKey: publicKey.ToBase64());
+        credential.MultihopExitRegion = multihopExitRegion ?? string.Empty;
 
         errorResponse.SetData(credential);
         Logger.LogInformation(
@@ -415,7 +465,7 @@ public class GRDGateway
     /// with it. A 200 means the credential is usable (body is dismissible);
     /// any non-200 is a critical failure and the credential must never be
     /// used again — discard it and run a fresh registration. Auth is the
-    /// api-auth-token sent in the grd-api-auth-token HTTP header (the v1.4
+    /// api-auth-token sent in the grd-api-auth-token HTTP header (the
     /// convention for GET requests).
     /// </summary>
     public static async Task<ErrorResponse> VerifyCredentialsForClientId(string clientId, string apiToken,
@@ -473,7 +523,7 @@ public class GRDGateway
 
         var payload = new InvalidateCredsPayload { ApiToken = apiToken, SubscriberCredential = subCred };
 
-        // Best-effort per the v1.4 spec — the response body carries nothing
+        // Best-effort — the response body carries nothing
         // actionable.
         var reqUri = new Uri($"https://{hostName}/api/v1.4/device/{clientId}/invalidate-credentials");
         var request = new HttpRequestMessage(HttpMethod.Post, reqUri);
@@ -505,7 +555,9 @@ public class GRDGateway
     // crashed the app when BaseHostName failed DNS during region churn.
     public static async Task SetDeviceFilterConfigsForDeviceId()
     {
-        if (!GRDVPNHelper.Singleton.IsConnected(out _)) return;
+        // GetCurrentVPNState asks the service, which tracks both transports;
+        // IsConnected walks only the RAS table and so never sees a WireGuard tunnel.
+        if (!GRDVPNHelper.Singleton.GetCurrentVPNState(out _)) return;
         if (string.IsNullOrEmpty(BaseHostName))
         {
             Logger.LogError("Cannot set DeviceFilterConfig since BaseHostName is not set!");
@@ -526,22 +578,41 @@ public class GRDGateway
             var clientId = DeviceIdentifier;
 
             // build request
-            // Mid-session POSTs are accepted under v1.4 and take effect
-            // server-side immediately. The auth token stays in the JSON body
-            // (v1.4 convention: GETs use the grd-api-auth-token header,
+            // Mid-session POSTs take effect server-side immediately. The auth
+            // token stays in the JSON body (GETs use the grd-api-auth-token header,
             // POSTs carry the token in the body).
             var reqUri = new Uri($"https://{BaseHostName}/api/v1.4/device/{clientId}/config/filters");
-            var request = new HttpRequestMessage(HttpMethod.Post, reqUri);
-            request.Content = new StringContent(dfcJson);
 
-            var response = await HttpUtils.Client.SendAsync(request);
+            // This runs straight after the connect returns. A WireGuard tunnel is
+            // reported up before it carries traffic, so the first attempts can fail
+            // with an unreachable host or an unresolvable name; retry those.
+            const int maxAttempts = 10;
+            for (var attempt = 1; ; attempt++)
+            {
+                try
+                {
+                    var request = new HttpRequestMessage(HttpMethod.Post, reqUri)
+                    {
+                        Content = new StringContent(dfcJson),
+                    };
+                    var response = await HttpUtils.Client.SendAsync(request);
 
-            if (!response.IsSuccessStatusCode)
-                Logger.LogError(
-                    $"SetDeviceFilterConfigsForDeviceId: Error returned when syncing with host: {response.StatusCode}");
-            else
-                Logger.LogInformation(
-                    $"SetDeviceFilterConfigsForDeviceId: Syncing with host successful: {response.StatusCode}");
+                    if (!response.IsSuccessStatusCode)
+                        Logger.LogError(
+                            $"SetDeviceFilterConfigsForDeviceId: Error returned when syncing with host: {response.StatusCode}");
+                    else
+                        Logger.LogInformation(
+                            $"SetDeviceFilterConfigsForDeviceId: Syncing with host successful: {response.StatusCode} (attempt {attempt})");
+                    break;
+                }
+                catch (Exception e) when (IsTransientDnsOrNetworkFailure(e) && attempt < maxAttempts)
+                {
+                    Logger.LogWarning(
+                        "SetDeviceFilterConfigsForDeviceId: transient DNS/network failure on attempt {Attempt}/{Max} for '{Host}'; retrying after 1s. {Msg}",
+                        attempt, maxAttempts, reqUri.Host, e.Message);
+                    await Task.Delay(1000);
+                }
+            }
         }
         catch (Exception ex)
         {
@@ -550,6 +621,66 @@ public class GRDGateway
     }
 
     #endregion - Device Filter Configs
+
+    #region Multi-hop
+
+    public class MultihopConfigPayload
+    {
+        [JsonPropertyName("multihop-exit-region")]
+        public string MultihopExitRegion { get; set; } = string.Empty;
+
+        [JsonPropertyName("api-auth-token")]
+        public string ApiAuthToken { get; set; } = string.Empty;
+    }
+
+    /// <summary>
+    /// Changes the multi-hop exit of the main credential's existing registration:
+    /// <c>POST device/{client-id}/config/multihop</c>. Pass an exit slug,
+    /// or <see cref="Common.kGRDMultihopDisabled"/> to return to single-hop. The
+    /// gateway re-routes a live tunnel within a few seconds, so no reconnect is
+    /// needed. It returns HTTP 400 when the exit is the entry host's own city or the
+    /// host is not multihop-entry-enabled; the previous exit then stays in effect.
+    /// </summary>
+    public static async Task<ErrorResponse> SetMultihopExitRegion(string exitRegionOrDisabled)
+    {
+        var errorResponse = new ErrorResponse();
+        var clientId = DeviceIdentifier;
+        if (string.IsNullOrEmpty(BaseHostName) || string.IsNullOrEmpty(clientId) || string.IsNullOrEmpty(ApiAuthToken))
+            return errorResponse.SetErrorMessage("SetMultihopExitRegion: no registered gateway credential.");
+
+        var payloadString = JsonSerializer.Serialize(
+            new MultihopConfigPayload { MultihopExitRegion = exitRegionOrDisabled, ApiAuthToken = ApiAuthToken },
+            RegisterDevicePayloadJsonContext.Default.MultihopConfigPayload);
+        var reqUri = new Uri($"https://{BaseHostName}/api/v1.4/device/{clientId}/config/multihop");
+        Logger.LogInformation("SetMultihopExitRegion: POST {Url} exit={Exit}", reqUri, exitRegionOrDisabled);
+
+        try
+        {
+            var response = await HttpUtils.Client.SendAsync(
+                new HttpRequestMessage(HttpMethod.Post, reqUri) { Content = new StringContent(payloadString) });
+            errorResponse.SetResponse(response);
+            if (!response.IsSuccessStatusCode)
+            {
+                var body = await response.Content.ReadAsStringAsync();
+                var apiError = GRDAPIError.FromResponseBody(body, response.StatusCode);
+                Logger.LogError(
+                    "SetMultihopExitRegion: refused ({Status}): {Title}: {Message}",
+                    (int)response.StatusCode, apiError.Title, apiError.Message);
+                return errorResponse.SetGrdApiError(apiError);
+            }
+
+            Logger.LogInformation("SetMultihopExitRegion: exit is now {Exit}", exitRegionOrDisabled);
+        }
+        catch (Exception e)
+        {
+            Logger.LogError(e, "SetMultihopExitRegion: request failed");
+            errorResponse.SetException(e).SetErrorMessage(e.Message);
+        }
+
+        return errorResponse;
+    }
+
+    #endregion - Multi-hop
 
     #region Alerts
 
@@ -569,7 +700,7 @@ public class GRDGateway
     /// Fetch this device's privacy alerts
     /// </summary>
     /// <remarks>
-    /// POST with the token in the JSON body, matching this SDK's v1.4 convention
+    /// POST with the token in the JSON body, matching this SDK's convention
     /// for POSTs. The endpoint advertises <c>allow: OPTIONS, POST</c> and rejects GET with 405.
     /// A body must be present — a POST with no body fails JSON decoding server-side. The
     /// gateway also accepts the token in a <c>grd-api-auth-token</c> header, but

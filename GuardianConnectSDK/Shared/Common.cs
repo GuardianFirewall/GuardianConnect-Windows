@@ -4,7 +4,6 @@ using System.Text;
 using System.Text.Json;
 using System.Text.Json.Serialization;
 using Serilog;
-using Serilog.Enrichers.WithCaller;
 using Serilog.Events;
 
 namespace GuardianConnect.Shared;
@@ -94,6 +93,35 @@ public class Common
     public const string kGuardianUseFileBasedWireGuardConfig = "kGuardianUseFileBasedWireGuardConfig";
 
     public const string kGRDSmartRoutingProxyEnabled = "kGRDSmartRoutingProxyEnabled";
+
+    /// <summary>
+    /// HKCU user setting. "true" means the user has opted into Stealth Mode, which
+    /// dials the gateway by its published IPv4 address instead of its hostname so
+    /// the connection survives a network that blocks DNS resolution for
+    /// guardianapp.com. Applies to both WireGuard and IKEv2; IKEv2 and the HTTPS
+    /// pre-flight validate the address against the gateway certificate's
+    /// iPAddress SAN.
+    /// </summary>
+    public const string kGRDStealthModeEnabled = "kGRDStealthModeEnabled";
+
+    /// <summary>
+    /// HKCU user setting. "true" means the user has turned Multi-hop on. Multi-hop
+    /// is in effect only when an exit is also set (<see cref="kGRDMultihopExitRegion"/>).
+    /// </summary>
+    public const string kGRDMultihopEnabled = "kGRDMultihopEnabled";
+
+    /// <summary>
+    /// HKCU user setting: the multi-hop exit city, a JSON-encoded city-precision
+    /// <c>GRDRegion</c>. Its <c>multihop-exit-names</c> entry (e.g. "newyork") is the
+    /// exit slug sent to the gateway. Empty means no exit chosen.
+    /// </summary>
+    public const string kGRDMultihopExitRegion = "kGRDMultihopExitRegion";
+
+    /// <summary>
+    /// Value sent as <c>multihop-exit-region</c> to turn multi-hop off on an
+    /// existing registration.
+    /// </summary>
+    public const string kGRDMultihopDisabled = "disabled";
 
     public const string kGRDWGDevicePublicKey = "wg-device-public-key";
     public const string kGRDWGDevicePrivateKey = "wg-device-private-key";
@@ -187,6 +215,7 @@ public class Common
     public const string kGRDTrialExpirationInterval = "GRDTrialExpirationInterval";
     public const string kGRDFreeTrialExpired = "GRDFreeTrialExpired";
 
+    /// <summary>The device filter flags (<c>DeviceFilterConfigFlags</c>) as an integer.</summary>
     public const string kGRDDeviceFilterConfigBlocklist = "GRDDeviceFilterConfigBlocklist";
 
     // Note from Tech Lead 2023-03-23
@@ -384,7 +413,7 @@ public class Common
                 .Enrich.WithProcessId()
                 .Enrich.WithThreadId()
                 .Enrich.WithThreadName()
-                .Enrich.WithCaller(false, 0)
+                .Enrich.With(new CallerEnricher())
                 .WriteTo.Conditional(evt => !LogFilterOn, wt => wt.File(LogFilePath, shared: true,
                     outputTemplate:
                     "{Timestamp:yyyy-MM-dd HH:mm:ss:ffffff-K} {ProcessId}.{ThreadId}[{ThreadName}]):{Caller} [{Level:u3}] {Message}{NewLine}{Exception}"));

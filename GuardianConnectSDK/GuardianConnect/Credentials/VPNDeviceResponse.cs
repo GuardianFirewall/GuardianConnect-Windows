@@ -3,7 +3,7 @@ using System.Text.Json.Serialization;
 namespace GuardianConnect.Credentials;
 
 /// <summary>
-/// The host's reply to <c>POST /api/v1.4/device-credentials</c>, for EITHER transport
+/// The host's response to the device registration, for EITHER transport
 /// protocol. A superset of both protocols' response shapes — the server only
 /// populates the subset relevant to the negotiated protocol, so every field is
 /// nullable. Carried verbatim on <see cref="GRDCredential.Device"/> so the

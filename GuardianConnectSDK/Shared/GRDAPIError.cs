@@ -6,7 +6,7 @@ namespace GuardianConnect.Shared;
 
 /// <summary>
 /// The standardized API error body: <c>{"error-title", "error-message"}</c>.
-/// As of API v1.4 every non-200/201 response in both the Connect API and SGW
+/// Every non-200/201 response in both the Connect API and SGW
 /// environments returns this shape, and title/message are intended to be
 /// shown to the user directly.
 /// </summary>
@@ -18,7 +18,7 @@ public class GRDAPIError
         Message = "";
     }
 
-    public GRDAPIError(Dictionary<string, object>? dict, HttpStatusCode statusCode)
+    public GRDAPIError(Dictionary<string, object?>? dict, HttpStatusCode statusCode)
     {
         Title = "";
         Message = "";
@@ -29,8 +29,9 @@ public class GRDAPIError
         }
         else
         {
-            Title = (dict.ContainsKey("error-title") ? dict["error-title"].ToString() : "") ?? "";
-            Message = (dict.ContainsKey("error-message") ? dict["error-message"].ToString() : "") ?? "";
+            // A key present with a JSON null value yields "" rather than throwing.
+            Title = dict.TryGetValue("error-title", out var title) ? title?.ToString() ?? "" : "";
+            Message = dict.TryGetValue("error-message", out var message) ? message?.ToString() ?? "" : "";
             StatusCode = (int)statusCode;
         }
     }
