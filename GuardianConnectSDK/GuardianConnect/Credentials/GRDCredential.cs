@@ -91,9 +91,8 @@ public class GRDCredential
     /// <para>
     /// Persisted because the live copy lives in an in-memory host cache that only
     /// host selection populates, and a stored-credential dial skips host selection.
-    /// In a new process the record is otherwise recoverable only through an API call
-    /// that itself needs DNS — which is exactly what Stealth Mode exists to avoid.
-    /// Null on credentials created before this property existed.
+    /// Null on credentials created before this property existed;
+    /// <c>GRDVPNHelper.ActiveConnectionPossible</c> treats those as not reusable.
     /// </para>
     /// </summary>
     public GRDSGWServer? Server { get; set; }
