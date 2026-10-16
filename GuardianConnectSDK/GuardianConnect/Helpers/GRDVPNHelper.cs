@@ -205,12 +205,10 @@ public class GRDVPNHelper
             valid = false;
         }
 
-        // Stealth Mode and Smart Routing Proxy read the gateway record saved on the
-        // credential. A credential saved without one is not reusable while either is
-        // on; a fresh registration saves the record.
-        if (valid && mainCreds.Server is null
-            && (IsStealthModeEnabled()
-                || (IsSmartRoutingProxyEnabled() && p == GRDTransportProtocol.TransportProtocol.TransportWireGuard)))
+        // Every credential carries the gateway record it was registered against
+        // (Stealth Mode, Smart Routing Proxy and multi-hop read it). A credential
+        // saved without one is not reusable; a fresh registration saves the record.
+        if (valid && mainCreds.Server is null)
         {
             _logger.LogInformation(
                 "ActiveConnectionPossible({Protocol}): stored credential for {Host} has no gateway record; "
