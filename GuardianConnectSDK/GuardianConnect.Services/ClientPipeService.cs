@@ -19,6 +19,7 @@ public class ClientPipeService : BackgroundService
     private static CancellationToken _cancellationToken;
     private static bool AdministrativeShutdownRequested;
     internal static int NumberOfClientsConnected;
+    private const int MaxConsecutiveReadFailures = 5;
     private readonly ILogger<ClientPipeService> _logger;
 
     public ClientPipeService(ILogger<ClientPipeService> logger)
@@ -238,6 +239,11 @@ public class ClientPipeService : BackgroundService
                 $"ClientPipeService[{threadId}]: Writing connection ACK string to client: '{connectTestACKResponse}'");
             ss.WriteString(connectTestACKResponse);
 
+            // Failed reads in a row. A read that fails without blocking fails again
+            // at once, so the loop would spin a core; past the limit the client is
+            // dropped and the thread goes back to waiting for a connection.
+            var consecutiveFailures = 0;
+
             while (pipeServer.IsConnected && !_cancellationToken.IsCancellationRequested &&
                    !AdministrativeShutdownRequested)
                 try
@@ -251,6 +257,7 @@ public class ClientPipeService : BackgroundService
                     _logger.Log(LogLevel.Information,
                         $"ClientPipeService[{threadId}]: Waiting for command from client ...");
                     var commandString = ss.ReadStringAsync().GetAwaiter().GetResult();
+                    consecutiveFailures = 0;
                     _logger.Log(LogLevel.Information,
                         $"ClientPipeService[{threadId}]: string from client: {commandString}");
                     if (!pipeServer.IsConnected) continue;
@@ -376,17 +383,35 @@ public class ClientPipeService : BackgroundService
                             break;
                     }
                 }
+                // The client closed its end of the pipe.
+                catch (EndOfStreamException)
+                {
+                    _logger.Log(LogLevel.Information, $"ClientPipeService[{threadId}]: client closed the pipe.");
+                    break;
+                }
                 // Catch the IOException that is raised if the pipe is broken
                 // or disconnected.
                 catch (IOException e)
                 {
                     //_logger.LogError(e, $"ClientPipeService[{threadId}] IOException ERROR: {0}", e.Message);
                     _logger.Log(LogLevel.Error, $"ClientPipeService[{threadId}]: IOException {e.Message}");
+                    if (++consecutiveFailures >= MaxConsecutiveReadFailures)
+                    {
+                        _logger.Log(LogLevel.Error,
+                            $"ClientPipeService[{threadId}]: {consecutiveFailures} failures in a row; dropping the client.");
+                        break;
+                    }
                 }
                 catch (Exception e)
                 {
                     //_logger.LogError(e, "ERROR: {0}", e.Message);
                     _logger.Log(LogLevel.Error, $"ClientPipeService[{threadId}]: Exception {e.Message}");
+                    if (++consecutiveFailures >= MaxConsecutiveReadFailures)
+                    {
+                        _logger.Log(LogLevel.Error,
+                            $"ClientPipeService[{threadId}]: {consecutiveFailures} failures in a row; dropping the client.");
+                        break;
+                    }
                 }
 
             _logger.Log(LogLevel.Information, "ClientPipeService.End -- inner While()...");
