@@ -389,23 +389,10 @@ public class ClientPipeService : BackgroundService
                     _logger.Log(LogLevel.Information, $"ClientPipeService[{threadId}]: client closed the pipe.");
                     break;
                 }
-                // Catch the IOException that is raised if the pipe is broken
-                // or disconnected.
-                catch (IOException e)
-                {
-                    //_logger.LogError(e, $"ClientPipeService[{threadId}] IOException ERROR: {0}", e.Message);
-                    _logger.Log(LogLevel.Error, $"ClientPipeService[{threadId}]: IOException {e.Message}");
-                    if (++consecutiveFailures >= MaxConsecutiveReadFailures)
-                    {
-                        _logger.Log(LogLevel.Error,
-                            $"ClientPipeService[{threadId}]: {consecutiveFailures} failures in a row; dropping the client.");
-                        break;
-                    }
-                }
+                // IOException when the pipe is broken or disconnected, or any other failure.
                 catch (Exception e)
                 {
-                    //_logger.LogError(e, "ERROR: {0}", e.Message);
-                    _logger.Log(LogLevel.Error, $"ClientPipeService[{threadId}]: Exception {e.Message}");
+                    _logger.Log(LogLevel.Error, $"ClientPipeService[{threadId}]: {e.GetType().Name} {e.Message}");
                     if (++consecutiveFailures >= MaxConsecutiveReadFailures)
                     {
                         _logger.Log(LogLevel.Error,
