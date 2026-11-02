@@ -134,15 +134,15 @@ internal class VpnDnsFilteringHandler
         switch (connectionResult)
         {
             case Utility.CheckConnectionResult.CONNECTED:
-                Logger.LogDebug("UpdateFiltersState: GuardianVPN connected, set filters");
+                Logger.LogDebug("UpdateFiltersState: VPN connected, set filters");
                 if (IsActive())
                 {
                     Logger.LogDebug(
-                        "UpdateFiltersState: GuardianVPN connected and Filters are already installed");
+                        "UpdateFiltersState: VPN connected and filters are already installed");
                     return;
                 }
 
-                Logger.LogDebug("UpdateFiltersState: GuardianVPN connected, setting filters");
+                Logger.LogDebug("UpdateFiltersState: VPN connected, setting filters");
                 // Enable DNS filtering
                 if (!SetFilters(EntryName))
                 {
@@ -151,21 +151,15 @@ internal class VpnDnsFilteringHandler
                     ConnectionRoutines.DisconnectEntryAndRemove();
                     return;
                 }
-
-                Logger.LogDebug("UpdateFiltersState: Calling SetFiltersInstalledFlag():");
-                VpnUtils.SetFiltersInstalledFlag();
                 break;
             case Utility.CheckConnectionResult.DISCONNECTED:
                 // Disable DNS filtering
-                Logger.LogDebug("UpdateFiltersState: GuardianVPN Disconnected, remove filters");
+                Logger.LogDebug("UpdateFiltersState: VPN disconnected, remove filters");
                 if (!RemoveFilters(EntryName))
                 {
                     Logger.LogInformation("UpdateFiltersState: Failed to remove DNS filters");
                     break;
                 }
-
-                // Reset service launch counter if dns filters successfully removed.
-                VpnUtils.ResetFiltersInstalledFlag();
                 break;
             default:
                 // Entry not found, handle accordingly

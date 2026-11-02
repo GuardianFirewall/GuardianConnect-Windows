@@ -17,17 +17,29 @@ public class StreamString
     }
 
 
-    public string ReadString()
+    /// <summary>
+    /// Reads the two-byte length prefix. Null when the pipe is no longer
+    /// connected. ReadByte returns -1 at end of stream, when the other end has
+    /// closed the pipe; the server side can still report IsConnected at that
+    /// point, so -1 is checked as well.
+    /// </summary>
+    /// <exception cref="EndOfStreamException">The other end closed the pipe.</exception>
+    private int? ReadLengthPrefix()
     {
-        var len = 0;
-
-        len = ioStream.ReadByte() * 256;
-        len += ioStream.ReadByte();
+        var high = ioStream.ReadByte();
+        var low = high < 0 ? -1 : ioStream.ReadByte();
         if (!((PipeStream)ioStream).IsConnected)
         {
             Log.Information("ReadByte stream disconnected");
-            return "";
+            return null;
         }
+        if (high < 0 || low < 0) throw new EndOfStreamException("Pipe closed by the other end.");
+        return high * 256 + low;
+    }
+
+    public string ReadString()
+    {
+        if (ReadLengthPrefix() is not { } len) return "";
 
         var inBuffer = new byte[len];
         ioStream.ReadExactly(inBuffer, 0, len);
@@ -38,15 +50,7 @@ public class StreamString
 
     public async Task<string> ReadStringAsync()
     {
-        var len = 0;
-
-        len = ioStream.ReadByte() * 256;
-        len += ioStream.ReadByte();
-        if (!((PipeStream)ioStream).IsConnected)
-        {
-            Log.Information("ReadByte stream disconnected");
-            return "";
-        }
+        if (ReadLengthPrefix() is not { } len) return "";
 
         var inBuffer = new byte[len];
 

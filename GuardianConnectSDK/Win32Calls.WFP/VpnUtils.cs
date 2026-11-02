@@ -5,7 +5,6 @@ using Windows.Win32.NetworkManagement.WindowsFilteringPlatform;
 using Windows.Win32.Security;
 using GuardianConnect.Shared;
 using Microsoft.Extensions.Logging.Abstractions;
-using Microsoft.Win32;
 using Serilog;
 using ILogger = Microsoft.Extensions.Logging.ILogger;
 
@@ -16,7 +15,6 @@ public class VpnUtils
     private const string GRD_NETWORK_PROFILE_GUID = "fbcfac3f-8459-419f-8e48-1f0b49cdb85e";
     private const string GRD_VPN_DNSSUBLAYER_GUID = "754b7cbd-cad3-474e-8d2c-054413fd4509";
 
-    private const string kGuardianVpnHelperRegistryStoragePath = "Software\\GuardianSoftware\\Vpn\\HelperService";
     // The four LUID-scoped permit filter IDs (UDP/TCP × V4/V6) installed by
     // PermitQueriesFromTAP, tracked here so RemoveWpmFilters can delete them
     // on disconnect. Was previously two static ulongs (TAP_IPv4_Id /
@@ -505,35 +503,5 @@ public class VpnUtils
         }
 
         return whetherSuccessful;
-    }
-
-    public static void SetFiltersInstalledFlag()
-    {
-        try
-        {
-            using (var key = Registry.CurrentUser.CreateSubKey(kGuardianVpnHelperRegistryStoragePath))
-            {
-                if (key != null) key.SetValue("FiltersInstalled", 1, RegistryValueKind.DWord);
-            }
-        }
-        catch (Exception ex)
-        {
-            Log.Error($"SetFiltersInstalledFlag: Failed to set registry key. Exception: {ex.Message}");
-        }
-    }
-
-    public static void ResetFiltersInstalledFlag()
-    {
-        try
-        {
-            using (var key = Registry.CurrentUser.CreateSubKey(kGuardianVpnHelperRegistryStoragePath))
-            {
-                if (key != null) key.SetValue("FiltersInstalled", 0, RegistryValueKind.DWord);
-            }
-        }
-        catch (Exception ex)
-        {
-            Log.Error($"ResetFiltersInstalledFlag: Failed to reset registry key. Exception: {ex.Message}");
-        }
     }
 }
