@@ -19,6 +19,12 @@ jobs:
 
   build-both-architectures:
 
+    # GITHUB_TOKEN publishes to GitHub Packages; the three SDK packages are
+    # linked to this repo, so packages: write is sufficient (no PAT).
+    permissions:
+      contents: read
+      packages: write
+
     strategy:
       matrix:
         configuration: [Release]
@@ -325,14 +331,14 @@ jobs:
         
     # Update GitHub Packages with the consolidated multi-RID nuget packages
     - name: Update GitHub with nuget packages - GuardianConnectSDK
-      run: nuget push SIGNED_GuardianConnectSDK.${{env.PKGVERSION}}.nupkg `${{ secrets.GUARDIANFIREWALL_GH_PKG_TOKEN }} -Source GitHub -SkipDuplicate
+      run: nuget push SIGNED_GuardianConnectSDK.${{env.PKGVERSION}}.nupkg `${{ secrets.GITHUB_TOKEN }} -Source GitHub -SkipDuplicate
 
     - name: Update GitHub with nuget packages - GuardianConnect.Services.SDK
-      run: nuget push SIGNED_GuardianConnect.Services.SDK.${{env.PKGVERSION}}.nupkg `${{ secrets.GUARDIANFIREWALL_GH_PKG_TOKEN }} -Source GitHub -SkipDuplicate
+      run: nuget push SIGNED_GuardianConnect.Services.SDK.${{env.PKGVERSION}}.nupkg `${{ secrets.GITHUB_TOKEN }} -Source GitHub -SkipDuplicate
 
     # Update GitHub Packages for ConnectSDK.Services.Abstractions with nuget package
     - name: Update GitHub with nuget packages - SDK Services Abstractions
-      run: nuget push GuardianConnectSDK_Services_Abstractions.${{env.PKGVERSION}}.nupkg `${{ secrets.GUARDIANFIREWALL_GH_PKG_TOKEN }} -Source GitHub -SkipDuplicate
+      run: nuget push GuardianConnectSDK_Services_Abstractions.${{env.PKGVERSION}}.nupkg `${{ secrets.GITHUB_TOKEN }} -Source GitHub -SkipDuplicate
       
 ####    - name: Update GitHub with nuget packages - Service
 ####      run: nuget push SIGNED_GuardianFirewallService.${{env.PKGVERSION}}.nupkg ${{ secrets.GUARDIANFIREWALL_GH_PKG_TOKEN }} -Source GitHub -SkipDuplicate
